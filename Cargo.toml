@@ -10,6 +10,10 @@ repository = "https://github.com/dignifiedquire/rust-rsa"
 keywords = ["rsa", "encryption", "security", "public key crypto"]
 
 [dependencies]
-num-bigint = "^0.2"
+# num-bigint = "^0.2"
+# num-bigint = { path = "../num-bigint", features = ["rand"] }
+num-bigint = { git = "https://github.com/dignifiedquire/num-bigint", features = ["rand"] }
 num-traits = "^0.2"
+num-integer = "^0.1"
 lazy_static = "^1.0"
+rand = "^0.5"
