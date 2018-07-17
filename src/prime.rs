@@ -1,8 +1,11 @@
+use num_bigint::Sign::{Minus, Plus};
 ///! Prime implements probabilistic prime checkers.
-use num_bigint::{BigUint, RandBigInt};
-use num_integer::Integer;
+use num_bigint::{BigInt, BigUint, RandBigInt};
+use num_integer::{Integer, Roots};
 use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
 use rand::{SeedableRng, StdRng};
+
+use math::jacobi;
 
 lazy_static! {
     static ref BIG_64: BigUint = BigUint::from_u64(64).unwrap();
@@ -82,7 +85,7 @@ pub fn probably_prime(x: &BigUint, n: usize) -> bool {
         return false;
     }
 
-    probably_prime_miller_rabin(x, n + 1, true) //&& probably_prime_lucas(x)
+    probably_prime_miller_rabin(x, n + 1, true) && probably_prime_lucas(x)
 }
 
 /// Reports whether n passes reps rounds of the
@@ -162,7 +165,64 @@ fn probably_prime_miller_rabin(n: &BigUint, reps: usize, force2: bool) -> bool {
 //
 // Crandall and Pomerance, Prime Numbers: A Computational Perspective, 2nd ed.
 // Springer, 2005.
-fn probably_prime_lucas(x: &BigUint) -> bool {
+fn probably_prime_lucas(n: &BigUint) -> bool {
+    if n.is_zero() || n.is_one() {
+        return false;
+    }
+
+    // Two is the only even prime
+    if let Some(n) = n.to_u64() {
+        if n == 2 {
+            return true;
+        }
+    }
+
+    // Baillie-OEIS "method C" for choosing D, P, Q,
+    // as in https://oeis.org/A217719/a217719.txt:
+    // try increasing P ≥ 3 such that D = P² - 4 (so Q = 1)
+    // until Jacobi(D, n) = -1.
+    // The search is expected to succeed for non-square n after just a few trials.
+    // After more than expected failures, check whether n is square
+    // (which would cause Jacobi(D, n) = 1 for all D not dividing n).
+    let mut p = 3;
+    let mut d = BigInt::one();
+    let n_int = BigInt::from_biguint(Plus, n.clone());
+
+    loop {
+        if p > 10000 {
+            panic!("internal error: cannot find (D/n) = -1 for {:?}", n)
+        }
+
+        d += p * p - 4;
+        let j = jacobi(&d, &n_int);
+        if j == -1 {
+            break;
+        }
+        if j == 0 {
+            // d = p²-4 = (p-2)(p+2).
+            // If (d/n) == 0 then d shares a prime factor with n.
+            // Since the loop proceeds in increasing p and starts with p-2==1,
+            // the shared prime factor must be p+2.
+            // If p+2 == n, then n is prime; otherwise p+2 is a proper factor of n.
+            if let Some(n_int) = n_int.to_i64() {
+                return n_int == p + 2;
+            } else {
+                return false;
+            }
+        }
+
+        if p == 40 {
+            // We'll never find (d/n) = -1 if n is a square.
+            // If n is a non-square we expect to find a d in just a few attempts on average.
+            // After 40 attempts, take a moment to check if n is indeed a square.
+            if &(&n_int * &n_int).sqrt() == &n_int {
+                return false;
+            }
+        }
+
+        p += 1;
+    }
+
     false
 }
 

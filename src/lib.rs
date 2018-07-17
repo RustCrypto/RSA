@@ -5,4 +5,5 @@ extern crate num_traits;
 extern crate lazy_static;
 extern crate rand;
 
+mod math;
 pub mod prime;
