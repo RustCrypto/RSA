@@ -2,5 +2,14 @@
 name = "rsa"
 version = "0.1.0"
 authors = ["dignifiedquire <dignifiedquire@gmail.com>"]
+description = "PGP implementation in Rust"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/dignifiedquire/rust-rsa"
+repository = "https://github.com/dignifiedquire/rust-rsa"
+
+keywords = ["rsa", "encryption", "security", "public key crypto"]
 
 [dependencies]
+num-bigint = "^0.2"
+num-traits = "^0.2"
+lazy_static = "^1.0"
