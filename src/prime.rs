@@ -1,7 +1,8 @@
 #![cfg_attr(feature = "cargo-clippy", allow(many_single_char_names))]
+
+///! Prime implements probabilistic prime checkers.
 use byteorder::{BigEndian, ByteOrder};
 use num_bigint::Sign::Plus;
-///! Prime implements probabilistic prime checkers.
 use num_bigint::{BigInt, BigUint, RandBigInt};
 use num_integer::Integer;
 use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
@@ -94,7 +95,7 @@ pub fn probably_prime(x: &BigUint, n: usize) -> bool {
 /// Miller-Rabin primality test, using pseudo-randomly chosen bases.
 /// If `force2` is true, one of the rounds is forced to use base 2.
 /// See Handbook of Applied Cryptography, p. 139, Algorithm 4.24.
-fn probably_prime_miller_rabin(n: &BigUint, reps: usize, force2: bool) -> bool {
+pub fn probably_prime_miller_rabin(n: &BigUint, reps: usize, force2: bool) -> bool {
     // println!("miller-rabin: {}", n);
     let nm1 = n - &BigUint::one();
     // determine q, k such that nm1 = q << k
@@ -159,7 +160,7 @@ fn probably_prime_miller_rabin(n: &BigUint, reps: usize, force2: bool) -> bool {
 //
 // Crandall and Pomerance, Prime Numbers: A Computational Perspective, 2nd ed.
 // Springer, 2005.
-fn probably_prime_lucas(n: &BigUint) -> bool {
+pub fn probably_prime_lucas(n: &BigUint) -> bool {
     // println!("lucas: {}", n);
     // Discard 0, 1.
     if n.is_zero() || n.is_one() {
