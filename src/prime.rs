@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "cargo-clippy", allow(many_single_char_names))]
+use byteorder::{BigEndian, ByteOrder};
 use num_bigint::Sign::Plus;
 ///! Prime implements probabilistic prime checkers.
 use num_bigint::{BigInt, BigUint, RandBigInt};
@@ -93,49 +95,41 @@ pub fn probably_prime(x: &BigUint, n: usize) -> bool {
 /// If `force2` is true, one of the rounds is forced to use base 2.
 /// See Handbook of Applied Cryptography, p. 139, Algorithm 4.24.
 fn probably_prime_miller_rabin(n: &BigUint, reps: usize, force2: bool) -> bool {
+    // println!("miller-rabin: {}", n);
     let nm1 = n - &BigUint::one();
     // determine q, k such that nm1 = q << k
     let k = nm1.trailing_zeros().unwrap();
-    let q = &nm1 << k;
-
+    let q = &nm1 >> k;
     let nm3 = n - BigUint::from_u64(3).unwrap();
-    // TODO: seed = n[0]
-    let mut rng = StdRng::from_seed([1u8; 32]);
 
-    let mut x: BigUint;
-    let mut y: BigUint;
-    let mut quotient = BigUint::zero();
+    let mut seed_vec = vec![0u8; 4];
+    BigEndian::write_u32(seed_vec.as_mut_slice(), n.get_limb(0));
+    let mut seed = [0u8; 32];
+    seed[0..4].copy_from_slice(&seed_vec[..]);
+    let mut rng = StdRng::from_seed(seed);
 
-    'next: loop {
-        for i in 0..reps {
-            if i == reps - 1 && force2 {
-                x = BigUint::from_u64(2).unwrap();
-            } else {
-                x = rng.gen_biguint_below(&nm3);
-                x += BigUint::from_u64(2).unwrap();
-            }
+    'nextrandom: for i in 0..reps {
+        let x = if i == reps - 1 && force2 {
+            BigUint::from_u64(2).unwrap()
+        } else {
+            rng.gen_biguint_below(&nm3) + BigUint::from_u64(2).unwrap()
+        };
 
-            y = x.modpow(&q, n);
-            if y.is_one() || &y == &nm1 {
-                continue;
-            }
-
-            for _ in 1..k {
-                y = y.modpow(&y, n);
-                let (q_, y_) = quotient.div_mod_floor(&y);
-                quotient = q_;
-                y = y_;
-
-                if &y == &nm1 {
-                    continue 'next;
-                }
-                if y.is_one() {
-                    return false;
-                }
-            }
-            return false;
+        let mut y = x.modpow(&q, n);
+        if y.is_one() || y == nm1 {
+            continue;
         }
-        break;
+
+        for _ in 1..k {
+            y = y.modpow(&BigUint::from_u64(2).unwrap(), n);
+            if y == nm1 {
+                break 'nextrandom;
+            }
+            if y.is_one() {
+                return false;
+            }
+        }
+        return false;
     }
 
     true
@@ -166,15 +160,15 @@ fn probably_prime_miller_rabin(n: &BigUint, reps: usize, force2: bool) -> bool {
 // Crandall and Pomerance, Prime Numbers: A Computational Perspective, 2nd ed.
 // Springer, 2005.
 fn probably_prime_lucas(n: &BigUint) -> bool {
+    // println!("lucas: {}", n);
+    // Discard 0, 1.
     if n.is_zero() || n.is_one() {
         return false;
     }
 
-    // Two is the only even prime
-    if let Some(n) = n.to_u64() {
-        if n == 2 {
-            return true;
-        }
+    // Two is the only even prime.
+    if n.to_u64() == Some(2) {
+        return false;
     }
 
     // Baillie-OEIS "method C" for choosing D, P, Q,
@@ -184,17 +178,18 @@ fn probably_prime_lucas(n: &BigUint) -> bool {
     // The search is expected to succeed for non-square n after just a few trials.
     // After more than expected failures, check whether n is square
     // (which would cause Jacobi(D, n) = 1 for all D not dividing n).
-    let mut p = 3;
-    let mut d = BigInt::one();
+    let mut p = 3u64;
     let n_int = BigInt::from_biguint(Plus, n.clone());
 
     loop {
         if p > 10000 {
+            // This is widely believed to be impossible.
+            // If we get a report, we'll want the exact number n.
             panic!("internal error: cannot find (D/n) = -1 for {:?}", n)
         }
 
-        d += p * p - 4;
-        let j = jacobi(&d, &n_int);
+        let j = jacobi(&BigInt::from_u64(p * p - 4).unwrap(), &n_int);
+
         if j == -1 {
             break;
         }
@@ -204,26 +199,146 @@ fn probably_prime_lucas(n: &BigUint) -> bool {
             // Since the loop proceeds in increasing p and starts with p-2==1,
             // the shared prime factor must be p+2.
             // If p+2 == n, then n is prime; otherwise p+2 is a proper factor of n.
-            if let Some(n_int) = n_int.to_i64() {
-                return n_int == p + 2;
-            } else {
-                return false;
-            }
+            return n_int.to_i64() == Some(p as i64 + 2);
         }
 
-        if p == 40 {
-            // We'll never find (d/n) = -1 if n is a square.
-            // If n is a non-square we expect to find a d in just a few attempts on average.
-            // After 40 attempts, take a moment to check if n is indeed a square.
-            if &(&n_int * &n_int).sqrt() == &n_int {
-                return false;
-            }
+        // We'll never find (d/n) = -1 if n is a square.
+        // If n is a non-square we expect to find a d in just a few attempts on average.
+        // After 40 attempts, take a moment to check if n is indeed a square.
+        if p == 40 && (&n_int * &n_int).sqrt() == n_int {
+            return false;
         }
 
         p += 1;
     }
 
+    // Grantham definition of "extra strong Lucas pseudoprime", after Thm 2.3 on p. 876
+    // (D, P, Q above have become Δ, b, 1):
+    //
+    // Let U_n = U_n(b, 1), V_n = V_n(b, 1), and Δ = b²-4.
+    // An extra strong Lucas pseudoprime to base b is a composite n = 2^r s + Jacobi(Δ, n),
+    // where s is odd and gcd(n, 2*Δ) = 1, such that either (i) U_s ≡ 0 mod n and V_s ≡ ±2 mod n,
+    // or (ii) V_{2^t s} ≡ 0 mod n for some 0 ≤ t < r-1.
+    //
+    // We know gcd(n, Δ) = 1 or else we'd have found Jacobi(d, n) == 0 above.
+    // We know gcd(n, 2) = 1 because n is odd.
+    //
+    // Arrange s = (n - Jacobi(Δ, n)) / 2^r = (n+1) / 2^r.
+    let mut s = n + BigUint::one();
+    let r = s.trailing_zeros().unwrap();
+    s = &s >> r;
+    let nm2 = n - BigUint::from_u64(2).unwrap(); // n - 2
+                                                 // We apply the "almost extra strong" test, which checks the above conditions
+                                                 // except for U_s ≡ 0 mod n, which allows us to avoid computing any U_k values.
+                                                 // Jacobsen points out that maybe we should just do the full extra strong test:
+                                                 // "It is also possible to recover U_n using Crandall and Pomerance equation 3.13:
+                                                 // U_n = D^-1 (2V_{n+1} - PV_n) allowing us to run the full extra-strong test
+                                                 // at the cost of a single modular inversion. This computation is easy and fast in GMP,
+                                                 // so we can get the full extra-strong test at essentially the same performance as the
+                                                 // almost extra strong test."
+
+    // Compute Lucas sequence V_s(b, 1), where:
+    //
+    //	V(0) = 2
+    //	V(1) = P
+    //	V(k) = P V(k-1) - Q V(k-2).
+    //
+    // (Remember that due to method C above, P = b, Q = 1.)
+    //
+    // In general V(k) = α^k + β^k, where α and β are roots of x² - Px + Q.
+    // Crandall and Pomerance (p.147) observe that for 0 ≤ j ≤ k,
+    //
+    //	V(j+k) = V(j)V(k) - V(k-j).
+    //
+    // So in particular, to quickly double the subscript:
+    //
+    //	V(2k) = V(k)² - 2
+    //	V(2k+1) = V(k) V(k+1) - P
+    //
+    // We can therefore start with k=0 and build up to k=s in log₂(s) steps.
+    let mut vk = BigUint::from_u64(2).unwrap();
+    let mut vk1 = BigUint::from_u64(p).unwrap();
+
+    for i in (0..s.bits()).rev() {
+        if is_bit_set(&s, i) {
+            // k' = 2k+1
+            // V(k') = V(2k+1) = V(k) V(k+1) - P
+            let t1 = (&vk * &vk1) + n - p;
+            vk = &t1 % n;
+            // V(k'+1) = V(2k+2) = V(k+1)² - 2
+            let t1 = (&vk1 * &vk1) + &nm2;
+            vk1 = &t1 % n;
+        } else {
+            // k' = 2k
+            // V(k'+1) = V(2k+1) = V(k) V(k+1) - P
+            let t1 = (&vk * &vk1) + n - p;
+            vk1 = &t1 % n;
+            // V(k') = V(2k) = V(k)² - 2
+            let t1 = (&vk * &vk) + &nm2;
+            vk = &t1 % n;
+        }
+    }
+
+    // Now k=s, so vk = V(s). Check V(s) ≡ ±2 (mod n).
+    if vk.to_u64() == Some(2) || vk == nm2 {
+        // Check U(s) ≡ 0.
+        // As suggested by Jacobsen, apply Crandall and Pomerance equation 3.13:
+        //
+        //	U(k) = D⁻¹ (2 V(k+1) - P V(k))
+        //
+        // Since we are checking for U(k) == 0 it suffices to check 2 V(k+1) == P V(k) mod n,
+        // or P V(k) - 2 V(k+1) == 0 mod n.
+        let mut t1 = &vk * p;
+        let mut t2 = &vk1 << 1;
+
+        if t1 < t2 {
+            ::std::mem::swap(&mut t1, &mut t2);
+        }
+
+        t1 -= t2;
+
+        if (t1 % n).is_zero() {
+            return true;
+        }
+    }
+
+    // Check V(2^t s) ≡ 0 mod n for some 0 ≤ t < r-1.
+    for _ in 0..r - 1 {
+        if vk.is_zero() {
+            return true;
+        }
+
+        // Optimization: V(k) = 2 is a fixed point for V(k') = V(k)² - 2,
+        // so if V(k) = 2, we can stop: we will never find a future V(k) == 0.
+        if vk.to_u64() == Some(2) {
+            return false;
+        }
+
+        // k' = 2k
+        // V(k') = V(2k) = V(k)² - 2
+        let t1 = (&vk * &vk) - BigUint::from_u64(2).unwrap();
+        vk = &t1 % n;
+    }
+
     false
+}
+
+/// Checks if the i-th bit is set
+#[inline]
+fn is_bit_set(x: &BigUint, i: usize) -> bool {
+    get_bit(x, i) == 1
+}
+
+/// Returns the i-th bit.
+#[inline]
+fn get_bit(x: &BigUint, i: usize) -> u8 {
+    let j = i / 32;
+    // if is out of range of the set words, it is always false.
+    if i >= x.bits() {
+        return 0;
+    }
+
+    (x.get_limb(j) >> (i % 32) & 1) as u8
 }
 
 #[cfg(test)]
@@ -368,7 +483,6 @@ mod tests {
                 let mut i = 3;
                 let mut want = $want;
                 while i < 100000 {
-                    i += 1;
                     let n = BigUint::from_u64(i).unwrap();
                     let pseudo = $cond(&n);
                     if pseudo && (want.is_empty() || i != want[0]) {
@@ -379,6 +493,7 @@ mod tests {
                     if !want.is_empty() && i == want[0] {
                         want = want[1..].to_vec();
                     }
+                    i += 2;
                 }
 
                 if !want.is_empty() {
@@ -399,9 +514,23 @@ mod tests {
 
     test_pseudo_primes!(
         test_probably_prime_lucas,
-        |n| !probably_prime_lucas(n) && !probably_prime_miller_rabin(n, 1, true),
+        |n| probably_prime_lucas(n) && !probably_prime_miller_rabin(n, 1, true),
         vec![
             989, 3239, 5777, 10877, 27971, 29681, 30739, 31631, 39059, 72389, 73919, 75077,
         ]
     );
+
+    #[test]
+    fn test_bit_set() {
+        let v = &vec![0b10101001];
+        let num = BigUint::from_slice(&v);
+        assert!(is_bit_set(&num, 0));
+        assert!(!is_bit_set(&num, 1));
+        assert!(!is_bit_set(&num, 2));
+        assert!(is_bit_set(&num, 3));
+        assert!(!is_bit_set(&num, 4));
+        assert!(is_bit_set(&num, 5));
+        assert!(!is_bit_set(&num, 6));
+        assert!(is_bit_set(&num, 7));
+    }
 }

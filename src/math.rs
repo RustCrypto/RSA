@@ -1,3 +1,4 @@
+#![cfg_attr(feature = "cargo-clippy", allow(many_single_char_names))]
 use num_bigint::BigInt;
 use num_integer::Integer;
 use num_traits::{One, Signed, Zero};
@@ -7,7 +8,7 @@ use num_traits::{One, Signed, Zero};
 pub fn jacobi(x: &BigInt, y: &BigInt) -> isize {
     if !y.is_odd() {
         panic!(
-            "invalid arguments, y must be and odd integer,but got {:?}",
+            "invalid arguments, y must be an odd integer,but got {:?}",
             y
         );
     }
