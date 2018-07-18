@@ -229,14 +229,15 @@ pub fn probably_prime_lucas(n: &BigUint) -> bool {
     let r = s.trailing_zeros().unwrap();
     s = &s >> r;
     let nm2 = n - BigUint::from_u64(2).unwrap(); // n - 2
-                                                 // We apply the "almost extra strong" test, which checks the above conditions
-                                                 // except for U_s ≡ 0 mod n, which allows us to avoid computing any U_k values.
-                                                 // Jacobsen points out that maybe we should just do the full extra strong test:
-                                                 // "It is also possible to recover U_n using Crandall and Pomerance equation 3.13:
-                                                 // U_n = D^-1 (2V_{n+1} - PV_n) allowing us to run the full extra-strong test
-                                                 // at the cost of a single modular inversion. This computation is easy and fast in GMP,
-                                                 // so we can get the full extra-strong test at essentially the same performance as the
-                                                 // almost extra strong test."
+
+    // We apply the "almost extra strong" test, which checks the above conditions
+    // except for U_s ≡ 0 mod n, which allows us to avoid computing any U_k values.
+    // Jacobsen points out that maybe we should just do the full extra strong test:
+    // "It is also possible to recover U_n using Crandall and Pomerance equation 3.13:
+    // U_n = D^-1 (2V_{n+1} - PV_n) allowing us to run the full extra-strong test
+    // at the cost of a single modular inversion. This computation is easy and fast in GMP,
+    // so we can get the full extra-strong test at essentially the same performance as the
+    // almost extra strong test."
 
     // Compute Lucas sequence V_s(b, 1), where:
     //
