@@ -14,7 +14,6 @@ pub fn jacobi(x: &BigInt, y: &BigInt) -> isize {
 
     let mut a = x.clone();
     let mut b = y.clone();
-    let mut c = BigInt::zero();
     let mut j = 1;
 
     if b.is_negative() {
@@ -48,7 +47,7 @@ pub fn jacobi(x: &BigInt, y: &BigInt) -> isize {
             }
         }
 
-        c = &a >> s; // a = 2^s*c
+        let c = &a >> s; // a = 2^s*c
 
         // swap numerator and denominator
         if b.get_limb(0) & 3 == 3 && c.get_limb(0) & 3 == 3 {

@@ -1,7 +1,7 @@
-use num_bigint::Sign::{Minus, Plus};
+use num_bigint::Sign::Plus;
 ///! Prime implements probabilistic prime checkers.
 use num_bigint::{BigInt, BigUint, RandBigInt};
-use num_integer::{Integer, Roots};
+use num_integer::Integer;
 use num_traits::{FromPrimitive, One, ToPrimitive, Zero};
 use rand::{SeedableRng, StdRng};
 
@@ -360,4 +360,48 @@ mod tests {
             }
         }
     }
+
+    macro_rules! test_pseudo_primes {
+        ($name:ident, $cond:expr, $want:expr) => {
+            #[test]
+            fn $name() {
+                let mut i = 3;
+                let mut want = $want;
+                while i < 100000 {
+                    i += 1;
+                    let n = BigUint::from_u64(i).unwrap();
+                    let pseudo = $cond(&n);
+                    if pseudo && (want.is_empty() || i != want[0]) {
+                        panic!("cond({}) = true, want false", i);
+                    } else if !pseudo && !want.is_empty() && i == want[0] {
+                        panic!("cond({}) = false, want true", i);
+                    }
+                    if !want.is_empty() && i == want[0] {
+                        want = want[1..].to_vec();
+                    }
+                }
+
+                if !want.is_empty() {
+                    panic!("forgot to test: {:?}", want);
+                }
+            }
+        };
+    }
+
+    test_pseudo_primes!(
+        test_probably_prime_miller_rabin,
+        |n| probably_prime_miller_rabin(n, 1, true) && !probably_prime_lucas(n),
+        vec![
+            2047, 3277, 4033, 4681, 8321, 15841, 29341, 42799, 49141, 52633, 65281, 74665, 80581,
+            85489, 88357, 90751,
+        ]
+    );
+
+    test_pseudo_primes!(
+        test_probably_prime_lucas,
+        |n| !probably_prime_lucas(n) && !probably_prime_miller_rabin(n, 1, true),
+        vec![
+            989, 3239, 5777, 10877, 27971, 29681, 30739, 31631, 39059, 72389, 73919, 75077,
+        ]
+    );
 }
