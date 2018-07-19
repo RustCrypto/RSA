@@ -1,4 +1,8 @@
 use num_bigint::BigUint;
+use rand::Rng;
+
+use algorithms::generate_multi_prime_key;
+use errors::Result;
 
 /// Represents the public part of an RSA key.
 pub struct RSAPublicKey {
@@ -42,6 +46,18 @@ impl PublicKey for RSAPublicKey {
 
     fn e(&self) -> u32 {
         self.e
+    }
+}
+
+impl RSAPrivateKey {
+    /// Generate a new RSA key pair of the given bit size using the passed in `rng`.
+    pub fn new<R: Rng>(rng: &mut R, bit_size: usize) -> Result<RSAPrivateKey> {
+        generate_multi_prime_key(rng, 2, bit_size)
+    }
+
+    /// Constructs an RSA key pair from the individual components.
+    pub fn from_components(n: BigUint, e: u32, d: BigUint, primes: Vec<BigUint>) -> RSAPrivateKey {
+        RSAPrivateKey { n, e, d, primes }
     }
 }
 
