@@ -11,6 +11,9 @@ use rand::{SeedableRng, StdRng};
 use math::jacobi;
 
 lazy_static! {
+    static ref BIG_1: BigUint = BigUint::one();
+    static ref BIG_2: BigUint = BigUint::from_u64(2).unwrap();
+    static ref BIG_3: BigUint = BigUint::from_u64(3).unwrap();
     static ref BIG_64: BigUint = BigUint::from_u64(64).unwrap();
 }
 
@@ -97,11 +100,11 @@ pub fn probably_prime(x: &BigUint, n: usize) -> bool {
 /// See Handbook of Applied Cryptography, p. 139, Algorithm 4.24.
 pub fn probably_prime_miller_rabin(n: &BigUint, reps: usize, force2: bool) -> bool {
     // println!("miller-rabin: {}", n);
-    let nm1 = n - &BigUint::one();
+    let nm1 = n - &*BIG_1;
     // determine q, k such that nm1 = q << k
     let k = nm1.trailing_zeros().unwrap();
     let q = &nm1 >> k;
-    let nm3 = n - BigUint::from_u64(3).unwrap();
+    let nm3 = n - &*BIG_3;
 
     let mut seed_vec = vec![0u8; 4];
     BigEndian::write_u32(seed_vec.as_mut_slice(), n.get_limb(0));
@@ -111,9 +114,9 @@ pub fn probably_prime_miller_rabin(n: &BigUint, reps: usize, force2: bool) -> bo
 
     'nextrandom: for i in 0..reps {
         let x = if i == reps - 1 && force2 {
-            BigUint::from_u64(2).unwrap()
+            BIG_2.clone()
         } else {
-            rng.gen_biguint_below(&nm3) + BigUint::from_u64(2).unwrap()
+            rng.gen_biguint_below(&nm3) + &*BIG_2
         };
 
         let mut y = x.modpow(&q, n);
@@ -122,7 +125,7 @@ pub fn probably_prime_miller_rabin(n: &BigUint, reps: usize, force2: bool) -> bo
         }
 
         for _ in 1..k {
-            y = y.modpow(&BigUint::from_u64(2).unwrap(), n);
+            y = y.modpow(&*BIG_2, n);
             if y == nm1 {
                 break 'nextrandom;
             }
@@ -225,10 +228,10 @@ pub fn probably_prime_lucas(n: &BigUint) -> bool {
     // We know gcd(n, 2) = 1 because n is odd.
     //
     // Arrange s = (n - Jacobi(Δ, n)) / 2^r = (n+1) / 2^r.
-    let mut s = n + BigUint::one();
+    let mut s = n + &*BIG_1;
     let r = s.trailing_zeros().unwrap();
     s = &s >> r;
-    let nm2 = n - BigUint::from_u64(2).unwrap(); // n - 2
+    let nm2 = n - &*BIG_2; // n - 2
 
     // We apply the "almost extra strong" test, which checks the above conditions
     // except for U_s ≡ 0 mod n, which allows us to avoid computing any U_k values.
@@ -258,7 +261,7 @@ pub fn probably_prime_lucas(n: &BigUint) -> bool {
     //	V(2k+1) = V(k) V(k+1) - P
     //
     // We can therefore start with k=0 and build up to k=s in log₂(s) steps.
-    let mut vk = BigUint::from_u64(2).unwrap();
+    let mut vk = BIG_2.clone();
     let mut vk1 = BigUint::from_u64(p).unwrap();
 
     for i in (0..s.bits()).rev() {
@@ -318,7 +321,7 @@ pub fn probably_prime_lucas(n: &BigUint) -> bool {
 
         // k' = 2k
         // V(k') = V(2k) = V(k)² - 2
-        let t1 = (&vk * &vk) - BigUint::from_u64(2).unwrap();
+        let t1 = (&vk * &vk) - &*BIG_2;
         vk = &t1 % n;
     }
 
