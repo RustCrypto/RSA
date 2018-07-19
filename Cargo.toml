@@ -15,6 +15,7 @@ keywords = ["rsa", "encryption", "security", "public key crypto"]
 num-bigint = { git = "https://github.com/dignifiedquire/num-bigint", features = ["rand"] }
 num-traits = "^0.2"
 num-integer = "^0.1"
+num-iter = "^0.1"
 lazy_static = "^1.0"
 rand = "^0.5"
-byteorder = "*"
+byteorder = "^1.2"

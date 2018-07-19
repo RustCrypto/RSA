@@ -2,13 +2,16 @@
 
 extern crate num_bigint;
 extern crate num_traits;
+extern crate rand;
 extern crate rsa;
 extern crate test;
 
 use num_bigint::BigUint;
-use rsa::prime;
-
+use rand::{SeedableRng, StdRng};
 use test::Bencher;
+
+use rsa::prime;
+use rsa::RandPrime;
 
 const NUM: &'static str = "203956878356401977405765866929034577280193993314348263094772646453283062722701277632936616063144088173312372882677123879538709400158306567338328279154499698366071906766440037074217117805690872792848149112022286332144876183376326512083574821647933992961249917319836219304274280243803104015000563790123";
 
@@ -48,6 +51,16 @@ fn bench_prime_miller_rabin(b: &mut Bencher) {
 
     b.iter(|| {
         let res = prime::probably_prime_miller_rabin(&x, 1, true);
+        test::black_box(res);
+    });
+}
+
+#[bench]
+fn bench_gen_prime(b: &mut Bencher) {
+    let mut rng = StdRng::from_seed([0u8; 32]);
+
+    b.iter(|| {
+        let res = rng.gen_prime(1024);
         test::black_box(res);
     });
 }

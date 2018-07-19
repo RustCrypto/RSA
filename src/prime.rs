@@ -1,6 +1,6 @@
 #![cfg_attr(feature = "cargo-clippy", allow(many_single_char_names))]
 
-///! Prime implements probabilistic prime checkers.
+//! Implements probabilistic prime checkers.
 use byteorder::{BigEndian, ByteOrder};
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint, RandBigInt};
@@ -94,9 +94,9 @@ pub fn probably_prime(x: &BigUint, n: usize) -> bool {
     probably_prime_miller_rabin(x, n + 1, true) && probably_prime_lucas(x)
 }
 
-/// Reports whether n passes reps rounds of the
-/// Miller-Rabin primality test, using pseudo-randomly chosen bases.
+/// Reports whether n passes reps rounds of the Miller-Rabin primality test, using pseudo-randomly chosen bases.
 /// If `force2` is true, one of the rounds is forced to use base 2.
+///
 /// See Handbook of Applied Cryptography, p. 139, Algorithm 4.24.
 pub fn probably_prime_miller_rabin(n: &BigUint, reps: usize, force2: bool) -> bool {
     // println!("miller-rabin: {}", n);
@@ -139,30 +139,31 @@ pub fn probably_prime_miller_rabin(n: &BigUint, reps: usize, force2: bool) -> bo
     true
 }
 
-// Reports whether n passes the "almost extra strong" Lucas probable prime test,
-// using Baillie-OEIS parameter selection. This corresponds to "AESLPSP" on Jacobsen's tables (link below).
-// The combination of this test and a Miller-Rabin/Fermat test with base 2 gives a Baillie-PSW test.
-//
-// References:
-//
-// Baillie and Wagstaff, "Lucas Pseudoprimes", Mathematics of Computation 35(152),
-// October 1980, pp. 1391-1417, especially page 1401.
-// http://www.ams.org/journals/mcom/1980-35-152/S0025-5718-1980-0583518-6/S0025-5718-1980-0583518-6.pdf
-//
-// Grantham, "Frobenius Pseudoprimes", Mathematics of Computation 70(234),
-// March 2000, pp. 873-891.
-// http://www.ams.org/journals/mcom/2001-70-234/S0025-5718-00-01197-2/S0025-5718-00-01197-2.pdf
-//
-// Baillie, "Extra strong Lucas pseudoprimes", OEIS A217719, https://oeis.org/A217719.
-//
-// Jacobsen, "Pseudoprime Statistics, Tables, and Data", http://ntheory.org/pseudoprimes.html.
-//
-// Nicely, "The Baillie-PSW Primality Test", http://www.trnicely.net/misc/bpsw.html.
-// (Note that Nicely's definition of the "extra strong" test gives the wrong Jacobi condition,
-// as pointed out by Jacobsen.)
-//
-// Crandall and Pomerance, Prime Numbers: A Computational Perspective, 2nd ed.
-// Springer, 2005.
+/// Reports whether n passes the "almost extra strong" Lucas probable prime test,
+/// using Baillie-OEIS parameter selection. This corresponds to "AESLPSP" on Jacobsen's tables (link below).
+/// The combination of this test and a Miller-Rabin/Fermat test with base 2 gives a Baillie-PSW test.
+///
+///
+/// References:
+///
+/// Baillie and Wagstaff, "Lucas Pseudoprimes", Mathematics of Computation 35(152),
+/// October 1980, pp. 1391-1417, especially page 1401.
+/// http://www.ams.org/journals/mcom/1980-35-152/S0025-5718-1980-0583518-6/S0025-5718-1980-0583518-6.pdf
+///
+/// Grantham, "Frobenius Pseudoprimes", Mathematics of Computation 70(234),
+/// March 2000, pp. 873-891.
+/// http://www.ams.org/journals/mcom/2001-70-234/S0025-5718-00-01197-2/S0025-5718-00-01197-2.pdf
+///
+/// Baillie, "Extra strong Lucas pseudoprimes", OEIS A217719, https://oeis.org/A217719.
+///
+/// Jacobsen, "Pseudoprime Statistics, Tables, and Data", http://ntheory.org/pseudoprimes.html.
+///
+/// Nicely, "The Baillie-PSW Primality Test", http://www.trnicely.net/misc/bpsw.html.
+/// (Note that Nicely's definition of the "extra strong" test gives the wrong Jacobi condition,
+/// as pointed out by Jacobsen.)
+///
+/// Crandall and Pomerance, Prime Numbers: A Computational Perspective, 2nd ed.
+/// Springer, 2005.
 pub fn probably_prime_lucas(n: &BigUint) -> bool {
     // println!("lucas: {}", n);
     // Discard 0, 1.
