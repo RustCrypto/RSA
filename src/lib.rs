@@ -8,8 +8,8 @@ extern crate num_iter;
 extern crate rand;
 
 pub mod prime;
-
 pub use prime_rand::RandPrime;
-mod prime_rand;
+pub mod key;
 
 mod math;
+mod prime_rand;
