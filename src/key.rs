@@ -179,4 +179,16 @@ mod tests {
     key_generation!(key_generation_multi_5_64, 5, 64);
     key_generation!(key_generation_multi_8_576, 8, 576);
     key_generation!(key_generation_multi_16_1024, 16, 1024);
+
+    #[test]
+    fn test_impossible_keys() {
+        // make sure not infinite loops are hit here.
+        let mut rng = thread_rng();
+        for i in 0..32 {
+            assert!(RSAPrivateKey::new(&mut rng, i).is_err());
+            assert!(generate_multi_prime_key(&mut rng, 3, i).is_err());
+            assert!(generate_multi_prime_key(&mut rng, 4, i).is_err());
+            assert!(generate_multi_prime_key(&mut rng, 5, i).is_err());
+        }
+    }
 }

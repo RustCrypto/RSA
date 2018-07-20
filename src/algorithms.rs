@@ -26,7 +26,9 @@ pub fn generate_multi_prime_key<R: Rng>(
     nprimes: usize,
     bit_size: usize,
 ) -> Result<RSAPrivateKey> {
-    assert!(nprimes >= 2, "nprimes must be >= 2");
+    if nprimes >= 2 {
+        return Err(format_err!("nprimes must be >= 2"));
+    }
 
     if bit_size < 64 {
         let prime_limit = 1u32.wrapping_shl((bit_size / nprimes) as u32) as f32;
