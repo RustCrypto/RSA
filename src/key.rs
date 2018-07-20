@@ -177,6 +177,6 @@ mod tests {
     key_generation!(key_generation_multi_4_64, 4, 64);
 
     key_generation!(key_generation_multi_5_64, 5, 64);
-    key_generation!(key_generation_multi_8_64, 8, 64);
-    // key_generation!(key_generation_multi_16_64, 16, 64);
+    key_generation!(key_generation_multi_8_576, 8, 576);
+    key_generation!(key_generation_multi_16_1024, 16, 1024);
 }
