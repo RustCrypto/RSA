@@ -61,9 +61,8 @@ impl<R: Rng + ?Sized> RandPrime for R {
 
         loop {
             self.fill_bytes(&mut bytes);
-
             // Clear bits in the first byte to make sure the candidate has a size <= bits.
-            bytes[0] &= (1u8.wrapping_shl(b as u32)) - 1;
+            bytes[0] &= ((1u32 << (b as u32)) - 1) as u8;
 
             // Don't let the value be too small, i.e, set the most significant two bits.
             // Setting the top two bits, rather than just the top bit,
@@ -80,7 +79,7 @@ impl<R: Rng + ?Sized> RandPrime for R {
             }
 
             // Make the value odd since an even number this large certainly isn't prime.
-            bytes[bytes_len - 1] |= 1;
+            bytes[bytes_len - 1] |= 1u8;
 
             let mut p = BigUint::from_bytes_be(&bytes);
             // must always be a u64, as the SMALL_PRIMES_PRODUCT is a u64

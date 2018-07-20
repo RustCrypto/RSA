@@ -4,9 +4,10 @@ use errors::Result;
 use key::RSAPrivateKey;
 use math::ModInverse;
 use num_bigint::BigUint;
-use num_traits::{FromPrimitive, One};
+use num_traits::{FromPrimitive, One, Zero};
 use prime_rand::RandPrime;
 
+/// Default exponent for RSA keys.
 const EXP: u32 = 65537;
 
 // Generates a multi-prime RSA keypair of the given bit
@@ -43,7 +44,7 @@ pub fn generate_multi_prime_key<R: Rng>(
         }
     }
 
-    let mut primes = Vec::with_capacity(nprimes);
+    let mut primes = vec![BigUint::zero(); nprimes];
     let n_final: BigUint;
     let d_final: BigUint;
 
@@ -93,7 +94,7 @@ pub fn generate_multi_prime_key<R: Rng>(
             continue 'next;
         }
 
-        let exp = BigUint::from_u64(EXP as u64).unwrap();
+        let exp = BigUint::from_u64(u64::from(EXP)).unwrap();
         if let Some(d) = exp.mod_inverse(totient) {
             n_final = n;
             d_final = d;
