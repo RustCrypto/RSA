@@ -6,17 +6,19 @@
 
 ## Status
 
-Currently at Phase 1 (ii) :construction:.
+Currently at Phase 1 (iv) :construction:.
 
 There will be three phases before `1.0` :ship: can be released.
 
 1. :construction:  Make it work
     1. Prime generation :white_check_mark:
-    2. Key generation
-    3. Encryption
-    4. Decryption
-    5. Padding modes
-    6. Key import & export
+    2. Key generation :white_check_mark:
+    3. PKCS1v1.5: Encryption & Decryption :white_check_mark:
+    4. PKCS1v1.5 (session key): Encryption & Decryption
+    5. OAEP: Encryption & Decryption
+    6. PKCS1v1.5: Sign & Verify
+    7. PSS: Sign & Verify
+    8. Key import & export
 2. :rocket: Make it fast
     1. Benchmarks
     2. compare to other implementations
