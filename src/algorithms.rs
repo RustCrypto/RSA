@@ -26,20 +26,22 @@ pub fn generate_multi_prime_key<R: Rng>(
     nprimes: usize,
     bit_size: usize,
 ) -> Result<RSAPrivateKey> {
-    if nprimes >= 2 {
+    if nprimes < 2 {
         return Err(format_err!("nprimes must be >= 2"));
     }
 
     if bit_size < 64 {
-        let prime_limit = 1u32.wrapping_shl((bit_size / nprimes) as u32) as f32;
+        let prime_limit = (1u64 << (bit_size / nprimes) as u64) as f64;
+        println!("{} {}", prime_limit, bit_size);
         // pi aproximates the number of primes less than prime_limit
-        let mut pi = prime_limit / (prime_limit.log2() - 1f32);
+        let mut pi = prime_limit / (prime_limit.ln() - 1f64);
         // Generated primes start with 0b11, so we can only use a quarter of them.
-        pi /= 4f32;
+        pi /= 4f64;
         // Use a factor of two to ensure taht key generation terminates in a
         // reasonable amount of time.
-        pi /= 2f32;
-        if pi < (nprimes as f32) {
+        pi /= 2f64;
+        println!("{} < {}", pi, nprimes as f64);
+        if pi < nprimes as f64 {
             return Err(format_err!(
                 "too few primes of given length to generate an RSA key"
             ));

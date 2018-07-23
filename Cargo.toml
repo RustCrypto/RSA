@@ -2,7 +2,7 @@
 name = "rsa"
 version = "0.1.0"
 authors = ["dignifiedquire <dignifiedquire@gmail.com>"]
-description = "PGP implementation in Rust"
+description = "RSA implementation in Rust"
 license = "MIT OR Apache-2.0"
 homepage = "https://github.com/dignifiedquire/rust-rsa"
 repository = "https://github.com/dignifiedquire/rust-rsa"
@@ -10,9 +10,8 @@ repository = "https://github.com/dignifiedquire/rust-rsa"
 keywords = ["rsa", "encryption", "security", "public key crypto"]
 
 [dependencies]
-# num-bigint = "^0.2"
-# num-bigint = { path = "../num-bigint", features = ["rand"] }
-num-bigint = { git = "https://github.com/dignifiedquire/num-bigint", features = ["rand"] }
+# num-bigint = { path = "../num-bigint", features = ["rand", "i128"] }
+num-bigint = { git = "https://github.com/dignifiedquire/num-bigint", features = ["rand", "i128"] }
 num-traits = "^0.2"
 num-integer = "^0.1"
 num-iter = "^0.1"
@@ -20,3 +19,13 @@ lazy_static = "^1.0"
 rand = "^0.5"
 byteorder = "^1.2"
 failure = "*"
+subtle = "^0.7"
+
+[dev-dependencies]
+base64 = "*"
+
+[profile.release]
+debug = true
+
+[profile.bench]
+debug = true

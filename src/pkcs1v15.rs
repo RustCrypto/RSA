@@ -1,0 +1,222 @@
+use num_bigint::BigUint;
+use rand::Rng;
+use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
+
+use errors::Result;
+use key::{self, PublicKey, RSAPrivateKey};
+
+// Encrypts the given message with RSA and the padding
+// scheme from PKCS#1 v1.5.  The message must be no longer than the
+// length of the public modulus minus 11 bytes.
+pub fn encrypt<R: Rng, K: PublicKey>(rng: &mut R, pub_key: &K, msg: &[u8]) -> Result<Vec<u8>> {
+    key::check_public(pub_key)?;
+
+    let k = pub_key.size();
+    if msg.len() > k - 11 {
+        return Err(format_err!("message too long"));
+    }
+
+    // EM = 0x00 || 0x02 || PS || 0x00 || M
+    let mut em = vec![0u8; k];
+    em[1] = 2;
+    non_zero_random_bytes(rng, &mut em[2..k - msg.len() - 1]);
+    em[k - msg.len() - 1] = 0;
+    em[k - msg.len()..].copy_from_slice(msg);
+
+    let m = BigUint::from_bytes_be(&em);
+    let c = key::encrypt(pub_key, &m).to_bytes_be();
+
+    // left pad with zeros
+    let padding_bytes = k - c.len();
+    for el in em.iter_mut().take(padding_bytes) {
+        *el = 0;
+    }
+    em[padding_bytes..].copy_from_slice(&c);
+
+    Ok(em)
+}
+
+/// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5.
+// If an `rng` is passed, it uses RSA blinding to avoid timing side-channel attacks.
+//
+// Note that whether this function returns an error or not discloses secret
+// information. If an attacker can cause this function to run repeatedly and
+// learn whether each instance returned an error then they can decrypt and
+// forge signatures as if they had the private key. See
+// `decrypt_session_key` for a way of solving this problem.
+pub fn decrypt<R: Rng>(
+    rng: Option<&mut R>,
+    priv_key: &RSAPrivateKey,
+    ciphertext: &[u8],
+) -> Result<Vec<u8>> {
+    key::check_public(priv_key)?;
+
+    let (valid, out, index) = decrypt_inner(rng, priv_key, ciphertext)?;
+    if valid == 0 {
+        return Err(format_err!("decryption error"));
+    }
+
+    Ok(out[index as usize..].to_vec())
+}
+
+/// Decrypts ciphertext using `priv_key` and blinds the operation if
+/// `rng` is given. It returns one or zero in valid that indicates whether the
+/// plaintext was correctly structured. In either case, the plaintext is
+/// returned in em so that it may be read independently of whether it was valid
+/// in order to maintain constant memory access patterns. If the plaintext was
+/// valid then index contains the index of the original message in em.
+#[inline]
+fn decrypt_inner<R: Rng>(
+    rng: Option<&mut R>,
+    priv_key: &RSAPrivateKey,
+    ciphertext: &[u8],
+) -> Result<(u8, Vec<u8>, u32)> {
+    let k = priv_key.size();
+    if k < 11 {
+        return Err(format_err!("decryption error"));
+    }
+
+    let c = BigUint::from_bytes_be(ciphertext);
+    let m = key::decrypt(rng, priv_key, &c)?.to_bytes_be();
+
+    let em = key::left_pad(&m, k);
+
+    let first_byte_is_zero = em[0].ct_eq(&0u8);
+    let second_byte_is_two = em[1].ct_eq(&2u8);
+
+    // The remainder of the plaintext must be a string of non-zero random
+    // octets, followed by a 0, followed by the message.
+    //   looking_for_index: 1 iff we are still looking for the zero.
+    //   index: the offset of the first zero byte.
+    let mut looking_for_index = 1u8;
+    let mut index = 0u32;
+
+    for (i, el) in em.iter().enumerate().skip(2) {
+        let equals0 = el.ct_eq(&0u8);
+        index.conditional_assign(&(i as u32), Choice::from(looking_for_index) & equals0);
+        looking_for_index.conditional_assign(&0u8, equals0);
+    }
+
+    // The PS padding must be at least 8 bytes long, and it starts two
+    // bytes into em.
+    // TODO: WARNING: THIS MUST BE CONSTANT TIME CHECK:
+    // Ref: https://github.com/dalek-cryptography/subtle/issues/20
+    // This is currently copy & paste from the constant time impl in
+    // go, but very likely not sufficient.
+    let valid_ps = Choice::from((((2i32 + 8i32 - index as i32 - 1i32) >> 31) & 1) as u8);
+    let valid =
+        first_byte_is_zero & second_byte_is_two & Choice::from(!looking_for_index & 1) & valid_ps;
+    index = u32::conditional_select(&0, &(index + 1), valid);
+
+    Ok((valid.unwrap_u8(), em, index))
+}
+
+/// Fills the provided slice with random values, which are guranteed
+/// to not be zero.
+#[inline]
+fn non_zero_random_bytes<R: Rng>(rng: &mut R, data: &mut [u8]) {
+    rng.fill(data);
+
+    for el in data {
+        if *el == 0u8 {
+            *el = rng.gen();
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use base64;
+    use key::RSAPublicKey;
+    use num_traits::Num;
+    use padding::PaddingScheme;
+    use rand::{thread_rng, ThreadRng};
+
+    #[test]
+    fn test_non_zero_bytes() {
+        for _ in 0..10 {
+            let mut rng = thread_rng();
+            let mut b = vec![0u8; 512];
+            non_zero_random_bytes(&mut rng, &mut b);
+            for el in &b {
+                assert_ne!(*el, 0u8);
+            }
+        }
+    }
+
+    fn get_private_key() -> RSAPrivateKey {
+        // In order to generate new test vectors you'll need the PEM form of this key:
+        // -----BEGIN RSA PRIVATE KEY-----
+        // MIIBOgIBAAJBALKZD0nEffqM1ACuak0bijtqE2QrI/KLADv7l3kK3ppMyCuLKoF0
+        // fd7Ai2KW5ToIwzFofvJcS/STa6HA5gQenRUCAwEAAQJBAIq9amn00aS0h/CrjXqu
+        // /ThglAXJmZhOMPVn4eiu7/ROixi9sex436MaVeMqSNf7Ex9a8fRNfWss7Sqd9eWu
+        // RTUCIQDasvGASLqmjeffBNLTXV2A5g4t+kLVCpsEIZAycV5GswIhANEPLmax0ME/
+        // EO+ZJ79TJKN5yiGBRsv5yvx5UiHxajEXAiAhAol5N4EUyq6I9w1rYdhPMGpLfk7A
+        // IU2snfRJ6Nq2CQIgFrPsWRCkV+gOYcajD17rEqmuLrdIRexpg8N1DOSXoJ8CIGlS
+        // tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
+        // -----END RSA PRIVATE KEY-----
+
+        RSAPrivateKey::from_components(
+            BigUint::from_str_radix("9353930466774385905609975137998169297361893554149986716853295022578535724979677252958524466350471210367835187480748268864277464700638583474144061408845077", 10).unwrap(),
+            65537,
+            BigUint::from_str_radix("7266398431328116344057699379749222532279343923819063639497049039389899328538543087657733766554155839834519529439851673014800261285757759040931985506583861", 10).unwrap(),
+            vec![
+                BigUint::from_str_radix("98920366548084643601728869055592650835572950932266967461790948584315647051443",10).unwrap(),
+                BigUint::from_str_radix("94560208308847015747498523884063394671606671904944666360068158221458669711639", 10).unwrap()
+            ],
+        )
+    }
+
+    #[test]
+    fn test_decrypt_pkcs1v15() {
+        let priv_key = get_private_key();
+
+        let tests = [[
+	    "gIcUIoVkD6ATMBk/u/nlCZCCWRKdkfjCgFdo35VpRXLduiKXhNz1XupLLzTXAybEq15juc+EgY5o0DHv/nt3yg==",
+	    "x",
+	], [
+	    "Y7TOCSqofGhkRb+jaVRLzK8xw2cSo1IVES19utzv6hwvx+M8kFsoWQm5DzBeJCZTCVDPkTpavUuEbgp8hnUGDw==",
+	    "testing.",
+	], [
+	    "arReP9DJtEVyV2Dg3dDp4c/PSk1O6lxkoJ8HcFupoRorBZG+7+1fDAwT1olNddFnQMjmkb8vxwmNMoTAT/BFjQ==",
+	    "testing.\n",
+	], [
+	"WtaBXIoGC54+vH0NH0CHHE+dRDOsMc/6BrfFu2lEqcKL9+uDuWaf+Xj9mrbQCjjZcpQuX733zyok/jsnqe/Ftw==",
+		"01234567890123456789012345678901234567890123456789012",
+	]];
+
+        for test in &tests {
+            let out = priv_key
+                .decrypt::<ThreadRng>(
+                    None,
+                    PaddingScheme::PKCS1v15,
+                    &base64::decode(test[0]).unwrap(),
+                )
+                .unwrap();
+            assert_eq!(out, test[1].as_bytes());
+        }
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_pkcs1v15() {
+        let mut rng = thread_rng();
+        let priv_key = get_private_key();
+        let k = priv_key.size();
+
+        for i in 1..100 {
+            let mut input: Vec<u8> = (0..i * 8).map(|_| rng.gen()).collect();
+            if input.len() > k - 11 {
+                input = input[0..k - 11].to_vec();
+            }
+
+            let pub_key: RSAPublicKey = priv_key.clone().into();
+            let ciphertext = encrypt(&mut rng, &pub_key, &input).unwrap();
+            assert_ne!(input, ciphertext);
+            let blind: bool = rng.gen();
+            let blinder = if blind { Some(&mut rng) } else { None };
+            let plaintext = decrypt(blinder, &priv_key, &ciphertext).unwrap();
+            assert_eq!(input, plaintext);
+        }
+    }
+}
