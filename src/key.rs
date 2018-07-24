@@ -1,9 +1,10 @@
 use num_bigint::{BigUint, RandBigInt};
 use num_traits::{FromPrimitive, One, Zero};
-use rand::Rng;
+use rand::{Rng, ThreadRng};
 
 use algorithms::generate_multi_prime_key;
 use errors::Result;
+use hash::Hash;
 use math::ModInverse;
 use padding::PaddingScheme;
 use pkcs1v15;
@@ -71,6 +72,10 @@ impl RSAPublicKey {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
             PaddingScheme::OAEP => unimplemented!("not yet implemented"),
+            _ => Err(format_err!(
+                "invalid padding scheme for decryption: {:?}",
+                padding
+            )),
         }
     }
 }
@@ -135,15 +140,69 @@ impl RSAPrivateKey {
     }
 
     /// Decrypt the given message.
-    pub fn decrypt<R: Rng>(
+    pub fn decrypt(&self, padding: PaddingScheme, ciphertext: &[u8]) -> Result<Vec<u8>> {
+        match padding {
+            // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
+            PaddingScheme::PKCS1v15 => pkcs1v15::decrypt::<ThreadRng>(None, self, ciphertext),
+            PaddingScheme::OAEP => unimplemented!("not yet implemented"),
+            _ => Err(format_err!(
+                "invalid padding scheme for decryption: {:?}",
+                padding
+            )),
+        }
+    }
+
+    /// Decrypt the given message.
+    /// Uses `rng` to blind the decryption process.
+    pub fn decrypt_blinded<R: Rng>(
         &self,
-        rng: Option<&mut R>,
+        rng: &mut R,
         padding: PaddingScheme,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
         match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::decrypt(rng, self, ciphertext),
+            PaddingScheme::PKCS1v15 => pkcs1v15::decrypt(Some(rng), self, ciphertext),
             PaddingScheme::OAEP => unimplemented!("not yet implemented"),
+            _ => Err(format_err!(
+                "invalid padding scheme for decryption: {:?}",
+                padding
+            )),
+        }
+    }
+
+    /// Sign the given digest.
+    pub fn sign<H: Hash>(
+        &self,
+        padding: PaddingScheme,
+        hash: Option<&H>,
+        digest: &[u8],
+    ) -> Result<Vec<u8>> {
+        match padding {
+            PaddingScheme::PKCS1v15 => pkcs1v15::sign::<ThreadRng, _>(None, self, hash, digest),
+            PaddingScheme::PSS => unimplemented!("not yet implemented"),
+            _ => Err(format_err!(
+                "invalid padding scheme for decryption: {:?}",
+                padding
+            )),
+        }
+    }
+
+    /// Sign the given digest.
+    /// Use `rng` for blinding.
+    pub fn sign_blinded<R: Rng, H: Hash>(
+        &self,
+        rng: &mut R,
+        padding: PaddingScheme,
+        hash: Option<&H>,
+        digest: &[u8],
+    ) -> Result<Vec<u8>> {
+        match padding {
+            PaddingScheme::PKCS1v15 => pkcs1v15::sign(Some(rng), self, hash, digest),
+            PaddingScheme::PSS => unimplemented!("not yet implemented"),
+            _ => Err(format_err!(
+                "invalid padding scheme for decryption: {:?}",
+                padding
+            )),
         }
     }
 }
@@ -219,6 +278,24 @@ pub fn decrypt<R: Rng>(
         }
         None => Ok(m),
     }
+}
+
+#[inline]
+pub fn decrypt_and_check<R: Rng>(
+    rng: Option<&mut R>,
+    priv_key: &RSAPrivateKey,
+    c: &BigUint,
+) -> Result<BigUint> {
+    let m = decrypt(rng, priv_key, c)?;
+
+    // In order to defend against errors in the CRT computation, m^e is
+    // calculated, which should match the original ciphertext.
+    let check = encrypt(priv_key, &m);
+    if c != &check {
+        return Err(format_err!("internal error"));
+    }
+
+    Ok(m)
 }
 
 /// Returns a new vector of the given length, with 0s left padded.

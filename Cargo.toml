@@ -23,6 +23,8 @@ subtle = "^0.7"
 
 [dev-dependencies]
 base64 = "*"
+sha-1 = "^0.7"
+hex = "^0.3"
 
 [profile.release]
 debug = true

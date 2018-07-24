@@ -3,4 +3,5 @@
 pub enum PaddingScheme {
     PKCS1v15,
     OAEP,
+    PSS,
 }

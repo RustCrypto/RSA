@@ -3,11 +3,13 @@ use rand::Rng;
 use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
 
 use errors::Result;
+use hash::Hash;
 use key::{self, PublicKey, RSAPrivateKey};
 
 // Encrypts the given message with RSA and the padding
 // scheme from PKCS#1 v1.5.  The message must be no longer than the
 // length of the public modulus minus 11 bytes.
+#[inline]
 pub fn encrypt<R: Rng, K: PublicKey>(rng: &mut R, pub_key: &K, msg: &[u8]) -> Result<Vec<u8>> {
     key::check_public(pub_key)?;
 
@@ -26,13 +28,7 @@ pub fn encrypt<R: Rng, K: PublicKey>(rng: &mut R, pub_key: &K, msg: &[u8]) -> Re
     let m = BigUint::from_bytes_be(&em);
     let c = key::encrypt(pub_key, &m).to_bytes_be();
 
-    // left pad with zeros
-    let padding_bytes = k - c.len();
-    for el in em.iter_mut().take(padding_bytes) {
-        *el = 0;
-    }
-    em[padding_bytes..].copy_from_slice(&c);
-
+    copy_with_left_pad(&mut em, &c);
     Ok(em)
 }
 
@@ -44,6 +40,7 @@ pub fn encrypt<R: Rng, K: PublicKey>(rng: &mut R, pub_key: &K, msg: &[u8]) -> Re
 // learn whether each instance returned an error then they can decrypt and
 // forge signatures as if they had the private key. See
 // `decrypt_session_key` for a way of solving this problem.
+#[inline]
 pub fn decrypt<R: Rng>(
     rng: Option<&mut R>,
     priv_key: &RSAPrivateKey,
@@ -57,6 +54,76 @@ pub fn decrypt<R: Rng>(
     }
 
     Ok(out[index as usize..].to_vec())
+}
+
+// Calculates the signature of hashed using
+// RSASSA-PKCS1-V1_5-SIGN from RSA PKCS#1 v1.5. Note that `hashed` must
+// be the result of hashing the input message using the given hash
+// function. If hash is `None`, hashed is signed directly. This isn't
+// advisable except for interoperability.
+//
+// If `rng` is not `None` then RSA blinding will be used to avoid timing
+// side-channel attacks.
+//
+// This function is deterministic. Thus, if the set of possible
+// messages is small, an attacker may be able to build a map from
+// messages to signatures and identify the signed messages. As ever,
+// signatures provide authenticity, not confidentiality.
+#[inline]
+pub fn sign<R: Rng, H: Hash>(
+    rng: Option<&mut R>,
+    priv_key: &RSAPrivateKey,
+    hash: Option<&H>,
+    hashed: &[u8],
+) -> Result<Vec<u8>> {
+    let (hash_len, prefix) = hash_info(hash, hashed.len())?;
+
+    let t_len = prefix.len() + hash_len;
+    let k = priv_key.size();
+    if k < t_len + 11 {
+        return Err(format_err!("message too long"));
+    }
+
+    // EM = 0x00 || 0x01 || PS || 0x00 || T
+    let mut em = vec![0xff; k];
+    em[0] = 0;
+    em[1] = 1;
+    em[k - t_len - 1] = 0;
+    em[k - t_len..k - hash_len].copy_from_slice(&prefix);
+    em[k - hash_len..k].copy_from_slice(hashed);
+
+    let m = BigUint::from_bytes_be(&em);
+    let c = key::decrypt_and_check(rng, priv_key, &m)?.to_bytes_be();
+
+    copy_with_left_pad(&mut em, &c);
+
+    Ok(em)
+}
+
+#[inline]
+fn hash_info<H: Hash>(hash: Option<&H>, digest_len: usize) -> Result<(usize, Vec<u8>)> {
+    match hash {
+        Some(hash) => {
+            let hash_len = hash.size();
+            if digest_len != hash_len {
+                return Err(format_err!("input must be a hashed messsage"));
+            }
+
+            Ok((hash_len, hash.asn1_prefix()))
+        }
+        // this means the data is signed directly
+        None => Ok((digest_len, Vec::new())),
+    }
+}
+
+#[inline]
+fn copy_with_left_pad(dest: &mut [u8], src: &[u8]) {
+    // left pad with zeros
+    let padding_bytes = dest.len() - src.len();
+    for el in dest.iter_mut().take(padding_bytes) {
+        *el = 0;
+    }
+    dest[padding_bytes..].copy_from_slice(src);
 }
 
 /// Decrypts ciphertext using `priv_key` and blinds the operation if
@@ -119,7 +186,9 @@ fn non_zero_random_bytes<R: Rng>(rng: &mut R, data: &mut [u8]) {
 
     for el in data {
         if *el == 0u8 {
-            *el = rng.gen();
+            while *el == 0u8 {
+                *el = rng.gen();
+            }
         }
     }
 }
@@ -128,10 +197,14 @@ fn non_zero_random_bytes<R: Rng>(rng: &mut R, data: &mut [u8]) {
 mod tests {
     use super::*;
     use base64;
-    use key::RSAPublicKey;
+    use hex;
     use num_traits::Num;
+    use rand::thread_rng;
+    use sha1::{Digest, Sha1};
+
+    use hash::Hashes;
+    use key::RSAPublicKey;
     use padding::PaddingScheme;
-    use rand::{thread_rng, ThreadRng};
 
     #[test]
     fn test_non_zero_bytes() {
@@ -188,11 +261,7 @@ mod tests {
 
         for test in &tests {
             let out = priv_key
-                .decrypt::<ThreadRng>(
-                    None,
-                    PaddingScheme::PKCS1v15,
-                    &base64::decode(test[0]).unwrap(),
-                )
+                .decrypt(PaddingScheme::PKCS1v15, &base64::decode(test[0]).unwrap())
                 .unwrap();
             assert_eq!(out, test[1].as_bytes());
         }
@@ -218,5 +287,50 @@ mod tests {
             let plaintext = decrypt(blinder, &priv_key, &ciphertext).unwrap();
             assert_eq!(input, plaintext);
         }
+    }
+
+    #[test]
+    fn test_sign_pkcs1v15() {
+        let priv_key = get_private_key();
+
+        let tests = [[
+            "Test.\n", "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e336ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+	]];
+
+        for test in &tests {
+            let digest = Sha1::digest(test[0].as_bytes()).to_vec();
+            let expected = hex::decode(test[1]).unwrap();
+
+            let out = priv_key
+                .sign(PaddingScheme::PKCS1v15, Some(&Hashes::SHA1), &digest)
+                .unwrap();
+            assert_ne!(out, digest);
+            assert_eq!(out, expected);
+
+            let mut rng = thread_rng();
+            let out2 = priv_key
+                .sign_blinded(
+                    &mut rng,
+                    PaddingScheme::PKCS1v15,
+                    Some(&Hashes::SHA1),
+                    &digest,
+                )
+                .unwrap();
+            assert_eq!(out2, expected);
+        }
+    }
+
+    #[test]
+    fn test_unpadded_signature() {
+        let msg = b"Thu Dec 19 18:06:16 EST 2013\n";
+        let expected_sig = base64::decode("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
+        let priv_key = get_private_key();
+
+        let sig = priv_key
+            .sign::<Hashes>(PaddingScheme::PKCS1v15, None, msg)
+            .unwrap();
+        assert_eq!(expected_sig, sig);
+
+        // TODO: verify sig once implemented
     }
 }
