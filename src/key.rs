@@ -108,6 +108,27 @@ impl RSAPublicKey {
             )),
         }
     }
+
+    /// Verify a signed message.
+    /// `hashed`must be the result of hashing the input using the hashing function
+    /// passed in through `hash`.
+    /// If the message is valid `Ok(())` is returned, otherwiese an `Err` indicating failure.
+    pub fn verify<H: Hash>(
+        &self,
+        padding: PaddingScheme,
+        hash: Option<&H>,
+        hashed: &[u8],
+        sig: &[u8],
+    ) -> Result<()> {
+        match padding {
+            PaddingScheme::PKCS1v15 => pkcs1v15::verify(self, hash, hashed, sig),
+            PaddingScheme::PSS => unimplemented!("not yet implemented"),
+            _ => Err(format_err!(
+                "invalid padding scheme for decryption: {:?}",
+                padding
+            )),
+        }
+    }
 }
 
 impl<'a> PublicKey for &'a RSAPublicKey {

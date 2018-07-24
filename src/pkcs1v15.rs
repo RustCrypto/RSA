@@ -100,6 +100,44 @@ pub fn sign<R: Rng, H: Hash>(
     Ok(em)
 }
 
+/// Verifies an RSA PKCS#1 v1.5 signature.
+#[inline]
+pub fn verify<H: Hash, K: PublicKey>(
+    pub_key: &K,
+    hash: Option<&H>,
+    hashed: &[u8],
+    sig: &[u8],
+) -> Result<()> {
+    let (hash_len, prefix) = hash_info(hash, hashed.len())?;
+
+    let t_len = prefix.len() + hash_len;
+    let k = pub_key.size();
+    if k < t_len + 11 {
+        return Err(format_err!("verification error"));
+    }
+
+    let c = BigUint::from_bytes_be(sig);
+    let m = key::encrypt(pub_key, &c).to_bytes_be();
+    let em = key::left_pad(&m, k);
+
+    // EM = 0x00 || 0x01 || PS || 0x00 || T
+    let mut ok = em[0].ct_eq(&0u8);
+    ok = ok & em[1].ct_eq(&1u8);
+    ok = ok & em[k - hash_len..k].ct_eq(hashed);
+    ok = ok & em[k - t_len..k - hash_len].ct_eq(&prefix);
+    ok = ok & em[k - t_len - 1].ct_eq(&0u8);
+
+    for el in em.iter().skip(2).take(k - t_len - 3) {
+        ok = ok & el.ct_eq(&0xff)
+    }
+
+    if ok.unwrap_u8() != 1 {
+        return Err(format_err!("verification error"));
+    }
+
+    Ok(())
+}
+
 #[inline]
 fn hash_info<H: Hash>(hash: Option<&H>, digest_len: usize) -> Result<(usize, Vec<u8>)> {
     match hash {
@@ -322,6 +360,25 @@ mod tests {
     }
 
     #[test]
+    fn test_verify_pkcs1v15() {
+        let priv_key = get_private_key();
+
+        let tests = [[
+            "Test.\n", "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e336ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+	]];
+        let pub_key: RSAPublicKey = priv_key.into();
+
+        for test in &tests {
+            let digest = Sha1::digest(test[0].as_bytes()).to_vec();
+            let sig = hex::decode(test[1]).unwrap();
+
+            pub_key
+                .verify(PaddingScheme::PKCS1v15, Some(&Hashes::SHA1), &digest, &sig)
+                .expect("failed to verify");
+        }
+    }
+
+    #[test]
     fn test_unpadded_signature() {
         let msg = b"Thu Dec 19 18:06:16 EST 2013\n";
         let expected_sig = base64::decode("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
@@ -332,6 +389,9 @@ mod tests {
             .unwrap();
         assert_eq!(expected_sig, sig);
 
-        // TODO: verify sig once implemented
+        let pub_key: RSAPublicKey = priv_key.into();
+        pub_key
+            .verify::<Hashes>(PaddingScheme::PKCS1v15, None, msg, &sig)
+            .expect("failed to verify");
     }
 }
