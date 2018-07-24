@@ -4,7 +4,7 @@ use num_traits::{FromPrimitive, One, Signed, Zero};
 use rand::{Rng, ThreadRng};
 
 use algorithms::generate_multi_prime_key;
-use errors::Result;
+use errors::{Error, Result};
 use hash::Hash;
 use math::ModInverse;
 use padding::PaddingScheme;
@@ -102,10 +102,7 @@ impl RSAPublicKey {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
             PaddingScheme::OAEP => unimplemented!("not yet implemented"),
-            _ => Err(format_err!(
-                "invalid padding scheme for decryption: {:?}",
-                padding
-            )),
+            _ => Err(Error::InvalidPaddingScheme),
         }
     }
 
@@ -123,10 +120,7 @@ impl RSAPublicKey {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::verify(self, hash, hashed, sig),
             PaddingScheme::PSS => unimplemented!("not yet implemented"),
-            _ => Err(format_err!(
-                "invalid padding scheme for decryption: {:?}",
-                padding
-            )),
+            _ => Err(Error::InvalidPaddingScheme),
         }
     }
 }
@@ -241,12 +235,12 @@ impl RSAPrivateKey {
         for prime in &self.primes {
             // Any primes ≤ 1 will cause divide-by-zero panics later.
             if prime < &BigUint::one() {
-                return Err(format_err!("invalid prime value"));
+                return Err(Error::InvalidPrime);
             }
             m *= prime;
         }
         if m != self.n {
-            return Err(format_err!("invalid modulus"));
+            return Err(Error::InvalidModulus);
         }
 
         // Check that de ≡ 1 mod p-1, for each prime.
@@ -259,7 +253,7 @@ impl RSAPrivateKey {
         for prime in &self.primes {
             let congruence: BigUint = &de % (prime - BigUint::one());
             if !congruence.is_one() {
-                return Err(format_err!("invalid exponents"));
+                return Err(Error::InvalidExponent);
             }
         }
 
@@ -272,10 +266,7 @@ impl RSAPrivateKey {
             // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
             PaddingScheme::PKCS1v15 => pkcs1v15::decrypt::<ThreadRng>(None, self, ciphertext),
             PaddingScheme::OAEP => unimplemented!("not yet implemented"),
-            _ => Err(format_err!(
-                "invalid padding scheme for decryption: {:?}",
-                padding
-            )),
+            _ => Err(Error::InvalidPaddingScheme),
         }
     }
 
@@ -290,10 +281,7 @@ impl RSAPrivateKey {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::decrypt(Some(rng), self, ciphertext),
             PaddingScheme::OAEP => unimplemented!("not yet implemented"),
-            _ => Err(format_err!(
-                "invalid padding scheme for decryption: {:?}",
-                padding
-            )),
+            _ => Err(Error::InvalidPaddingScheme),
         }
     }
 
@@ -307,10 +295,7 @@ impl RSAPrivateKey {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::sign::<ThreadRng, _>(None, self, hash, digest),
             PaddingScheme::PSS => unimplemented!("not yet implemented"),
-            _ => Err(format_err!(
-                "invalid padding scheme for decryption: {:?}",
-                padding
-            )),
+            _ => Err(Error::InvalidPaddingScheme),
         }
     }
 
@@ -326,10 +311,7 @@ impl RSAPrivateKey {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::sign(Some(rng), self, hash, digest),
             PaddingScheme::PSS => unimplemented!("not yet implemented"),
-            _ => Err(format_err!(
-                "invalid padding scheme for decryption: {:?}",
-                padding
-            )),
+            _ => Err(Error::InvalidPaddingScheme),
         }
     }
 }
@@ -337,11 +319,11 @@ impl RSAPrivateKey {
 #[inline]
 pub fn check_public(public_key: &impl PublicKey) -> Result<()> {
     if public_key.e() < 2 {
-        return Err(format_err!("public exponent too small"));
+        return Err(Error::PublicExponentTooSmall);
     }
 
     if public_key.e() > 1 << (31 - 1) {
-        return Err(format_err!("public exponent too large"));
+        return Err(Error::PublicExponentTooLarge);
     }
 
     Ok(())
@@ -362,11 +344,11 @@ pub fn decrypt<R: Rng>(
     c: &BigUint,
 ) -> Result<BigUint> {
     if c > priv_key.n() {
-        return Err(format_err!("decryption error"));
+        return Err(Error::Decryption);
     }
 
     if priv_key.n().is_zero() {
-        return Err(format_err!("decryption error"));
+        return Err(Error::Decryption);
     }
 
     let mut c = c.clone();
@@ -456,7 +438,7 @@ pub fn decrypt_and_check<R: Rng>(
     // calculated, which should match the original ciphertext.
     let check = encrypt(priv_key, &m);
     if c != &check {
-        return Err(format_err!("internal error"));
+        return Err(Error::Internal);
     }
 
     Ok(m)

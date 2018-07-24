@@ -2,7 +2,7 @@ use num_bigint::BigUint;
 use rand::Rng;
 use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
 
-use errors::Result;
+use errors::{Error, Result};
 use hash::Hash;
 use key::{self, PublicKey, RSAPrivateKey};
 
@@ -15,7 +15,7 @@ pub fn encrypt<R: Rng, K: PublicKey>(rng: &mut R, pub_key: &K, msg: &[u8]) -> Re
 
     let k = pub_key.size();
     if msg.len() > k - 11 {
-        return Err(format_err!("message too long"));
+        return Err(Error::MessageTooLong);
     }
 
     // EM = 0x00 || 0x02 || PS || 0x00 || M
@@ -50,7 +50,7 @@ pub fn decrypt<R: Rng>(
 
     let (valid, out, index) = decrypt_inner(rng, priv_key, ciphertext)?;
     if valid == 0 {
-        return Err(format_err!("decryption error"));
+        return Err(Error::Decryption);
     }
 
     Ok(out[index as usize..].to_vec())
@@ -81,7 +81,7 @@ pub fn sign<R: Rng, H: Hash>(
     let t_len = prefix.len() + hash_len;
     let k = priv_key.size();
     if k < t_len + 11 {
-        return Err(format_err!("message too long"));
+        return Err(Error::MessageTooLong);
     }
 
     // EM = 0x00 || 0x01 || PS || 0x00 || T
@@ -113,7 +113,7 @@ pub fn verify<H: Hash, K: PublicKey>(
     let t_len = prefix.len() + hash_len;
     let k = pub_key.size();
     if k < t_len + 11 {
-        return Err(format_err!("verification error"));
+        return Err(Error::Verification);
     }
 
     let c = BigUint::from_bytes_be(sig);
@@ -132,7 +132,7 @@ pub fn verify<H: Hash, K: PublicKey>(
     }
 
     if ok.unwrap_u8() != 1 {
-        return Err(format_err!("verification error"));
+        return Err(Error::Verification);
     }
 
     Ok(())
@@ -144,7 +144,7 @@ fn hash_info<H: Hash>(hash: Option<&H>, digest_len: usize) -> Result<(usize, Vec
         Some(hash) => {
             let hash_len = hash.size();
             if digest_len != hash_len {
-                return Err(format_err!("input must be a hashed messsage"));
+                return Err(Error::InputNotHashed);
             }
 
             Ok((hash_len, hash.asn1_prefix()))
@@ -178,7 +178,7 @@ fn decrypt_inner<R: Rng>(
 ) -> Result<(u8, Vec<u8>, u32)> {
     let k = priv_key.size();
     if k < 11 {
-        return Err(format_err!("decryption error"));
+        return Err(Error::Decryption);
     }
 
     let c = BigUint::from_bytes_be(ciphertext);

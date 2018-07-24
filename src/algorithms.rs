@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use errors::Result;
+use errors::{Error, Result};
 use key::RSAPrivateKey;
 use math::ModInverse;
 use num_bigint::BigUint;
@@ -27,7 +27,7 @@ pub fn generate_multi_prime_key<R: Rng>(
     bit_size: usize,
 ) -> Result<RSAPrivateKey> {
     if nprimes < 2 {
-        return Err(format_err!("nprimes must be >= 2"));
+        return Err(Error::NprimesTooSmall);
     }
 
     if bit_size < 64 {
@@ -40,11 +40,9 @@ pub fn generate_multi_prime_key<R: Rng>(
         // Use a factor of two to ensure taht key generation terminates in a
         // reasonable amount of time.
         pi /= 2f64;
-        println!("{} < {}", pi, nprimes as f64);
+
         if pi < nprimes as f64 {
-            return Err(format_err!(
-                "too few primes of given length to generate an RSA key"
-            ));
+            return Err(Error::TooFewPrimes);
         }
     }
 
