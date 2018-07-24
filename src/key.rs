@@ -1,5 +1,6 @@
-use num_bigint::{BigUint, RandBigInt};
-use num_traits::{FromPrimitive, One, Zero};
+use num_bigint::Sign::Plus;
+use num_bigint::{BigInt, BigUint, RandBigInt};
+use num_traits::{FromPrimitive, One, Signed, Zero};
 use rand::{Rng, ThreadRng};
 
 use algorithms::generate_multi_prime_key;
@@ -27,6 +28,35 @@ pub struct RSAPrivateKey {
     d: BigUint,
     /// Prime factors of N, contains >= 2 elements.
     primes: Vec<BigUint>,
+    /// precomputed values to speed up private operations
+    precomputed: Option<PrecomputedValues>,
+}
+
+#[derive(Debug, Clone)]
+struct PrecomputedValues {
+    /// D mod (P-1)
+    dp: BigUint,
+    /// D mod (Q-1)
+    dq: BigUint,
+    /// Q^-1 mod P
+    qinv: BigInt,
+
+    /// CRTValues is used for the 3rd and subsequent primes. Due to a
+    /// historical accident, the CRT for the first two primes is handled
+    /// differently in PKCS#1 and interoperability is sufficiently
+    /// important that we mirror this.
+    crt_values: Vec<CRTValue>,
+}
+
+/// Contains the precomputed Chinese remainder theorem values.
+#[derive(Debug, Clone)]
+struct CRTValue {
+    /// D mod (prime - 1)
+    exp: BigInt,
+    /// R·Coeff ≡ 1 mod Prime.
+    coeff: BigInt,
+    /// product of primes prior to this (inc p and q)
+    r: BigInt,
 }
 
 impl From<RSAPrivateKey> for RSAPublicKey {
@@ -118,7 +148,56 @@ impl RSAPrivateKey {
 
     /// Constructs an RSA key pair from the individual components.
     pub fn from_components(n: BigUint, e: u32, d: BigUint, primes: Vec<BigUint>) -> RSAPrivateKey {
-        RSAPrivateKey { n, e, d, primes }
+        let mut k = RSAPrivateKey {
+            n,
+            e,
+            d,
+            primes,
+            precomputed: None,
+        };
+
+        k.precompute();
+
+        k
+    }
+
+    /// Performs some calculations to speed up private key operations.
+    pub fn precompute(&mut self) {
+        if self.precomputed.is_some() {
+            return;
+        }
+
+        let dp = &self.d % (&self.primes[0] - BigUint::one());
+        let dq = &self.d % (&self.primes[1] - BigUint::one());
+        let qinv = self.primes[1]
+            .clone()
+            .mod_inverse(&self.primes[0])
+            .map(|v| BigInt::from_biguint(Plus, v))
+            .unwrap();
+
+        let mut r: BigUint = &self.primes[0] * &self.primes[1];
+        let crt_values: Vec<CRTValue> = self
+            .primes
+            .iter()
+            .skip(2)
+            .map(|prime| {
+                let res = CRTValue {
+                    exp: BigInt::from_biguint(Plus, &self.d % (prime - BigUint::one())),
+                    r: BigInt::from_biguint(Plus, r.clone()),
+                    coeff: BigInt::from_biguint(Plus, r.clone().mod_inverse(prime).unwrap()),
+                };
+                r *= prime;
+
+                res
+            })
+            .collect();
+
+        self.precomputed = Some(PrecomputedValues {
+            dp,
+            dq,
+            qinv,
+            crt_values,
+        });
     }
 
     /// Returns the private exponent of the key.
@@ -135,6 +214,33 @@ impl RSAPrivateKey {
     /// Returns `Ok(())` if everything is good, otherwise an approriate error.
     pub fn validate(&self) -> Result<()> {
         check_public(self)?;
+
+        // Check that Πprimes == n.
+        let mut m = BigUint::one();
+        for prime in &self.primes {
+            // Any primes ≤ 1 will cause divide-by-zero panics later.
+            if prime < &BigUint::one() {
+                return Err(format_err!("invalid prime value"));
+            }
+            m *= prime;
+        }
+        if m != self.n {
+            return Err(format_err!("invalid modulus"));
+        }
+
+        // Check that de ≡ 1 mod p-1, for each prime.
+        // This implies that e is coprime to each p-1 as e has a multiplicative
+        // inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
+        // exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
+        // mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
+        let mut de = BigUint::from_u64(u64::from(self.e)).unwrap();
+        de *= self.d.clone();
+        for prime in &self.primes {
+            let congruence: BigUint = &de % (prime - BigUint::one());
+            if !congruence.is_one() {
+                return Err(format_err!("invalid exponents"));
+            }
+        }
 
         Ok(())
     }
@@ -268,8 +374,45 @@ pub fn decrypt<R: Rng>(
         c = (c * &rpowe) % priv_key.n();
     }
 
-    // TODO: use precomputed once implemented
-    let m = c.modpow(priv_key.d(), priv_key.n());
+    let m = match priv_key.precomputed {
+        None => c.modpow(priv_key.d(), priv_key.n()),
+        Some(ref precomputed) => {
+            // We have the precalculated values needed for the CRT.
+            let mut m = BigInt::from_biguint(Plus, c.modpow(&precomputed.dp, &priv_key.primes[0]));
+            let mut m2 = BigInt::from_biguint(Plus, c.modpow(&precomputed.dq, &priv_key.primes[1]));
+
+            m -= &m2;
+            // clones make me sad :(
+            let primes: Vec<_> = priv_key
+                .primes
+                .iter()
+                .map(|v| BigInt::from_biguint(Plus, v.clone()))
+                .collect();
+            if m.is_negative() {
+                m += &primes[0];
+            }
+            m *= &precomputed.qinv;
+            m %= &primes[0];
+            m *= &primes[1];
+            m += m2;
+
+            let c = BigInt::from_biguint(Plus, c);
+            for (i, value) in precomputed.crt_values.iter().enumerate() {
+                let prime = &primes[2 + i];
+                m2 = c.modpow(&value.exp, prime);
+                m2 -= &m;
+                m2 *= &value.coeff;
+                m2 %= prime;
+                if m2.is_negative() {
+                    m2 += prime;
+                }
+                m2 *= &value.r;
+                m += &m2;
+            }
+
+            m.to_biguint().unwrap()
+        }
+    };
 
     match ir {
         Some(ref ir) => {
@@ -325,6 +468,7 @@ mod tests {
             e: 200,
             d: BigUint::from_u64(123).unwrap(),
             primes: vec![],
+            precomputed: None,
         };
         let public_key: RSAPublicKey = private_key.into();
 
