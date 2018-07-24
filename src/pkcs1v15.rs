@@ -186,6 +186,7 @@ fn non_zero_random_bytes<R: Rng>(rng: &mut R, data: &mut [u8]) {
 
     for el in data {
         if *el == 0u8 {
+            // TODO: break after a certain amount of time
             while *el == 0u8 {
                 *el = rng.gen();
             }

@@ -24,10 +24,18 @@ subtle = "^0.7"
 [dev-dependencies]
 base64 = "*"
 sha-1 = "^0.7"
+sha2 = "^0.7"
 hex = "^0.3"
 
+
+[[bench]]
+name = "prime"
+
+[[bench]]
+name = "key"
+
 [profile.release]
-debug = true
+# debug = true
 
 [profile.bench]
-debug = true
+# debug = true

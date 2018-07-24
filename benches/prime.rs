@@ -57,7 +57,7 @@ fn bench_prime_miller_rabin(b: &mut Bencher) {
 
 #[bench]
 fn bench_gen_prime(b: &mut Bencher) {
-    let mut rng = StdRng::from_seed([0u8; 32]);
+    let mut rng = StdRng::from_seed([1u8; 32]);
 
     b.iter(|| {
         let res = rng.gen_prime(1024);
