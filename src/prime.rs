@@ -1,4 +1,4 @@
-#![cfg_attr(feature = "cargo-clippy", allow(many_single_char_names))]
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::many_single_char_names))]
 
 //! Implements probabilistic prime checkers.
 use byteorder::{BigEndian, ByteOrder};
@@ -61,7 +61,7 @@ pub fn probably_prime(x: &BigUint, n: usize) -> bool {
         return false;
     }
 
-    if x < &BIG_64 {
+    if x < &*BIG_64 {
         return (PRIME_BIT_MASK & (1 << x.to_u64().unwrap())) != 0;
     }
 

@@ -234,7 +234,7 @@ impl RSAPrivateKey {
         let mut m = BigUint::one();
         for prime in &self.primes {
             // Any primes ≤ 1 will cause divide-by-zero panics later.
-            if prime < &BigUint::one() {
+            if *prime < BigUint::one() {
                 return Err(Error::InvalidPrime);
             }
             m *= prime;

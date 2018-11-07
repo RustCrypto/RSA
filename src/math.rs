@@ -1,4 +1,4 @@
-#![cfg_attr(feature = "cargo-clippy", allow(many_single_char_names))]
+#![cfg_attr(feature = "cargo-clippy", allow(clippy::many_single_char_names))]
 use std::borrow::Cow;
 
 use num_bigint::Sign::Plus;
@@ -159,7 +159,7 @@ fn mod_inverse(a: Cow<BigInt>, m: &BigInt) -> Option<BigInt> {
         s = -s;
     }
 
-    if &s > m {
+    if s > *m {
         return Some(s - m);
     }
     if s.is_negative() {

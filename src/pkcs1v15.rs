@@ -122,13 +122,13 @@ pub fn verify<H: Hash, K: PublicKey>(
 
     // EM = 0x00 || 0x01 || PS || 0x00 || T
     let mut ok = em[0].ct_eq(&0u8);
-    ok = ok & em[1].ct_eq(&1u8);
-    ok = ok & em[k - hash_len..k].ct_eq(hashed);
-    ok = ok & em[k - t_len..k - hash_len].ct_eq(&prefix);
-    ok = ok & em[k - t_len - 1].ct_eq(&0u8);
+    ok &= em[1].ct_eq(&1u8);
+    ok &= em[k - hash_len..k].ct_eq(hashed);
+    ok &= em[k - t_len..k - hash_len].ct_eq(&prefix);
+    ok &= em[k - t_len - 1].ct_eq(&0u8);
 
     for el in em.iter().skip(2).take(k - t_len - 3) {
-        ok = ok & el.ct_eq(&0xff)
+        ok &= el.ct_eq(&0xff)
     }
 
     if ok.unwrap_u8() != 1 {
