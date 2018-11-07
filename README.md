@@ -20,9 +20,9 @@ There will be three phases before `1.0` :ship: can be released.
     7. PSS: Sign & Verify
     8. Key import & export
 2. :rocket: Make it fast
-    1. Benchmarks
-    2. compare to other implementations
-    3. optimize
+    1. Benchmarks :white_check_mark:
+    2. compare to other implementations :construction:
+    3. optimize :construction:
 3. :lock: Make it secure
     1. Fuzz testing
     2. Security Audits
