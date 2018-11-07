@@ -106,10 +106,10 @@ pub fn probably_prime_miller_rabin(n: &BigUint, reps: usize, force2: bool) -> bo
     let q = &nm1 >> k;
     let nm3 = n - &*BIG_3;
 
-    let mut seed_vec = vec![0u8; 4];
-    BigEndian::write_u32(seed_vec.as_mut_slice(), n.get_limb(0));
+    let mut seed_vec = vec![0u8; 8];
+    BigEndian::write_u64(seed_vec.as_mut_slice(), n.get_limb(0));
     let mut seed = [0u8; 32];
-    seed[0..4].copy_from_slice(&seed_vec[..]);
+    seed[0..8].copy_from_slice(&seed_vec[..]);
     let mut rng = StdRng::from_seed(seed);
 
     'nextrandom: for i in 0..reps {
@@ -338,13 +338,13 @@ fn is_bit_set(x: &BigUint, i: usize) -> bool {
 /// Returns the i-th bit.
 #[inline]
 fn get_bit(x: &BigUint, i: usize) -> u8 {
-    let j = i / 32;
+    let j = i / 64;
     // if is out of range of the set words, it is always false.
     if i >= x.bits() {
         return 0;
     }
 
-    (x.get_limb(j) >> (i % 32) & 1) as u8
+    (x.get_limb(j) >> (i % 64) & 1) as u8
 }
 
 #[cfg(test)]
@@ -521,9 +521,7 @@ mod tests {
     test_pseudo_primes!(
         test_probably_prime_lucas,
         |n| probably_prime_lucas(n) && !probably_prime_miller_rabin(n, 1, true),
-        vec![
-            989, 3239, 5777, 10877, 27971, 29681, 30739, 31631, 39059, 72389, 73919, 75077,
-        ]
+        vec![989, 3239, 5777, 10877, 27971, 29681, 30739, 31631, 39059, 72389, 73919, 75077,]
     );
 
     #[test]
