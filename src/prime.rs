@@ -11,10 +11,10 @@ use rand::{SeedableRng, StdRng};
 use math::jacobi;
 
 lazy_static! {
-    static ref BIG_1: BigUint = BigUint::one();
-    static ref BIG_2: BigUint = BigUint::from_u64(2).unwrap();
-    static ref BIG_3: BigUint = BigUint::from_u64(3).unwrap();
-    static ref BIG_64: BigUint = BigUint::from_u64(64).unwrap();
+    pub(crate) static ref BIG_1: BigUint = BigUint::one();
+    pub(crate) static ref BIG_2: BigUint = BigUint::from_u64(2).unwrap();
+    pub(crate) static ref BIG_3: BigUint = BigUint::from_u64(3).unwrap();
+    pub(crate) static ref BIG_64: BigUint = BigUint::from_u64(64).unwrap();
 }
 
 const PRIMES_A: u64 = 3 * 5 * 7 * 11 * 13 * 17 * 19 * 23 * 37;

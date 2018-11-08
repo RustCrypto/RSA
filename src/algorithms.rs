@@ -8,7 +8,7 @@ use num_traits::{FromPrimitive, One, Zero};
 use prime_rand::RandPrime;
 
 /// Default exponent for RSA keys.
-const EXP: u32 = 65537;
+const EXP: u64 = 65537;
 
 // Generates a multi-prime RSA keypair of the given bit
 // size and the given random source, as suggested in [1]. Although the public
@@ -96,7 +96,7 @@ pub fn generate_multi_prime_key<R: Rng>(
             continue 'next;
         }
 
-        let exp = BigUint::from_u64(u64::from(EXP)).unwrap();
+        let exp = BigUint::from_u64(EXP).unwrap();
         if let Some(d) = exp.mod_inverse(totient) {
             n_final = n;
             d_final = d;
@@ -105,6 +105,9 @@ pub fn generate_multi_prime_key<R: Rng>(
     }
 
     Ok(RSAPrivateKey::from_components(
-        n_final, EXP, d_final, primes,
+        n_final,
+        BigUint::from_u64(EXP).unwrap(),
+        d_final,
+        primes,
     ))
 }

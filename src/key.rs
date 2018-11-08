@@ -10,11 +10,16 @@ use math::ModInverse;
 use padding::PaddingScheme;
 use pkcs1v15;
 
+lazy_static! {
+    static ref MIN_PUB_EXPONENT: BigUint = BigUint::from_u64(2).unwrap();
+    static ref MAX_PUB_EXPONENT: BigUint = BigUint::from_u64(1 << (31 - 1)).unwrap();
+}
+
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone)]
 pub struct RSAPublicKey {
     n: BigUint,
-    e: u32,
+    e: BigUint,
 }
 
 /// Represents a whole RSA key, public and private parts.
@@ -23,7 +28,7 @@ pub struct RSAPrivateKey {
     /// Modulus
     n: BigUint,
     /// Public exponent
-    e: u32,
+    e: BigUint,
     /// Private exponent
     d: BigUint,
     /// Prime factors of N, contains >= 2 elements.
@@ -73,7 +78,7 @@ pub trait PublicKey {
     /// Returns the modulus of the key.
     fn n(&self) -> &BigUint;
     /// Returns the public exponent of the key.
-    fn e(&self) -> u32;
+    fn e(&self) -> &BigUint;
     /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
     /// or by this public key will have the same size.
     fn size(&self) -> usize {
@@ -86,8 +91,8 @@ impl PublicKey for RSAPublicKey {
         &self.n
     }
 
-    fn e(&self) -> u32 {
-        self.e
+    fn e(&self) -> &BigUint {
+        &self.e
     }
 }
 
@@ -130,8 +135,8 @@ impl<'a> PublicKey for &'a RSAPublicKey {
         &self.n
     }
 
-    fn e(&self) -> u32 {
-        self.e
+    fn e(&self) -> &BigUint {
+        &self.e
     }
 }
 
@@ -140,8 +145,8 @@ impl PublicKey for RSAPrivateKey {
         &self.n
     }
 
-    fn e(&self) -> u32 {
-        self.e
+    fn e(&self) -> &BigUint {
+        &self.e
     }
 }
 
@@ -150,8 +155,8 @@ impl<'a> PublicKey for &'a RSAPrivateKey {
         &self.n
     }
 
-    fn e(&self) -> u32 {
-        self.e
+    fn e(&self) -> &BigUint {
+        &self.e
     }
 }
 
@@ -162,7 +167,12 @@ impl RSAPrivateKey {
     }
 
     /// Constructs an RSA key pair from the individual components.
-    pub fn from_components(n: BigUint, e: u32, d: BigUint, primes: Vec<BigUint>) -> RSAPrivateKey {
+    pub fn from_components(
+        n: BigUint,
+        e: BigUint,
+        d: BigUint,
+        primes: Vec<BigUint>,
+    ) -> RSAPrivateKey {
         let mut k = RSAPrivateKey {
             n,
             e,
@@ -248,7 +258,7 @@ impl RSAPrivateKey {
         // inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
         // exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
         // mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
-        let mut de = BigUint::from_u64(u64::from(self.e)).unwrap();
+        let mut de = self.e.clone();
         de *= self.d.clone();
         for prime in &self.primes {
             let congruence: BigUint = &de % (prime - BigUint::one());
@@ -318,11 +328,11 @@ impl RSAPrivateKey {
 
 #[inline]
 pub fn check_public(public_key: &impl PublicKey) -> Result<()> {
-    if public_key.e() < 2 {
+    if public_key.e() < &*MIN_PUB_EXPONENT {
         return Err(Error::PublicExponentTooSmall);
     }
 
-    if public_key.e() > 1 << (31 - 1) {
+    if public_key.e() > &*MAX_PUB_EXPONENT {
         return Err(Error::PublicExponentTooLarge);
     }
 
@@ -331,8 +341,7 @@ pub fn check_public(public_key: &impl PublicKey) -> Result<()> {
 
 #[inline]
 pub fn encrypt<K: PublicKey>(key: &K, m: &BigUint) -> BigUint {
-    let e = BigUint::from_u64(u64::from(key.e())).unwrap();
-    m.modpow(&e, key.n())
+    m.modpow(key.e(), key.n())
 }
 
 /// Performs RSA decryption, resulting in a plaintext `BigUint`.
@@ -372,7 +381,7 @@ pub fn decrypt<R: Rng>(
             }
         }
 
-        let e = BigUint::from_u64(u64::from(priv_key.e())).unwrap();
+        let e = priv_key.e();
         let rpowe = r.modpow(&e, priv_key.n()); // N != 0
         c = (c * &rpowe) % priv_key.n();
     }
@@ -468,7 +477,7 @@ mod tests {
     fn test_from_into() {
         let private_key = RSAPrivateKey {
             n: BigUint::from_u64(100).unwrap(),
-            e: 200,
+            e: BigUint::from_u64(200).unwrap(),
             d: BigUint::from_u64(123).unwrap(),
             primes: vec![],
             precomputed: None,
@@ -476,7 +485,7 @@ mod tests {
         let public_key: RSAPublicKey = private_key.into();
 
         assert_eq!(public_key.n().to_u64(), Some(100));
-        assert_eq!(public_key.e(), 200);
+        assert_eq!(public_key.e().to_u64(), Some(200));
     }
 
     fn test_key_basics(private_key: RSAPrivateKey) {
