@@ -7,7 +7,7 @@ license = "MIT OR Apache-2.0"
 homepage = "https://github.com/dignifiedquire/rust-rsa"
 repository = "https://github.com/dignifiedquire/rust-rsa"
 
-keywords = ["rsa", "encryption", "security", "public key crypto"]
+keywords = ["rsa", "encryption", "security", "crypto"]
 
 [dependencies]
 num-bigint-dig = { version = "0.2", features = ["rand", "i128", "u64_digit"] }
