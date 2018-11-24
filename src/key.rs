@@ -97,6 +97,14 @@ impl PublicKey for RSAPublicKey {
 }
 
 impl RSAPublicKey {
+    /// Create a new key from its components.
+    pub fn new(n: BigUint, e: BigUint) -> Result<Self> {
+        let k = RSAPublicKey { n, e };
+        check_public(&k)?;
+
+        Ok(k)
+    }
+
     /// Encrypt the given message.
     pub fn encrypt<R: Rng>(
         &self,
