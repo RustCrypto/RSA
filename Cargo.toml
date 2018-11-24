@@ -10,8 +10,7 @@ repository = "https://github.com/dignifiedquire/rust-rsa"
 keywords = ["rsa", "encryption", "security", "public key crypto"]
 
 [dependencies]
-# num-bigint = { path = "../num-bigint", features = ["rand", "i128"] }
-num-bigint = { git = "https://github.com/dignifiedquire/num-bigint", features = ["rand", "i128", "u64_digit"] , branch = "master" }
+num-bigint-dig = { version = "0.2", features = ["rand", "i128", "u64_digit"] }
 num-traits = "0.2.6"
 num-integer = "0.1.39"
 num-iter = "0.1.37"
