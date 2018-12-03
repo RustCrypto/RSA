@@ -1,6 +1,7 @@
 # RSA
+[![crates.io](https://img.shields.io/crates/v/rsa.svg)](https://crates.io/crates/rsa) [![Documentation](https://docs.rs/rsa/badge.svg)](https://docs.rs/rsa) [![Build Status](https://travis-ci.org/RustCrypto/rsa.svg?branch=master)](https://travis-ci.org/RustCrypto/rsa) [![dependency status](https://deps.rs/repo/github/RustCrypto/rsa/status.svg)](https://deps.rs/repo/github/RustCrypto/rsa)
 
-> A portable RSA implementation in Rust.
+A portable RSA implementation in pure Rust.
 
 :warning: **WARNING:** This library has __not__ been audited, so please do not use for production code.
 
