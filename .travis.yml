@@ -1,0 +1,12 @@
+language: rust
+
+matrix:
+  include:
+    - rust: 1.27.0
+    - rust: stable
+    - rust: nightly
+
+script:
+  - cargo test --verbose --all --release
+
+cache: cargo
