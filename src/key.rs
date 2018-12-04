@@ -206,7 +206,7 @@ impl RSAPrivateKey {
             .clone()
             .mod_inverse(&self.primes[0])
             .map(|v| BigInt::from_biguint(Plus, v))
-            .unwrap();
+            .expect("invalid prime");
 
         let mut r: BigUint = &self.primes[0] * &self.primes[1];
         let crt_values: Vec<CRTValue> = self
@@ -217,7 +217,10 @@ impl RSAPrivateKey {
                 let res = CRTValue {
                     exp: BigInt::from_biguint(Plus, &self.d % (prime - BigUint::one())),
                     r: BigInt::from_biguint(Plus, r.clone()),
-                    coeff: BigInt::from_biguint(Plus, r.clone().mod_inverse(prime).unwrap()),
+                    coeff: BigInt::from_biguint(
+                        Plus,
+                        r.clone().mod_inverse(prime).expect("invalid coeff"),
+                    ),
                 };
                 r *= prime;
 
@@ -360,7 +363,7 @@ pub fn decrypt<R: Rng>(
     priv_key: &RSAPrivateKey,
     c: &BigUint,
 ) -> Result<BigUint> {
-    if c > priv_key.n() {
+    if c >= priv_key.n() {
         return Err(Error::Decryption);
     }
 
@@ -368,10 +371,8 @@ pub fn decrypt<R: Rng>(
         return Err(Error::Decryption);
     }
 
-    let mut c = c.clone();
     let mut ir = None;
-
-    if let Some(ref mut rng) = rng {
+    let c = if let Some(ref mut rng) = rng {
         // Blinding enabled. Blinding involves multiplying c by r^e.
         // Then the decryption operation performs (m^e * r^e)^d mod n
         // which equals mr mod n. The factor of r can then be removed
@@ -391,24 +392,32 @@ pub fn decrypt<R: Rng>(
 
         let e = priv_key.e();
         let rpowe = r.modpow(&e, priv_key.n()); // N != 0
-        c = (c * &rpowe) % priv_key.n();
-    }
+        (c * &rpowe) % priv_key.n()
+    } else {
+        c.clone()
+    };
 
     let m = match priv_key.precomputed {
         None => c.modpow(priv_key.d(), priv_key.n()),
         Some(ref precomputed) => {
             // We have the precalculated values needed for the CRT.
-            let mut m = BigInt::from_biguint(Plus, c.modpow(&precomputed.dp, &priv_key.primes[0]));
-            let mut m2 = BigInt::from_biguint(Plus, c.modpow(&precomputed.dq, &priv_key.primes[1]));
+
+            let p = &priv_key.primes[0];
+            let q = &priv_key.primes[1];
+
+            let mut m = BigInt::from_biguint(Plus, c.modpow(&precomputed.dp, p));
+            let mut m2 = BigInt::from_biguint(Plus, c.modpow(&precomputed.dq, q));
 
             m -= &m2;
+
             // clones make me sad :(
             let primes: Vec<_> = priv_key
                 .primes
                 .iter()
                 .map(|v| BigInt::from_biguint(Plus, v.clone()))
                 .collect();
-            if m.is_negative() {
+
+            while m.is_negative() {
                 m += &primes[0];
             }
             m *= &precomputed.qinv;
@@ -423,14 +432,14 @@ pub fn decrypt<R: Rng>(
                 m2 -= &m;
                 m2 *= &value.coeff;
                 m2 %= prime;
-                if m2.is_negative() {
+                while m2.is_negative() {
                     m2 += prime;
                 }
                 m2 *= &value.r;
                 m += &m2;
             }
 
-            m.to_biguint().unwrap()
+            m.to_biguint().expect("failed to decrypt")
         }
     };
 
@@ -496,8 +505,8 @@ mod tests {
         assert_eq!(public_key.e().to_u64(), Some(200));
     }
 
-    fn test_key_basics(private_key: RSAPrivateKey) {
-        private_key.validate().expect("failed to validate");
+    fn test_key_basics(private_key: &RSAPrivateKey) {
+        private_key.validate().expect("invalid private key");
 
         assert!(
             private_key.d() < private_key.n(),
@@ -505,12 +514,14 @@ mod tests {
         );
 
         let pub_key: RSAPublicKey = private_key.clone().into();
-        let m = BigUint::from_u64(42).unwrap();
+        let m = BigUint::from_u64(42).expect("invalid 42");
         let c = encrypt(&pub_key, &m);
-        let m2 = decrypt::<ThreadRng>(None, &private_key, &c).unwrap();
+        let m2 = decrypt::<ThreadRng>(None, &private_key, &c)
+            .expect("unable to decrypt without blinding");
         assert_eq!(m, m2);
         let mut rng = thread_rng();
-        let m3 = decrypt(Some(&mut rng), &private_key, &c).unwrap();
+        let m3 =
+            decrypt(Some(&mut rng), &private_key, &c).expect("unable to decrypt with blinding");
         assert_eq!(m, m3);
     }
 
@@ -519,14 +530,17 @@ mod tests {
             #[test]
             fn $name() {
                 let mut rng = thread_rng();
-                let private_key = if $multi == 2 {
-                    RSAPrivateKey::new(&mut rng, $size).unwrap()
-                } else {
-                    generate_multi_prime_key(&mut rng, $multi, $size).unwrap()
-                };
-                assert_eq!(private_key.n().bits(), $size);
 
-                test_key_basics(private_key);
+                for _ in 0..10 {
+                    let private_key = if $multi == 2 {
+                        RSAPrivateKey::new(&mut rng, $size).expect("failed to generate key")
+                    } else {
+                        generate_multi_prime_key(&mut rng, $multi, $size).unwrap()
+                    };
+                    assert_eq!(private_key.n().bits(), $size);
+
+                    test_key_basics(&private_key);
+                }
             }
         };
     }
@@ -551,6 +565,27 @@ mod tests {
             let _ = generate_multi_prime_key(&mut rng, 3, i);
             let _ = generate_multi_prime_key(&mut rng, 4, i);
             let _ = generate_multi_prime_key(&mut rng, 5, i);
+        }
+    }
+
+    #[test]
+    fn test_negative_decryption_value() {
+        let private_key = RSAPrivateKey::from_components(
+            BigUint::from_bytes_le(&vec![
+                99, 192, 208, 179, 0, 220, 7, 29, 49, 151, 75, 107, 75, 73, 200, 180,
+            ]),
+            BigUint::from_bytes_le(&vec![1, 0, 1]),
+            BigUint::from_bytes_le(&vec![
+                81, 163, 254, 144, 171, 159, 144, 42, 244, 133, 51, 249, 28, 12, 63, 65,
+            ]),
+            vec![
+                BigUint::from_bytes_le(&vec![105, 101, 60, 173, 19, 153, 3, 192]),
+                BigUint::from_bytes_le(&vec![235, 65, 160, 134, 32, 136, 6, 241]),
+            ],
+        );
+
+        for _ in 0..1000 {
+            test_key_basics(&private_key);
         }
     }
 }
