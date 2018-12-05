@@ -1,5 +1,4 @@
-#![doc(html_logo_url =
-    "https://raw.githubusercontent.com/RustCrypto/meta/master/logo_small.png")]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/RustCrypto/meta/master/logo_small.png")]
 extern crate num_bigint_dig as num_bigint;
 extern crate num_integer;
 extern crate num_traits;

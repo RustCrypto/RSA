@@ -96,7 +96,7 @@ pub fn generate_multi_prime_key<R: Rng>(
             continue 'next;
         }
 
-        let exp = BigUint::from_u64(EXP).unwrap();
+        let exp = BigUint::from_u64(EXP).expect("invalid static exponent");
         if let Some(d) = exp.mod_inverse(totient) {
             n_final = n;
             d_final = d;
@@ -106,7 +106,7 @@ pub fn generate_multi_prime_key<R: Rng>(
 
     Ok(RSAPrivateKey::from_components(
         n_final,
-        BigUint::from_u64(EXP).unwrap(),
+        BigUint::from_u64(EXP).expect("invalid static exponent"),
         d_final,
         primes,
     ))
