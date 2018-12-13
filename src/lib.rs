@@ -22,10 +22,10 @@ pub use prime_rand::RandPrime;
 pub mod errors;
 pub mod padding;
 pub use key::{PublicKey, RSAPrivateKey, RSAPublicKey};
+pub mod algorithms;
 pub mod hash;
+pub mod math;
 
-mod algorithms;
 mod key;
-mod math;
 mod pkcs1v15;
 mod prime_rand;
