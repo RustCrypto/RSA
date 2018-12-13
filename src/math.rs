@@ -111,68 +111,77 @@ impl ModInverse<BigInt> for BigInt {
 }
 
 /// Calculate the modular inverse of `a`.
-/// Implemenation is based on Algorithm 4 Shifting Euclidean algorithm in [1]
-///
-/// [1] Modular Inverse Algorithms Without Multiplications for Cryptographic Applications - Laszlo Hars
+/// Implemenation is based on the naive version from wikipedia.
 #[inline]
-fn mod_inverse(a: Cow<BigInt>, m: &BigInt) -> Option<BigInt> {
-    assert!(a.as_ref() != m, "a must not be equal to m");
-    assert!(a.is_positive(), "does not yet work for negative numbers");
+fn mod_inverse(g: Cow<BigInt>, n: &BigInt) -> Option<BigInt> {
+    assert!(g.as_ref() != n, "g must not be equal to n");
+    assert!(!n.is_negative(), "negative modulus not supported");
 
-    let mut u: BigInt;
-    let mut v: BigInt;
-    let mut r: BigInt;
-    let mut s: BigInt;
-
-    if a.as_ref() < m {
-        u = m.clone();
-        v = a.into_owned();
-        r = BigInt::zero();
-        s = BigInt::one();
+    let n = n.abs();
+    let g = if g.is_negative() {
+        g.mod_floor(&n).to_biguint().unwrap()
     } else {
-        u = a.into_owned();
-        v = m.clone();
-        r = BigInt::one();
-        s = BigInt::zero();
-    }
+        g.to_biguint().unwrap()
+    };
 
-    while v.bits() > 1 {
-        let f = u.bits() - v.bits();
-        if u.sign() == v.sign() {
-            u -= &v << f;
-            r -= &s << f;
-        } else {
-            u += &v << f;
-            r += &s << f;
-        }
-        if u.bits() < v.bits() {
-            ::std::mem::swap(&mut u, &mut v);
-            ::std::mem::swap(&mut r, &mut s);
-        }
-    }
+    let (d, x, _) = extended_gcd(&g, &n.to_biguint().unwrap());
 
-    if v.is_zero() {
+    if !d.is_one() {
         return None;
     }
 
-    if v.is_negative() {
-        s = -s;
+    if x.is_negative() {
+        Some(x + n)
+    } else {
+        Some(x)
+    }
+}
+
+/// Calculates the extended eucledian algorithm.
+/// See https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm for details.
+/// The returned values are
+/// - greatest common divisor (1)
+/// - Bezout coefficients (2)
+// TODO: implement optimized variants
+pub fn extended_gcd(a: &BigUint, b: &BigUint) -> (BigInt, BigInt, BigInt) {
+    let mut a = BigInt::from_biguint(Plus, a.clone());
+    let mut b = BigInt::from_biguint(Plus, b.clone());
+
+    let mut ua = BigInt::one();
+    let mut va = BigInt::zero();
+
+    let mut ub = BigInt::zero();
+    let mut vb = BigInt::one();
+
+    let mut q;
+    let mut tmp;
+    let mut r;
+
+    while !b.is_zero() {
+        q = &a / &b;
+        r = &a % &b;
+
+        a = b;
+        b = r;
+
+        tmp = ua;
+        ua = ub.clone();
+        ub = tmp - &q * &ub;
+
+        tmp = va;
+        va = vb.clone();
+        vb = tmp - &q * &vb;
     }
 
-    if s > *m {
-        return Some(s - m);
-    }
-    if s.is_negative() {
-        return Some(s + m);
-    }
-
-    Some(s)
+    (a, ua, va)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use num_bigint::RandBigInt;
     use num_traits::FromPrimitive;
+    use rand::thread_rng;
 
     #[test]
     fn test_jacobi() {
@@ -209,16 +218,19 @@ mod tests {
         let tests = [
             ["1234567", "458948883992"],
 	    ["239487239847", "2410312426921032588552076022197566074856950548502459942654116941958108831682612228890093858261341614673227141477904012196503648957050582631942730706805009223062734745341073406696246014589361659774041027169249453200378729434170325843778659198143763193776859869524088940195577346119843545301547043747207749969763750084308926339295559968882457872412993810129130294592999947926365264059284647209730384947211681434464714438488520940127459844288859336526896320919633919"],
-            // TODO: enable, once algorithm works for negative numbers
-	    // ["-10", "13"],
+	    ["-10", "13"],
+            ["-6193420858199668535", "2881"],
         ];
 
         for test in &tests {
             let element = BigInt::parse_bytes(test[0].as_bytes(), 10).unwrap();
             let modulus = BigInt::parse_bytes(test[1].as_bytes(), 10).unwrap();
 
+            println!("{} modinv {}", element, modulus);
             let inverse = element.clone().mod_inverse(&modulus).unwrap();
-            let cmp = (inverse * &element) % &modulus;
+            println!("inverse: {}", &inverse);
+            let cmp = (inverse * &element).mod_floor(&modulus);
+
             assert_eq!(
                 cmp,
                 BigInt::one(),
@@ -235,26 +247,57 @@ mod tests {
         for n in 2..100 {
             let modulus = BigInt::from_u64(n).unwrap();
             for x in 1..n {
-                let element = BigInt::from_u64(x).unwrap();
-                let gcd = element.gcd(&modulus);
+                for sign in vec![1i64, -1i64] {
+                    let element = BigInt::from_i64(sign * x as i64).unwrap();
+                    let gcd = element.gcd(&modulus);
 
-                if !gcd.is_one() {
-                    continue;
+                    if !gcd.is_one() {
+                        continue;
+                    }
+
+                    let inverse = element.clone().mod_inverse(&modulus).unwrap();
+                    let cmp = (&inverse * &element).mod_floor(&modulus);
+                    println!("inverse: {}", &inverse);
+                    assert_eq!(
+                        cmp,
+                        BigInt::one(),
+                        "mod_inverse({}, {}) * {} % {} = {}, not 1",
+                        &element,
+                        &modulus,
+                        &element,
+                        &modulus,
+                        &cmp
+                    );
                 }
-
-                let inverse = element.clone().mod_inverse(&modulus).unwrap();
-                let cmp = (&inverse * &element) % &modulus;
-                assert_eq!(
-                    cmp,
-                    BigInt::one(),
-                    "mod_inverse({}, {})*{}%{}={}, not 1",
-                    &element,
-                    &modulus,
-                    &element,
-                    &modulus,
-                    &cmp
-                );
             }
         }
     }
+
+    #[test]
+    fn test_extended_gcd_example() {
+        // simple example for wikipedia
+        let a = BigUint::from_u32(240).unwrap();
+        let b = BigUint::from_u32(46).unwrap();
+        let (q, s_k, t_k) = extended_gcd(&a, &b);
+
+        assert_eq!(q, BigInt::from_i32(2).unwrap());
+        assert_eq!(s_k, BigInt::from_i32(-9).unwrap());
+        assert_eq!(t_k, BigInt::from_i32(47).unwrap());
+    }
+
+    #[test]
+    fn test_extended_gcd_assumptions() {
+        let mut rng = thread_rng();
+
+        for i in 1..100 {
+            let a = rng.gen_biguint(i * 128);
+            let b = rng.gen_biguint(i * 128);
+            let (q, s_k, t_k) = extended_gcd(&a, &b);
+
+            let lhs = BigInt::from_biguint(Plus, a) * &s_k;
+            let rhs = BigInt::from_biguint(Plus, b) * &t_k;
+            assert_eq!(q, lhs + &rhs);
+        }
+    }
+
 }

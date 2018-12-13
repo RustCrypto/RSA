@@ -32,7 +32,7 @@ pub fn generate_multi_prime_key<R: Rng>(
 
     if bit_size < 64 {
         let prime_limit = (1u64 << (bit_size / nprimes) as u64) as f64;
-        println!("{} {}", prime_limit, bit_size);
+
         // pi aproximates the number of primes less than prime_limit
         let mut pi = prime_limit / (prime_limit.ln() - 1f64);
         // Generated primes start with 0b11, so we can only use a quarter of them.
