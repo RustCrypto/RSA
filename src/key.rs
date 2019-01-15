@@ -1,3 +1,4 @@
+use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint, RandBigInt};
 use num_traits::{FromPrimitive, One, Signed, Zero};
@@ -6,7 +7,6 @@ use rand::{Rng, ThreadRng};
 use algorithms::generate_multi_prime_key;
 use errors::{Error, Result};
 use hash::Hash;
-use math::ModInverse;
 use padding::PaddingScheme;
 use pkcs1v15;
 

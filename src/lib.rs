@@ -1,5 +1,5 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/RustCrypto/meta/master/logo_small.png")]
-extern crate num_bigint_dig as num_bigint;
+extern crate num_bigint;
 extern crate num_integer;
 extern crate num_traits;
 #[macro_use]
@@ -17,15 +17,11 @@ extern crate rand;
 extern crate sha1;
 extern crate subtle;
 
-pub mod prime;
-pub use prime_rand::RandPrime;
 pub mod errors;
 pub mod padding;
 pub use key::{PublicKey, RSAPrivateKey, RSAPublicKey};
 pub mod algorithms;
 pub mod hash;
-pub mod math;
 
 mod key;
 mod pkcs1v15;
-mod prime_rand;

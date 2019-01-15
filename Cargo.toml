@@ -10,7 +10,8 @@ keywords = ["rsa", "encryption", "security", "crypto"]
 categories = ["cryptography"]
 
 [dependencies]
-num-bigint-dig = { version = "0.2", features = ["rand", "i128", "u64_digit"] }
+#num-bigint-dig = { version = "0.2", features = ["rand", "i128", "u64_digit", "prime"] }
+num-bigint = { git = "https://github.com/dignifiedquire/num-bigint", features = ["rand", "i128", "u64_digit", "prime"], package = "num-bigint-dig" }
 num-traits = "0.2.6"
 num-integer = "0.1.39"
 num-iter = "0.1.37"
@@ -25,9 +26,6 @@ base64 = "0.10.0"
 sha-1 = "0.8.0"
 sha2 = "0.8.0"
 hex = "0.3.2"
-
-[[bench]]
-name = "prime"
 
 [[bench]]
 name = "key"

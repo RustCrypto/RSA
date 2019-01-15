@@ -1,11 +1,10 @@
+use num_bigint::traits::ModInverse;
+use num_bigint::{BigUint, RandPrime};
+use num_traits::{FromPrimitive, One, Zero};
 use rand::Rng;
 
 use errors::{Error, Result};
 use key::RSAPrivateKey;
-use math::ModInverse;
-use num_bigint::BigUint;
-use num_traits::{FromPrimitive, One, Zero};
-use prime_rand::RandPrime;
 
 /// Default exponent for RSA keys.
 const EXP: u64 = 65537;
