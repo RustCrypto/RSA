@@ -98,7 +98,7 @@ pub fn generate_multi_prime_key<R: Rng>(
         let exp = BigUint::from_u64(EXP).expect("invalid static exponent");
         if let Some(d) = exp.mod_inverse(totient) {
             n_final = n;
-            d_final = d;
+            d_final = d.to_biguint().unwrap();
             break;
         }
     }

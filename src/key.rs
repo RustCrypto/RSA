@@ -205,7 +205,6 @@ impl RSAPrivateKey {
         let qinv = self.primes[1]
             .clone()
             .mod_inverse(&self.primes[0])
-            .map(|v| BigInt::from_biguint(Plus, v))
             .expect("invalid prime");
 
         let mut r: BigUint = &self.primes[0] * &self.primes[1];
@@ -219,7 +218,7 @@ impl RSAPrivateKey {
                     r: BigInt::from_biguint(Plus, r.clone()),
                     coeff: BigInt::from_biguint(
                         Plus,
-                        r.clone().mod_inverse(prime).expect("invalid coeff"),
+                        r.clone().mod_inverse(prime).expect("invalid coeff").to_biguint().unwrap(),
                     ),
                 };
                 r *= prime;
@@ -446,7 +445,7 @@ pub fn decrypt<R: Rng>(
     match ir {
         Some(ref ir) => {
             // unblind
-            Ok((m * ir) % priv_key.n())
+            Ok((m * ir.to_biguint().unwrap()) % priv_key.n())
         }
         None => Ok(m),
     }
