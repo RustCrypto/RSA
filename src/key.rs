@@ -118,6 +118,21 @@ pub trait PublicKey {
     fn size(&self) -> usize {
         (self.n().bits() + 7) / 8
     }
+
+    /// Encrypt the given message.
+    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>>;
+
+    /// Verify a signed message.
+    /// `hashed`must be the result of hashing the input using the hashing function
+    /// passed in through `hash`.
+    /// If the message is valid `Ok(())` is returned, otherwiese an `Err` indicating failure.
+    fn verify<H: Hash>(
+        &self,
+        padding: PaddingScheme,
+        hash: Option<&H>,
+        hashed: &[u8],
+        sig: &[u8],
+    ) -> Result<()>;
 }
 
 impl PublicKey for RSAPublicKey {
@@ -128,24 +143,7 @@ impl PublicKey for RSAPublicKey {
     fn e(&self) -> &BigUint {
         &self.e
     }
-}
-
-impl RSAPublicKey {
-    /// Create a new key from its components.
-    pub fn new(n: BigUint, e: BigUint) -> Result<Self> {
-        let k = RSAPublicKey { n, e };
-        check_public(&k)?;
-
-        Ok(k)
-    }
-
-    /// Encrypt the given message.
-    pub fn encrypt<R: Rng>(
-        &self,
-        rng: &mut R,
-        padding: PaddingScheme,
-        msg: &[u8],
-    ) -> Result<Vec<u8>> {
+    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
             PaddingScheme::OAEP => unimplemented!("not yet implemented"),
@@ -153,11 +151,7 @@ impl RSAPublicKey {
         }
     }
 
-    /// Verify a signed message.
-    /// `hashed`must be the result of hashing the input using the hashing function
-    /// passed in through `hash`.
-    /// If the message is valid `Ok(())` is returned, otherwiese an `Err` indicating failure.
-    pub fn verify<H: Hash>(
+    fn verify<H: Hash>(
         &self,
         padding: PaddingScheme,
         hash: Option<&H>,
@@ -172,6 +166,16 @@ impl RSAPublicKey {
     }
 }
 
+impl RSAPublicKey {
+    /// Create a new key from its components.
+    pub fn new(n: BigUint, e: BigUint) -> Result<Self> {
+        let k = RSAPublicKey { n, e };
+        check_public(&k)?;
+
+        Ok(k)
+    }
+}
+
 impl<'a> PublicKey for &'a RSAPublicKey {
     fn n(&self) -> &BigUint {
         &self.n
@@ -179,6 +183,20 @@ impl<'a> PublicKey for &'a RSAPublicKey {
 
     fn e(&self) -> &BigUint {
         &self.e
+    }
+
+    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
+        (*self).encrypt(rng, padding, msg)
+    }
+
+    fn verify<H: Hash>(
+        &self,
+        padding: PaddingScheme,
+        hash: Option<&H>,
+        hashed: &[u8],
+        sig: &[u8],
+    ) -> Result<()> {
+        (*self).verify(padding, hash, hashed, sig)
     }
 }
 
@@ -190,6 +208,28 @@ impl PublicKey for RSAPrivateKey {
     fn e(&self) -> &BigUint {
         &self.e
     }
+
+    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
+        match padding {
+            PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
+            PaddingScheme::OAEP => unimplemented!("not yet implemented"),
+            _ => Err(Error::InvalidPaddingScheme),
+        }
+    }
+
+    fn verify<H: Hash>(
+        &self,
+        padding: PaddingScheme,
+        hash: Option<&H>,
+        hashed: &[u8],
+        sig: &[u8],
+    ) -> Result<()> {
+        match padding {
+            PaddingScheme::PKCS1v15 => pkcs1v15::verify(self, hash, hashed, sig),
+            PaddingScheme::PSS => unimplemented!("not yet implemented"),
+            _ => Err(Error::InvalidPaddingScheme),
+        }
+    }
 }
 
 impl<'a> PublicKey for &'a RSAPrivateKey {
@@ -199,6 +239,20 @@ impl<'a> PublicKey for &'a RSAPrivateKey {
 
     fn e(&self) -> &BigUint {
         &self.e
+    }
+
+    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
+        (*self).encrypt(rng, padding, msg)
+    }
+
+    fn verify<H: Hash>(
+        &self,
+        padding: PaddingScheme,
+        hash: Option<&H>,
+        hashed: &[u8],
+        sig: &[u8],
+    ) -> Result<()> {
+        (*self).verify(padding, hash, hashed, sig)
     }
 }
 

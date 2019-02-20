@@ -5,6 +5,32 @@ A portable RSA implementation in pure Rust.
 
 :warning: **WARNING:** This library has __not__ been audited, so please do not use for production code.
 
+## Example
+
+```rust
+extern crate rsa;
+extern crate rand;
+
+use rsa::{PublicKey, RSAPrivateKey, PaddingScheme};
+use rand::rngs::OsRng;
+
+use rsa::{PublicKey, RSAPrivateKey, PaddingScheme};
+use rand::rngs::OsRng;
+
+let mut rng = OsRng::new().expect("no secure randomness available");
+let bits = 2048;
+let key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+
+// Encrypt
+let data = b"hello world";
+let enc_data = key.encrypt(&mut rng, PaddingScheme::PKCS1v15, &data[..]).expect("failed to encrypt");
+assert_ne!(&data[..], &enc_data[..]);
+
+// Decrypt
+let dec_data = key.decrypt(PaddingScheme::PKCS1v15, &enc_data).expect("failed to decrypt");
+assert_eq!(&data[..], &dec_data[..]);
+```
+
 ## Status
 
 Currently at Phase 1 (v) :construction:.
