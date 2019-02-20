@@ -1,3 +1,4 @@
+use clear_on_drop::clear::Clear;
 use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint, RandBigInt};
@@ -37,6 +38,15 @@ pub struct RSAPrivateKey {
     precomputed: Option<PrecomputedValues>,
 }
 
+impl Drop for RSAPrivateKey {
+    #[inline]
+    fn drop(&mut self) {
+        self.d.clear();
+        self.primes.clear();
+        self.precomputed.clear();
+    }
+}
+
 #[derive(Debug, Clone)]
 struct PrecomputedValues {
     /// D mod (P-1)
@@ -53,6 +63,16 @@ struct PrecomputedValues {
     crt_values: Vec<CRTValue>,
 }
 
+impl Drop for PrecomputedValues {
+    #[inline]
+    fn drop(&mut self) {
+        self.dp.clear();
+        self.dq.clear();
+        self.qinv.clear();
+        self.crt_values.clear();
+    }
+}
+
 /// Contains the precomputed Chinese remainder theorem values.
 #[derive(Debug, Clone)]
 struct CRTValue {
@@ -66,10 +86,10 @@ struct CRTValue {
 
 impl From<RSAPrivateKey> for RSAPublicKey {
     fn from(private_key: RSAPrivateKey) -> Self {
-        RSAPublicKey {
-            n: private_key.n.clone(),
-            e: private_key.e,
-        }
+        let n = private_key.n.clone();
+        let e = private_key.e.clone();
+
+        RSAPublicKey { n, e }
     }
 }
 
@@ -218,7 +238,11 @@ impl RSAPrivateKey {
                     r: BigInt::from_biguint(Plus, r.clone()),
                     coeff: BigInt::from_biguint(
                         Plus,
-                        r.clone().mod_inverse(prime).expect("invalid coeff").to_biguint().unwrap(),
+                        r.clone()
+                            .mod_inverse(prime)
+                            .expect("invalid coeff")
+                            .to_biguint()
+                            .unwrap(),
                     ),
                 };
                 r *= prime;

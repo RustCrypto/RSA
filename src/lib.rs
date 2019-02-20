@@ -9,6 +9,7 @@ extern crate byteorder;
 extern crate failure;
 #[cfg(test)]
 extern crate base64;
+extern crate clear_on_drop;
 #[cfg(test)]
 extern crate hex;
 extern crate num_iter;

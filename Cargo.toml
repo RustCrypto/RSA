@@ -19,6 +19,7 @@ rand = "0.5.5"
 byteorder = "1.2.7"
 failure = "0.1.3"
 subtle = "2.0.0"
+clear_on_drop = "0.2.3"
 
 [dev-dependencies]
 base64 = "0.10.0"
@@ -37,4 +38,4 @@ name = "key"
 
 [features]
 default = []
-nightly = ["subtle/nightly"]
+nightly = ["subtle/nightly", "clear_on_drop/nightly"]
