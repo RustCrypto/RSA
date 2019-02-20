@@ -4,6 +4,8 @@ use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint, RandBigInt};
 use num_traits::{FromPrimitive, One, Signed, Zero};
 use rand::{Rng, ThreadRng};
+#[cfg(feature = "serde1")]
+use serde::{Deserialize, Serialize};
 
 use algorithms::generate_multi_prime_key;
 use errors::{Error, Result};
@@ -17,7 +19,8 @@ lazy_static! {
 }
 
 /// Represents the public part of an RSA key.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 pub struct RSAPublicKey {
     n: BigUint,
     e: BigUint,
@@ -25,6 +28,7 @@ pub struct RSAPublicKey {
 
 /// Represents a whole RSA key, public and private parts.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 pub struct RSAPrivateKey {
     /// Modulus
     n: BigUint,
@@ -35,8 +39,18 @@ pub struct RSAPrivateKey {
     /// Prime factors of N, contains >= 2 elements.
     primes: Vec<BigUint>,
     /// precomputed values to speed up private operations
+    #[cfg_attr(feature = "serde1", serde(skip))]
     precomputed: Option<PrecomputedValues>,
 }
+
+impl PartialEq for RSAPrivateKey {
+    #[inline]
+    fn eq(&self, other: &RSAPrivateKey) -> bool {
+        self.n == other.n && self.e == other.e && self.d == other.d && self.primes == other.primes
+    }
+}
+
+impl Eq for RSAPrivateKey {}
 
 impl Drop for RSAPrivateKey {
     #[inline]
@@ -610,5 +624,65 @@ mod tests {
         for _ in 0..1000 {
             test_key_basics(&private_key);
         }
+    }
+
+    #[test]
+    #[cfg(feature = "serde1")]
+    fn test_serde() {
+        use rand::{SeedableRng, XorShiftRng};
+        use serde_test::{assert_tokens, Token};
+
+        let mut rng = XorShiftRng::from_seed([1; 16]);
+        let priv_key = RSAPrivateKey::new(&mut rng, 64).expect("failed to generate key");
+
+        let priv_tokens = [
+            Token::Struct {
+                name: "RSAPrivateKey",
+                len: 4,
+            },
+            Token::Str("n"),
+            Token::Seq { len: Some(2) },
+            Token::U32(1296829443),
+            Token::U32(2444363981),
+            Token::SeqEnd,
+            Token::Str("e"),
+            Token::Seq { len: Some(1) },
+            Token::U32(65537),
+            Token::SeqEnd,
+            Token::Str("d"),
+            Token::Seq { len: Some(2) },
+            Token::U32(298985985),
+            Token::U32(2349628418),
+            Token::SeqEnd,
+            Token::Str("primes"),
+            Token::Seq { len: Some(2) },
+            Token::Seq { len: Some(1) },
+            Token::U32(3238068481),
+            Token::SeqEnd,
+            Token::Seq { len: Some(1) },
+            Token::U32(3242199299),
+            Token::SeqEnd,
+            Token::SeqEnd,
+            Token::StructEnd,
+        ];
+        assert_tokens(&priv_key, &priv_tokens);
+
+        let priv_tokens = [
+            Token::Struct {
+                name: "RSAPublicKey",
+                len: 2,
+            },
+            Token::Str("n"),
+            Token::Seq { len: Some(2) },
+            Token::U32(1296829443),
+            Token::U32(2444363981),
+            Token::SeqEnd,
+            Token::Str("e"),
+            Token::Seq { len: Some(1) },
+            Token::U32(65537),
+            Token::SeqEnd,
+            Token::StructEnd,
+        ];
+        assert_tokens(&RSAPublicKey::from(priv_key), &priv_tokens);
     }
 }

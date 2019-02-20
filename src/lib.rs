@@ -7,16 +7,22 @@ extern crate lazy_static;
 extern crate byteorder;
 #[macro_use]
 extern crate failure;
-#[cfg(test)]
-extern crate base64;
 extern crate clear_on_drop;
-#[cfg(test)]
-extern crate hex;
 extern crate num_iter;
 extern crate rand;
+extern crate subtle;
+
+#[cfg(feature = "serde1")]
+extern crate serde;
+
+#[cfg(test)]
+extern crate base64;
+#[cfg(test)]
+extern crate hex;
+#[cfg(all(test, feature = "serde1"))]
+extern crate serde_test;
 #[cfg(test)]
 extern crate sha1;
-extern crate subtle;
 
 pub mod errors;
 pub mod padding;
