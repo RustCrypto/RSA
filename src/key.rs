@@ -1,8 +1,11 @@
+use clear_on_drop::clear::Clear;
 use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint, RandBigInt};
 use num_traits::{FromPrimitive, One, Signed, Zero};
 use rand::{Rng, ThreadRng};
+#[cfg(feature = "serde1")]
+use serde::{Deserialize, Serialize};
 
 use algorithms::generate_multi_prime_key;
 use errors::{Error, Result};
@@ -16,7 +19,8 @@ lazy_static! {
 }
 
 /// Represents the public part of an RSA key.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 pub struct RSAPublicKey {
     n: BigUint,
     e: BigUint,
@@ -24,6 +28,7 @@ pub struct RSAPublicKey {
 
 /// Represents a whole RSA key, public and private parts.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 pub struct RSAPrivateKey {
     /// Modulus
     n: BigUint,
@@ -34,7 +39,26 @@ pub struct RSAPrivateKey {
     /// Prime factors of N, contains >= 2 elements.
     primes: Vec<BigUint>,
     /// precomputed values to speed up private operations
+    #[cfg_attr(feature = "serde1", serde(skip))]
     precomputed: Option<PrecomputedValues>,
+}
+
+impl PartialEq for RSAPrivateKey {
+    #[inline]
+    fn eq(&self, other: &RSAPrivateKey) -> bool {
+        self.n == other.n && self.e == other.e && self.d == other.d && self.primes == other.primes
+    }
+}
+
+impl Eq for RSAPrivateKey {}
+
+impl Drop for RSAPrivateKey {
+    #[inline]
+    fn drop(&mut self) {
+        self.d.clear();
+        self.primes.clear();
+        self.precomputed.clear();
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -53,6 +77,16 @@ struct PrecomputedValues {
     crt_values: Vec<CRTValue>,
 }
 
+impl Drop for PrecomputedValues {
+    #[inline]
+    fn drop(&mut self) {
+        self.dp.clear();
+        self.dq.clear();
+        self.qinv.clear();
+        self.crt_values.clear();
+    }
+}
+
 /// Contains the precomputed Chinese remainder theorem values.
 #[derive(Debug, Clone)]
 struct CRTValue {
@@ -66,10 +100,10 @@ struct CRTValue {
 
 impl From<RSAPrivateKey> for RSAPublicKey {
     fn from(private_key: RSAPrivateKey) -> Self {
-        RSAPublicKey {
-            n: private_key.n.clone(),
-            e: private_key.e,
-        }
+        let n = private_key.n.clone();
+        let e = private_key.e.clone();
+
+        RSAPublicKey { n, e }
     }
 }
 
@@ -84,6 +118,21 @@ pub trait PublicKey {
     fn size(&self) -> usize {
         (self.n().bits() + 7) / 8
     }
+
+    /// Encrypt the given message.
+    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>>;
+
+    /// Verify a signed message.
+    /// `hashed`must be the result of hashing the input using the hashing function
+    /// passed in through `hash`.
+    /// If the message is valid `Ok(())` is returned, otherwiese an `Err` indicating failure.
+    fn verify<H: Hash>(
+        &self,
+        padding: PaddingScheme,
+        hash: Option<&H>,
+        hashed: &[u8],
+        sig: &[u8],
+    ) -> Result<()>;
 }
 
 impl PublicKey for RSAPublicKey {
@@ -94,24 +143,7 @@ impl PublicKey for RSAPublicKey {
     fn e(&self) -> &BigUint {
         &self.e
     }
-}
-
-impl RSAPublicKey {
-    /// Create a new key from its components.
-    pub fn new(n: BigUint, e: BigUint) -> Result<Self> {
-        let k = RSAPublicKey { n, e };
-        check_public(&k)?;
-
-        Ok(k)
-    }
-
-    /// Encrypt the given message.
-    pub fn encrypt<R: Rng>(
-        &self,
-        rng: &mut R,
-        padding: PaddingScheme,
-        msg: &[u8],
-    ) -> Result<Vec<u8>> {
+    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
             PaddingScheme::OAEP => unimplemented!("not yet implemented"),
@@ -119,11 +151,7 @@ impl RSAPublicKey {
         }
     }
 
-    /// Verify a signed message.
-    /// `hashed`must be the result of hashing the input using the hashing function
-    /// passed in through `hash`.
-    /// If the message is valid `Ok(())` is returned, otherwiese an `Err` indicating failure.
-    pub fn verify<H: Hash>(
+    fn verify<H: Hash>(
         &self,
         padding: PaddingScheme,
         hash: Option<&H>,
@@ -138,6 +166,16 @@ impl RSAPublicKey {
     }
 }
 
+impl RSAPublicKey {
+    /// Create a new key from its components.
+    pub fn new(n: BigUint, e: BigUint) -> Result<Self> {
+        let k = RSAPublicKey { n, e };
+        check_public(&k)?;
+
+        Ok(k)
+    }
+}
+
 impl<'a> PublicKey for &'a RSAPublicKey {
     fn n(&self) -> &BigUint {
         &self.n
@@ -145,6 +183,20 @@ impl<'a> PublicKey for &'a RSAPublicKey {
 
     fn e(&self) -> &BigUint {
         &self.e
+    }
+
+    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
+        (*self).encrypt(rng, padding, msg)
+    }
+
+    fn verify<H: Hash>(
+        &self,
+        padding: PaddingScheme,
+        hash: Option<&H>,
+        hashed: &[u8],
+        sig: &[u8],
+    ) -> Result<()> {
+        (*self).verify(padding, hash, hashed, sig)
     }
 }
 
@@ -156,6 +208,28 @@ impl PublicKey for RSAPrivateKey {
     fn e(&self) -> &BigUint {
         &self.e
     }
+
+    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
+        match padding {
+            PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
+            PaddingScheme::OAEP => unimplemented!("not yet implemented"),
+            _ => Err(Error::InvalidPaddingScheme),
+        }
+    }
+
+    fn verify<H: Hash>(
+        &self,
+        padding: PaddingScheme,
+        hash: Option<&H>,
+        hashed: &[u8],
+        sig: &[u8],
+    ) -> Result<()> {
+        match padding {
+            PaddingScheme::PKCS1v15 => pkcs1v15::verify(self, hash, hashed, sig),
+            PaddingScheme::PSS => unimplemented!("not yet implemented"),
+            _ => Err(Error::InvalidPaddingScheme),
+        }
+    }
 }
 
 impl<'a> PublicKey for &'a RSAPrivateKey {
@@ -165,6 +239,20 @@ impl<'a> PublicKey for &'a RSAPrivateKey {
 
     fn e(&self) -> &BigUint {
         &self.e
+    }
+
+    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
+        (*self).encrypt(rng, padding, msg)
+    }
+
+    fn verify<H: Hash>(
+        &self,
+        padding: PaddingScheme,
+        hash: Option<&H>,
+        hashed: &[u8],
+        sig: &[u8],
+    ) -> Result<()> {
+        (*self).verify(padding, hash, hashed, sig)
     }
 }
 
@@ -218,7 +306,11 @@ impl RSAPrivateKey {
                     r: BigInt::from_biguint(Plus, r.clone()),
                     coeff: BigInt::from_biguint(
                         Plus,
-                        r.clone().mod_inverse(prime).expect("invalid coeff").to_biguint().unwrap(),
+                        r.clone()
+                            .mod_inverse(prime)
+                            .expect("invalid coeff")
+                            .to_biguint()
+                            .unwrap(),
                     ),
                 };
                 r *= prime;
@@ -586,5 +678,65 @@ mod tests {
         for _ in 0..1000 {
             test_key_basics(&private_key);
         }
+    }
+
+    #[test]
+    #[cfg(feature = "serde1")]
+    fn test_serde() {
+        use rand::{SeedableRng, XorShiftRng};
+        use serde_test::{assert_tokens, Token};
+
+        let mut rng = XorShiftRng::from_seed([1; 16]);
+        let priv_key = RSAPrivateKey::new(&mut rng, 64).expect("failed to generate key");
+
+        let priv_tokens = [
+            Token::Struct {
+                name: "RSAPrivateKey",
+                len: 4,
+            },
+            Token::Str("n"),
+            Token::Seq { len: Some(2) },
+            Token::U32(1296829443),
+            Token::U32(2444363981),
+            Token::SeqEnd,
+            Token::Str("e"),
+            Token::Seq { len: Some(1) },
+            Token::U32(65537),
+            Token::SeqEnd,
+            Token::Str("d"),
+            Token::Seq { len: Some(2) },
+            Token::U32(298985985),
+            Token::U32(2349628418),
+            Token::SeqEnd,
+            Token::Str("primes"),
+            Token::Seq { len: Some(2) },
+            Token::Seq { len: Some(1) },
+            Token::U32(3238068481),
+            Token::SeqEnd,
+            Token::Seq { len: Some(1) },
+            Token::U32(3242199299),
+            Token::SeqEnd,
+            Token::SeqEnd,
+            Token::StructEnd,
+        ];
+        assert_tokens(&priv_key, &priv_tokens);
+
+        let priv_tokens = [
+            Token::Struct {
+                name: "RSAPublicKey",
+                len: 2,
+            },
+            Token::Str("n"),
+            Token::Seq { len: Some(2) },
+            Token::U32(1296829443),
+            Token::U32(2444363981),
+            Token::SeqEnd,
+            Token::Str("e"),
+            Token::Seq { len: Some(1) },
+            Token::U32(65537),
+            Token::SeqEnd,
+            Token::StructEnd,
+        ];
+        assert_tokens(&RSAPublicKey::from(priv_key), &priv_tokens);
     }
 }
