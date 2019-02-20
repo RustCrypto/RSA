@@ -1,6 +1,6 @@
 use num_bigint::BigUint;
 use rand::Rng;
-use subtle::{Choice, ConditionallyAssignable, ConditionallySelectable, ConstantTimeEq};
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 use errors::{Error, Result};
 use hash::Hash;
