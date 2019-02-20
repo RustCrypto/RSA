@@ -1,4 +1,4 @@
-[project]
+[package]
 name = "rsa"
 version = "0.1.1-alpha.0"
 authors = ["RustCrypto Developers", "dignifiedquire <dignifiedquire@gmail.com>"]
