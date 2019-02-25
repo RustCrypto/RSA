@@ -55,7 +55,7 @@ fn bench_rsa_2048_pkcsv1_sign_blinded(b: &mut Bencher) {
             .sign_blinded(
                 &mut rng,
                 PaddingScheme::PKCS1v15,
-                Some(&Hashes::SHA256),
+                Some(&Hashes::SHA2_256),
                 &digest,
             )
             .unwrap();
