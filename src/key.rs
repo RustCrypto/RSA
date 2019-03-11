@@ -446,6 +446,42 @@ pub fn encrypt<K: PublicKey>(key: &K, m: &BigUint) -> BigUint {
     m.modpow(key.e(), key.n())
 }
 
+// Returns the blinded c, along with the unblinding factor.
+pub fn blind<R: Rng>(rng: &mut R, priv_key: &RSAPrivateKey, c: &BigUint) -> (BigUint, BigUint) {
+    // Blinding involves multiplying c by r^e.
+    // Then the decryption operation performs (m^e * r^e)^d mod n
+    // which equals mr mod n. The factor of r can then be removed
+    // by multiplying by the multiplicative inverse of r.
+
+    let mut r: BigUint;
+    let mut ir: Option<BigInt>;
+    let unblinder;
+    loop {
+        r = rng.gen_biguint_below(priv_key.n());
+        if r.is_zero() {
+            r = BigUint::one();
+        }
+        ir = r.clone().mod_inverse(priv_key.n());
+        if let Some(ir) = ir {
+            if let Some(ub) = ir.to_biguint() {
+                unblinder = ub;
+                break;
+            }
+        }
+    }
+
+    let e = priv_key.e();
+    let rpowe = r.modpow(&e, priv_key.n()); // N != 0
+    let c = (c * &rpowe) % priv_key.n();
+
+    (c, unblinder)
+}
+
+// Given an m and and unblinding factor, unblind the m.
+pub fn unblind(priv_key: &RSAPrivateKey, m: &BigUint, unblind: &BigUint) -> BigUint {
+    (m * unblind) % priv_key.n()
+}
+
 /// Performs RSA decryption, resulting in a plaintext `BigUint`.
 /// Peforms RSA blinding if an `Rng` is passed.
 #[inline]
@@ -464,26 +500,9 @@ pub fn decrypt<R: Rng>(
 
     let mut ir = None;
     let c = if let Some(ref mut rng) = rng {
-        // Blinding enabled. Blinding involves multiplying c by r^e.
-        // Then the decryption operation performs (m^e * r^e)^d mod n
-        // which equals mr mod n. The factor of r can then be removed
-        // by multiplying by the multiplicative inverse of r.
-
-        let mut r: BigUint;
-        loop {
-            r = rng.gen_biguint_below(priv_key.n());
-            if r.is_zero() {
-                r = BigUint::one();
-            }
-            ir = r.clone().mod_inverse(priv_key.n());
-            if ir.is_some() {
-                break;
-            }
-        }
-
-        let e = priv_key.e();
-        let rpowe = r.modpow(&e, priv_key.n()); // N != 0
-        (c * &rpowe) % priv_key.n()
+        let (blinded, unblinder) = blind(rng, priv_key, c);
+        ir = Some(unblinder);
+        blinded
     } else {
         c.clone()
     };
@@ -537,7 +556,7 @@ pub fn decrypt<R: Rng>(
     match ir {
         Some(ref ir) => {
             // unblind
-            Ok((m * ir.to_biguint().unwrap()) % priv_key.n())
+            Ok(unblind(priv_key, &m, &ir))
         }
         None => Ok(m),
     }
