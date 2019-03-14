@@ -51,10 +51,22 @@ extern crate serde_test;
 #[cfg(test)]
 extern crate sha1;
 
+/// useful algorithms
 pub mod algorithms;
+
+/// Contains raw RSA functions that should not be used directly.
+///
+/// This module is provided so that other crates that implement non-standard RSA schemes can use these RSA primitives.
+/// If you are not implementing a custom RSA-based scheme, you should not use these functions.
 pub mod danger;
+
+/// Errot types
 pub mod errors;
+
+/// Supported hash functions.
 pub mod hash;
+
+/// Supported padding schemes.
 pub mod padding;
 
 mod key;

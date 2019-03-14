@@ -442,7 +442,7 @@ pub fn check_public(public_key: &impl PublicKey) -> Result<()> {
     Ok(())
 }
 
-/// Raw RSA encryption of m with the public key.
+/// Raw RSA encryption of m with the public key. No padding is performed.
 #[inline]
 pub fn encrypt<K: PublicKey>(key: &K, m: &BigUint) -> BigUint {
     m.modpow(key.e(), key.n())
@@ -484,7 +484,7 @@ pub fn unblind(priv_key: &RSAPrivateKey, m: &BigUint, unblinder: &BigUint) -> Bi
     (m * unblinder) % priv_key.n()
 }
 
-/// Performs raw RSA decryption, resulting in a plaintext `BigUint`.
+/// Performs raw RSA decryption with no padding, resulting in a plaintext `BigUint`.
 /// Peforms RSA blinding if an `Rng` is passed.
 #[inline]
 pub fn decrypt<R: Rng>(
