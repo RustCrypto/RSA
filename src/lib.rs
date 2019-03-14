@@ -52,6 +52,7 @@ extern crate serde_test;
 extern crate sha1;
 
 pub mod algorithms;
+pub mod danger;
 pub mod errors;
 pub mod hash;
 pub mod padding;

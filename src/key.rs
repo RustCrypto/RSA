@@ -426,23 +426,9 @@ impl RSAPrivateKey {
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
-
-    /// Blind the given digest, returning the blinded digest and the unblinding factor.
-    pub fn blind<R: Rng>(&self, rng: &mut R, digest: &[u8]) -> (Vec<u8>, Vec<u8>) {
-        let c = BigUint::from_bytes_be(digest);
-        let (c, unblinder) = blind::<R>(rng, self, &c);
-        (c.to_bytes_be(), unblinder.to_bytes_be())
-    }
-
-    /// Unblind the given signature, producing a signature that also signs the unblided digest.
-    pub fn unblind(&self, blinded_sig: &[u8], unblinder: &[u8]) -> Vec<u8> {
-        let blinded_sig = BigUint::from_bytes_be(blinded_sig);
-        let unblinder = BigUint::from_bytes_be(unblinder);
-        let unblinded = unblind(self, &blinded_sig, &unblinder);
-        unblinded.to_bytes_be()
-    }
 }
 
+/// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
 pub fn check_public(public_key: &impl PublicKey) -> Result<()> {
     if public_key.e() < &*MIN_PUB_EXPONENT {
@@ -456,12 +442,13 @@ pub fn check_public(public_key: &impl PublicKey) -> Result<()> {
     Ok(())
 }
 
+/// Raw RSA encryption of m with the public key.
 #[inline]
 pub fn encrypt<K: PublicKey>(key: &K, m: &BigUint) -> BigUint {
     m.modpow(key.e(), key.n())
 }
 
-// Returns the bed c, along with the unblinding factor.
+/// Returns the blinded c, along with the unblinding factor.
 pub fn blind<R: Rng>(rng: &mut R, priv_key: &RSAPrivateKey, c: &BigUint) -> (BigUint, BigUint) {
     // Blinding involves multiplying c by r^e.
     // Then the decryption operation performs (m^e * r^e)^d mod n
@@ -492,12 +479,12 @@ pub fn blind<R: Rng>(rng: &mut R, priv_key: &RSAPrivateKey, c: &BigUint) -> (Big
     (c, unblinder)
 }
 
-// Given an m and and unblinding factor, unblind the m.
+/// Given an m and and unblinding factor, unblind the m.
 pub fn unblind(priv_key: &RSAPrivateKey, m: &BigUint, unblinder: &BigUint) -> BigUint {
     (m * unblinder) % priv_key.n()
 }
 
-/// Performs RSA decryption, resulting in a plaintext `BigUint`.
+/// Performs raw RSA decryption, resulting in a plaintext `BigUint`.
 /// Peforms RSA blinding if an `Rng` is passed.
 #[inline]
 pub fn decrypt<R: Rng>(
@@ -577,6 +564,9 @@ pub fn decrypt<R: Rng>(
     }
 }
 
+/// Performs RSA decryption, resulting in a plaintext `BigUint`.
+/// Peforms RSA blinding if an `Rng` is passed.
+/// This will also check for errors in the CRT computation.
 #[inline]
 pub fn decrypt_and_check<R: Rng>(
     rng: Option<&mut R>,
