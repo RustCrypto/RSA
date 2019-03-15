@@ -112,7 +112,7 @@ pub fn decrypt_and_check<R: Rng>(
 }
 
 /// Returns the blinded c, along with the unblinding factor.
-pub fn blind<R: Rng>(rng: &mut R, priv_key: &RSAPrivateKey, c: &BigUint) -> (BigUint, BigUint) {
+pub fn blind<R: Rng, K: PublicKey>(rng: &mut R, key: &K, c: &BigUint) -> (BigUint, BigUint) {
   // Blinding involves multiplying c by r^e.
   // Then the decryption operation performs (m^e * r^e)^d mod n
   // which equals mr mod n. The factor of r can then be removed
@@ -122,11 +122,11 @@ pub fn blind<R: Rng>(rng: &mut R, priv_key: &RSAPrivateKey, c: &BigUint) -> (Big
   let mut ir: Option<BigInt>;
   let unblinder;
   loop {
-    r = rng.gen_biguint_below(priv_key.n());
+    r = rng.gen_biguint_below(key.n());
     if r.is_zero() {
       r = BigUint::one();
     }
-    ir = r.clone().mod_inverse(priv_key.n());
+    ir = r.clone().mod_inverse(key.n());
     if let Some(ir) = ir {
       if let Some(ub) = ir.to_biguint() {
         unblinder = ub;
@@ -135,16 +135,16 @@ pub fn blind<R: Rng>(rng: &mut R, priv_key: &RSAPrivateKey, c: &BigUint) -> (Big
     }
   }
 
-  let e = priv_key.e();
-  let rpowe = r.modpow(&e, priv_key.n()); // N != 0
-  let c = (c * &rpowe) % priv_key.n();
+  let e = key.e();
+  let rpowe = r.modpow(&e, key.n()); // N != 0
+  let c = (c * &rpowe) % key.n();
 
   (c, unblinder)
 }
 
 /// Given an m and and unblinding factor, unblind the m.
-pub fn unblind(priv_key: &RSAPrivateKey, m: &BigUint, unblinder: &BigUint) -> BigUint {
-  (m * unblinder) % priv_key.n()
+pub fn unblind(key: impl PublicKey, m: &BigUint, unblinder: &BigUint) -> BigUint {
+  (m * unblinder) % key.n()
 }
 
 /// Returns a new vector of the given length, with 0s left padded.
