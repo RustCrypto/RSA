@@ -54,12 +54,6 @@ extern crate sha1;
 /// Useful algorithms.
 pub mod algorithms;
 
-/// Contains raw RSA functions that should not be used directly.
-///
-/// This module is provided so that other crates that implement non-standard RSA schemes can use these RSA primitives.
-/// If you are not implementing a custom RSA-based scheme, you should not use these functions.
-pub mod danger;
-
 /// Error types.
 pub mod errors;
 
@@ -74,3 +68,12 @@ mod pkcs1v15;
 
 pub use self::key::{PublicKey, RSAPrivateKey, RSAPublicKey};
 pub use self::padding::PaddingScheme;
+
+// Optionally expose internals if requested via feature-flag.
+
+#[cfg(not(feature = "expose-internals"))]
+mod internals;
+
+/// Internal raw RSA functions.
+#[cfg(feature = "expose-internals")]
+pub mod internals;

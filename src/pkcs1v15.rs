@@ -4,6 +4,7 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 use errors::{Error, Result};
 use hash::Hash;
+use internals;
 use key::{self, PublicKey, RSAPrivateKey};
 
 // Encrypts the given message with RSA and the padding
@@ -26,7 +27,7 @@ pub fn encrypt<R: Rng, K: PublicKey>(rng: &mut R, pub_key: &K, msg: &[u8]) -> Re
     em[k - msg.len()..].copy_from_slice(msg);
 
     let m = BigUint::from_bytes_be(&em);
-    let c = key::encrypt(pub_key, &m).to_bytes_be();
+    let c = internals::encrypt(pub_key, &m).to_bytes_be();
 
     copy_with_left_pad(&mut em, &c);
     Ok(em)
@@ -93,7 +94,7 @@ pub fn sign<R: Rng, H: Hash>(
     em[k - hash_len..k].copy_from_slice(hashed);
 
     let m = BigUint::from_bytes_be(&em);
-    let c = key::decrypt_and_check(rng, priv_key, &m)?.to_bytes_be();
+    let c = internals::decrypt_and_check(rng, priv_key, &m)?.to_bytes_be();
 
     copy_with_left_pad(&mut em, &c);
 
@@ -117,8 +118,8 @@ pub fn verify<H: Hash, K: PublicKey>(
     }
 
     let c = BigUint::from_bytes_be(sig);
-    let m = key::encrypt(pub_key, &c).to_bytes_be();
-    let em = key::left_pad(&m, k);
+    let m = internals::encrypt(pub_key, &c).to_bytes_be();
+    let em = internals::left_pad(&m, k);
 
     // EM = 0x00 || 0x01 || PS || 0x00 || T
     let mut ok = em[0].ct_eq(&0u8);
@@ -182,9 +183,9 @@ fn decrypt_inner<R: Rng>(
     }
 
     let c = BigUint::from_bytes_be(ciphertext);
-    let m = key::decrypt(rng, priv_key, &c)?.to_bytes_be();
+    let m = internals::decrypt(rng, priv_key, &c)?.to_bytes_be();
 
-    let em = key::left_pad(&m, k);
+    let em = internals::left_pad(&m, k);
 
     let first_byte_is_zero = em[0].ct_eq(&0u8);
     let second_byte_is_two = em[1].ct_eq(&2u8);
