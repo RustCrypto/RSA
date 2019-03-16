@@ -1,8 +1,8 @@
 use clear_on_drop::clear::Clear;
 use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
-use num_bigint::{BigInt, BigUint, RandBigInt};
-use num_traits::{FromPrimitive, One, Signed, Zero};
+use num_bigint::{BigInt, BigUint};
+use num_traits::{FromPrimitive, One};
 use rand::{Rng, ThreadRng};
 #[cfg(feature = "serde1")]
 use serde::{Deserialize, Serialize};
@@ -40,7 +40,7 @@ pub struct RSAPrivateKey {
     primes: Vec<BigUint>,
     /// precomputed values to speed up private operations
     #[cfg_attr(feature = "serde1", serde(skip))]
-    precomputed: Option<PrecomputedValues>,
+    pub(crate) precomputed: Option<PrecomputedValues>,
 }
 
 impl PartialEq for RSAPrivateKey {
@@ -62,19 +62,19 @@ impl Drop for RSAPrivateKey {
 }
 
 #[derive(Debug, Clone)]
-struct PrecomputedValues {
+pub(crate) struct PrecomputedValues {
     /// D mod (P-1)
-    dp: BigUint,
+    pub(crate) dp: BigUint,
     /// D mod (Q-1)
-    dq: BigUint,
+    pub(crate) dq: BigUint,
     /// Q^-1 mod P
-    qinv: BigInt,
+    pub(crate) qinv: BigInt,
 
     /// CRTValues is used for the 3rd and subsequent primes. Due to a
     /// historical accident, the CRT for the first two primes is handled
     /// differently in PKCS#1 and interoperability is sufficiently
     /// important that we mirror this.
-    crt_values: Vec<CRTValue>,
+    pub(crate) crt_values: Vec<CRTValue>,
 }
 
 impl Drop for PrecomputedValues {
@@ -89,13 +89,13 @@ impl Drop for PrecomputedValues {
 
 /// Contains the precomputed Chinese remainder theorem values.
 #[derive(Debug, Clone)]
-struct CRTValue {
+pub(crate) struct CRTValue {
     /// D mod (prime - 1)
-    exp: BigInt,
+    pub(crate) exp: BigInt,
     /// R·Coeff ≡ 1 mod Prime.
-    coeff: BigInt,
+    pub(crate) coeff: BigInt,
     /// product of primes prior to this (inc p and q)
-    r: BigInt,
+    pub(crate) r: BigInt,
 }
 
 impl From<RSAPrivateKey> for RSAPublicKey {
@@ -428,6 +428,7 @@ impl RSAPrivateKey {
     }
 }
 
+/// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
 pub fn check_public(public_key: &impl PublicKey) -> Result<()> {
     if public_key.e() < &*MIN_PUB_EXPONENT {
@@ -441,143 +442,10 @@ pub fn check_public(public_key: &impl PublicKey) -> Result<()> {
     Ok(())
 }
 
-#[inline]
-pub fn encrypt<K: PublicKey>(key: &K, m: &BigUint) -> BigUint {
-    m.modpow(key.e(), key.n())
-}
-
-/// Performs RSA decryption, resulting in a plaintext `BigUint`.
-/// Peforms RSA blinding if an `Rng` is passed.
-#[inline]
-pub fn decrypt<R: Rng>(
-    mut rng: Option<&mut R>,
-    priv_key: &RSAPrivateKey,
-    c: &BigUint,
-) -> Result<BigUint> {
-    if c >= priv_key.n() {
-        return Err(Error::Decryption);
-    }
-
-    if priv_key.n().is_zero() {
-        return Err(Error::Decryption);
-    }
-
-    let mut ir = None;
-    let c = if let Some(ref mut rng) = rng {
-        // Blinding enabled. Blinding involves multiplying c by r^e.
-        // Then the decryption operation performs (m^e * r^e)^d mod n
-        // which equals mr mod n. The factor of r can then be removed
-        // by multiplying by the multiplicative inverse of r.
-
-        let mut r: BigUint;
-        loop {
-            r = rng.gen_biguint_below(priv_key.n());
-            if r.is_zero() {
-                r = BigUint::one();
-            }
-            ir = r.clone().mod_inverse(priv_key.n());
-            if ir.is_some() {
-                break;
-            }
-        }
-
-        let e = priv_key.e();
-        let rpowe = r.modpow(&e, priv_key.n()); // N != 0
-        (c * &rpowe) % priv_key.n()
-    } else {
-        c.clone()
-    };
-
-    let m = match priv_key.precomputed {
-        None => c.modpow(priv_key.d(), priv_key.n()),
-        Some(ref precomputed) => {
-            // We have the precalculated values needed for the CRT.
-
-            let p = &priv_key.primes[0];
-            let q = &priv_key.primes[1];
-
-            let mut m = BigInt::from_biguint(Plus, c.modpow(&precomputed.dp, p));
-            let mut m2 = BigInt::from_biguint(Plus, c.modpow(&precomputed.dq, q));
-
-            m -= &m2;
-
-            // clones make me sad :(
-            let primes: Vec<_> = priv_key
-                .primes
-                .iter()
-                .map(|v| BigInt::from_biguint(Plus, v.clone()))
-                .collect();
-
-            while m.is_negative() {
-                m += &primes[0];
-            }
-            m *= &precomputed.qinv;
-            m %= &primes[0];
-            m *= &primes[1];
-            m += m2;
-
-            let c = BigInt::from_biguint(Plus, c);
-            for (i, value) in precomputed.crt_values.iter().enumerate() {
-                let prime = &primes[2 + i];
-                m2 = c.modpow(&value.exp, prime);
-                m2 -= &m;
-                m2 *= &value.coeff;
-                m2 %= prime;
-                while m2.is_negative() {
-                    m2 += prime;
-                }
-                m2 *= &value.r;
-                m += &m2;
-            }
-
-            m.to_biguint().expect("failed to decrypt")
-        }
-    };
-
-    match ir {
-        Some(ref ir) => {
-            // unblind
-            Ok((m * ir.to_biguint().unwrap()) % priv_key.n())
-        }
-        None => Ok(m),
-    }
-}
-
-#[inline]
-pub fn decrypt_and_check<R: Rng>(
-    rng: Option<&mut R>,
-    priv_key: &RSAPrivateKey,
-    c: &BigUint,
-) -> Result<BigUint> {
-    let m = decrypt(rng, priv_key, c)?;
-
-    // In order to defend against errors in the CRT computation, m^e is
-    // calculated, which should match the original ciphertext.
-    let check = encrypt(priv_key, &m);
-    if c != &check {
-        return Err(Error::Internal);
-    }
-
-    Ok(m)
-}
-
-/// Returns a new vector of the given length, with 0s left padded.
-#[inline]
-pub fn left_pad(input: &[u8], size: usize) -> Vec<u8> {
-    let n = if input.len() > size {
-        size
-    } else {
-        input.len()
-    };
-
-    let mut out = vec![0u8; size];
-    out[size - n..].copy_from_slice(input);
-    out
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use internals;
     use num_traits::{FromPrimitive, ToPrimitive};
     use rand::{thread_rng, ThreadRng};
 
@@ -606,13 +474,13 @@ mod tests {
 
         let pub_key: RSAPublicKey = private_key.clone().into();
         let m = BigUint::from_u64(42).expect("invalid 42");
-        let c = encrypt(&pub_key, &m);
-        let m2 = decrypt::<ThreadRng>(None, &private_key, &c)
+        let c = internals::encrypt(&pub_key, &m);
+        let m2 = internals::decrypt::<ThreadRng>(None, &private_key, &c)
             .expect("unable to decrypt without blinding");
         assert_eq!(m, m2);
         let mut rng = thread_rng();
-        let m3 =
-            decrypt(Some(&mut rng), &private_key, &c).expect("unable to decrypt with blinding");
+        let m3 = internals::decrypt(Some(&mut rng), &private_key, &c)
+            .expect("unable to decrypt with blinding");
         assert_eq!(m, m3);
     }
 

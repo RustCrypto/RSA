@@ -48,3 +48,4 @@ name = "key"
 default = []
 nightly = ["subtle/nightly", "clear_on_drop/nightly"]
 serde1 = ["num-bigint/serde", "serde"]
+expose-internals = []

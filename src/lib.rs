@@ -51,9 +51,16 @@ extern crate serde_test;
 #[cfg(test)]
 extern crate sha1;
 
+/// Useful algorithms.
 pub mod algorithms;
+
+/// Error types.
 pub mod errors;
+
+/// Supported hash functions.
 pub mod hash;
+
+/// Supported padding schemes.
 pub mod padding;
 
 mod key;
@@ -61,3 +68,12 @@ mod pkcs1v15;
 
 pub use self::key::{PublicKey, RSAPrivateKey, RSAPublicKey};
 pub use self::padding::PaddingScheme;
+
+// Optionally expose internals if requested via feature-flag.
+
+#[cfg(not(feature = "expose-internals"))]
+mod internals;
+
+/// Internal raw RSA functions.
+#[cfg(feature = "expose-internals")]
+pub mod internals;
