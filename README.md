@@ -14,9 +14,6 @@ extern crate rand;
 use rsa::{PublicKey, RSAPrivateKey, PaddingScheme};
 use rand::rngs::OsRng;
 
-use rsa::{PublicKey, RSAPrivateKey, PaddingScheme};
-use rand::rngs::OsRng;
-
 let mut rng = OsRng::new().expect("no secure randomness available");
 let bits = 2048;
 let key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
