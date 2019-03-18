@@ -7,11 +7,11 @@ use rand::{Rng, ThreadRng};
 #[cfg(feature = "serde1")]
 use serde::{Deserialize, Serialize};
 
-use algorithms::generate_multi_prime_key;
-use errors::{Error, Result};
-use hash::Hash;
-use padding::PaddingScheme;
-use pkcs1v15;
+use crate::algorithms::generate_multi_prime_key;
+use crate::errors::{Error, Result};
+use crate::hash::Hash;
+use crate::padding::PaddingScheme;
+use crate::pkcs1v15;
 
 lazy_static! {
     static ref MIN_PUB_EXPONENT: BigUint = BigUint::from_u64(2).unwrap();
@@ -445,7 +445,7 @@ pub fn check_public(public_key: &impl PublicKey) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use internals;
+    use crate::internals;
     use num_traits::{FromPrimitive, ToPrimitive};
     use rand::{thread_rng, ThreadRng};
 

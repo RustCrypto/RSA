@@ -1,5 +1,5 @@
-use errors::{Error, Result};
-use key::{PublicKey, RSAPrivateKey};
+use crate::errors::{Error, Result};
+use crate::key::{PublicKey, RSAPrivateKey};
 use num_bigint::{BigInt, BigUint, ModInverse, RandBigInt, Sign::Plus};
 use num_traits::{One, Signed, Zero};
 use rand::Rng;
