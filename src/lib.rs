@@ -26,18 +26,11 @@
 //! ```
 //!
 
-
-
-
 #[macro_use]
 extern crate lazy_static;
 
 #[macro_use]
 extern crate failure;
-
-
-
-
 
 #[cfg(feature = "serde1")]
 extern crate serde;
@@ -48,7 +41,6 @@ extern crate base64;
 extern crate hex;
 #[cfg(all(test, feature = "serde1"))]
 extern crate serde_test;
-
 
 /// Useful algorithms.
 pub mod algorithms;
