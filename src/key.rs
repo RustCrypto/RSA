@@ -286,7 +286,7 @@ impl RSAPrivateKey {
     ///
     /// Generally this is not needed since `RSAPrivateKey` implements the `PublicKey` trait,
     /// but it can occationally be useful to discard the private information entirely.
-    pub fn to_public(&self) -> RSAPublicKey {
+    pub fn to_public_key(&self) -> RSAPublicKey {
         // Safe to unwrap since n and e are already verified.
         RSAPublicKey::new(self.n().clone(), self.e().clone()).unwrap()
     }
