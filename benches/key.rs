@@ -1,22 +1,16 @@
 #![feature(test)]
 
-use base64;
-
-
-
-
-
 extern crate test;
 
+use base64;
 use num_bigint::BigUint;
 use num_traits::{FromPrimitive, Num};
 use rand::{SeedableRng, StdRng};
-use sha2::{Digest, Sha256};
-use test::Bencher;
-
 use rsa::hash::Hashes;
 use rsa::padding::PaddingScheme;
 use rsa::RSAPrivateKey;
+use sha2::{Digest, Sha256};
+use test::Bencher;
 
 const DECRYPT_VAL: &'static str =
     "XW4qfrpQDarEMBfPyIYE9UvuOFkbBi0tiGYbIOJPLMNe/LWuPD0BQ7ceqlOlPPcKLinYz0DlnqW3It/V7ae59zw9afA3YIWdq0Ut2BnYL+aJixnqaP+PjsQNcHg6axCF11iNQ4jpXrZDiQcI+q9EEzZDTMsiMxtjfgBQUd8LHT87YoQXDWaFPCVpliACMc8aUk442kH1tc4jEuXwjEjFErvAM/J7VizCdU/dnKrlq2mBDzvZ6hxY9TYHFB/zY6DZPJAgEMUxYWCR9xPJ7X256DV1Kt0Ht33DWoFcgh/pPLM1q9pK0HVxCdclXfZOeCqlrLgZ5Gxv5DM4BtV7Z4m85w==";
