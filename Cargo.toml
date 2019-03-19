@@ -8,6 +8,7 @@ documentation = "https://docs.rs/rsa"
 repository = "https://github.com/RustCrypto/RSA"
 keywords = ["rsa", "encryption", "security", "crypto"]
 categories = ["cryptography"]
+readme = "README.md"
 
 [dependencies]
 num-bigint = { version = "0.3", features = ["rand", "i128", "u64_digit", "prime"], package = "num-bigint-dig" }
