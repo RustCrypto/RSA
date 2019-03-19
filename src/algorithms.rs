@@ -3,8 +3,8 @@ use num_bigint::{BigUint, RandPrime};
 use num_traits::{FromPrimitive, One, Zero};
 use rand::Rng;
 
-use errors::{Error, Result};
-use key::RSAPrivateKey;
+use crate::errors::{Error, Result};
+use crate::key::RSAPrivateKey;
 
 /// Default exponent for RSA keys.
 const EXP: u64 = 65537;

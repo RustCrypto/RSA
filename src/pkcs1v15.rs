@@ -2,10 +2,10 @@ use num_bigint::BigUint;
 use rand::Rng;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
-use errors::{Error, Result};
-use hash::Hash;
-use internals;
-use key::{self, PublicKey, RSAPrivateKey};
+use crate::errors::{Error, Result};
+use crate::hash::Hash;
+use crate::internals;
+use crate::key::{self, PublicKey, RSAPrivateKey};
 
 // Encrypts the given message with RSA and the padding
 // scheme from PKCS#1 v1.5.  The message must be no longer than the
@@ -243,9 +243,9 @@ mod tests {
     use rand::thread_rng;
     use sha1::{Digest, Sha1};
 
-    use hash::Hashes;
-    use key::RSAPublicKey;
-    use padding::PaddingScheme;
+    use crate::hash::Hashes;
+    use crate::key::RSAPublicKey;
+    use crate::padding::PaddingScheme;
 
     #[test]
     fn test_non_zero_bytes() {

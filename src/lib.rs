@@ -26,18 +26,11 @@
 //! ```
 //!
 
-extern crate num_bigint;
-extern crate num_integer;
-extern crate num_traits;
 #[macro_use]
 extern crate lazy_static;
-extern crate byteorder;
+
 #[macro_use]
 extern crate failure;
-extern crate clear_on_drop;
-extern crate num_iter;
-extern crate rand;
-extern crate subtle;
 
 #[cfg(feature = "serde1")]
 extern crate serde;
@@ -48,8 +41,6 @@ extern crate base64;
 extern crate hex;
 #[cfg(all(test, feature = "serde1"))]
 extern crate serde_test;
-#[cfg(test)]
-extern crate sha1;
 
 /// Useful algorithms.
 pub mod algorithms;
