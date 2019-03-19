@@ -282,6 +282,15 @@ impl RSAPrivateKey {
         k
     }
 
+    /// Get the public key from the private key, cloning `n` and `e`.
+    ///
+    /// Generally this is not needed since `RSAPrivateKey` implements the `PublicKey` trait,
+    /// but it can occationally be useful to discard the private information entirely.
+    pub fn to_public_key(&self) -> RSAPublicKey {
+        // Safe to unwrap since n and e are already verified.
+        RSAPublicKey::new(self.n().clone(), self.e().clone()).unwrap()
+    }
+
     /// Performs some calculations to speed up private key operations.
     pub fn precompute(&mut self) {
         if self.precomputed.is_some() {
