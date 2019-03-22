@@ -3,7 +3,7 @@ use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
 use num_traits::{FromPrimitive, One};
-use rand::{Rng, ThreadRng};
+use rand::{rngs::ThreadRng, Rng};
 #[cfg(feature = "serde1")]
 use serde::{Deserialize, Serialize};
 
@@ -456,7 +456,7 @@ mod tests {
     use super::*;
     use crate::internals;
     use num_traits::{FromPrimitive, ToPrimitive};
-    use rand::{thread_rng, ThreadRng};
+    use rand::{rngs::ThreadRng, thread_rng};
 
     #[test]
     fn test_from_into() {

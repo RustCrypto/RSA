@@ -5,7 +5,7 @@ extern crate test;
 use base64;
 use num_bigint::BigUint;
 use num_traits::{FromPrimitive, Num};
-use rand::{SeedableRng, StdRng};
+use rand::{rngs::StdRng, SeedableRng};
 use rsa::hash::Hashes;
 use rsa::padding::PaddingScheme;
 use rsa::RSAPrivateKey;
