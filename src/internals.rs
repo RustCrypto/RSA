@@ -1,8 +1,11 @@
-use crate::errors::{Error, Result};
-use crate::key::{PublicKey, RSAPrivateKey};
-use num_bigint::{BigInt, BigUint, ModInverse, RandBigInt, Sign::Plus};
+use num_bigint::{BigInt, BigUint, IntoBigInt, IntoBigUint, ModInverse, RandBigInt, ToBigInt};
 use num_traits::{One, Signed, Zero};
 use rand::Rng;
+use std::borrow::Cow;
+use zeroize::Zeroize;
+
+use crate::errors::{Error, Result};
+use crate::key::{PublicKey, RSAPrivateKey};
 
 /// Raw RSA encryption of m with the public key. No padding is performed.
 #[inline]
@@ -27,12 +30,13 @@ pub fn decrypt<R: Rng>(
     }
 
     let mut ir = None;
+
     let c = if let Some(ref mut rng) = rng {
         let (blinded, unblinder) = blind(rng, priv_key, c);
         ir = Some(unblinder);
-        blinded
+        Cow::Owned(blinded)
     } else {
-        c.clone()
+        Cow::Borrowed(c)
     };
 
     let m = match priv_key.precomputed {
@@ -43,16 +47,16 @@ pub fn decrypt<R: Rng>(
             let p = &priv_key.primes()[0];
             let q = &priv_key.primes()[1];
 
-            let mut m = BigInt::from_biguint(Plus, c.modpow(&precomputed.dp, p));
-            let mut m2 = BigInt::from_biguint(Plus, c.modpow(&precomputed.dq, q));
+            let mut m = c.modpow(&precomputed.dp, p).into_bigint().unwrap();
+            let mut m2 = c.modpow(&precomputed.dq, q).into_bigint().unwrap();
 
             m -= &m2;
 
-            // clones make me sad :(
-            let primes: Vec<_> = priv_key
+            let mut primes: Vec<_> = priv_key
                 .primes()
                 .iter()
-                .map(|v| BigInt::from_biguint(Plus, v.clone()))
+                .map(ToBigInt::to_bigint)
+                .map(Option::unwrap)
                 .collect();
 
             while m.is_negative() {
@@ -61,9 +65,9 @@ pub fn decrypt<R: Rng>(
             m *= &precomputed.qinv;
             m %= &primes[0];
             m *= &primes[1];
-            m += m2;
+            m += &m2;
 
-            let c = BigInt::from_biguint(Plus, c);
+            let mut c = c.into_owned().into_bigint().unwrap();
             for (i, value) in precomputed.crt_values.iter().enumerate() {
                 let prime = &primes[2 + i];
                 m2 = c.modpow(&value.exp, prime);
@@ -77,7 +81,15 @@ pub fn decrypt<R: Rng>(
                 m += &m2;
             }
 
-            m.to_biguint().expect("failed to decrypt")
+            // clear tmp values
+            for prime in primes.iter_mut() {
+                prime.zeroize();
+            }
+            primes.clear();
+            c.zeroize();
+            m2.zeroize();
+
+            m.into_biguint().expect("failed to decrypt")
         }
     };
 
@@ -104,6 +116,7 @@ pub fn decrypt_and_check<R: Rng>(
     // In order to defend against errors in the CRT computation, m^e is
     // calculated, which should match the original ciphertext.
     let check = encrypt(priv_key, &m);
+
     if c != &check {
         return Err(Error::Internal);
     }
@@ -128,16 +141,22 @@ pub fn blind<R: Rng, K: PublicKey>(rng: &mut R, key: &K, c: &BigUint) -> (BigUin
         }
         ir = r.clone().mod_inverse(key.n());
         if let Some(ir) = ir {
-            if let Some(ub) = ir.to_biguint() {
+            if let Some(ub) = ir.into_biguint() {
                 unblinder = ub;
                 break;
             }
         }
     }
 
-    let e = key.e();
-    let rpowe = r.modpow(&e, key.n()); // N != 0
-    let c = (c * &rpowe) % key.n();
+    let c = {
+        let mut rpowe = r.modpow(key.e(), key.n()); // N != 0
+        let mut c = c * &rpowe;
+        c %= key.n();
+
+        rpowe.zeroize();
+
+        c
+    };
 
     (c, unblinder)
 }

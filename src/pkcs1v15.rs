@@ -1,6 +1,7 @@
 use num_bigint::BigUint;
 use rand::Rng;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
 use crate::hash::Hash;
@@ -26,10 +27,16 @@ pub fn encrypt<R: Rng, K: PublicKey>(rng: &mut R, pub_key: &K, msg: &[u8]) -> Re
     em[k - msg.len() - 1] = 0;
     em[k - msg.len()..].copy_from_slice(msg);
 
-    let m = BigUint::from_bytes_be(&em);
-    let c = internals::encrypt(pub_key, &m).to_bytes_be();
+    {
+        let mut m = BigUint::from_bytes_be(&em);
+        let mut c = internals::encrypt(pub_key, &m).to_bytes_be();
+        copy_with_left_pad(&mut em, &c);
 
-    copy_with_left_pad(&mut em, &c);
+        // clear out tmp values
+        m.zeroize();
+        c.zeroize();
+    }
+
     Ok(em)
 }
 
@@ -93,10 +100,16 @@ pub fn sign<R: Rng, H: Hash>(
     em[k - t_len..k - hash_len].copy_from_slice(&prefix);
     em[k - hash_len..k].copy_from_slice(hashed);
 
-    let m = BigUint::from_bytes_be(&em);
-    let c = internals::decrypt_and_check(rng, priv_key, &m)?.to_bytes_be();
+    {
+        let mut m = BigUint::from_bytes_be(&em);
+        let mut c = internals::decrypt_and_check(rng, priv_key, &m)?.to_bytes_be();
 
-    copy_with_left_pad(&mut em, &c);
+        copy_with_left_pad(&mut em, &c);
+
+        // clear tmp values
+        m.zeroize();
+        c.zeroize();
+    }
 
     Ok(em)
 }
@@ -117,9 +130,11 @@ pub fn verify<H: Hash, K: PublicKey>(
         return Err(Error::Verification);
     }
 
-    let c = BigUint::from_bytes_be(sig);
-    let m = internals::encrypt(pub_key, &c).to_bytes_be();
-    let em = internals::left_pad(&m, k);
+    let em = {
+        let c = BigUint::from_bytes_be(sig);
+        let m = internals::encrypt(pub_key, &c).to_bytes_be();
+        internals::left_pad(&m, k)
+    };
 
     // EM = 0x00 || 0x01 || PS || 0x00 || T
     let mut ok = em[0].ct_eq(&0u8);
@@ -182,10 +197,16 @@ fn decrypt_inner<R: Rng>(
         return Err(Error::Decryption);
     }
 
-    let c = BigUint::from_bytes_be(ciphertext);
-    let m = internals::decrypt(rng, priv_key, &c)?.to_bytes_be();
+    let em = {
+        let mut c = BigUint::from_bytes_be(ciphertext);
+        let mut m = internals::decrypt(rng, priv_key, &c)?;
+        let em = internals::left_pad(&m.to_bytes_be(), k);
 
-    let em = internals::left_pad(&m, k);
+        c.zeroize();
+        m.zeroize();
+
+        em
+    };
 
     let first_byte_is_zero = em[0].ct_eq(&0u8);
     let second_byte_is_two = em[1].ct_eq(&2u8);

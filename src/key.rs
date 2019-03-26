@@ -1,4 +1,3 @@
-use clear_on_drop::clear::Clear;
 use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
@@ -6,6 +5,7 @@ use num_traits::{FromPrimitive, One};
 use rand::{rngs::ThreadRng, Rng};
 #[cfg(feature = "serde1")]
 use serde::{Deserialize, Serialize};
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::algorithms::generate_multi_prime_key;
 use crate::errors::{Error, Result};
@@ -27,7 +27,7 @@ pub struct RSAPublicKey {
 }
 
 /// Represents a whole RSA key, public and private parts.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ZeroizeOnDrop)]
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 pub struct RSAPrivateKey {
     /// Modulus
@@ -52,16 +52,20 @@ impl PartialEq for RSAPrivateKey {
 
 impl Eq for RSAPrivateKey {}
 
-impl Drop for RSAPrivateKey {
-    #[inline]
-    fn drop(&mut self) {
-        self.d.clear();
+impl Zeroize for RSAPrivateKey {
+    fn zeroize(&mut self) {
+        self.d.zeroize();
+        for prime in self.primes.iter_mut() {
+            prime.zeroize();
+        }
         self.primes.clear();
-        self.precomputed.clear();
+        if self.precomputed.is_some() {
+            self.precomputed.take().unwrap().zeroize();
+        }
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, ZeroizeOnDrop)]
 pub(crate) struct PrecomputedValues {
     /// D mod (P-1)
     pub(crate) dp: BigUint,
@@ -77,18 +81,20 @@ pub(crate) struct PrecomputedValues {
     pub(crate) crt_values: Vec<CRTValue>,
 }
 
-impl Drop for PrecomputedValues {
-    #[inline]
-    fn drop(&mut self) {
-        self.dp.clear();
-        self.dq.clear();
-        self.qinv.clear();
+impl Zeroize for PrecomputedValues {
+    fn zeroize(&mut self) {
+        self.dp.zeroize();
+        self.dq.zeroize();
+        self.qinv.zeroize();
+        for val in self.crt_values.iter_mut() {
+            val.zeroize();
+        }
         self.crt_values.clear();
     }
 }
 
 /// Contains the precomputed Chinese remainder theorem values.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Zeroize)]
 pub(crate) struct CRTValue {
     /// D mod (prime - 1)
     pub(crate) exp: BigInt,
