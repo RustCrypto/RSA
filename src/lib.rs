@@ -31,6 +31,10 @@ extern crate lazy_static;
 
 #[macro_use]
 extern crate failure;
+extern crate num_iter;
+extern crate rand;
+extern crate subtle;
+extern crate zeroize;
 
 #[cfg(feature = "serde1")]
 extern crate serde;
