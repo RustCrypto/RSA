@@ -23,7 +23,7 @@ failure = "0.1.5"
 subtle = "2.0.0"
 sha-1 = "0.8.1"
 sha2 = "0.8.0"
-sha3 = "0.8.0"
+sha3 = "0.8.1"
 digest = "0.8.0"
 
 [dependencies.zeroize]

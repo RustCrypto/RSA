@@ -1,4 +1,6 @@
-use sha1::{Sha1,Digest};
+use sha1::{Digest, Sha1};
+use sha2::{Sha224, Sha256, Sha384, Sha512};
+use sha3::{Sha3_256, Sha3_384, Sha3_512};
 
 /// A generic trait that exposes the information that is needed for a hash function to be
 /// used in `sign` and `verify.`.
@@ -28,10 +30,9 @@ pub enum Hashes {
     RIPEMD160,
 }
 
-fn sha1_digest(msg: &[u8]) -> Vec<u8> {
-    let mut hasher = Sha1::new();
+fn digest<H: Digest>(msg: &[u8], hasher: &mut H) -> Vec<u8> {
     hasher.input(msg);
-    let res = hasher.result();
+    let res = hasher.result_reset();
     res.iter().cloned().collect()
 }
 
@@ -104,19 +105,17 @@ impl Hash for Hashes {
 
     fn digest(&self, msg: &[u8]) -> Vec<u8> {
         match *self {
-
             Hashes::MD5 => panic!("Not implemented"),
-            Hashes::SHA1 =>  sha1_digest(msg),
-            Hashes::SHA2_224 => panic!("Not implemented"),
-            Hashes::SHA2_256 => panic!("Not implemented"),
-            Hashes::SHA2_384 => panic!("Not implemented"),
-            Hashes::SHA2_512 => panic!("Not implemented"),
-            Hashes::SHA3_256 => panic!("Not implemented"),
-            Hashes::SHA3_384 => panic!("Not implemented"),
-            Hashes::SHA3_512 => panic!("Not implemented"),
+            Hashes::SHA1 => digest(msg, &mut Sha1::new()),
+            Hashes::SHA2_224 => digest(msg, &mut Sha224::new()),
+            Hashes::SHA2_256 => digest(msg, &mut Sha256::new()),
+            Hashes::SHA2_384 => digest(msg, &mut Sha384::new()),
+            Hashes::SHA2_512 => digest(msg, &mut Sha512::new()),
+            Hashes::SHA3_256 => digest(msg, &mut Sha3_256::new()),
+            Hashes::SHA3_384 => digest(msg, &mut Sha3_384::new()),
+            Hashes::SHA3_512 => digest(msg, &mut Sha3_512::new()),
             Hashes::MD5SHA1 => panic!("Not implemented"),
             Hashes::RIPEMD160 => panic!("Not implemented"),
-
         }
     }
 }
