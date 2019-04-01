@@ -6,6 +6,7 @@ pub trait Hash {
 
     /// Returns the ASN1 DER prefix for the the hash function.
     fn asn1_prefix(&self) -> Vec<u8>;
+
 }
 
 /// A list of provided hashes, implementing `Hash`.

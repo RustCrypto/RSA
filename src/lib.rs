@@ -64,8 +64,11 @@ pub use pem;
 
 mod key;
 mod parse;
+
 mod pkcs1v15;
 mod raw;
+
+pub mod oaep;
 
 pub use self::key::{PublicKey, RSAPrivateKey, RSAPublicKey};
 pub use self::padding::PaddingScheme;
