@@ -179,3 +179,14 @@ pub fn left_pad(input: &[u8], size: usize) -> Vec<u8> {
     out[size - n..].copy_from_slice(input);
     out
 }
+
+#[inline]
+pub fn copy_with_left_pad(dest: &mut [u8], src: &[u8]) {
+    // left pad with zeros
+    let padding_bytes = dest.len() - src.len();
+    for el in dest.iter_mut().take(padding_bytes) {
+        *el = 0;
+    }
+    dest[padding_bytes..].copy_from_slice(src);
+}
+

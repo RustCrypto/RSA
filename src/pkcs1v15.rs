@@ -30,7 +30,7 @@ pub fn encrypt<R: Rng, K: PublicKey>(rng: &mut R, pub_key: &K, msg: &[u8]) -> Re
     {
         let mut m = BigUint::from_bytes_be(&em);
         let mut c = internals::encrypt(pub_key, &m).to_bytes_be();
-        copy_with_left_pad(&mut em, &c);
+        internals::copy_with_left_pad(&mut em, &c);
 
         // clear out tmp values
         m.zeroize();
@@ -104,7 +104,7 @@ pub fn sign<R: Rng, H: Hash>(
         let mut m = BigUint::from_bytes_be(&em);
         let mut c = internals::decrypt_and_check(rng, priv_key, &m)?.to_bytes_be();
 
-        copy_with_left_pad(&mut em, &c);
+        internals::copy_with_left_pad(&mut em, &c);
 
         // clear tmp values
         m.zeroize();
@@ -168,16 +168,6 @@ fn hash_info<H: Hash>(hash: Option<&H>, digest_len: usize) -> Result<(usize, Vec
         // this means the data is signed directly
         None => Ok((digest_len, Vec::new())),
     }
-}
-
-#[inline]
-fn copy_with_left_pad(dest: &mut [u8], src: &[u8]) {
-    // left pad with zeros
-    let padding_bytes = dest.len() - src.len();
-    for el in dest.iter_mut().take(padding_bytes) {
-        *el = 0;
-    }
-    dest[padding_bytes..].copy_from_slice(src);
 }
 
 /// Decrypts ciphertext using `priv_key` and blinds the operation if

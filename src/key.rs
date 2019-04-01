@@ -9,9 +9,10 @@ use zeroize::Zeroize;
 
 use crate::algorithms::generate_multi_prime_key;
 use crate::errors::{Error, Result};
-use crate::hash::Hash;
+use crate::hash::{Hash,Hashes};
 use crate::padding::PaddingScheme;
 use crate::pkcs1v15;
+use crate::oaep;
 
 lazy_static! {
     static ref MIN_PUB_EXPONENT: BigUint = BigUint::from_u64(2).unwrap();
@@ -164,7 +165,10 @@ impl PublicKey for RSAPublicKey {
     fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
-            PaddingScheme::OAEP => unimplemented!("not yet implemented"),
+            PaddingScheme::OAEP => oaep::encrypt(rng,self,msg,oaep::OaepOptions {
+                hash: Hashes::SHA1,
+                label: None,
+            }),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
