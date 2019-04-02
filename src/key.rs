@@ -425,7 +425,10 @@ impl RSAPrivateKey {
     ) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::decrypt(Some(rng), self, ciphertext),
-            PaddingScheme::OAEP => unimplemented!("not yet implemented"),
+            PaddingScheme::OAEP => oaep::decrypt(Some(rng), self, ciphertext, oaep::OaepOptions {
+                hash: Hashes::SHA1,
+                label: None,
+            }),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
