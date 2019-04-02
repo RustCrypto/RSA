@@ -86,9 +86,6 @@ pub fn encrypt<R: Rng, K: PublicKey, H: Hash>(
     let k = pub_key.size();
 
     if msg.len() > k - 2 * h.size() - 2 {
-        println!("message len = {:?}",msg.len());
-        println!("message k = {:?}", k);
-        println!("message h = {:?}", h.size());
         return Err(Error::MessageTooLong);
     }
 
