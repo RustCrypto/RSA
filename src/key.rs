@@ -165,10 +165,7 @@ impl PublicKey for RSAPublicKey {
     fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
-            PaddingScheme::OAEP => oaep::encrypt(rng,self,msg,oaep::OaepOptions {
-                hash: Hashes::SHA1,
-                label: None,
-            }),
+            PaddingScheme::OAEP => oaep::encrypt(rng,self,msg, oaep::OaepOptions::new()),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
@@ -234,7 +231,7 @@ impl PublicKey for RSAPrivateKey {
     fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
-            PaddingScheme::OAEP => unimplemented!("not yet implemented"),
+            PaddingScheme::OAEP => oaep::encrypt(rng, self, msg, oaep::OaepOptions::new()),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
@@ -410,7 +407,7 @@ impl RSAPrivateKey {
         match padding {
             // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
             PaddingScheme::PKCS1v15 => pkcs1v15::decrypt::<ThreadRng>(None, self, ciphertext),
-            PaddingScheme::OAEP => unimplemented!("not yet implemented"),
+            PaddingScheme::OAEP => oaep::decrypt::<ThreadRng>(None, self, ciphertext, oaep::OaepOptions::new()),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
@@ -425,10 +422,7 @@ impl RSAPrivateKey {
     ) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::decrypt(Some(rng), self, ciphertext),
-            PaddingScheme::OAEP => oaep::decrypt(Some(rng), self, ciphertext, oaep::OaepOptions {
-                hash: Hashes::SHA1,
-                label: None,
-            }),
+            PaddingScheme::OAEP => oaep::decrypt(Some(rng), self, ciphertext, oaep::OaepOptions::new()),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }

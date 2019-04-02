@@ -3,14 +3,36 @@ use rand::Rng;
 use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
-use crate::hash::Hash;
+use crate::hash::{Hash,Hashes};
 use crate::internals;
 use crate::key::{self, PublicKey, RSAPrivateKey};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
-pub struct OaepOptions<H: Hash> {
-    pub hash: H,
+#[derive(Debug, Clone)]
+pub struct OaepOptions {
+    pub hash: Hashes,
     pub label: Option<String>,
+}
+
+impl OaepOptions {
+    pub fn new() -> OaepOptions {
+        OaepOptions {
+            hash: Hashes::SHA1,
+            label: None,
+        }
+    }
+
+    pub fn hash(mut self,h:Hashes) -> Self {
+        self.hash = h;
+        self
+    }
+
+    pub fn label(mut self,l:Option<String>) -> Self {
+        self.label = l;
+        self
+    }
+
+
 }
 
 fn inc_counter(counter: &mut [u8]) {
@@ -74,11 +96,11 @@ fn mgf1_xor<H: Hash>(out: &mut [u8], h: &H, seed: &[u8]) {
 // scheme from PKCS#1 v1.5.  The message must be no longer than the
 // length of the public modulus minus 11 bytes.
 #[inline]
-pub fn encrypt<R: Rng, K: PublicKey, H: Hash>(
+pub fn encrypt<R: Rng, K: PublicKey>(
     rng: &mut R,
     pub_key: &K,
     msg: &[u8],
-    oaep_options: OaepOptions<H>,
+    oaep_options: OaepOptions,
 ) -> Result<Vec<u8>> {
     key::check_public(pub_key)?;
 
@@ -133,11 +155,11 @@ pub fn encrypt<R: Rng, K: PublicKey, H: Hash>(
 // forge signatures as if they had the private key. See
 // `decrypt_session_key` for a way of solving this problem.
 #[inline]
-pub fn decrypt<R: Rng, H: Hash>(
+pub fn decrypt<R: Rng>(
     rng: Option<&mut R>,
     priv_key: &RSAPrivateKey,
     ciphertext: &[u8],
-    oaep_options: OaepOptions<H>,
+    oaep_options: OaepOptions,
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
@@ -157,11 +179,11 @@ pub fn decrypt<R: Rng, H: Hash>(
 /// in order to maintain constant memory access patterns. If the plaintext was
 /// valid then index contains the index of the original message in em.
 #[inline]
-fn decrypt_inner<R: Rng,H:Hash>(
+fn decrypt_inner<R: Rng>(
     rng: Option<&mut R>,
     priv_key: &RSAPrivateKey,
     ciphertext: &[u8],
-    oaep_options: OaepOptions<H>,
+    oaep_options: OaepOptions,
 ) -> Result<(u8, Vec<u8>, u32)> {
 
     let k = priv_key.size();
@@ -288,6 +310,8 @@ mod tests {
         let priv_key = get_private_key();
         let k = priv_key.size();
 
+        let oaep_options = OaepOptions::new();
+
         for i in 1..20 {
             let mut input: Vec<u8> = (0..i * 8).map(|_| rng.gen()).collect();
             if input.len() > k - 11 {
@@ -295,17 +319,11 @@ mod tests {
             }
 
             let pub_key: RSAPublicKey = priv_key.clone().into();
-            let ciphertext = encrypt(&mut rng, &pub_key, &input,  OaepOptions{
-                hash: Hashes::SHA1,
-                label: None,
-            }).unwrap();
+            let ciphertext = encrypt(&mut rng, &pub_key, &input,  oaep_options.clone()).unwrap();
             assert_ne!(input, ciphertext);
             let blind: bool = rng.gen();
             let blinder = if blind { Some(&mut rng) } else { None };
-            let plaintext = decrypt(blinder, &priv_key, &ciphertext,OaepOptions{
-                hash: Hashes::SHA1,
-                label: None,
-            }).unwrap();
+            let plaintext = decrypt(blinder, &priv_key, &ciphertext, oaep_options.clone()).unwrap();
             assert_eq!(input, plaintext);
         }
     }
