@@ -9,10 +9,10 @@ use zeroize::Zeroize;
 
 use crate::algorithms::generate_multi_prime_key;
 use crate::errors::{Error, Result};
-use crate::hash::{Hash,Hashes};
+use crate::hash::Hash;
+use crate::oaep;
 use crate::padding::PaddingScheme;
 use crate::pkcs1v15;
-use crate::oaep;
 
 lazy_static! {
     static ref MIN_PUB_EXPONENT: BigUint = BigUint::from_u64(2).unwrap();
@@ -165,7 +165,7 @@ impl PublicKey for RSAPublicKey {
     fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
-            PaddingScheme::OAEP => oaep::encrypt(rng,self,msg, oaep::OaepOptions::new()),
+            PaddingScheme::OAEP => oaep::encrypt(rng, self, msg, oaep::OaepOptions::new()),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
@@ -407,7 +407,9 @@ impl RSAPrivateKey {
         match padding {
             // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
             PaddingScheme::PKCS1v15 => pkcs1v15::decrypt::<ThreadRng>(None, self, ciphertext),
-            PaddingScheme::OAEP => oaep::decrypt::<ThreadRng>(None, self, ciphertext, oaep::OaepOptions::new()),
+            PaddingScheme::OAEP => {
+                oaep::decrypt::<ThreadRng>(None, self, ciphertext, oaep::OaepOptions::new())
+            }
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
@@ -422,7 +424,9 @@ impl RSAPrivateKey {
     ) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::decrypt(Some(rng), self, ciphertext),
-            PaddingScheme::OAEP => oaep::decrypt(Some(rng), self, ciphertext, oaep::OaepOptions::new()),
+            PaddingScheme::OAEP => {
+                oaep::decrypt(Some(rng), self, ciphertext, oaep::OaepOptions::new())
+            }
             _ => Err(Error::InvalidPaddingScheme),
         }
     }

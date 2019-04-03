@@ -1,13 +1,15 @@
-use num_bigint::BigUint;
 use rand::Rng;
+
+use num_bigint::BigUint;
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
-use crate::hash::{Hash,Hashes};
+use crate::hash::{Hash, Hashes};
 use crate::internals;
 use crate::key::{self, PublicKey, RSAPrivateKey};
-use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
+/// Represents oaep cipering/deciphering options.
 #[derive(Debug, Clone)]
 pub struct OaepOptions {
     pub hash: Hashes,
@@ -22,17 +24,15 @@ impl OaepOptions {
         }
     }
 
-    pub fn hash(mut self,h:Hashes) -> Self {
+    pub fn set_hash(mut self, h: Hashes) -> Self {
         self.hash = h;
         self
     }
 
-    pub fn label(mut self,l:Option<String>) -> Self {
+    pub fn set_label(mut self, l: Option<String>) -> Self {
         self.label = l;
         self
     }
-
-
 }
 
 fn inc_counter(counter: &mut [u8]) {
@@ -93,8 +93,8 @@ fn mgf1_xor<H: Hash>(out: &mut [u8], h: &H, seed: &[u8]) {
 }
 
 // Encrypts the given message with RSA and the padding
-// scheme from PKCS#1 v1.5.  The message must be no longer than the
-// length of the public modulus minus 11 bytes.
+// scheme from PKCS#1 OAEP.  The message must be no longer than the
+// length of the public modulus minus (2+ 2*hash.size()).
 #[inline]
 pub fn encrypt<R: Rng, K: PublicKey>(
     rng: &mut R,
@@ -146,7 +146,7 @@ pub fn encrypt<R: Rng, K: PublicKey>(
     Ok(em)
 }
 
-/// Decrypts a plaintext using RSA and the padding scheme from OAEP
+/// Decrypts a plaintext using RSA and the padding scheme from pkcs1# OAEP
 // If an `rng` is passed, it uses RSA blinding to avoid timing side-channel attacks.
 //
 // Note that whether this function returns an error or not discloses secret
@@ -171,7 +171,6 @@ pub fn decrypt<R: Rng>(
     Ok(out[index as usize..].to_vec())
 }
 
-
 /// Decrypts ciphertext using `priv_key` and blinds the operation if
 /// `rng` is given. It returns one or zero in valid that indicates whether the
 /// plaintext was correctly structured. In either case, the plaintext is
@@ -185,7 +184,6 @@ fn decrypt_inner<R: Rng>(
     ciphertext: &[u8],
     oaep_options: OaepOptions,
 ) -> Result<(u8, Vec<u8>, u32)> {
-
     let k = priv_key.size();
     if k < 11 {
         return Err(Error::Decryption);
@@ -193,8 +191,7 @@ fn decrypt_inner<R: Rng>(
 
     let h = oaep_options.hash;
 
-    if ciphertext.len() > k ||
-        k < h.size()*2+2 {
+    if ciphertext.len() > k || k < h.size() * 2 + 2 {
         return Err(Error::Decryption);
     }
 
@@ -226,7 +223,6 @@ fn decrypt_inner<R: Rng>(
 
     let hash_are_equal = db[0..h.size()].ct_eq(expected_p_hash.as_slice());
 
-
     // The remainder of the plaintext must be zero or more 0x00, followed
     // by 0x01, followed by the message.
     //   looking_for_index: 1 if we are still looking for the 0x01
@@ -244,10 +240,11 @@ fn decrypt_inner<R: Rng>(
         zero_before_one.conditional_assign(&1u8, Choice::from(looking_for_index) & !equals0);
     }
 
-
-    let valid =
-        first_byte_is_zero & hash_are_equal & ! Choice::from(zero_before_one) & ! Choice::from(looking_for_index);
-    index = u32::conditional_select(&0, &(index + 2 + (h.size()*2) as u32), valid);
+    let valid = first_byte_is_zero
+        & hash_are_equal
+        & !Choice::from(zero_before_one)
+        & !Choice::from(looking_for_index);
+    index = u32::conditional_select(&0, &(index + 2 + (h.size() * 2) as u32), valid);
 
     Ok((valid.unwrap_u8(), em, index))
 }
@@ -256,11 +253,11 @@ fn decrypt_inner<R: Rng>(
 mod tests {
 
     use super::*;
-    use num_traits::FromPrimitive;
     use crate::hash::Hashes;
     use crate::key::RSAPublicKey;
+    use num_traits::FromPrimitive;
+    use rand::distributions::Alphanumeric;
     use rand::thread_rng;
-
 
     fn get_private_key() -> RSAPrivateKey {
         // -----BEGIN RSA PRIVATE KEY-----
@@ -291,7 +288,6 @@ mod tests {
         // BoB0er/UmDm4Ly/97EO9A0PKMOE5YbMq9s3t3RlWcsdrU7dvw+p2+A==
         // -----END RSA PRIVATE KEY-----
 
-
         RSAPrivateKey::from_components(
             BigUint::parse_bytes(b"00d397b84d98a4c26138ed1b695a8106ead91d553bf06041b62d3fdc50a041e222b8f4529689c1b82c5e71554f5dd69fa2f4b6158cf0dbeb57811a0fc327e1f28e74fe74d3bc166c1eabdc1b8b57b934ca8be5b00b4f29975bcc99acaf415b59bb28a6782bb41a2c3c2976b3c18dbadef62f00c6bb226640095096c0cc60d22fe7ef987d75c6a81b10d96bf292028af110dc7cc1bbc43d22adab379a0cd5d8078cc780ff5cd6209dea34c922cf784f7717e428d75b5aec8ff30e5f0141510766e2e0ab8d473c84e8710b2b98227c3db095337ad3452f19e2b9bfbccdd8148abf6776fa552775e6e75956e45229ae5a9c46949bab1e622f0e48f56524a84ed3483b", 16).unwrap(),
             BigUint::from_u64(65537).unwrap(),
@@ -305,21 +301,42 @@ mod tests {
 
     #[test]
     fn test_encrypt_decrypt_oaep() {
-
         let mut rng = thread_rng();
         let priv_key = get_private_key();
         let k = priv_key.size();
 
-        let oaep_options = OaepOptions::new();
+        let mut oaep_options = OaepOptions::new();
 
-        for i in 1..20 {
+        let hashers = [
+            Hashes::SHA1,
+            Hashes::SHA2_224,
+            Hashes::SHA2_256,
+            Hashes::SHA2_384,
+            Hashes::SHA2_512,
+            Hashes::SHA3_256,
+            Hashes::SHA3_384,
+            Hashes::SHA3_512,
+        ];
+
+        for i in 1..16 {
             let mut input: Vec<u8> = (0..i * 8).map(|_| rng.gen()).collect();
             if input.len() > k - 11 {
                 input = input[0..k - 11].to_vec();
             }
+            let hasher_idx: u32 = rng.gen();
+            let has_label: bool = rng.gen();
+            let label = if has_label {
+                Some(rng.sample_iter(&Alphanumeric).take(30).collect())
+            } else {
+                None
+            };
+
+            oaep_options = oaep_options
+                .set_hash(hashers[(hasher_idx as usize % hashers.len())])
+                .set_label(label);
 
             let pub_key: RSAPublicKey = priv_key.clone().into();
-            let ciphertext = encrypt(&mut rng, &pub_key, &input,  oaep_options.clone()).unwrap();
+            let ciphertext = encrypt(&mut rng, &pub_key, &input, oaep_options.clone()).unwrap();
             assert_ne!(input, ciphertext);
             let blind: bool = rng.gen();
             let blinder = if blind { Some(&mut rng) } else { None };
@@ -328,7 +345,24 @@ mod tests {
         }
     }
 
-
-    // TODO add test with test vectors like https://github.com/golang/go/blob/master/src/crypto/rsa/rsa_test.go
+    #[test]
+    fn test_decrypt_oaep_invalid_hash() {
+        let mut rng = thread_rng();
+        let priv_key = get_private_key();
+        let pub_key: RSAPublicKey = priv_key.clone().into();
+        let mut oaep_options = OaepOptions::new();
+        let ciphertext = encrypt(
+            &mut rng,
+            &pub_key,
+            "a_plain_text".as_bytes(),
+            oaep_options.clone(),
+        )
+        .unwrap();
+        oaep_options = oaep_options.set_label(Some("a_label".to_owned()));
+        assert!(
+            decrypt(Some(&mut rng), &priv_key, &ciphertext, oaep_options.clone()).is_err(),
+            "decrypt should have failed on hash verification"
+        );
+    }
 
 }

@@ -61,8 +61,8 @@ pub mod hash;
 pub mod padding;
 
 mod key;
+pub mod oaep;
 mod pkcs1v15;
-mod oaep;
 
 pub use self::key::{PublicKey, RSAPrivateKey, RSAPublicKey};
 pub use self::padding::PaddingScheme;
