@@ -1,39 +1,14 @@
 use rand::Rng;
 
+use digest::DynDigest;
+
 use num_bigint::BigUint;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
-use crate::hash::{Hash, Hashes};
 use crate::internals;
 use crate::key::{self, PublicKey, RSAPrivateKey};
-
-/// Represents oaep cipering/deciphering options.
-#[derive(Debug, Clone)]
-pub struct OaepOptions {
-    pub hash: Hashes,
-    pub label: Option<String>,
-}
-
-impl OaepOptions {
-    pub fn new() -> OaepOptions {
-        OaepOptions {
-            hash: Hashes::SHA1,
-            label: None,
-        }
-    }
-
-    pub fn set_hash(mut self, h: Hashes) -> Self {
-        self.hash = h;
-        self
-    }
-
-    pub fn set_label(mut self, l: Option<String>) -> Self {
-        self.label = l;
-        self
-    }
-}
 
 fn inc_counter(counter: &mut [u8]) {
     if counter[3] == u8::max_value() {
@@ -68,23 +43,24 @@ fn inc_counter(counter: &mut [u8]) {
 }
 
 /// Mask generation function
-fn mgf1_xor<H: Hash>(out: &mut [u8], h: &H, seed: &[u8]) {
+fn mgf1_xor(out: &mut [u8], digest: &mut impl DynDigest, seed: &[u8]) {
     let mut counter = vec![0u8; 4];
     let mut i = 0;
 
     while i < out.len() {
-        let mut digest_data = vec![0u8; seed.len() + 4];
-        digest_data[0..seed.len()].copy_from_slice(seed);
-        digest_data[seed.len()..].copy_from_slice(&counter);
+        let mut digest_input = vec![0u8; seed.len() + 4];
+        digest_input[0..seed.len()].copy_from_slice(seed);
+        digest_input[seed.len()..].copy_from_slice(&counter);
 
-        let digest = h.digest(digest_data.as_slice());
+        digest.input(digest_input.as_slice());
+        let digest_output = &*digest.result_reset();
         let mut j = 0;
         loop {
-            if j >= digest.len() || i >= out.len() {
+            if j >= digest_output.len() || i >= out.len() {
                 break;
             }
 
-            out[i] ^= digest[j];
+            out[i] ^= digest_output[j];
             j += 1;
             i += 1;
         }
@@ -100,18 +76,20 @@ pub fn encrypt<R: Rng, K: PublicKey>(
     rng: &mut R,
     pub_key: &K,
     msg: &[u8],
-    oaep_options: OaepOptions,
+    digest: &mut impl DynDigest,
+    label: Option<String>
 ) -> Result<Vec<u8>> {
     key::check_public(pub_key)?;
 
-    let h = oaep_options.hash;
     let k = pub_key.size();
 
-    if msg.len() > k - 2 * h.size() - 2 {
+    let h_size = digest.output_size();
+
+    if msg.len() > k - 2 * h_size - 2 {
         return Err(Error::MessageTooLong);
     }
 
-    let label = match oaep_options.label {
+    let label = match label {
         Some(l) => l,
         None => "".to_owned(),
     };
@@ -119,19 +97,20 @@ pub fn encrypt<R: Rng, K: PublicKey>(
     let mut em = vec![0u8; k];
 
     let (_, payload) = em.split_at_mut(1);
-    let (seed, db) = payload.split_at_mut(h.size());
+    let (seed, db) = payload.split_at_mut(h_size);
     rng.fill(seed);
 
     // Data block DB =  pHash || PS || 01 || M
-    let db_len = k - h.size() - 1;
+    let db_len = k -h_size - 1;
 
-    let p_hash = h.digest(label.as_bytes());
-    db[0..h.size()].copy_from_slice(p_hash.as_slice());
+    digest.input(label.as_bytes());
+    let p_hash = digest.result_reset();
+    db[0..h_size].copy_from_slice(&*p_hash);
     db[db_len - msg.len() - 1] = 1;
     db[db_len - msg.len()..].copy_from_slice(msg);
 
-    mgf1_xor(db, &h, seed);
-    mgf1_xor(seed, &h, db);
+    mgf1_xor(db, digest, seed);
+    mgf1_xor(seed, digest, db);
 
     {
         let mut m = BigUint::from_bytes_be(&em);
@@ -159,11 +138,12 @@ pub fn decrypt<R: Rng>(
     rng: Option<&mut R>,
     priv_key: &RSAPrivateKey,
     ciphertext: &[u8],
-    oaep_options: OaepOptions,
+    digest: &mut impl DynDigest,
+    label: Option<String>
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
-    let (valid, out, index) = decrypt_inner(rng, priv_key, ciphertext, oaep_options)?;
+    let (valid, out, index) = decrypt_inner(rng, priv_key, ciphertext, digest, label)?;
     if valid == 0 {
         return Err(Error::Decryption);
     }
@@ -182,16 +162,17 @@ fn decrypt_inner<R: Rng>(
     rng: Option<&mut R>,
     priv_key: &RSAPrivateKey,
     ciphertext: &[u8],
-    oaep_options: OaepOptions,
+    digest: &mut impl DynDigest,
+    label: Option<String>
 ) -> Result<(u8, Vec<u8>, u32)> {
     let k = priv_key.size();
     if k < 11 {
         return Err(Error::Decryption);
     }
 
-    let h = oaep_options.hash;
+    let h_size = digest.output_size();
 
-    if ciphertext.len() > k || k < h.size() * 2 + 2 {
+    if ciphertext.len() > k || k < h_size * 2 + 2 {
         return Err(Error::Decryption);
     }
 
@@ -206,22 +187,24 @@ fn decrypt_inner<R: Rng>(
         em
     };
 
-    let label = match oaep_options.label {
+    let label = match label {
         Some(l) => l,
         None => "".to_owned(),
     };
 
-    let expected_p_hash = h.digest(label.as_bytes());
+    digest.input(label.as_bytes());
+
+    let expected_p_hash = &*digest.result_reset();
 
     let first_byte_is_zero = em[0].ct_eq(&0u8);
 
     let (_, payload) = em.split_at_mut(1);
-    let (seed, db) = payload.split_at_mut(h.size());
+    let (seed, db) = payload.split_at_mut(h_size);
 
-    mgf1_xor(seed, &h, db);
-    mgf1_xor(db, &h, seed);
+    mgf1_xor(seed, digest, db);
+    mgf1_xor(db, digest, seed);
 
-    let hash_are_equal = db[0..h.size()].ct_eq(expected_p_hash.as_slice());
+    let hash_are_equal = db[0..h_size].ct_eq(expected_p_hash);
 
     // The remainder of the plaintext must be zero or more 0x00, followed
     // by 0x01, followed by the message.
@@ -232,7 +215,7 @@ fn decrypt_inner<R: Rng>(
     let mut index = 0u32;
     let mut zero_before_one = 0u8;
 
-    for (i, el) in db.iter().skip(h.size()).enumerate() {
+    for (i, el) in db.iter().skip(h_size).enumerate() {
         let equals0 = el.ct_eq(&0u8);
         let equals1 = el.ct_eq(&1u8);
         index.conditional_assign(&(i as u32), Choice::from(looking_for_index) & equals1);
@@ -244,7 +227,7 @@ fn decrypt_inner<R: Rng>(
         & hash_are_equal
         & !Choice::from(zero_before_one)
         & !Choice::from(looking_for_index);
-    index = u32::conditional_select(&0, &(index + 2 + (h.size() * 2) as u32), valid);
+    index = u32::conditional_select(&0, &(index + 2 + (h_size * 2) as u32), valid);
 
     Ok((valid.unwrap_u8(), em, index))
 }
@@ -253,11 +236,14 @@ fn decrypt_inner<R: Rng>(
 mod tests {
 
     use super::*;
-    use crate::hash::Hashes;
     use crate::key::RSAPublicKey;
     use num_traits::FromPrimitive;
     use rand::distributions::Alphanumeric;
     use rand::thread_rng;
+
+    use sha1::Sha1;
+    use sha2::{Sha224, Sha256, Sha384, Sha512};
+    use sha3::{Sha3_256, Sha3_384, Sha3_512};
 
     fn get_private_key() -> RSAPrivateKey {
         // -----BEGIN RSA PRIVATE KEY-----
@@ -301,29 +287,32 @@ mod tests {
 
     #[test]
     fn test_encrypt_decrypt_oaep() {
-        let mut rng = thread_rng();
+
         let priv_key = get_private_key();
-        let k = priv_key.size();
+        do_test_encrypt_decrypt_oaep(&priv_key, &mut Sha1::default());
+        do_test_encrypt_decrypt_oaep(&priv_key, &mut Sha224::default());
+        do_test_encrypt_decrypt_oaep(&priv_key, &mut Sha256::default());
+        do_test_encrypt_decrypt_oaep(&priv_key, &mut Sha384::default());
+        do_test_encrypt_decrypt_oaep(&priv_key, &mut Sha512::default());
+        do_test_encrypt_decrypt_oaep(&priv_key, &mut Sha3_256::default());
+        do_test_encrypt_decrypt_oaep(&priv_key, &mut Sha3_384::default());
+        do_test_encrypt_decrypt_oaep(&priv_key, &mut Sha3_512::default());
+    }
 
-        let mut oaep_options = OaepOptions::new();
+    fn do_test_encrypt_decrypt_oaep<D: DynDigest>(
+        prk: &RSAPrivateKey,
+        digest: &mut D,
+    ) {
 
-        let hashers = [
-            Hashes::SHA1,
-            Hashes::SHA2_224,
-            Hashes::SHA2_256,
-            Hashes::SHA2_384,
-            Hashes::SHA2_512,
-            Hashes::SHA3_256,
-            Hashes::SHA3_384,
-            Hashes::SHA3_512,
-        ];
+        let mut rng = thread_rng();
 
-        for i in 1..16 {
+        let k = prk.size();
+
+         for i in 1..8 {
             let mut input: Vec<u8> = (0..i * 8).map(|_| rng.gen()).collect();
             if input.len() > k - 11 {
                 input = input[0..k - 11].to_vec();
             }
-            let hasher_idx: u32 = rng.gen();
             let has_label: bool = rng.gen();
             let label = if has_label {
                 Some(rng.sample_iter(&Alphanumeric).take(30).collect())
@@ -331,18 +320,15 @@ mod tests {
                 None
             };
 
-            oaep_options = oaep_options
-                .set_hash(hashers[(hasher_idx as usize % hashers.len())])
-                .set_label(label);
-
-            let pub_key: RSAPublicKey = priv_key.clone().into();
-            let ciphertext = encrypt(&mut rng, &pub_key, &input, oaep_options.clone()).unwrap();
+            let pub_key: RSAPublicKey = prk.clone().into();
+            let ciphertext = encrypt(&mut rng, &pub_key, &input, digest, label.clone()).unwrap();
             assert_ne!(input, ciphertext);
             let blind: bool = rng.gen();
             let blinder = if blind { Some(&mut rng) } else { None };
-            let plaintext = decrypt(blinder, &priv_key, &ciphertext, oaep_options.clone()).unwrap();
+            let plaintext = decrypt(blinder, &prk, &ciphertext, digest, label).unwrap();
             assert_eq!(input, plaintext);
-        }
+         }
+
     }
 
     #[test]
@@ -350,17 +336,17 @@ mod tests {
         let mut rng = thread_rng();
         let priv_key = get_private_key();
         let pub_key: RSAPublicKey = priv_key.clone().into();
-        let mut oaep_options = OaepOptions::new();
+        let mut digest = Sha1::default();
         let ciphertext = encrypt(
             &mut rng,
             &pub_key,
             "a_plain_text".as_bytes(),
-            oaep_options.clone(),
+            &mut digest,
+            None,
         )
         .unwrap();
-        oaep_options = oaep_options.set_label(Some("a_label".to_owned()));
         assert!(
-            decrypt(Some(&mut rng), &priv_key, &ciphertext, oaep_options.clone()).is_err(),
+            decrypt(Some(&mut rng), &priv_key, &ciphertext, &mut digest, Some("label".to_owned())).is_err(),
             "decrypt should have failed on hash verification"
         );
     }
