@@ -9,9 +9,10 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::algorithms::generate_multi_prime_key;
 use crate::errors::{Error, Result};
-use crate::hash::Hash;
+use crate::hash::{Hash, Hashes};
 use crate::padding::PaddingScheme;
 use crate::pkcs1v15;
+use crate::pss;
 
 lazy_static! {
     static ref MIN_PUB_EXPONENT: BigUint = BigUint::from_u64(2).unwrap();
@@ -132,10 +133,10 @@ pub trait PublicKey {
     /// `hashed`must be the result of hashing the input using the hashing function
     /// passed in through `hash`.
     /// If the message is valid `Ok(())` is returned, otherwiese an `Err` indicating failure.
-    fn verify<H: Hash>(
+    fn verify(
         &self,
         padding: PaddingScheme,
-        hash: Option<&H>,
+        hash: Option<&Hashes>,
         hashed: &[u8],
         sig: &[u8],
     ) -> Result<()>;
@@ -157,16 +158,16 @@ impl PublicKey for RSAPublicKey {
         }
     }
 
-    fn verify<H: Hash>(
+    fn verify(
         &self,
         padding: PaddingScheme,
-        hash: Option<&H>,
+        hash: Option<&Hashes>,
         hashed: &[u8],
         sig: &[u8],
     ) -> Result<()> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::verify(self, hash, hashed, sig),
-            PaddingScheme::PSS => unimplemented!("not yet implemented"),
+            PaddingScheme::PSS => pss::verify(self, hash.unwrap(), hashed, sig),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
@@ -195,10 +196,10 @@ impl<'a> PublicKey for &'a RSAPublicKey {
         (*self).encrypt(rng, padding, msg)
     }
 
-    fn verify<H: Hash>(
+    fn verify(
         &self,
         padding: PaddingScheme,
-        hash: Option<&H>,
+        hash: Option<&Hashes>,
         hashed: &[u8],
         sig: &[u8],
     ) -> Result<()> {
@@ -223,16 +224,16 @@ impl PublicKey for RSAPrivateKey {
         }
     }
 
-    fn verify<H: Hash>(
+    fn verify(
         &self,
         padding: PaddingScheme,
-        hash: Option<&H>,
+        hash: Option<&Hashes>,
         hashed: &[u8],
         sig: &[u8],
     ) -> Result<()> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::verify(self, hash, hashed, sig),
-            PaddingScheme::PSS => unimplemented!("not yet implemented"),
+            PaddingScheme::PSS => pss::verify(self, hash.unwrap(), hashed, sig),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
@@ -251,10 +252,10 @@ impl<'a> PublicKey for &'a RSAPrivateKey {
         (*self).encrypt(rng, padding, msg)
     }
 
-    fn verify<H: Hash>(
+    fn verify(
         &self,
         padding: PaddingScheme,
-        hash: Option<&H>,
+        hash: Option<&Hashes>,
         hashed: &[u8],
         sig: &[u8],
     ) -> Result<()> {
@@ -428,16 +429,16 @@ impl RSAPrivateKey {
 
     /// Sign the given digest.
     /// Use `rng` for blinding.
-    pub fn sign_blinded<R: Rng, H: Hash>(
+    pub fn sign_blinded<R: Rng>(
         &self,
         rng: &mut R,
         padding: PaddingScheme,
-        hash: Option<&H>,
+        hash: Option<&Hashes>,
         digest: &[u8],
     ) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::sign(Some(rng), self, hash, digest),
-            PaddingScheme::PSS => unimplemented!("not yet implemented"),
+            PaddingScheme::PSS => pss::sign(rng, self, hash.expect("Can't use None hash with PSS"), digest, None),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }

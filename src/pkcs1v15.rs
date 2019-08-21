@@ -171,7 +171,7 @@ fn hash_info<H: Hash>(hash: Option<&H>, digest_len: usize) -> Result<(usize, Vec
 }
 
 #[inline]
-fn copy_with_left_pad(dest: &mut [u8], src: &[u8]) {
+pub fn copy_with_left_pad(dest: &mut [u8], src: &[u8]) {
     // left pad with zeros
     let padding_bytes = dest.len() - src.len();
     for el in dest.iter_mut().take(padding_bytes) {
@@ -414,7 +414,7 @@ mod tests {
 
         let pub_key: RSAPublicKey = priv_key.into();
         pub_key
-            .verify::<Hashes>(PaddingScheme::PKCS1v15, None, msg, &sig)
+            .verify(PaddingScheme::PKCS1v15, None, msg, &sig)
             .expect("failed to verify");
     }
 }
