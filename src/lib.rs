@@ -46,6 +46,8 @@ extern crate hex;
 #[cfg(all(test, feature = "serde1"))]
 extern crate serde_test;
 
+pub use num_bigint::BigUint;
+
 /// Useful algorithms.
 pub mod algorithms;
 
