@@ -390,8 +390,10 @@ mod tests {
     #[test]
     fn test_from_into() {
         let private_key = RSAPrivateKey {
-            n: BigUint::from_u64(100).unwrap(),
-            e: BigUint::from_u64(200).unwrap(),
+            pubkey_components: RSAPublicKey {
+                n: BigUint::from_u64(100).unwrap(),
+                e: BigUint::from_u64(200).unwrap(),
+            },
             d: BigUint::from_u64(123).unwrap(),
             primes: vec![],
             precomputed: None,

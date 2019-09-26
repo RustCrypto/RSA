@@ -8,7 +8,7 @@
 //! extern crate rsa;
 //! extern crate rand;
 //!
-//! use rsa::{PublicKey, RSAPrivateKey, PaddingScheme};
+//! use rsa::RSAPrivateKey;
 //! use rand::rngs::OsRng;
 //!
 //! let mut rng = OsRng::new().expect("no secure randomness available");
@@ -17,11 +17,11 @@
 //!
 //! // Encrypt
 //! let data = b"hello world";
-//! let enc_data = key.encrypt(&mut rng, PaddingScheme::PKCS1v15, &data[..]).expect("failed to encrypt");
+//! let enc_data = key.encrypt_pkcs1v15(&mut rng, &data[..]).expect("failed to encrypt");
 //! assert_ne!(&data[..], &enc_data[..]);
 //!
 //! // Decrypt
-//! let dec_data = key.decrypt(PaddingScheme::PKCS1v15, &enc_data).expect("failed to decrypt");
+//! let dec_data = key.decrypt_pkcs1v15(&enc_data).expect("failed to decrypt");
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
 //!
@@ -57,15 +57,11 @@ pub mod errors;
 /// Supported hash functions.
 pub mod hash;
 
-/// Supported padding schemes.
-pub mod padding;
-
 mod key;
 mod pkcs1v15;
 mod pss;
 
 pub use self::key::{RSAPrivateKey, RSAPublicKey};
-pub use self::padding::PaddingScheme;
 
 // Optionally expose internals if requested via feature-flag.
 

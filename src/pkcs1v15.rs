@@ -266,7 +266,6 @@ mod tests {
 
     use crate::hash::Hashes;
     use crate::key::RSAPublicKey;
-    use crate::padding::PaddingScheme;
 
     #[test]
     fn test_non_zero_bytes() {
@@ -323,7 +322,7 @@ mod tests {
 
         for test in &tests {
             let out = priv_key
-                .decrypt(PaddingScheme::PKCS1v15, &base64::decode(test[0]).unwrap())
+                .decrypt_pkcs1v15(&base64::decode(test[0]).unwrap())
                 .unwrap();
             assert_eq!(out, test[1].as_bytes());
         }
@@ -364,16 +363,15 @@ mod tests {
             let expected = hex::decode(test[1]).unwrap();
 
             let out = priv_key
-                .sign(PaddingScheme::PKCS1v15, Some(&Hashes::SHA1), &digest)
+                .sign_pkcs1v15(Some(&Hashes::SHA1), &digest)
                 .unwrap();
             assert_ne!(out, digest);
             assert_eq!(out, expected);
 
             let mut rng = thread_rng();
             let out2 = priv_key
-                .sign_blinded(
+                .sign_pkcs1v15_blinded(
                     &mut rng,
-                    PaddingScheme::PKCS1v15,
                     Some(&Hashes::SHA1),
                     &digest,
                 )
@@ -396,7 +394,7 @@ mod tests {
             let sig = hex::decode(test[1]).unwrap();
 
             pub_key
-                .verify(PaddingScheme::PKCS1v15, Some(&Hashes::SHA1), &digest, &sig)
+                .verify_pkcs1v15(Some(&Hashes::SHA1), &digest, &sig)
                 .expect("failed to verify");
         }
     }
@@ -408,13 +406,13 @@ mod tests {
         let priv_key = get_private_key();
 
         let sig = priv_key
-            .sign::<Hashes>(PaddingScheme::PKCS1v15, None, msg)
+            .sign_pkcs1v15::<Hashes>(None, msg)
             .unwrap();
         assert_eq!(expected_sig, sig);
 
         let pub_key: RSAPublicKey = priv_key.into();
         pub_key
-            .verify(PaddingScheme::PKCS1v15, None, msg, &sig)
+            .verify_pkcs1v15::<Hashes>(None, msg, &sig)
             .expect("failed to verify");
     }
 }
