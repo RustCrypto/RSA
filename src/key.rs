@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::algorithms::generate_multi_prime_key;
-use crate::errors::{Error, Result};
+use crate::errors::{Error, Result as RsaResult};
 use crate::hash::{Hash, Hashes};
 use crate::padding::PaddingScheme;
 use crate::pkcs1v15;
@@ -127,7 +127,7 @@ impl From<RSAPrivateKey> for RSAPublicKey {
 
 impl RSAPublicKey {
     /// Create a new key from its components.
-    pub fn new(n: BigUint, e: BigUint) -> Result<Self> {
+    pub fn new(n: BigUint, e: BigUint) -> RsaResult<Self> {
         let k = RSAPublicKey { n, e };
         check_public(&k)?;
 
@@ -150,37 +150,28 @@ impl RSAPublicKey {
         (self.n().bits() + 7) / 8
     }
 
-    /// Encrypt the given message
-    pub fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
-            PaddingScheme::OAEP => unimplemented!("not yet implemented"),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
+    /// Encrypt the given message, using the PKCS1v15 padding scheme.
+    pub fn encrypt_pkcs1v15<R: Rng>(&self, rng: &mut R, msg: &[u8]) -> RsaResult<Vec<u8>> {
+        pkcs1v15::encrypt(rng, self, msg)
     }
 
-    /// Verify a signed message.
+    /// Verify a message signed with the PKCS1v15 padding scheme.
     /// `hashed` must be the result of hashing the input using the hashing function
     /// identified using the ASN1 prefix in `hash_asn1_prefix`.
     /// If the message is valid `Ok(())` is returned, otherwiese an `Err` indicating failure.
-    pub fn verify<H: Hash>(
+    pub fn verify_pkcs1v15<H: Hash>(
         &self,
-        padding: PaddingScheme,
         hash: Option<&H>,
         hashed: &[u8],
         sig: &[u8],
-    ) -> Result<()> {
-        match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::verify(self, hash, hashed, sig),
-            PaddingScheme::PSS => pss::verify(self, hash.unwrap(), hashed, sig),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
+    ) -> RsaResult<()> {
+        pkcs1v15::verify(self, hash, hashed, sig)
     }
 }
 
 impl RSAPrivateKey {
     /// Generate a new RSA key pair of the given bit size using the passed in `rng`.
-    pub fn new<R: Rng>(rng: &mut R, bit_size: usize) -> Result<RSAPrivateKey> {
+    pub fn new<R: Rng>(rng: &mut R, bit_size: usize) -> RsaResult<RSAPrivateKey> {
         generate_multi_prime_key(rng, 2, bit_size)
     }
 
@@ -271,7 +262,7 @@ impl RSAPrivateKey {
 
     /// Performs basic sanity checks on the key.
     /// Returns `Ok(())` if everything is good, otherwise an approriate error.
-    pub fn validate(&self) -> Result<()> {
+    pub fn validate(&self) -> RsaResult<()> {
         check_public(self)?;
 
         // Check that Πprimes == n.
@@ -304,59 +295,41 @@ impl RSAPrivateKey {
         Ok(())
     }
 
-    /// Decrypt the given message.
-    pub fn decrypt(&self, padding: PaddingScheme, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        match padding {
-            // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
-            PaddingScheme::PKCS1v15 => pkcs1v15::decrypt::<ThreadRng>(None, self, ciphertext),
-            PaddingScheme::OAEP => unimplemented!("not yet implemented"),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
+    /// Decrypt the given message, using the PKCS1v15 padding scheme.
+    pub fn decrypt_pkcs1v15(&self, ciphertext: &[u8]) -> RsaResult<Vec<u8>> {
+        pkcs1v15::decrypt::<ThreadRng>(None, self, ciphertext)
     }
 
-    /// Decrypt the given message.
+    /// Decrypt the given message, using the PKCS1v15 padding scheme.
+    ///
     /// Uses `rng` to blind the decryption process.
-    pub fn decrypt_blinded<R: Rng>(
+    pub fn decrypt_pkcs1v15_blinded<R: Rng>(
         &self,
         rng: &mut R,
-        padding: PaddingScheme,
         ciphertext: &[u8],
-    ) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::decrypt(Some(rng), self, ciphertext),
-            PaddingScheme::OAEP => unimplemented!("not yet implemented"),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
+    ) -> RsaResult<Vec<u8>> {
+        pkcs1v15::decrypt(Some(rng), self, ciphertext)
     }
 
-    /// Sign the given digest.
-    pub fn sign<H: Hash>(
+    /// Sign the given digest using the PKCS1v15 padding scheme.
+    pub fn sign_pkcs1v15<H: Hash>(
         &self,
-        padding: PaddingScheme,
         hash: Option<&H>,
         digest: &[u8],
-    ) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::sign::<ThreadRng, _>(None, self, hash, digest),
-            PaddingScheme::PSS => unimplemented!("not yet implemented"),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
+    ) -> RsaResult<Vec<u8>> {
+        pkcs1v15::sign::<ThreadRng, _>(None, self, hash, digest)
     }
 
-    /// Sign the given digest.
+    /// Sign the given digest using the PKCS1v15 padding scheme.
+    ///
     /// Use `rng` for blinding.
-    pub fn sign_blinded<R: Rng>(
+    pub fn sign_pkcs1v15_blinded<H: Hash, R: Rng>(
         &self,
         rng: &mut R,
-        padding: PaddingScheme,
-        hash: Option<&Hashes>,
+        hash: Option<&H>,
         digest: &[u8],
-    ) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::sign(Some(rng), self, hash, digest),
-            PaddingScheme::PSS => pss::sign(rng, self, hash.expect("Can't use None hash with PSS"), digest, None),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
+    ) -> RsaResult<Vec<u8>> {
+        pkcs1v15::sign(Some(rng), self, hash, digest)
     }
 }
 
