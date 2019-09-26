@@ -3,6 +3,7 @@ use rand::Rng;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroize;
 
+use crate::algorithms::copy_with_left_pad;
 use crate::errors::{Error, Result};
 use crate::hash::Hash;
 use crate::internals;
@@ -168,16 +169,6 @@ fn hash_info<H: Hash>(hash: Option<&H>, digest_len: usize) -> Result<(usize, &'s
         // this means the data is signed directly
         None => Ok((digest_len, &[])),
     }
-}
-
-#[inline]
-pub fn copy_with_left_pad(dest: &mut [u8], src: &[u8]) {
-    // left pad with zeros
-    let padding_bytes = dest.len() - src.len();
-    for el in dest.iter_mut().take(padding_bytes) {
-        *el = 0;
-    }
-    dest[padding_bytes..].copy_from_slice(src);
 }
 
 /// Decrypts ciphertext using `priv_key` and blinds the operation if

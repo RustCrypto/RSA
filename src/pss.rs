@@ -1,4 +1,4 @@
-use crate::pkcs1v15::copy_with_left_pad;
+use crate::algorithms::copy_with_left_pad;
 use crate::internals;
 use crate::key::{RSAPrivateKey, RSAPublicKey};
 use crate::errors::{Error, Result};
