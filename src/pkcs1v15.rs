@@ -155,7 +155,7 @@ pub fn verify<H: Hash>(
 }
 
 #[inline]
-fn hash_info<H: Hash>(hash: Option<&H>, digest_len: usize) -> Result<(usize, Vec<u8>)> {
+fn hash_info<H: Hash>(hash: Option<&H>, digest_len: usize) -> Result<(usize, &'static [u8])> {
     match hash {
         Some(hash) => {
             let hash_len = hash.size();
@@ -166,7 +166,7 @@ fn hash_info<H: Hash>(hash: Option<&H>, digest_len: usize) -> Result<(usize, Vec
             Ok((hash_len, hash.asn1_prefix()))
         }
         // this means the data is signed directly
-        None => Ok((digest_len, Vec::new())),
+        None => Ok((digest_len, &[])),
     }
 }
 
