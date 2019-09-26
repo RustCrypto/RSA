@@ -1,19 +1,16 @@
 use crate::pkcs1v15::copy_with_left_pad;
 use crate::internals;
-use crate::hash::{Hashes, Hash};
-use crate::key::{RSAPrivateKey, PublicKey};
+use crate::key::{RSAPrivateKey, RSAPublicKey};
 use crate::errors::{Error, Result};
 
 use std::vec::Vec;
 use num_bigint::BigUint;
 use subtle::ConstantTimeEq;
-use sha2::{Digest, Sha256};
-use sha1::Sha1;
+use digest::Digest;
 use rand::Rng;
 
-pub fn verify<K: PublicKey>(
-    pub_key: &K,
-    hash: &Hashes,
+pub fn verify<H: Digest>(
+    pub_key: &RSAPublicKey,
     hashed: &[u8],
     sig: &[u8]) -> Result<()>
 {
@@ -33,15 +30,7 @@ pub fn verify<K: PublicKey>(
     let mut em = vec![0; em_len];
     copy_with_left_pad(&mut em, &m);
 
-    match hash {
-        Hashes::SHA1 => {
-            emsa_pss_verify(hashed, &mut em, em_bits, None, Sha1::new())
-        },
-        Hashes::SHA2_256 => {
-            emsa_pss_verify(hashed, &mut em, em_bits, None, Sha256::new())
-        },
-        _ => unimplemented!()
-    }
+    emsa_pss_verify::<H>(hashed, &mut em, em_bits, None)
 }
 
 
@@ -49,15 +38,15 @@ pub fn verify<K: PublicKey>(
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. The opts argument may be nil, in which case sensible
 /// defaults are used.
-pub fn sign<T: Rng>(rng: &mut T, priv_key: &RSAPrivateKey, hash: &Hashes, hashed: &[u8], salt_len: Option<usize>) -> Result<Vec<u8>> {
+pub fn sign<T: Rng, H: Digest>(rng: &mut T, priv_key: &RSAPrivateKey, hashed: &[u8], salt_len: Option<usize>, blind: bool) -> Result<Vec<u8>> {
     let salt_len = salt_len.unwrap_or_else(|| {
-        (priv_key.n().bits() + 7) / 8 - 2 - hash.size()
+        (priv_key.n().bits() + 7) / 8 - 2 - H::output_size()
     });
 
     let mut salt = vec![0; salt_len];
     rng.fill(&mut salt[..]);
 
-    return sign_pss_with_salt(rng, priv_key, hash, hashed, &salt)
+    return sign_pss_with_salt::<_, H>(rng, priv_key, hashed, &salt, blind)
 }
 
 
@@ -65,28 +54,27 @@ pub fn sign<T: Rng>(rng: &mut T, priv_key: &RSAPrivateKey, hash: &Hashes, hashed
 // Note that hashed must be the result of hashing the input message using the
 // given hash function. salt is a random sequence of bytes whose length will be
 // later used to verify the signature.
-fn sign_pss_with_salt<T: Rng>(rng: &mut T, priv_key: &RSAPrivateKey, hash: &Hashes, hashed: &[u8], salt: &[u8]) -> Result<Vec<u8>> {
+fn sign_pss_with_salt<T: Rng, H: Digest>(rng: &mut T, priv_key: &RSAPrivateKey, hashed: &[u8], salt: &[u8], blind: bool) -> Result<Vec<u8>> {
     let n_bits = priv_key.n().bits();
     let mut em = vec![0; ((n_bits - 1) + 7) / 8];
-    match hash {
-        Hashes::SHA1 => {
-            emsa_pss_encode(&mut em, hashed, n_bits - 1, salt, Sha1::new())?;
-        },
-        Hashes::SHA2_256 => {
-            emsa_pss_encode(&mut em, hashed, n_bits - 1, salt, Sha256::new())?;
-        },
-        _ => unimplemented!()
-    }
+    emsa_pss_encode::<H>(&mut em, hashed, n_bits - 1, salt)?;
 
-    let mut m = BigUint::from_bytes_be(&em);
-    let mut c = internals::decrypt_and_check(Some(rng), priv_key, &m)?.to_bytes_be();
+    let m = BigUint::from_bytes_be(&em);
+
+    let blind_rng = if blind {
+        Some(rng)
+    } else {
+        None
+    };
+
+    let c = internals::decrypt_and_check(blind_rng, priv_key, &m)?.to_bytes_be();
 
     let mut s = vec![0; (n_bits + 7) / 8];
     copy_with_left_pad(&mut s, &c);
     return Ok(s)
 }
 
-fn emsa_pss_encode<H: Digest>(em: &mut [u8], m_hash: &[u8], em_bits: usize, salt: &[u8], mut hash: H) -> Result<()> {
+fn emsa_pss_encode<H: Digest>(em: &mut [u8], m_hash: &[u8], em_bits: usize, salt: &[u8]) -> Result<()> {
     // See [1], section 9.1.1
     let h_len = H::output_size();
     let s_len = salt.len();
@@ -125,11 +113,13 @@ fn emsa_pss_encode<H: Digest>(em: &mut [u8], m_hash: &[u8], em_bits: usize, salt
     //
     // 6.  Let H = Hash(M'), an octet string of length h_len.
     let prefix = [0u8; 8];
+    let mut hash = H::new();
+
     hash.input(&prefix);
     hash.input(m_hash);
     hash.input(salt);
 
-    let hashed = hash.result_reset();
+    let hashed = hash.result();
     h.copy_from_slice(&hashed);
 
     // 7.  Generate an octet string PS consisting of em_len - s_len - h_len - 2
@@ -143,7 +133,7 @@ fn emsa_pss_encode<H: Digest>(em: &mut [u8], m_hash: &[u8], em_bits: usize, salt
     // 9.  Let dbMask = MGF(H, emLen - hLen - 1).
     //
     // 10. Let maskedDB = DB \xor dbMask.
-    mgf1_xor(db, &mut hash, &h);
+    mgf1_xor(db, &mut H::new(), &h);
 
     // 11. Set the leftmost 8 * em_len - em_bits bits of the leftmost octet in
     //     maskedDB to zero.
@@ -155,7 +145,7 @@ fn emsa_pss_encode<H: Digest>(em: &mut [u8], m_hash: &[u8], em_bits: usize, salt
     return Ok(())
 }
 
-fn emsa_pss_verify<H: Digest>(m_hash: &[u8], em: &mut [u8], em_bits: usize, s_len: Option<usize>, mut hash: H) -> Result<()> {
+fn emsa_pss_verify<H: Digest>(m_hash: &[u8], em: &mut [u8], em_bits: usize, s_len: Option<usize>) -> Result<()> {
     // 1. If the length of M is greater than the input limitation for the
     //    hash function (2^61 - 1 octets for SHA-1), output "inconsistent"
     //    and stop.
@@ -193,7 +183,7 @@ fn emsa_pss_verify<H: Digest>(m_hash: &[u8], em: &mut [u8], em_bits: usize, s_le
     // 7. Let dbMask = MGF(H, em_len - h_len - 1)
     //
     // 8. Let DB = maskedDB \xor dbMask
-    mgf1_xor(db, &mut hash, &*h);
+    mgf1_xor(db, &mut H::new(), &*h);
 
 
     // 9.  Set the leftmost 8 * emLen - emBits bits of the leftmost octet in DB
@@ -237,6 +227,7 @@ fn emsa_pss_verify<H: Digest>(m_hash: &[u8], em: &mut [u8], em_bits: usize, s_le
     // 13. Let H' = Hash(M'), an octet string of length hLen.
     let prefix = [0u8; 8];
 
+    let mut hash = H::new();
     hash.input(prefix);
     hash.input(m_hash);
     hash.input(salt);
@@ -283,6 +274,8 @@ fn inc_counter(counter: &mut [u8]) {
 }
 
 /// Mask generation function
+///
+/// Will reset the Digest before returning.
 fn mgf1_xor<T: Digest>(out: &mut [u8], digest: &mut T, seed: &[u8]) {
     let mut counter = vec![0u8; 4];
     let mut i = 0;
@@ -310,8 +303,7 @@ fn mgf1_xor<T: Digest>(out: &mut [u8], digest: &mut T, seed: &[u8]) {
 
 #[cfg(test)]
 mod test {
-    use crate::{PaddingScheme, RSAPrivateKey, RSAPublicKey, PublicKey};
-    use crate::hash::Hashes;
+    use crate::{RSAPrivateKey, RSAPublicKey};
 
     use num_bigint::BigUint;
     use num_traits::{FromPrimitive, Num};
@@ -355,7 +347,7 @@ mod test {
             let sig = hex::decode(test[1]).unwrap();
 
             pub_key
-                .verify(PaddingScheme::PSS, Some(&Hashes::SHA1), &digest, &sig)
+                .verify_pss::<Sha1>(&digest, &sig)
                 .expect("failed to verify");
         }
     }
@@ -369,11 +361,11 @@ mod test {
         for test in &tests {
             let digest = Sha1::digest(test.as_bytes()).to_vec();
             let sig = priv_key
-                .sign_blinded(&mut thread_rng(), PaddingScheme::PSS, Some(&Hashes::SHA1), &digest)
+                .sign_pss::<Sha1, _>(&mut thread_rng(), &digest, None, true)
                 .expect("failed to sign");
 
             priv_key
-                .verify(PaddingScheme::PSS, Some(&Hashes::SHA1), &digest, &sig)
+                .verify_pss::<Sha1>(&digest, &sig)
                 .expect("failed to verify");
         }
     }

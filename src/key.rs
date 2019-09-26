@@ -7,11 +7,11 @@ use rand::{rngs::ThreadRng, Rng};
 #[cfg(feature = "serde1")]
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
+use digest::Digest;
 
 use crate::algorithms::generate_multi_prime_key;
 use crate::errors::{Error, Result as RsaResult};
-use crate::hash::{Hash, Hashes};
-use crate::padding::PaddingScheme;
+use crate::hash::Hash;
 use crate::pkcs1v15;
 use crate::pss;
 
@@ -113,7 +113,7 @@ pub(crate) struct CRTValue {
 
 impl From<RSAPrivateKey> for RSAPublicKey {
     fn from(mut private_key: RSAPrivateKey) -> Self {
-        let mut broken_key = RSAPublicKey {
+        let broken_key = RSAPublicKey {
             // Fast, no-allocation creation of a biguint.
             n: BigUint::new_native(Default::default()),
             e: BigUint::new_native(Default::default())
@@ -166,6 +166,20 @@ impl RSAPublicKey {
         sig: &[u8],
     ) -> RsaResult<()> {
         pkcs1v15::verify(self, hash, hashed, sig)
+    }
+
+    /// Verify that the given signature is valid using the PSS padding scheme.
+    ///
+    /// The first parameter should be a pre-hashed message, using D as the
+    /// hashing scheme.
+    ///
+    /// The salt length is auto-detected.
+    pub fn verify_pss<D: Digest>(
+        &self,
+        hashed: &[u8],
+        sig: &[u8]
+    ) -> RsaResult<()> {
+        pss::verify::<D>(self, hashed, sig)
     }
 }
 
@@ -330,6 +344,25 @@ impl RSAPrivateKey {
         digest: &[u8],
     ) -> RsaResult<Vec<u8>> {
         pkcs1v15::sign(Some(rng), self, hash, digest)
+    }
+
+    /// Sign the given pre-hashed message using the PSS padding scheme. The
+    /// message should be hashed using the Digest algorithm passed as a generic
+    /// argument.
+    ///
+    /// RNG is used for PSS salt generation, and if `blind` is true, it will
+    /// also be used to blind the RSA encryption.
+    ///
+    /// The length of the salt can be controlled with the salt_len parameter. If
+    /// it is None, then it will be calculated to be as large as possible.
+    pub fn sign_pss<D: Digest, R: Rng>(
+        &self,
+        rng: &mut R,
+        digest: &[u8],
+        salt_len: Option<usize>,
+        blind: bool
+    ) -> RsaResult<Vec<u8>> {
+        pss::sign::<R, D>(rng, self, digest, salt_len, blind)
     }
 }
 
