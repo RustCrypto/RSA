@@ -6,13 +6,13 @@ use zeroize::Zeroize;
 use crate::errors::{Error, Result};
 use crate::hash::Hash;
 use crate::internals;
-use crate::key::{self, PublicKey, RSAPrivateKey};
+use crate::key::{self, RSAPublicKey, RSAPrivateKey};
 
 // Encrypts the given message with RSA and the padding
 // scheme from PKCS#1 v1.5.  The message must be no longer than the
 // length of the public modulus minus 11 bytes.
 #[inline]
-pub fn encrypt<R: Rng, K: PublicKey>(rng: &mut R, pub_key: &K, msg: &[u8]) -> Result<Vec<u8>> {
+pub fn encrypt<R: Rng>(rng: &mut R, pub_key: &RSAPublicKey, msg: &[u8]) -> Result<Vec<u8>> {
     key::check_public(pub_key)?;
 
     let k = pub_key.size();
@@ -116,8 +116,8 @@ pub fn sign<R: Rng, H: Hash>(
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
 #[inline]
-pub fn verify<H: Hash, K: PublicKey>(
-    pub_key: &K,
+pub fn verify<H: Hash>(
+    pub_key: &RSAPublicKey,
     hash: Option<&H>,
     hashed: &[u8],
     sig: &[u8],

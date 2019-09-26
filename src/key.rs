@@ -1,3 +1,4 @@
+use std::ops::Deref;
 use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
@@ -31,10 +32,8 @@ pub struct RSAPublicKey {
 #[derive(Debug, Clone, ZeroizeOnDrop)]
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 pub struct RSAPrivateKey {
-    /// Modulus
-    n: BigUint,
-    /// Public exponent
-    e: BigUint,
+    /// Public components of the private key.
+    pubkey_components: RSAPublicKey,
     /// Private exponent
     d: BigUint,
     /// Prime factors of N, contains >= 2 elements.
@@ -47,7 +46,7 @@ pub struct RSAPrivateKey {
 impl PartialEq for RSAPrivateKey {
     #[inline]
     fn eq(&self, other: &RSAPrivateKey) -> bool {
-        self.n == other.n && self.e == other.e && self.d == other.d && self.primes == other.primes
+        self.pubkey_components == other.pubkey_components && self.d == other.d && self.primes == other.primes
     }
 }
 
@@ -63,6 +62,13 @@ impl Zeroize for RSAPrivateKey {
         if self.precomputed.is_some() {
             self.precomputed.take().unwrap().zeroize();
         }
+    }
+}
+
+impl Deref for RSAPrivateKey {
+    type Target = RSAPublicKey;
+    fn deref(&self) -> &RSAPublicKey {
+        &self.pubkey_components
     }
 }
 
@@ -106,70 +112,16 @@ pub(crate) struct CRTValue {
 }
 
 impl From<RSAPrivateKey> for RSAPublicKey {
-    fn from(private_key: RSAPrivateKey) -> Self {
-        let n = private_key.n.clone();
-        let e = private_key.e.clone();
-
-        RSAPublicKey { n, e }
-    }
-}
-
-/// Generic trait for operations on a public key.
-pub trait PublicKey {
-    /// Returns the modulus of the key.
-    fn n(&self) -> &BigUint;
-    /// Returns the public exponent of the key.
-    fn e(&self) -> &BigUint;
-    /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
-    /// or by this public key will have the same size.
-    fn size(&self) -> usize {
-        (self.n().bits() + 7) / 8
-    }
-
-    /// Encrypt the given message.
-    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>>;
-
-    /// Verify a signed message.
-    /// `hashed`must be the result of hashing the input using the hashing function
-    /// passed in through `hash`.
-    /// If the message is valid `Ok(())` is returned, otherwiese an `Err` indicating failure.
-    fn verify(
-        &self,
-        padding: PaddingScheme,
-        hash: Option<&Hashes>,
-        hashed: &[u8],
-        sig: &[u8],
-    ) -> Result<()>;
-}
-
-impl PublicKey for RSAPublicKey {
-    fn n(&self) -> &BigUint {
-        &self.n
-    }
-
-    fn e(&self) -> &BigUint {
-        &self.e
-    }
-    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
-            PaddingScheme::OAEP => unimplemented!("not yet implemented"),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
-    }
-
-    fn verify(
-        &self,
-        padding: PaddingScheme,
-        hash: Option<&Hashes>,
-        hashed: &[u8],
-        sig: &[u8],
-    ) -> Result<()> {
-        match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::verify(self, hash, hashed, sig),
-            PaddingScheme::PSS => pss::verify(self, hash.unwrap(), hashed, sig),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
+    fn from(mut private_key: RSAPrivateKey) -> Self {
+        let mut broken_key = RSAPublicKey {
+            // Fast, no-allocation creation of a biguint.
+            n: BigUint::new_native(Default::default()),
+            e: BigUint::new_native(Default::default())
+        };
+        // The private key is going to get dropped after this, so temporarily
+        // making it invalid is fine.
+        let pubkey = core::mem::replace(&mut private_key.pubkey_components, broken_key);
+        pubkey
     }
 }
 
@@ -181,42 +133,25 @@ impl RSAPublicKey {
 
         Ok(k)
     }
-}
 
-impl<'a> PublicKey for &'a RSAPublicKey {
-    fn n(&self) -> &BigUint {
+    /// Returns the modulus of the key.
+    pub fn n(&self) -> &BigUint {
         &self.n
     }
 
-    fn e(&self) -> &BigUint {
+    /// Returns the public exponent of the key.
+    pub fn e(&self) -> &BigUint {
         &self.e
     }
 
-    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
-        (*self).encrypt(rng, padding, msg)
+    /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
+    /// or by this public key will have the same size.
+    pub fn size(&self) -> usize {
+        (self.n().bits() + 7) / 8
     }
 
-    fn verify(
-        &self,
-        padding: PaddingScheme,
-        hash: Option<&Hashes>,
-        hashed: &[u8],
-        sig: &[u8],
-    ) -> Result<()> {
-        (*self).verify(padding, hash, hashed, sig)
-    }
-}
-
-impl PublicKey for RSAPrivateKey {
-    fn n(&self) -> &BigUint {
-        &self.n
-    }
-
-    fn e(&self) -> &BigUint {
-        &self.e
-    }
-
-    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
+    /// Encrypt the given message
+    pub fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
             PaddingScheme::OAEP => unimplemented!("not yet implemented"),
@@ -224,10 +159,14 @@ impl PublicKey for RSAPrivateKey {
         }
     }
 
-    fn verify(
+    /// Verify a signed message.
+    /// `hashed` must be the result of hashing the input using the hashing function
+    /// identified using the ASN1 prefix in `hash_asn1_prefix`.
+    /// If the message is valid `Ok(())` is returned, otherwiese an `Err` indicating failure.
+    pub fn verify<H: Hash>(
         &self,
         padding: PaddingScheme,
-        hash: Option<&Hashes>,
+        hash: Option<&H>,
         hashed: &[u8],
         sig: &[u8],
     ) -> Result<()> {
@@ -236,30 +175,6 @@ impl PublicKey for RSAPrivateKey {
             PaddingScheme::PSS => pss::verify(self, hash.unwrap(), hashed, sig),
             _ => Err(Error::InvalidPaddingScheme),
         }
-    }
-}
-
-impl<'a> PublicKey for &'a RSAPrivateKey {
-    fn n(&self) -> &BigUint {
-        &self.n
-    }
-
-    fn e(&self) -> &BigUint {
-        &self.e
-    }
-
-    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
-        (*self).encrypt(rng, padding, msg)
-    }
-
-    fn verify(
-        &self,
-        padding: PaddingScheme,
-        hash: Option<&Hashes>,
-        hashed: &[u8],
-        sig: &[u8],
-    ) -> Result<()> {
-        (*self).verify(padding, hash, hashed, sig)
     }
 }
 
@@ -277,8 +192,9 @@ impl RSAPrivateKey {
         primes: Vec<BigUint>,
     ) -> RSAPrivateKey {
         let mut k = RSAPrivateKey {
-            n,
-            e,
+            pubkey_components: RSAPublicKey {
+                n, e
+            },
             d,
             primes,
             precomputed: None,
@@ -446,7 +362,7 @@ impl RSAPrivateKey {
 
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
-pub fn check_public(public_key: &impl PublicKey) -> Result<()> {
+pub fn check_public(public_key: &RSAPublicKey) -> RsaResult<()> {
     if public_key.e() < &*MIN_PUB_EXPONENT {
         return Err(Error::PublicExponentTooSmall);
     }
