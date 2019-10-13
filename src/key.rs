@@ -5,7 +5,7 @@ use num_traits::{FromPrimitive, One};
 use rand::{rngs::ThreadRng, Rng};
 #[cfg(feature = "serde1")]
 use serde::{Deserialize, Serialize};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::Zeroize;
 
 use crate::algorithms::generate_multi_prime_key;
 use crate::errors::{Error, Result};
@@ -27,7 +27,7 @@ pub struct RSAPublicKey {
 }
 
 /// Represents a whole RSA key, public and private parts.
-#[derive(Debug, Clone, ZeroizeOnDrop)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
 pub struct RSAPrivateKey {
     /// Modulus
@@ -65,7 +65,13 @@ impl Zeroize for RSAPrivateKey {
     }
 }
 
-#[derive(Debug, Clone, ZeroizeOnDrop)]
+impl Drop for RSAPrivateKey {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+#[derive(Debug, Clone)]
 pub(crate) struct PrecomputedValues {
     /// D mod (P-1)
     pub(crate) dp: BigUint,
@@ -90,6 +96,12 @@ impl Zeroize for PrecomputedValues {
             val.zeroize();
         }
         self.crt_values.clear();
+    }
+}
+
+impl Drop for PrecomputedValues {
+    fn drop(&mut self) {
+        self.zeroize();
     }
 }
 

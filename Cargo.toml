@@ -12,7 +12,7 @@ categories = ["cryptography"]
 readme = "README.md"
 
 [dependencies]
-num-bigint = { version = "0.4", features = ["rand", "i128", "u64_digit", "prime", "zeroize"], package = "num-bigint-dig" }
+num-bigint = { version = "0.5", features = ["rand", "i128", "u64_digit", "prime", "zeroize"], package = "num-bigint-dig" }
 num-traits = "0.2.6"
 num-integer = "0.1.39"
 num-iter = "0.1.37"
@@ -23,8 +23,8 @@ failure = "0.1.5"
 subtle = "2.0.0"
 
 [dependencies.zeroize]
-version = "0.6"
-features = ["std", "alloc"]
+version = "0.10.1"
+features = ["alloc", "zeroize_derive"]
 
 [dependencies.serde]
 optional = true
@@ -36,7 +36,7 @@ features = ["std", "derive"]
 base64 = "0.10.1"
 sha-1 = "0.8.1"
 sha2 = "0.8.0"
-hex = "0.3.2"
+hex = "0.4.0"
 serde_test = "1.0.89"
 
 
@@ -51,6 +51,6 @@ name = "key"
 
 [features]
 default = []
-nightly = ["subtle/nightly", "num-bigint/nightly", "zeroize/nightly"]
+nightly = ["subtle/nightly", "num-bigint/nightly"]
 serde1 = ["num-bigint/serde", "serde"]
 expose-internals = []
