@@ -2,7 +2,7 @@ language: rust
 
 matrix:
   include:
-    - rust: 1.31.0
+    - rust: 1.36.0
     - rust: stable
     - rust: nightly
       env: TRAVIS_NIGHTLY=true
