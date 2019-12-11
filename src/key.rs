@@ -578,10 +578,11 @@ mod tests {
     #[test]
     #[cfg(feature = "serde1")]
     fn test_serde() {
-        use rand::thread_rng;
+        use rand::SeedableRng;
+        use rand_xorshift::XorShiftRng;
         use serde_test::{assert_tokens, Token};
 
-        let mut rng = thread_rng();
+        let mut rng = XorShiftRng::from_seed([1; 16]);
         let priv_key = RSAPrivateKey::new(&mut rng, 64).expect("failed to generate key");
 
         let priv_tokens = [
