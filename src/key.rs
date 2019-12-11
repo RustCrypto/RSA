@@ -578,7 +578,8 @@ mod tests {
     #[test]
     #[cfg(feature = "serde1")]
     fn test_serde() {
-        use rand::{SeedableRng, XorShiftRng};
+        use rand::SeedableRng;
+        use rand_xorshift::XorShiftRng;
         use serde_test::{assert_tokens, Token};
 
         let mut rng = XorShiftRng::from_seed([1; 16]);

@@ -1,5 +1,6 @@
 # RSA
 [![crates.io](https://img.shields.io/crates/v/rsa.svg)](https://crates.io/crates/rsa) [![Documentation](https://docs.rs/rsa/badge.svg)](https://docs.rs/rsa) [![Build Status](https://travis-ci.org/RustCrypto/RSA.svg?branch=master)](https://travis-ci.org/RustCrypto/RSA) [![dependency status](https://deps.rs/repo/github/RustCrypto/RSA/status.svg)](https://deps.rs/repo/github/RustCrypto/RSA)
+![minimum rustc 1.36](https://img.shields.io/badge/rustc-1.36+-red.svg)
 
 A portable RSA implementation in pure Rust.
 
@@ -14,7 +15,7 @@ extern crate rand;
 use rsa::{PublicKey, RSAPrivateKey, PaddingScheme};
 use rand::rngs::OsRng;
 
-let mut rng = OsRng::new().expect("no secure randomness available");
+let mut rng = OsRng;
 let bits = 2048;
 let key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
 
