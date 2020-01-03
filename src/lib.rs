@@ -62,6 +62,7 @@ pub mod padding;
 
 mod key;
 mod pkcs1v15;
+mod raw;
 
 pub use self::key::{PublicKey, RSAPrivateKey, RSAPublicKey};
 pub use self::padding::PaddingScheme;
