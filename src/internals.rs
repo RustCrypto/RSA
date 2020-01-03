@@ -5,11 +5,11 @@ use std::borrow::Cow;
 use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
-use crate::key::{PublicKey, RSAPrivateKey};
+use crate::key::{PublicKeyParts, RSAPrivateKey};
 
 /// Raw RSA encryption of m with the public key. No padding is performed.
 #[inline]
-pub fn encrypt<K: PublicKey>(key: &K, m: &BigUint) -> BigUint {
+pub fn encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> BigUint {
     m.modpow(key.e(), key.n())
 }
 
@@ -125,7 +125,7 @@ pub fn decrypt_and_check<R: Rng>(
 }
 
 /// Returns the blinded c, along with the unblinding factor.
-pub fn blind<R: Rng, K: PublicKey>(rng: &mut R, key: &K, c: &BigUint) -> (BigUint, BigUint) {
+pub fn blind<R: Rng, K: PublicKeyParts>(rng: &mut R, key: &K, c: &BigUint) -> (BigUint, BigUint) {
     // Blinding involves multiplying c by r^e.
     // Then the decryption operation performs (m^e * r^e)^d mod n
     // which equals mr mod n. The factor of r can then be removed
@@ -162,7 +162,7 @@ pub fn blind<R: Rng, K: PublicKey>(rng: &mut R, key: &K, c: &BigUint) -> (BigUin
 }
 
 /// Given an m and and unblinding factor, unblind the m.
-pub fn unblind(key: impl PublicKey, m: &BigUint, unblinder: &BigUint) -> BigUint {
+pub fn unblind(key: impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> BigUint {
     (m * unblinder) % key.n()
 }
 

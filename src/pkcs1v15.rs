@@ -3,7 +3,7 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 use crate::errors::{Error, Result};
 use crate::hash::Hash;
-use crate::key::{self, PublicKey, RSAPrivateKey};
+use crate::key::{self, PublicKey, PublicKeyParts, RSAPrivateKey};
 use crate::raw::DecryptionPrimitive;
 
 // Encrypts the given message with RSA and the padding
