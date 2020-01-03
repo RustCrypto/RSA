@@ -12,6 +12,7 @@ use crate::errors::{Error, Result};
 use crate::hash::Hash;
 use crate::padding::PaddingScheme;
 use crate::pkcs1v15;
+use crate::raw::EncryptionPrimitive;
 
 lazy_static! {
     static ref MIN_PUB_EXPONENT: BigUint = BigUint::from_u64(2).unwrap();
@@ -126,7 +127,7 @@ impl From<RSAPrivateKey> for RSAPublicKey {
 }
 
 /// Generic trait for operations on a public key.
-pub trait PublicKey {
+pub trait PublicKey: EncryptionPrimitive {
     /// Returns the modulus of the key.
     fn n(&self) -> &BigUint;
     /// Returns the public exponent of the key.
