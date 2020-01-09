@@ -23,6 +23,8 @@ pub enum Error {
     InvalidModulus,
     #[fail(display = "invalid exponent")]
     InvalidExponent,
+    #[fail(display = "invalid coefficient")]
+    InvalidCoefficient,
     #[fail(display = "public exponent too small")]
     PublicExponentTooSmall,
     #[fail(display = "public exponent too large")]
