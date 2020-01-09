@@ -295,7 +295,8 @@ impl RSAPrivateKey {
             precomputed: None,
         };
 
-        k.precompute();
+        // precompute when possible, ignore error otherwise.
+        let _ = k.precompute();
 
         k
     }
@@ -310,9 +311,9 @@ impl RSAPrivateKey {
     }
 
     /// Performs some calculations to speed up private key operations.
-    pub fn precompute(&mut self) {
+    pub fn precompute(&mut self) -> Result<()> {
         if self.precomputed.is_some() {
-            return;
+            return Ok(());
         }
 
         let dp = &self.d % (&self.primes[0] - BigUint::one());
@@ -320,14 +321,12 @@ impl RSAPrivateKey {
         let qinv = self.primes[1]
             .clone()
             .mod_inverse(&self.primes[0])
-            .expect("invalid prime");
+            .ok_or(Error::InvalidPrime)?;
 
         let mut r: BigUint = &self.primes[0] * &self.primes[1];
-        let crt_values: Vec<CRTValue> = self
-            .primes
-            .iter()
-            .skip(2)
-            .map(|prime| {
+        let crt_values: Vec<CRTValue> = {
+            let mut values = Vec::with_capacity(self.primes.len() - 2);
+            for prime in &self.primes[2..] {
                 let res = CRTValue {
                     exp: BigInt::from_biguint(Plus, &self.d % (prime - BigUint::one())),
                     r: BigInt::from_biguint(Plus, r.clone()),
@@ -335,16 +334,17 @@ impl RSAPrivateKey {
                         Plus,
                         r.clone()
                             .mod_inverse(prime)
-                            .expect("invalid coeff")
+                            .ok_or(Error::InvalidCoefficient)?
                             .to_biguint()
                             .unwrap(),
                     ),
                 };
                 r *= prime;
 
-                res
-            })
-            .collect();
+                values.push(res);
+            }
+            values
+        };
 
         self.precomputed = Some(PrecomputedValues {
             dp,
@@ -352,6 +352,8 @@ impl RSAPrivateKey {
             qinv,
             crt_values,
         });
+
+        Ok(())
     }
 
     /// Returns the private exponent of the key.
