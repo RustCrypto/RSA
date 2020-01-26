@@ -77,7 +77,7 @@ pub fn encrypt<R: Rng, K: PublicKey>(
     pub_key: &K,
     msg: &[u8],
     digest: &mut impl DynDigest,
-    label: Option<String>
+    label: Option<String>,
 ) -> Result<Vec<u8>> {
     key::check_public(pub_key)?;
 
@@ -101,7 +101,7 @@ pub fn encrypt<R: Rng, K: PublicKey>(
     rng.fill(seed);
 
     // Data block DB =  pHash || PS || 01 || M
-    let db_len = k -h_size - 1;
+    let db_len = k - h_size - 1;
 
     digest.input(label.as_bytes());
     let p_hash = digest.result_reset();
@@ -139,7 +139,7 @@ pub fn decrypt<R: Rng>(
     priv_key: &RSAPrivateKey,
     ciphertext: &[u8],
     digest: &mut impl DynDigest,
-    label: Option<String>
+    label: Option<String>,
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
@@ -163,7 +163,7 @@ fn decrypt_inner<R: Rng>(
     priv_key: &RSAPrivateKey,
     ciphertext: &[u8],
     digest: &mut impl DynDigest,
-    label: Option<String>
+    label: Option<String>,
 ) -> Result<(u8, Vec<u8>, u32)> {
     let k = priv_key.size();
     if k < 11 {
@@ -287,7 +287,6 @@ mod tests {
 
     #[test]
     fn test_encrypt_decrypt_oaep() {
-
         let priv_key = get_private_key();
         do_test_encrypt_decrypt_oaep(&priv_key, &mut Sha1::default());
         do_test_encrypt_decrypt_oaep(&priv_key, &mut Sha224::default());
@@ -299,16 +298,12 @@ mod tests {
         do_test_encrypt_decrypt_oaep(&priv_key, &mut Sha3_512::default());
     }
 
-    fn do_test_encrypt_decrypt_oaep<D: DynDigest>(
-        prk: &RSAPrivateKey,
-        digest: &mut D,
-    ) {
-
+    fn do_test_encrypt_decrypt_oaep<D: DynDigest>(prk: &RSAPrivateKey, digest: &mut D) {
         let mut rng = thread_rng();
 
         let k = prk.size();
 
-         for i in 1..8 {
+        for i in 1..8 {
             let mut input: Vec<u8> = (0..i * 8).map(|_| rng.gen()).collect();
             if input.len() > k - 11 {
                 input = input[0..k - 11].to_vec();
@@ -327,8 +322,7 @@ mod tests {
             let blinder = if blind { Some(&mut rng) } else { None };
             let plaintext = decrypt(blinder, &prk, &ciphertext, digest, label).unwrap();
             assert_eq!(input, plaintext);
-         }
-
+        }
     }
 
     #[test]
@@ -346,9 +340,15 @@ mod tests {
         )
         .unwrap();
         assert!(
-            decrypt(Some(&mut rng), &priv_key, &ciphertext, &mut digest, Some("label".to_owned())).is_err(),
+            decrypt(
+                Some(&mut rng),
+                &priv_key,
+                &ciphertext,
+                &mut digest,
+                Some("label".to_owned())
+            )
+            .is_err(),
             "decrypt should have failed on hash verification"
         );
     }
-
 }
