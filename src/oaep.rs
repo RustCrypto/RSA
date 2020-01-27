@@ -85,7 +85,7 @@ pub fn encrypt<R: Rng, K: PublicKey>(
 
     let h_size = digest.output_size();
 
-    if msg.len() > k - 2 * h_size - 2 {
+    if msg.len() + 2 * h_size + 2 > k {
         return Err(Error::MessageTooLong);
     }
 
