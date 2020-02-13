@@ -60,11 +60,16 @@ pub mod hash;
 /// Supported padding schemes.
 pub mod padding;
 
+#[cfg(feature="pem")]
+pub use pem;
+
 mod key;
 mod pkcs1v15;
+mod parse;
 
 pub use self::key::{PublicKey, RSAPrivateKey, RSAPublicKey};
 pub use self::padding::PaddingScheme;
+pub use self::parse::{parse_private_key_pkcs1, parse_private_key_pkcs8, parse_public_key_pkcs1, parse_public_key_pkcs8};
 
 // Optionally expose internals if requested via feature-flag.
 
