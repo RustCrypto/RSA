@@ -200,7 +200,7 @@ impl RSAPublicKey {
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
     pub fn from_pkcs1(der: &[u8]) -> Result<RSAPublicKey> {
-        crate::parse_public_key_pkcs1(der)
+        crate::parse::parse_public_key_pkcs1(der)
     }
 
     /// Parse a `PKCS8` encoded RSA Public Key.
@@ -210,7 +210,7 @@ impl RSAPublicKey {
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
     pub fn from_pkcs8(der: &[u8]) -> Result<RSAPublicKey> {
-        crate::parse_public_key_pkcs8(der)
+        crate::parse::parse_public_key_pkcs8(der)
     }
 }
 
@@ -328,7 +328,7 @@ impl RSAPrivateKey {
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
     pub fn from_pkcs1(der: &[u8]) -> Result<RSAPrivateKey> {
-        crate::parse_private_key_pkcs1(der)
+        crate::parse::parse_private_key_pkcs1(der)
     }
 
     /// Parse a `PKCS8` encoded RSA Private Key.
@@ -338,7 +338,7 @@ impl RSAPrivateKey {
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
     pub fn from_pkcs8(der: &[u8]) -> Result<RSAPrivateKey> {
-        crate::parse_private_key_pkcs8(der)
+        crate::parse::parse_private_key_pkcs8(der)
     }
 
     /// Get the public key from the private key, cloning `n` and `e`.
