@@ -23,6 +23,29 @@ impl TryFrom<pem::Pem> for RSAPrivateKey {
     /// Expects one of the following `pem` headers:
     /// - `-----BEGIN PRIVATE KEY-----`
     /// - `-----BEGIN RSA PRIVATE KEY-----`
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use std::convert::TryFrom;
+    /// use rsa::RSAPrivateKey;
+    /// 
+    /// # // openssl genrsa -out tiny_key.pem 512
+    /// let file_content = r#"
+    /// -----BEGIN RSA PRIVATE KEY-----
+    /// MIIBOwIBAAJBAK5Z7jk1ql5DquRvlPmFgyBDCvdPQ0T2si2oPAUmNw2Z/qb2Sr/B
+    /// EBoWpagFf8Gl1K4PRipJSudDl6N/Vdb2CYkCAwEAAQJBAI3vWCfqsE8c9zoQPE8F
+    /// icHx0jOSq0ixLExO8M2gVqESq3SJpWbEbvPPbRb1sIqZHe5wV3Xmj09zvUzfdeB7
+    /// C6ECIQDjoB/kp7QlRiNhgudhQPct8XUf6Cgp7hBxL2K9Q9UzawIhAMQVvtH1TUOd
+    /// aSWiqrFx7w+54o58fIpkecI5Kl0TaWfbAiBrnye1Kn2IKhNMZWIUn2y+8izYeyGS
+    /// QZbQjQD4T3wcJQIgKGgWv2teNZ29ai0AIbrJuaLjhdsvStFzqctf6Hg0k1sCIQCj
+    /// JdwDGF7Kanex70KAacmOlw3vfx6XWT+2PH6Qh8tLug==
+    /// -----END RSA PRIVATE KEY-----
+    /// "#;
+    /// 
+    /// let pem = rsa::pem::parse(file_content).expect("failed to parse pem file");
+    /// let private_key = RSAPrivateKey::try_from(pem).expect("failed to parse key");
+    /// ```
     fn try_from(pem: pem::Pem) -> Result<RSAPrivateKey> {
         match &*pem.tag {
             "RSA PRIVATE KEY" => parse_private_key_pkcs1(&pem.contents),
@@ -43,6 +66,24 @@ impl TryFrom<pem::Pem> for RSAPublicKey {
     /// Expects one of the following `pem` headers:
     /// - `-----BEGIN PUBLIC KEY-----`
     /// - `-----BEGIN RSA PUBLIC KEY-----`
+    /// 
+    /// # Example
+    /// 
+    /// ```
+    /// use std::convert::TryFrom;
+    /// use rsa::RSAPublicKey;
+    /// 
+    /// # // openssl rsa -in tiny_key.pem -outform PEM -pubout -out tiny_key.pub.pem
+    /// let file_content = r#"
+    /// -----BEGIN PUBLIC KEY-----
+    /// MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAK5Z7jk1ql5DquRvlPmFgyBDCvdPQ0T2
+    /// si2oPAUmNw2Z/qb2Sr/BEBoWpagFf8Gl1K4PRipJSudDl6N/Vdb2CYkCAwEAAQ==
+    /// -----END PUBLIC KEY-----
+    /// "#;
+    /// 
+    /// let pem = rsa::pem::parse(file_content).expect("failed to parse pem file");
+    /// let public_key = RSAPublicKey::try_from(pem).expect("failed to parse key");
+    /// ```
     fn try_from(pem: pem::Pem) -> Result<RSAPublicKey> {
         match &*pem.tag {
             "RSA PUBLIC KEY" => parse_public_key_pkcs1(&pem.contents),
