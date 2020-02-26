@@ -34,14 +34,14 @@ extern crate rand;
 extern crate subtle;
 extern crate zeroize;
 
-#[cfg(feature = "serde1")]
-extern crate serde;
+#[cfg(feature = "serde")]
+extern crate serde_crate;
 
 #[cfg(test)]
 extern crate base64;
 #[cfg(test)]
 extern crate hex;
-#[cfg(all(test, feature = "serde1"))]
+#[cfg(all(test, feature = "serde"))]
 extern crate serde_test;
 
 pub use num_bigint::BigUint;

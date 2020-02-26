@@ -3,8 +3,8 @@ use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
 use num_traits::{FromPrimitive, One};
 use rand::{rngs::ThreadRng, Rng};
-#[cfg(feature = "serde1")]
-use serde::{Deserialize, Serialize};
+#[cfg(feature = "serde")]
+use serde_crate::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
 use crate::algorithms::generate_multi_prime_key;
@@ -20,7 +20,7 @@ lazy_static! {
 
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate="serde_crate"))]
 pub struct RSAPublicKey {
     n: BigUint,
     e: BigUint,
@@ -28,7 +28,7 @@ pub struct RSAPublicKey {
 
 /// Represents a whole RSA key, public and private parts.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde1", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate="serde_crate"))]
 pub struct RSAPrivateKey {
     /// Modulus
     n: BigUint,
@@ -39,7 +39,7 @@ pub struct RSAPrivateKey {
     /// Prime factors of N, contains >= 2 elements.
     primes: Vec<BigUint>,
     /// precomputed values to speed up private operations
-    #[cfg_attr(feature = "serde1", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(skip))]
     pub(crate) precomputed: Option<PrecomputedValues>,
 }
 
