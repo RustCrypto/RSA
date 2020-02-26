@@ -29,6 +29,8 @@ pub enum Error {
     PublicExponentTooSmall,
     #[fail(display = "public exponent too large")]
     PublicExponentTooLarge,
+    #[fail(display = "parse error: {}", reason)]
+    ParseError { reason: String },
     #[fail(display = "internal error")]
     Internal,
 }
