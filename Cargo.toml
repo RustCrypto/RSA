@@ -26,7 +26,8 @@ subtle = "2.0.0"
 version = "1.1.0"
 features = ["alloc", "zeroize_derive"]
 
-[dependencies.serde]
+[dependencies.serde_crate]
+package = "serde"
 optional = true
 version = "1.0.89"
 default-features = false
@@ -53,5 +54,6 @@ name = "key"
 [features]
 default = []
 nightly = ["subtle/nightly", "num-bigint/nightly"]
-serde1 = ["num-bigint/serde", "serde"]
+serde = ["num-bigint/serde", "serde_crate"]
+serde1 = ["serde"] # deprecated
 expose-internals = []
