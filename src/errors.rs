@@ -1,36 +1,38 @@
+use thiserror::Error;
+
 pub type Result<T> = ::std::result::Result<T, Error>;
 
 /// Error types
-#[derive(Debug, Fail)]
+#[derive(Debug, Error)]
 pub enum Error {
-    #[fail(display = "invalid padding scheme")]
+    #[error("invalid padding scheme")]
     InvalidPaddingScheme,
-    #[fail(display = "decryption error")]
+    #[error("decryption error")]
     Decryption,
-    #[fail(display = "verification error")]
+    #[error("verification error")]
     Verification,
-    #[fail(display = "message too long")]
+    #[error("message too long")]
     MessageTooLong,
-    #[fail(display = "input must be hashed")]
+    #[error("input must be hashed")]
     InputNotHashed,
-    #[fail(display = "nprimes must be >= 2")]
+    #[error("nprimes must be >= 2")]
     NprimesTooSmall,
-    #[fail(display = "too few primes of given length to generate an RSA key")]
+    #[error("too few primes of given length to generate an RSA key")]
     TooFewPrimes,
-    #[fail(display = "invalid prime value")]
+    #[error("invalid prime value")]
     InvalidPrime,
-    #[fail(display = "invalid modulus")]
+    #[error("invalid modulus")]
     InvalidModulus,
-    #[fail(display = "invalid exponent")]
+    #[error("invalid exponent")]
     InvalidExponent,
-    #[fail(display = "invalid coefficient")]
+    #[error("invalid coefficient")]
     InvalidCoefficient,
-    #[fail(display = "public exponent too small")]
+    #[error("public exponent too small")]
     PublicExponentTooSmall,
-    #[fail(display = "public exponent too large")]
+    #[error("public exponent too large")]
     PublicExponentTooLarge,
-    #[fail(display = "parse error: {}", reason)]
+    #[error("parse error: {}", reason)]
     ParseError { reason: String },
-    #[fail(display = "internal error")]
+    #[error("internal error")]
     Internal,
 }
