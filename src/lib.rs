@@ -14,7 +14,7 @@
 //! let mut rng = OsRng;
 //! let bits = 2048;
 //! let private_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
-//! let public_key = RSAPublicKey::from(private_key.clone());
+//! let public_key = RSAPublicKey::from(&private_key);
 //!
 //! // Encrypt
 //! let data = b"hello world";

@@ -35,7 +35,11 @@ pub trait PrivateKey: DecryptionPrimitive + PublicKeyParts {}
 
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate="serde_crate"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
 pub struct RSAPublicKey {
     n: BigUint,
     e: BigUint,
@@ -43,7 +47,11 @@ pub struct RSAPublicKey {
 
 /// Represents a whole RSA key, public and private parts.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate="serde_crate"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
 pub struct RSAPrivateKey {
     /// Modulus
     n: BigUint,
@@ -133,6 +141,12 @@ pub(crate) struct CRTValue {
 
 impl From<RSAPrivateKey> for RSAPublicKey {
     fn from(private_key: RSAPrivateKey) -> Self {
+        (&private_key).into()
+    }
+}
+
+impl From<&RSAPrivateKey> for RSAPublicKey {
+    fn from(private_key: &RSAPrivateKey) -> Self {
         let n = private_key.n.clone();
         let e = private_key.e.clone();
 
@@ -207,12 +221,12 @@ impl RSAPublicKey {
     /// following a `-----BEGIN RSA PUBLIC KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use rsa::RSAPublicKey;
-    /// 
+    ///
     /// # // openssl rsa -pubin -in tiny_key.pub.pem -RSAPublicKey_out
     /// let file_content = r#"
     /// -----BEGIN RSA PUBLIC KEY-----
@@ -220,7 +234,7 @@ impl RSAPublicKey {
     /// BX/BpdSuD0YqSUrnQ5ejf1XW9gmJAgMBAAE=
     /// -----END RSA PUBLIC KEY-----
     /// "#;
-    /// 
+    ///
     /// let der_encoded = file_content
     ///     .lines()
     ///     .filter(|line| !line.starts_with("-"))
@@ -241,12 +255,12 @@ impl RSAPublicKey {
     /// following a `-----BEGIN PUBLIC KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use rsa::RSAPublicKey;
-    /// 
+    ///
     /// # // openssl rsa -in tiny_key.pem -outform PEM -pubout -out tiny_key.pub.pem
     /// let file_content = r#"
     /// -----BEGIN PUBLIC KEY-----
@@ -254,7 +268,7 @@ impl RSAPublicKey {
     /// si2oPAUmNw2Z/qb2Sr/BEBoWpagFf8Gl1K4PRipJSudDl6N/Vdb2CYkCAwEAAQ==
     /// -----END PUBLIC KEY-----
     /// "#;
-    /// 
+    ///
     /// let der_encoded = file_content
     ///     .lines()
     ///     .filter(|line| !line.starts_with("-"))
@@ -353,12 +367,12 @@ impl RSAPrivateKey {
     /// following a `-----BEGIN RSA PRIVATE KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use rsa::RSAPrivateKey;
-    /// 
+    ///
     /// # // openssl genrsa -out tiny_key.pem 512
     /// let file_content = r#"
     /// -----BEGIN RSA PRIVATE KEY-----
@@ -371,7 +385,7 @@ impl RSAPrivateKey {
     /// JdwDGF7Kanex70KAacmOlw3vfx6XWT+2PH6Qh8tLug==
     /// -----END RSA PRIVATE KEY-----
     /// "#;
-    /// 
+    ///
     /// let der_encoded = file_content
     ///     .lines()
     ///     .filter(|line| !line.starts_with("-"))
@@ -392,12 +406,12 @@ impl RSAPrivateKey {
     /// following a `-----BEGIN PRIVATE KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use rsa::RSAPrivateKey;
-    /// 
+    ///
     /// # // openssl pkcs8 -topk8 -inform PEM -outform PEM -in tiny_key.pem -out tiny_key.pkcs8.pem -nocrypt
     /// let file_content = r#"
     /// -----BEGIN PRIVATE KEY-----
@@ -411,7 +425,7 @@ impl RSAPrivateKey {
     /// P7Y8fpCHy0u6
     /// -----END PRIVATE KEY-----
     /// "#;
-    /// 
+    ///
     /// let der_encoded = file_content
     ///     .lines()
     ///     .filter(|line| !line.starts_with("-"))
@@ -780,10 +794,7 @@ mod tests {
             BigUint::from_bytes_be(&n),
             BigUint::from_bytes_be(&e),
             BigUint::from_bytes_be(&d),
-            primes
-                .iter()
-                .map(|p| BigUint::from_bytes_be(p))
-                .collect(),
+            primes.iter().map(|p| BigUint::from_bytes_be(p)).collect(),
         );
     }
 }
