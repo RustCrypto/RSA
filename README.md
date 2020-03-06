@@ -9,9 +9,6 @@ A portable RSA implementation in pure Rust.
 ## Example
 
 ```rust
-extern crate rsa;
-extern crate rand;
-
 use rsa::{PublicKey, RSAPrivateKey, PaddingScheme};
 use rand::rngs::OsRng;
 
@@ -22,11 +19,11 @@ let pub_key = RSAPublicKey::from(&private_key);
 
 // Encrypt
 let data = b"hello world";
-let enc_data = pub_key.encrypt(&mut rng, PaddingScheme::PKCS1v15, &data[..]).expect("failed to encrypt");
+let enc_data = pub_key.encrypt(&mut rng, PaddingScheme::new_pkcs1v15(), &data[..]).expect("failed to encrypt");
 assert_ne!(&data[..], &enc_data[..]);
 
 // Decrypt
-let dec_data = priv_key.decrypt(PaddingScheme::PKCS1v15, &enc_data).expect("failed to decrypt");
+let dec_data = priv_key.decrypt(PaddingScheme::new_pkcs1v15(), &enc_data).expect("failed to decrypt");
 assert_eq!(&data[..], &dec_data[..]);
 ```
 
@@ -43,7 +40,7 @@ There will be three phases before `1.0` :ship: can be released.
     - [x] PKCS1v1.5: Sign & Verify :white_check_mark:
     - [ ] PKCS1v1.5 (session key): Encryption & Decryption
     - [x] OAEP: Encryption & Decryption
-    - [ ] PSS: Sign & Verify
+    - [x] PSS: Sign & Verify
     - [x] Key import & export
 2. :rocket: Make it fast
     - [x] Benchmarks :white_check_mark:
