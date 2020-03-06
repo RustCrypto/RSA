@@ -12,15 +12,34 @@ use crate::errors::{Error, Result};
 use crate::hash::Hash;
 use crate::padding::PaddingScheme;
 use crate::pkcs1v15;
+use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
 
 lazy_static! {
     static ref MIN_PUB_EXPONENT: BigUint = BigUint::from_u64(2).unwrap();
     static ref MAX_PUB_EXPONENT: BigUint = BigUint::from_u64(1 << (31 - 1)).unwrap();
 }
 
+pub trait PublicKeyParts {
+    /// Returns the modulus of the key.
+    fn n(&self) -> &BigUint;
+    /// Returns the public exponent of the key.
+    fn e(&self) -> &BigUint;
+    /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
+    /// or by this public key will have the same size.
+    fn size(&self) -> usize {
+        (self.n().bits() + 7) / 8
+    }
+}
+
+pub trait PrivateKey: DecryptionPrimitive + PublicKeyParts {}
+
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate="serde_crate"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
 pub struct RSAPublicKey {
     n: BigUint,
     e: BigUint,
@@ -28,7 +47,11 @@ pub struct RSAPublicKey {
 
 /// Represents a whole RSA key, public and private parts.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize), serde(crate="serde_crate"))]
+#[cfg_attr(
+    feature = "serde",
+    derive(Serialize, Deserialize),
+    serde(crate = "serde_crate")
+)]
 pub struct RSAPrivateKey {
     /// Modulus
     n: BigUint,
@@ -118,6 +141,12 @@ pub(crate) struct CRTValue {
 
 impl From<RSAPrivateKey> for RSAPublicKey {
     fn from(private_key: RSAPrivateKey) -> Self {
+        (&private_key).into()
+    }
+}
+
+impl From<&RSAPrivateKey> for RSAPublicKey {
+    fn from(private_key: &RSAPrivateKey) -> Self {
         let n = private_key.n.clone();
         let e = private_key.e.clone();
 
@@ -126,17 +155,7 @@ impl From<RSAPrivateKey> for RSAPublicKey {
 }
 
 /// Generic trait for operations on a public key.
-pub trait PublicKey {
-    /// Returns the modulus of the key.
-    fn n(&self) -> &BigUint;
-    /// Returns the public exponent of the key.
-    fn e(&self) -> &BigUint;
-    /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
-    /// or by this public key will have the same size.
-    fn size(&self) -> usize {
-        (self.n().bits() + 7) / 8
-    }
-
+pub trait PublicKey: EncryptionPrimitive + PublicKeyParts {
     /// Encrypt the given message.
     fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>>;
 
@@ -153,7 +172,7 @@ pub trait PublicKey {
     ) -> Result<()>;
 }
 
-impl PublicKey for RSAPublicKey {
+impl PublicKeyParts for RSAPublicKey {
     fn n(&self) -> &BigUint {
         &self.n
     }
@@ -161,6 +180,9 @@ impl PublicKey for RSAPublicKey {
     fn e(&self) -> &BigUint {
         &self.e
     }
+}
+
+impl PublicKey for RSAPublicKey {
     fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
@@ -199,12 +221,12 @@ impl RSAPublicKey {
     /// following a `-----BEGIN RSA PUBLIC KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use rsa::RSAPublicKey;
-    /// 
+    ///
     /// # // openssl rsa -pubin -in tiny_key.pub.pem -RSAPublicKey_out
     /// let file_content = r#"
     /// -----BEGIN RSA PUBLIC KEY-----
@@ -212,7 +234,7 @@ impl RSAPublicKey {
     /// BX/BpdSuD0YqSUrnQ5ejf1XW9gmJAgMBAAE=
     /// -----END RSA PUBLIC KEY-----
     /// "#;
-    /// 
+    ///
     /// let der_encoded = file_content
     ///     .lines()
     ///     .filter(|line| !line.starts_with("-"))
@@ -233,12 +255,12 @@ impl RSAPublicKey {
     /// following a `-----BEGIN PUBLIC KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use rsa::RSAPublicKey;
-    /// 
+    ///
     /// # // openssl rsa -in tiny_key.pem -outform PEM -pubout -out tiny_key.pub.pem
     /// let file_content = r#"
     /// -----BEGIN PUBLIC KEY-----
@@ -246,7 +268,7 @@ impl RSAPublicKey {
     /// si2oPAUmNw2Z/qb2Sr/BEBoWpagFf8Gl1K4PRipJSudDl6N/Vdb2CYkCAwEAAQ==
     /// -----END PUBLIC KEY-----
     /// "#;
-    /// 
+    ///
     /// let der_encoded = file_content
     ///     .lines()
     ///     .filter(|line| !line.starts_with("-"))
@@ -262,15 +284,17 @@ impl RSAPublicKey {
     }
 }
 
+impl<'a> PublicKeyParts for &'a RSAPublicKey {
+    fn n(&self) -> &BigUint {
+        &self.n
+    }
+
+    fn e(&self) -> &BigUint {
+        &self.e
+    }
+}
+
 impl<'a> PublicKey for &'a RSAPublicKey {
-    fn n(&self) -> &BigUint {
-        &self.n
-    }
-
-    fn e(&self) -> &BigUint {
-        &self.e
-    }
-
     fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         (*self).encrypt(rng, padding, msg)
     }
@@ -286,7 +310,7 @@ impl<'a> PublicKey for &'a RSAPublicKey {
     }
 }
 
-impl PublicKey for RSAPrivateKey {
+impl PublicKeyParts for RSAPrivateKey {
     fn n(&self) -> &BigUint {
         &self.n
     }
@@ -294,31 +318,11 @@ impl PublicKey for RSAPrivateKey {
     fn e(&self) -> &BigUint {
         &self.e
     }
-
-    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
-            PaddingScheme::OAEP => unimplemented!("not yet implemented"),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
-    }
-
-    fn verify<H: Hash>(
-        &self,
-        padding: PaddingScheme,
-        hash: Option<&H>,
-        hashed: &[u8],
-        sig: &[u8],
-    ) -> Result<()> {
-        match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::verify(self, hash, hashed, sig),
-            PaddingScheme::PSS => unimplemented!("not yet implemented"),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
-    }
 }
 
-impl<'a> PublicKey for &'a RSAPrivateKey {
+impl PrivateKey for RSAPrivateKey {}
+
+impl<'a> PublicKeyParts for &'a RSAPrivateKey {
     fn n(&self) -> &BigUint {
         &self.n
     }
@@ -326,21 +330,9 @@ impl<'a> PublicKey for &'a RSAPrivateKey {
     fn e(&self) -> &BigUint {
         &self.e
     }
-
-    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
-        (*self).encrypt(rng, padding, msg)
-    }
-
-    fn verify<H: Hash>(
-        &self,
-        padding: PaddingScheme,
-        hash: Option<&H>,
-        hashed: &[u8],
-        sig: &[u8],
-    ) -> Result<()> {
-        (*self).verify(padding, hash, hashed, sig)
-    }
 }
+
+impl<'a> PrivateKey for &'a RSAPrivateKey {}
 
 impl RSAPrivateKey {
     /// Generate a new RSA key pair of the given bit size using the passed in `rng`.
@@ -375,12 +367,12 @@ impl RSAPrivateKey {
     /// following a `-----BEGIN RSA PRIVATE KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use rsa::RSAPrivateKey;
-    /// 
+    ///
     /// # // openssl genrsa -out tiny_key.pem 512
     /// let file_content = r#"
     /// -----BEGIN RSA PRIVATE KEY-----
@@ -393,7 +385,7 @@ impl RSAPrivateKey {
     /// JdwDGF7Kanex70KAacmOlw3vfx6XWT+2PH6Qh8tLug==
     /// -----END RSA PRIVATE KEY-----
     /// "#;
-    /// 
+    ///
     /// let der_encoded = file_content
     ///     .lines()
     ///     .filter(|line| !line.starts_with("-"))
@@ -414,12 +406,12 @@ impl RSAPrivateKey {
     /// following a `-----BEGIN PRIVATE KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use rsa::RSAPrivateKey;
-    /// 
+    ///
     /// # // openssl pkcs8 -topk8 -inform PEM -outform PEM -in tiny_key.pem -out tiny_key.pkcs8.pem -nocrypt
     /// let file_content = r#"
     /// -----BEGIN PRIVATE KEY-----
@@ -433,7 +425,7 @@ impl RSAPrivateKey {
     /// P7Y8fpCHy0u6
     /// -----END PRIVATE KEY-----
     /// "#;
-    /// 
+    ///
     /// let der_encoded = file_content
     ///     .lines()
     ///     .filter(|line| !line.starts_with("-"))
@@ -606,7 +598,7 @@ impl RSAPrivateKey {
 
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
-pub fn check_public(public_key: &impl PublicKey) -> Result<()> {
+pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
     if public_key.e() < &*MIN_PUB_EXPONENT {
         return Err(Error::PublicExponentTooSmall);
     }
@@ -802,10 +794,7 @@ mod tests {
             BigUint::from_bytes_be(&n),
             BigUint::from_bytes_be(&e),
             BigUint::from_bytes_be(&d),
-            primes
-                .iter()
-                .map(|p| BigUint::from_bytes_be(p))
-                .collect(),
+            primes.iter().map(|p| BigUint::from_bytes_be(p)).collect(),
         );
     }
 }

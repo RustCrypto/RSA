@@ -8,20 +8,21 @@
 //! extern crate rsa;
 //! extern crate rand;
 //!
-//! use rsa::{PublicKey, RSAPrivateKey, PaddingScheme};
+//! use rsa::{PublicKey, RSAPrivateKey, RSAPublicKey, PaddingScheme};
 //! use rand::rngs::OsRng;
 //!
 //! let mut rng = OsRng;
 //! let bits = 2048;
-//! let key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+//! let private_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+//! let public_key = RSAPublicKey::from(&private_key);
 //!
 //! // Encrypt
 //! let data = b"hello world";
-//! let enc_data = key.encrypt(&mut rng, PaddingScheme::PKCS1v15, &data[..]).expect("failed to encrypt");
+//! let enc_data = public_key.encrypt(&mut rng, PaddingScheme::PKCS1v15, &data[..]).expect("failed to encrypt");
 //! assert_ne!(&data[..], &enc_data[..]);
 //!
 //! // Decrypt
-//! let dec_data = key.decrypt(PaddingScheme::PKCS1v15, &enc_data).expect("failed to decrypt");
+//! let dec_data = private_key.decrypt(PaddingScheme::PKCS1v15, &enc_data).expect("failed to decrypt");
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
 //!
@@ -58,12 +59,13 @@ pub mod hash;
 /// Supported padding schemes.
 pub mod padding;
 
-#[cfg(feature="pem")]
+#[cfg(feature = "pem")]
 pub use pem;
 
 mod key;
-mod pkcs1v15;
 mod parse;
+mod pkcs1v15;
+mod raw;
 
 pub use self::key::{PublicKey, RSAPrivateKey, RSAPublicKey};
 pub use self::padding::PaddingScheme;
