@@ -4,8 +4,7 @@ use digest::DynDigest;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 use crate::errors::{Error, Result};
-use crate::key::{self, PublicKey, PublicKeyParts, RSAPrivateKey};
-use crate::raw::DecryptionPrimitive;
+use crate::key::{self, PrivateKey, PublicKey};
 
 fn inc_counter(counter: &mut [u8]) {
     if counter[3] == u8::max_value() {
@@ -109,7 +108,7 @@ pub fn encrypt<R: Rng, K: PublicKey>(
     mgf1_xor(db, digest, seed);
     mgf1_xor(seed, digest, db);
 
-    pub_key.raw_encryption_primitive(&em)
+    pub_key.raw_encryption_primitive(&em, pub_key.size())
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from pkcs1# OAEP
@@ -121,9 +120,9 @@ pub fn encrypt<R: Rng, K: PublicKey>(
 /// forge signatures as if they had the private key. See
 /// `decrypt_session_key` for a way of solving this problem.
 #[inline]
-pub fn decrypt<R: Rng>(
+pub fn decrypt<R: Rng, SK: PrivateKey>(
     rng: Option<&mut R>,
-    priv_key: &RSAPrivateKey,
+    priv_key: &SK,
     ciphertext: &[u8],
     digest: &mut dyn DynDigest,
     label: Option<String>,
@@ -145,9 +144,9 @@ pub fn decrypt<R: Rng>(
 /// in order to maintain constant memory access patterns. If the plaintext was
 /// valid then index contains the index of the original message in em.
 #[inline]
-fn decrypt_inner<R: Rng>(
+fn decrypt_inner<R: Rng, SK: PrivateKey>(
     rng: Option<&mut R>,
-    priv_key: &RSAPrivateKey,
+    priv_key: &SK,
     ciphertext: &[u8],
     digest: &mut dyn DynDigest,
     label: Option<String>,
@@ -163,7 +162,7 @@ fn decrypt_inner<R: Rng>(
         return Err(Error::Decryption);
     }
 
-    let mut em = priv_key.raw_decryption_primitive(rng, ciphertext)?;
+    let mut em = priv_key.raw_decryption_primitive(rng, ciphertext, priv_key.size())?;
 
     let label = match label {
         Some(l) => l,

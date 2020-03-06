@@ -549,7 +549,7 @@ impl RSAPrivateKey {
                 pkcs1v15::decrypt::<ThreadRng, _>(None, self, ciphertext)
             }
             PaddingScheme::OAEP { mut digest, label } => {
-                oaep::decrypt::<ThreadRng>(None, self, ciphertext, &mut *digest, label)
+                oaep::decrypt::<ThreadRng, _>(None, self, ciphertext, &mut *digest, label)
             }
             _ => Err(Error::InvalidPaddingScheme),
         }
@@ -583,9 +583,14 @@ impl RSAPrivateKey {
                 mut salt_rng,
                 mut digest,
                 salt_len,
-            } => {
-                pss::sign::<_, ThreadRng>(&mut *salt_rng, None, self, input, salt_len, &mut *digest)
-            }
+            } => pss::sign::<_, ThreadRng, _>(
+                &mut *salt_rng,
+                None,
+                self,
+                input,
+                salt_len,
+                &mut *digest,
+            ),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
@@ -607,7 +612,7 @@ impl RSAPrivateKey {
                 mut salt_rng,
                 mut digest,
                 salt_len,
-            } => pss::sign::<_, R>(
+            } => pss::sign::<_, R, _>(
                 &mut *salt_rng,
                 Some(rng),
                 self,

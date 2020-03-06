@@ -3,14 +3,13 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 use crate::errors::{Error, Result};
 use crate::hash::Hash;
-use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
 use crate::key::{self, PrivateKey, PublicKey};
 
 // Encrypts the given message with RSA and the padding
 // scheme from PKCS#1 v1.5.  The message must be no longer than the
 // length of the public modulus minus 11 bytes.
 #[inline]
-pub fn encrypt<R: Rng>(rng: &mut R, pub_key: &RSAPublicKey, msg: &[u8]) -> Result<Vec<u8>> {
+pub fn encrypt<R: Rng, PK: PublicKey>(rng: &mut R, pub_key: &PK, msg: &[u8]) -> Result<Vec<u8>> {
     key::check_public(pub_key)?;
 
     let k = pub_key.size();
@@ -25,7 +24,7 @@ pub fn encrypt<R: Rng>(rng: &mut R, pub_key: &RSAPublicKey, msg: &[u8]) -> Resul
     em[k - msg.len() - 1] = 0;
     em[k - msg.len()..].copy_from_slice(msg);
 
-    pub_key.raw_encryption_primitive(&em)
+    pub_key.raw_encryption_primitive(&em, pub_key.size())
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5.
@@ -88,13 +87,13 @@ pub fn sign<R: Rng, SK: PrivateKey>(
     em[k - t_len..k - hash_len].copy_from_slice(&prefix);
     em[k - hash_len..k].copy_from_slice(hashed);
 
-    priv_key.raw_decryption_primitive(rng, &em)
+    priv_key.raw_decryption_primitive(rng, &em, priv_key.size())
 }
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
 #[inline]
-pub fn verify(
-    pub_key: &RSAPublicKey,
+pub fn verify<PK: PublicKey>(
+    pub_key: &PK,
     hash: Option<&Hash>,
     hashed: &[u8],
     sig: &[u8],
@@ -107,7 +106,7 @@ pub fn verify(
         return Err(Error::Verification);
     }
 
-    let em = pub_key.raw_encryption_primitive(sig)?;
+    let em = pub_key.raw_encryption_primitive(sig, pub_key.size())?;
 
     // EM = 0x00 || 0x01 || PS || 0x00 || T
     let mut ok = em[0].ct_eq(&0u8);
@@ -160,7 +159,7 @@ fn decrypt_inner<R: Rng, SK: PrivateKey>(
         return Err(Error::Decryption);
     }
 
-    let em = priv_key.raw_decryption_primitive(rng, ciphertext)?;
+    let em = priv_key.raw_decryption_primitive(rng, ciphertext, priv_key.size())?;
 
     let first_byte_is_zero = em[0].ct_eq(&0u8);
     let second_byte_is_two = em[1].ct_eq(&2u8);
@@ -219,7 +218,7 @@ mod tests {
     use rand::thread_rng;
     use sha1::{Digest, Sha1};
 
-    use crate::{Hash, PaddingScheme, PublicKey, RSAPublicKey};
+    use crate::{Hash, PaddingScheme, PublicKey, PublicKeyParts, RSAPrivateKey, RSAPublicKey};
 
     #[test]
     fn test_non_zero_bytes() {
@@ -374,4 +373,4 @@ mod tests {
             .verify(PaddingScheme::new_pkcs1v15(), msg, &sig)
             .expect("failed to verify");
     }
-
+}

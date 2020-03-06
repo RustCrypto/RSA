@@ -1,17 +1,14 @@
 use std::vec::Vec;
 
 use digest::DynDigest;
-use num_bigint::BigUint;
 use rand::{Rng, RngCore};
 use subtle::ConstantTimeEq;
 
-use crate::algorithms::copy_with_left_pad;
 use crate::errors::{Error, Result};
-use crate::internals;
-use crate::key::{PublicKeyParts, RSAPrivateKey, RSAPublicKey};
+use crate::key::{PrivateKey, PublicKey};
 
-pub fn verify(
-    pub_key: &RSAPublicKey,
+pub fn verify<PK: PublicKey>(
+    pub_key: &PK,
     hashed: &[u8],
     sig: &[u8],
     digest: &mut dyn DynDigest,
@@ -20,17 +17,10 @@ pub fn verify(
     if sig.len() != (n_bits + 7) / 8 {
         return Err(Error::Verification);
     }
-    let s = BigUint::from_bytes_be(sig);
-    let m = internals::encrypt(pub_key, &s).to_bytes_be();
+
     let em_bits = n_bits - 1;
     let em_len = (em_bits + 7) / 8;
-
-    if em_len < m.len() {
-        return Err(Error::Verification);
-    }
-
-    let mut em = vec![0; em_len];
-    copy_with_left_pad(&mut em, &m);
+    let mut em = pub_key.raw_encryption_primitive(sig, em_len)?;
 
     emsa_pss_verify(hashed, &mut em, em_bits, None, digest)
 }
@@ -39,10 +29,10 @@ pub fn verify(
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. The opts argument may be nil, in which case sensible
 /// defaults are used.
-pub fn sign<T: RngCore + ?Sized, S: Rng>(
+pub fn sign<T: RngCore + ?Sized, S: Rng, SK: PrivateKey>(
     rng: &mut T,
     blind_rng: Option<&mut S>,
-    priv_key: &RSAPrivateKey,
+    priv_key: &SK,
     hashed: &[u8],
     salt_len: Option<usize>,
     digest: &mut dyn DynDigest,
@@ -60,9 +50,9 @@ pub fn sign<T: RngCore + ?Sized, S: Rng>(
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. salt is a random sequence of bytes whose length will be
 /// later used to verify the signature.
-fn sign_pss_with_salt<T: Rng>(
+fn sign_pss_with_salt<T: Rng, SK: PrivateKey>(
     blind_rng: Option<&mut T>,
-    priv_key: &RSAPrivateKey,
+    priv_key: &SK,
     hashed: &[u8],
     salt: &[u8],
     digest: &mut dyn DynDigest,
@@ -71,14 +61,7 @@ fn sign_pss_with_salt<T: Rng>(
     let mut em = vec![0; ((n_bits - 1) + 7) / 8];
     emsa_pss_encode(&mut em, hashed, n_bits - 1, salt, digest)?;
 
-    let m = BigUint::from_bytes_be(&em);
-
-    let c = internals::decrypt_and_check(blind_rng, priv_key, &m)?.to_bytes_be();
-
-    let mut s = vec![0; (n_bits + 7) / 8];
-    copy_with_left_pad(&mut s, &c);
-
-    Ok(s)
+    priv_key.raw_decryption_primitive(blind_rng, &em, (n_bits + 7) / 8)
 }
 
 fn emsa_pss_encode(
