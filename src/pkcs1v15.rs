@@ -3,8 +3,8 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 use crate::errors::{Error, Result};
 use crate::hash::Hash;
-use crate::key::{self, PublicKeyParts, RSAPrivateKey, RSAPublicKey};
 use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
+use crate::key::{self, PrivateKey, PublicKey};
 
 // Encrypts the given message with RSA and the padding
 // scheme from PKCS#1 v1.5.  The message must be no longer than the
@@ -37,9 +37,9 @@ pub fn encrypt<R: Rng>(rng: &mut R, pub_key: &RSAPublicKey, msg: &[u8]) -> Resul
 // forge signatures as if they had the private key. See
 // `decrypt_session_key` for a way of solving this problem.
 #[inline]
-pub fn decrypt<R: Rng>(
+pub fn decrypt<R: Rng, SK: PrivateKey>(
     rng: Option<&mut R>,
-    priv_key: &RSAPrivateKey,
+    priv_key: &SK,
     ciphertext: &[u8],
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
@@ -66,9 +66,9 @@ pub fn decrypt<R: Rng>(
 // messages to signatures and identify the signed messages. As ever,
 // signatures provide authenticity, not confidentiality.
 #[inline]
-pub fn sign<R: Rng>(
+pub fn sign<R: Rng, SK: PrivateKey>(
     rng: Option<&mut R>,
-    priv_key: &RSAPrivateKey,
+    priv_key: &SK,
     hash: Option<&Hash>,
     hashed: &[u8],
 ) -> Result<Vec<u8>> {
@@ -150,9 +150,9 @@ fn hash_info(hash: Option<&Hash>, digest_len: usize) -> Result<(usize, &'static 
 /// in order to maintain constant memory access patterns. If the plaintext was
 /// valid then index contains the index of the original message in em.
 #[inline]
-fn decrypt_inner<R: Rng>(
+fn decrypt_inner<R: Rng, SK: PrivateKey>(
     rng: Option<&mut R>,
-    priv_key: &RSAPrivateKey,
+    priv_key: &SK,
     ciphertext: &[u8],
 ) -> Result<(u8, Vec<u8>, u32)> {
     let k = priv_key.size();
@@ -374,4 +374,4 @@ mod tests {
             .verify(PaddingScheme::new_pkcs1v15(), msg, &sig)
             .expect("failed to verify");
     }
-}
+

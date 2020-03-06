@@ -546,7 +546,7 @@ impl RSAPrivateKey {
         match padding {
             // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
             PaddingScheme::PKCS1v15 { .. } => {
-                pkcs1v15::decrypt::<ThreadRng>(None, self, ciphertext)
+                pkcs1v15::decrypt::<ThreadRng, _>(None, self, ciphertext)
             }
             PaddingScheme::OAEP { mut digest, label } => {
                 oaep::decrypt::<ThreadRng>(None, self, ciphertext, &mut *digest, label)
@@ -577,7 +577,7 @@ impl RSAPrivateKey {
     pub fn sign(&self, padding: PaddingScheme, input: &[u8]) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15 { ref hash } => {
-                pkcs1v15::sign::<ThreadRng>(None, self, hash.as_ref(), input)
+                pkcs1v15::sign::<ThreadRng, _>(None, self, hash.as_ref(), input)
             }
             PaddingScheme::PSS {
                 mut salt_rng,
