@@ -5,14 +5,15 @@ use num_traits::{FromPrimitive, One};
 use rand::{rngs::ThreadRng, Rng};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
+use std::ops::Deref;
 use zeroize::Zeroize;
 
 use crate::algorithms::generate_multi_prime_key;
 use crate::errors::{Error, Result};
-use crate::hash::Hash;
+
 use crate::padding::PaddingScheme;
 use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
-use crate::{oaep, pkcs1v15};
+use crate::{oaep, pkcs1v15, pss};
 
 lazy_static! {
     static ref MIN_PUB_EXPONENT: BigUint = BigUint::from_u64(2).unwrap();
@@ -22,8 +23,10 @@ lazy_static! {
 pub trait PublicKeyParts {
     /// Returns the modulus of the key.
     fn n(&self) -> &BigUint;
+
     /// Returns the public exponent of the key.
     fn e(&self) -> &BigUint;
+
     /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
     /// or by this public key will have the same size.
     fn size(&self) -> usize {
@@ -53,10 +56,8 @@ pub struct RSAPublicKey {
     serde(crate = "serde_crate")
 )]
 pub struct RSAPrivateKey {
-    /// Modulus
-    n: BigUint,
-    /// Public exponent
-    e: BigUint,
+    /// Public components of the private key.
+    pubkey_components: RSAPublicKey,
     /// Private exponent
     d: BigUint,
     /// Prime factors of N, contains >= 2 elements.
@@ -69,7 +70,9 @@ pub struct RSAPrivateKey {
 impl PartialEq for RSAPrivateKey {
     #[inline]
     fn eq(&self, other: &RSAPrivateKey) -> bool {
-        self.n == other.n && self.e == other.e && self.d == other.d && self.primes == other.primes
+        self.pubkey_components == other.pubkey_components
+            && self.d == other.d
+            && self.primes == other.primes
     }
 }
 
@@ -91,6 +94,13 @@ impl Zeroize for RSAPrivateKey {
 impl Drop for RSAPrivateKey {
     fn drop(&mut self) {
         self.zeroize();
+    }
+}
+
+impl Deref for RSAPrivateKey {
+    type Target = RSAPublicKey;
+    fn deref(&self) -> &RSAPublicKey {
+        &self.pubkey_components
     }
 }
 
@@ -163,13 +173,7 @@ pub trait PublicKey: EncryptionPrimitive + PublicKeyParts {
     /// `hashed`must be the result of hashing the input using the hashing function
     /// passed in through `hash`.
     /// If the message is valid `Ok(())` is returned, otherwiese an `Err` indicating failure.
-    fn verify<H: Hash>(
-        &self,
-        padding: PaddingScheme,
-        hash: Option<&H>,
-        hashed: &[u8],
-        sig: &[u8],
-    ) -> Result<()>;
+    fn verify(&self, padding: PaddingScheme, hashed: &[u8], sig: &[u8]) -> Result<()>;
 }
 
 impl PublicKeyParts for RSAPublicKey {
@@ -185,7 +189,7 @@ impl PublicKeyParts for RSAPublicKey {
 impl PublicKey for RSAPublicKey {
     fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::encrypt(rng, self, msg),
+            PaddingScheme::PKCS1v15 { .. } => pkcs1v15::encrypt(rng, self, msg),
             PaddingScheme::OAEP { mut digest, label } => {
                 oaep::encrypt(rng, self, msg, &mut *digest, label)
             }
@@ -193,16 +197,12 @@ impl PublicKey for RSAPublicKey {
         }
     }
 
-    fn verify<H: Hash>(
-        &self,
-        padding: PaddingScheme,
-        hash: Option<&H>,
-        hashed: &[u8],
-        sig: &[u8],
-    ) -> Result<()> {
+    fn verify(&self, padding: PaddingScheme, hashed: &[u8], sig: &[u8]) -> Result<()> {
         match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::verify(self, hash, hashed, sig),
-            PaddingScheme::PSS => unimplemented!("not yet implemented"),
+            PaddingScheme::PKCS1v15 { ref hash } => {
+                pkcs1v15::verify(self, hash.as_ref(), hashed, sig)
+            }
+            PaddingScheme::PSS { mut digest, .. } => pss::verify(self, hashed, sig, &mut *digest),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
@@ -287,10 +287,12 @@ impl RSAPublicKey {
 }
 
 impl<'a> PublicKeyParts for &'a RSAPublicKey {
+    /// Returns the modulus of the key.
     fn n(&self) -> &BigUint {
         &self.n
     }
 
+    /// Returns the public exponent of the key.
     fn e(&self) -> &BigUint {
         &self.e
     }
@@ -301,14 +303,8 @@ impl<'a> PublicKey for &'a RSAPublicKey {
         (*self).encrypt(rng, padding, msg)
     }
 
-    fn verify<H: Hash>(
-        &self,
-        padding: PaddingScheme,
-        hash: Option<&H>,
-        hashed: &[u8],
-        sig: &[u8],
-    ) -> Result<()> {
-        (*self).verify(padding, hash, hashed, sig)
+    fn verify(&self, padding: PaddingScheme, hashed: &[u8], sig: &[u8]) -> Result<()> {
+        (*self).verify(padding, hashed, sig)
     }
 }
 
@@ -332,6 +328,10 @@ impl<'a> PublicKeyParts for &'a RSAPrivateKey {
     fn e(&self) -> &BigUint {
         &self.e
     }
+
+    fn size(&self) -> usize {
+        (self.n().bits() + 7) / 8
+    }
 }
 
 impl<'a> PrivateKey for &'a RSAPrivateKey {}
@@ -350,8 +350,7 @@ impl RSAPrivateKey {
         primes: Vec<BigUint>,
     ) -> RSAPrivateKey {
         let mut k = RSAPrivateKey {
-            n,
-            e,
+            pubkey_components: RSAPublicKey { n, e },
             d,
             primes,
             precomputed: None,
@@ -546,7 +545,9 @@ impl RSAPrivateKey {
     pub fn decrypt(&self, padding: PaddingScheme, ciphertext: &[u8]) -> Result<Vec<u8>> {
         match padding {
             // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
-            PaddingScheme::PKCS1v15 => pkcs1v15::decrypt::<ThreadRng>(None, self, ciphertext),
+            PaddingScheme::PKCS1v15 { .. } => {
+                pkcs1v15::decrypt::<ThreadRng>(None, self, ciphertext)
+            }
             PaddingScheme::OAEP { mut digest, label } => {
                 oaep::decrypt::<ThreadRng>(None, self, ciphertext, &mut *digest, label)
             }
@@ -555,6 +556,7 @@ impl RSAPrivateKey {
     }
 
     /// Decrypt the given message.
+    ///
     /// Uses `rng` to blind the decryption process.
     pub fn decrypt_blinded<R: Rng>(
         &self,
@@ -563,7 +565,7 @@ impl RSAPrivateKey {
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
         match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::decrypt(Some(rng), self, ciphertext),
+            PaddingScheme::PKCS1v15 { .. } => pkcs1v15::decrypt(Some(rng), self, ciphertext),
             PaddingScheme::OAEP { mut digest, label } => {
                 oaep::decrypt(Some(rng), self, ciphertext, &mut *digest, label)
             }
@@ -572,31 +574,47 @@ impl RSAPrivateKey {
     }
 
     /// Sign the given digest.
-    pub fn sign<H: Hash>(
-        &self,
-        padding: PaddingScheme,
-        hash: Option<&H>,
-        digest: &[u8],
-    ) -> Result<Vec<u8>> {
+    pub fn sign(&self, padding: PaddingScheme, input: &[u8]) -> Result<Vec<u8>> {
         match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::sign::<ThreadRng, _>(None, self, hash, digest),
-            PaddingScheme::PSS => unimplemented!("not yet implemented"),
+            PaddingScheme::PKCS1v15 { ref hash } => {
+                pkcs1v15::sign::<ThreadRng>(None, self, hash.as_ref(), input)
+            }
+            PaddingScheme::PSS {
+                mut salt_rng,
+                mut digest,
+                salt_len,
+            } => {
+                pss::sign::<_, ThreadRng>(&mut *salt_rng, None, self, input, salt_len, &mut *digest)
+            }
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
 
     /// Sign the given digest.
+    ///
     /// Use `rng` for blinding.
-    pub fn sign_blinded<R: Rng, H: Hash>(
+    pub fn sign_blinded<R: Rng>(
         &self,
         rng: &mut R,
         padding: PaddingScheme,
-        hash: Option<&H>,
-        digest: &[u8],
+        input: &[u8],
     ) -> Result<Vec<u8>> {
         match padding {
-            PaddingScheme::PKCS1v15 => pkcs1v15::sign(Some(rng), self, hash, digest),
-            PaddingScheme::PSS => unimplemented!("not yet implemented"),
+            PaddingScheme::PKCS1v15 { ref hash } => {
+                pkcs1v15::sign(Some(rng), self, hash.as_ref(), input)
+            }
+            PaddingScheme::PSS {
+                mut salt_rng,
+                mut digest,
+                salt_len,
+            } => pss::sign::<_, R>(
+                &mut *salt_rng,
+                Some(rng),
+                self,
+                input,
+                salt_len,
+                &mut *digest,
+            ),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
@@ -631,8 +649,10 @@ mod tests {
     #[test]
     fn test_from_into() {
         let private_key = RSAPrivateKey {
-            n: BigUint::from_u64(100).unwrap(),
-            e: BigUint::from_u64(200).unwrap(),
+            pubkey_components: RSAPublicKey {
+                n: BigUint::from_u64(100).unwrap(),
+                e: BigUint::from_u64(200).unwrap(),
+            },
             d: BigUint::from_u64(123).unwrap(),
             primes: vec![],
             precomputed: None,
@@ -873,26 +893,35 @@ mod tests {
                 input = input[0..k - 11].to_vec();
             }
             let has_label: bool = rng.gen();
-            let padding_scheme = if has_label {
-                let label: String = rng.sample_iter(&Alphanumeric).take(30).collect();
+            let label: Option<String> = if has_label {
+                Some(rng.sample_iter(&Alphanumeric).take(30).collect())
+            } else {
+                None
+            };
+
+            let pub_key: RSAPublicKey = prk.into();
+
+            let ciphertext = if let Some(ref label) = label {
+                let padding = PaddingScheme::new_oaep_with_label::<D, _>(label);
+                pub_key.encrypt(&mut rng, padding, &input).unwrap()
+            } else {
+                let padding = PaddingScheme::new_oaep::<D>();
+                pub_key.encrypt(&mut rng, padding, &input).unwrap()
+            };
+
+            assert_ne!(input, ciphertext);
+            let blind: bool = rng.gen();
+
+            let padding = if let Some(ref label) = label {
                 PaddingScheme::new_oaep_with_label::<D, _>(label)
             } else {
                 PaddingScheme::new_oaep::<D>()
             };
 
-            let pub_key: RSAPublicKey = prk.into();
-            let ciphertext = pub_key
-                .encrypt(&mut rng, padding_scheme.clone(), &input)
-                .unwrap();
-
-            assert_ne!(input, ciphertext);
-            let blind: bool = rng.gen();
-
             let plaintext = if blind {
-                prk.decrypt(padding_scheme, &ciphertext).unwrap()
+                prk.decrypt(padding, &ciphertext).unwrap()
             } else {
-                prk.decrypt_blinded(&mut rng, padding_scheme, &ciphertext)
-                    .unwrap()
+                prk.decrypt_blinded(&mut rng, padding, &ciphertext).unwrap()
             };
 
             assert_eq!(input, plaintext);

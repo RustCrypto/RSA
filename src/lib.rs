@@ -17,10 +17,11 @@
 //! // Encrypt
 //! let data = b"hello world";
 //! let padding = PaddingScheme::new_pkcs1v15();
-//! let enc_data = public_key.encrypt(&mut rng, padding.clone(), &data[..]).expect("failed to encrypt");
+//! let enc_data = public_key.encrypt(&mut rng, padding, &data[..]).expect("failed to encrypt");
 //! assert_ne!(&data[..], &enc_data[..]);
 //!
 //! // Decrypt
+//! let padding = PaddingScheme::new_pkcs1v15();
 //! let dec_data = private_key.decrypt(padding, &enc_data).expect("failed to decrypt");
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
@@ -38,10 +39,11 @@
 //! // Encrypt
 //! let data = b"hello world";
 //! let padding = PaddingScheme::new_oaep::<sha2::Sha256>();
-//! let enc_data = public_key.encrypt(&mut rng, padding.clone(), &data[..]).expect("failed to encrypt");
+//! let enc_data = public_key.encrypt(&mut rng, padding, &data[..]).expect("failed to encrypt");
 //! assert_ne!(&data[..], &enc_data[..]);
 //!
 //! // Decrypt
+//! let padding = PaddingScheme::new_oaep::<sha2::Sha256>();
 //! let dec_data = private_key.decrypt(padding, &enc_data).expect("failed to decrypt");
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
@@ -80,8 +82,10 @@ mod key;
 mod oaep;
 mod parse;
 mod pkcs1v15;
+mod pss;
 mod raw;
 
+pub use self::hash::Hash;
 pub use self::key::{PublicKey, PublicKeyParts, RSAPrivateKey, RSAPublicKey};
 pub use self::padding::PaddingScheme;
 
