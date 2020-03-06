@@ -760,7 +760,12 @@ mod tests {
         let priv_tokens = [
             Token::Struct {
                 name: "RSAPrivateKey",
-                len: 4,
+                len: 3,
+            },
+            Token::Str("pubkey_components"),
+            Token::Struct {
+                name: "RSAPublicKey",
+                len: 2,
             },
             Token::Str("n"),
             Token::Seq { len: Some(2) },
@@ -771,6 +776,7 @@ mod tests {
             Token::Seq { len: Some(1) },
             Token::U32(65537),
             Token::SeqEnd,
+            Token::StructEnd,
             Token::Str("d"),
             Token::Seq { len: Some(2) },
             Token::U32(298985985),
