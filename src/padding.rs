@@ -7,14 +7,16 @@ use crate::hash::Hash;
 
 /// Available padding schemes.
 pub enum PaddingScheme {
+    /// Encryption and Decryption using PKCS1v15 padding.
     PKCS1v15Encrypt,
-    PKCS1v15Sign {
-        hash: Option<Hash>,
-    },
+    /// Sign and Verify using PKCS1v15 padding.
+    PKCS1v15Sign { hash: Option<Hash> },
+    /// Encryption and Decryption using OAEP padding.
     OAEP {
         digest: Box<dyn DynDigest>,
         label: Option<String>,
     },
+    /// Sign and Verify using PSS padding.
     PSS {
         salt_rng: Box<dyn RngCore>,
         digest: Box<dyn DynDigest>,
