@@ -4,6 +4,7 @@ use digest::DynDigest;
 use rand::{Rng, RngCore};
 use subtle::ConstantTimeEq;
 
+use crate::algorithms::mgf1_xor;
 use crate::errors::{Error, Result};
 use crate::key::{PrivateKey, PublicKey};
 
@@ -13,12 +14,11 @@ pub fn verify<PK: PublicKey>(
     sig: &[u8],
     digest: &mut dyn DynDigest,
 ) -> Result<()> {
-    let n_bits = pub_key.n().bits();
-    if sig.len() != (n_bits + 7) / 8 {
+    if sig.len() != pub_key.size() {
         return Err(Error::Verification);
     }
 
-    let em_bits = n_bits - 1;
+    let em_bits = pub_key.n().bits() - 1;
     let em_len = (em_bits + 7) / 8;
     let mut em = pub_key.raw_encryption_primitive(sig, em_len)?;
 
@@ -37,8 +37,7 @@ pub fn sign<T: RngCore + ?Sized, S: Rng, SK: PrivateKey>(
     salt_len: Option<usize>,
     digest: &mut dyn DynDigest,
 ) -> Result<Vec<u8>> {
-    let salt_len =
-        salt_len.unwrap_or_else(|| (priv_key.n().bits() + 7) / 8 - 2 - digest.output_size());
+    let salt_len = salt_len.unwrap_or_else(|| priv_key.size() - 2 - digest.output_size());
 
     let mut salt = vec![0; salt_len];
     rng.fill(&mut salt[..]);
@@ -57,11 +56,11 @@ fn sign_pss_with_salt<T: Rng, SK: PrivateKey>(
     salt: &[u8],
     digest: &mut dyn DynDigest,
 ) -> Result<Vec<u8>> {
-    let n_bits = priv_key.n().bits();
-    let mut em = vec![0; ((n_bits - 1) + 7) / 8];
-    emsa_pss_encode(&mut em, hashed, n_bits - 1, salt, digest)?;
+    let em_bits = priv_key.n().bits() - 1;
+    let mut em = vec![0; (em_bits + 7) / 8];
+    emsa_pss_encode(&mut em, hashed, em_bits, salt, digest)?;
 
-    priv_key.raw_decryption_primitive(blind_rng, &em, (n_bits + 7) / 8)
+    priv_key.raw_decryption_primitive(blind_rng, &em, priv_key.size())
 }
 
 fn emsa_pss_encode(
@@ -238,66 +237,6 @@ fn emsa_pss_verify(
         Ok(())
     } else {
         Err(Error::Verification)
-    }
-}
-
-fn inc_counter(counter: &mut [u8]) {
-    if counter[3] == u8::max_value() {
-        counter[3] = 0;
-    } else {
-        counter[3] += 1;
-        return;
-    }
-
-    if counter[2] == u8::max_value() {
-        counter[2] = 0;
-    } else {
-        counter[2] += 1;
-        return;
-    }
-
-    if counter[1] == u8::max_value() {
-        counter[1] = 0;
-    } else {
-        counter[1] += 1;
-        return;
-    }
-
-    if counter[0] == u8::max_value() {
-        counter[0] = 0u8;
-        counter[1] = 0u8;
-        counter[2] = 0u8;
-        counter[3] = 0u8;
-    } else {
-        counter[0] += 1;
-    }
-}
-
-/// Mask generation function
-///
-/// Will reset the Digest before returning.
-fn mgf1_xor(out: &mut [u8], digest: &mut dyn DynDigest, seed: &[u8]) {
-    let mut counter = vec![0u8; 4];
-    let mut i = 0;
-
-    while i < out.len() {
-        let mut digest_input = vec![0u8; seed.len() + 4];
-        digest_input[0..seed.len()].copy_from_slice(seed);
-        digest_input[seed.len()..].copy_from_slice(&counter);
-
-        digest.input(digest_input.as_slice());
-        let digest_output = &*digest.result_reset();
-        let mut j = 0;
-        loop {
-            if j >= digest_output.len() || i >= out.len() {
-                break;
-            }
-
-            out[i] ^= digest_output[j];
-            j += 1;
-            i += 1;
-        }
-        inc_counter(counter.as_mut_slice());
     }
 }
 

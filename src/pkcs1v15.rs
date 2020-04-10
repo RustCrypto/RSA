@@ -276,7 +276,7 @@ mod tests {
         for test in &tests {
             let out = priv_key
                 .decrypt(
-                    PaddingScheme::new_pkcs1v15(),
+                    PaddingScheme::new_pkcs1v15_encrypt(),
                     &base64::decode(test[0]).unwrap(),
                 )
                 .unwrap();
@@ -319,7 +319,7 @@ mod tests {
             let expected = hex::decode(test[1]).unwrap();
 
             let out = priv_key
-                .sign(PaddingScheme::new_pkcs1v15_with_hash(Hash::SHA1), &digest)
+                .sign(PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)), &digest)
                 .unwrap();
             assert_ne!(out, digest);
             assert_eq!(out, expected);
@@ -328,7 +328,7 @@ mod tests {
             let out2 = priv_key
                 .sign_blinded(
                     &mut rng,
-                    PaddingScheme::new_pkcs1v15_with_hash(Hash::SHA1),
+                    PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)),
                     &digest,
                 )
                 .unwrap();
@@ -351,7 +351,7 @@ mod tests {
 
             pub_key
                 .verify(
-                    PaddingScheme::new_pkcs1v15_with_hash(Hash::SHA1),
+                    PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)),
                     &digest,
                     &sig,
                 )
@@ -365,12 +365,14 @@ mod tests {
         let expected_sig = base64::decode("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
         let priv_key = get_private_key();
 
-        let sig = priv_key.sign(PaddingScheme::new_pkcs1v15(), msg).unwrap();
+        let sig = priv_key
+            .sign(PaddingScheme::new_pkcs1v15_sign(None), msg)
+            .unwrap();
         assert_eq!(expected_sig, sig);
 
         let pub_key: RSAPublicKey = priv_key.into();
         pub_key
-            .verify(PaddingScheme::new_pkcs1v15(), msg, &sig)
+            .verify(PaddingScheme::new_pkcs1v15_sign(None), msg, &sig)
             .expect("failed to verify");
     }
 }

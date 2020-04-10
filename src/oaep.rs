@@ -3,66 +3,9 @@ use rand::Rng;
 use digest::DynDigest;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
+use crate::algorithms::mgf1_xor;
 use crate::errors::{Error, Result};
 use crate::key::{self, PrivateKey, PublicKey};
-
-fn inc_counter(counter: &mut [u8]) {
-    if counter[3] == u8::max_value() {
-        counter[3] = 0;
-    } else {
-        counter[3] += 1;
-        return;
-    }
-
-    if counter[2] == u8::max_value() {
-        counter[2] = 0;
-    } else {
-        counter[2] += 1;
-        return;
-    }
-
-    if counter[1] == u8::max_value() {
-        counter[1] = 0;
-    } else {
-        counter[1] += 1;
-        return;
-    }
-
-    if counter[0] == u8::max_value() {
-        counter[0] = 0u8;
-        counter[1] = 0u8;
-        counter[2] = 0u8;
-        counter[3] = 0u8;
-    } else {
-        counter[0] += 1;
-    }
-}
-
-/// Mask generation function.
-fn mgf1_xor(out: &mut [u8], digest: &mut dyn DynDigest, seed: &[u8]) {
-    let mut counter = vec![0u8; 4];
-    let mut i = 0;
-
-    while i < out.len() {
-        let mut digest_input = vec![0u8; seed.len() + 4];
-        digest_input[0..seed.len()].copy_from_slice(seed);
-        digest_input[seed.len()..].copy_from_slice(&counter);
-
-        digest.input(digest_input.as_slice());
-        let digest_output = &*digest.result_reset();
-        let mut j = 0;
-        loop {
-            if j >= digest_output.len() || i >= out.len() {
-                break;
-            }
-
-            out[i] ^= digest_output[j];
-            j += 1;
-            i += 1;
-        }
-        inc_counter(counter.as_mut_slice());
-    }
-}
 
 /// Encrypts the given message with RSA and the padding
 /// scheme from PKCS#1 OAEP.  The message must be no longer than the

@@ -404,11 +404,15 @@ VY8J0wvbOtL9NjCMy6zz1zQ+N7oJ9mdhNwIDAQAB
         let clear_text = "Hello, World!";
 
         let encrypted = public_key
-            .encrypt(rng, PaddingScheme::new_pkcs1v15(), clear_text.as_bytes())
+            .encrypt(
+                rng,
+                PaddingScheme::new_pkcs1v15_encrypt(),
+                clear_text.as_bytes(),
+            )
             .expect("encrypt failed");
 
         let decrypted = private_key
-            .decrypt(PaddingScheme::new_pkcs1v15(), &encrypted)
+            .decrypt(PaddingScheme::new_pkcs1v15_encrypt(), &encrypted)
             .expect("decrypt failed");
 
         assert_eq!(

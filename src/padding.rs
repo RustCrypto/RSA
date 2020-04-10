@@ -7,7 +7,8 @@ use crate::hash::Hash;
 
 /// Available padding schemes.
 pub enum PaddingScheme {
-    PKCS1v15 {
+    PKCS1v15Encrypt,
+    PKCS1v15Sign {
         hash: Option<Hash>,
     },
     OAEP {
@@ -24,8 +25,9 @@ pub enum PaddingScheme {
 impl fmt::Debug for PaddingScheme {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            PaddingScheme::PKCS1v15 { ref hash } => {
-                write!(f, "PaddingScheme::PKCS1v15({:?})", hash)
+            PaddingScheme::PKCS1v15Encrypt => write!(f, "PaddingScheme::PKCS1v15Encrypt"),
+            PaddingScheme::PKCS1v15Sign { ref hash } => {
+                write!(f, "PaddingScheme::PKCS1v15Sign({:?})", hash)
             }
             PaddingScheme::OAEP { ref label, .. } => {
                 // TODO: How to print the digest name?
@@ -40,12 +42,12 @@ impl fmt::Debug for PaddingScheme {
 }
 
 impl PaddingScheme {
-    pub fn new_pkcs1v15() -> Self {
-        PaddingScheme::PKCS1v15 { hash: None }
+    pub fn new_pkcs1v15_encrypt() -> Self {
+        PaddingScheme::PKCS1v15Encrypt
     }
 
-    pub fn new_pkcs1v15_with_hash(hash: Hash) -> Self {
-        PaddingScheme::PKCS1v15 { hash: Some(hash) }
+    pub fn new_pkcs1v15_sign(hash: Option<Hash>) -> Self {
+        PaddingScheme::PKCS1v15Sign { hash }
     }
 
     pub fn new_oaep<T: 'static + Digest + DynDigest>() -> Self {

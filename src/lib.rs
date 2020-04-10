@@ -16,12 +16,12 @@
 //!
 //! // Encrypt
 //! let data = b"hello world";
-//! let padding = PaddingScheme::new_pkcs1v15();
+//! let padding = PaddingScheme::new_pkcs1v15_encrypt();
 //! let enc_data = public_key.encrypt(&mut rng, padding, &data[..]).expect("failed to encrypt");
 //! assert_ne!(&data[..], &enc_data[..]);
 //!
 //! // Decrypt
-//! let padding = PaddingScheme::new_pkcs1v15();
+//! let padding = PaddingScheme::new_pkcs1v15_encrypt();
 //! let dec_data = private_key.decrypt(padding, &enc_data).expect("failed to decrypt");
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```

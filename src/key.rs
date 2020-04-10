@@ -189,7 +189,7 @@ impl PublicKeyParts for RSAPublicKey {
 impl PublicKey for RSAPublicKey {
     fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         match padding {
-            PaddingScheme::PKCS1v15 { .. } => pkcs1v15::encrypt(rng, self, msg),
+            PaddingScheme::PKCS1v15Encrypt => pkcs1v15::encrypt(rng, self, msg),
             PaddingScheme::OAEP { mut digest, label } => {
                 oaep::encrypt(rng, self, msg, &mut *digest, label)
             }
@@ -199,7 +199,7 @@ impl PublicKey for RSAPublicKey {
 
     fn verify(&self, padding: PaddingScheme, hashed: &[u8], sig: &[u8]) -> Result<()> {
         match padding {
-            PaddingScheme::PKCS1v15 { ref hash } => {
+            PaddingScheme::PKCS1v15Sign { ref hash } => {
                 pkcs1v15::verify(self, hash.as_ref(), hashed, sig)
             }
             PaddingScheme::PSS { mut digest, .. } => pss::verify(self, hashed, sig, &mut *digest),
@@ -327,10 +327,6 @@ impl<'a> PublicKeyParts for &'a RSAPrivateKey {
 
     fn e(&self) -> &BigUint {
         &self.e
-    }
-
-    fn size(&self) -> usize {
-        (self.n().bits() + 7) / 8
     }
 }
 
@@ -545,7 +541,7 @@ impl RSAPrivateKey {
     pub fn decrypt(&self, padding: PaddingScheme, ciphertext: &[u8]) -> Result<Vec<u8>> {
         match padding {
             // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
-            PaddingScheme::PKCS1v15 { .. } => {
+            PaddingScheme::PKCS1v15Encrypt => {
                 pkcs1v15::decrypt::<ThreadRng, _>(None, self, ciphertext)
             }
             PaddingScheme::OAEP { mut digest, label } => {
@@ -565,7 +561,7 @@ impl RSAPrivateKey {
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
         match padding {
-            PaddingScheme::PKCS1v15 { .. } => pkcs1v15::decrypt(Some(rng), self, ciphertext),
+            PaddingScheme::PKCS1v15Encrypt => pkcs1v15::decrypt(Some(rng), self, ciphertext),
             PaddingScheme::OAEP { mut digest, label } => {
                 oaep::decrypt(Some(rng), self, ciphertext, &mut *digest, label)
             }
@@ -574,10 +570,10 @@ impl RSAPrivateKey {
     }
 
     /// Sign the given digest.
-    pub fn sign(&self, padding: PaddingScheme, input: &[u8]) -> Result<Vec<u8>> {
+    pub fn sign(&self, padding: PaddingScheme, digest_in: &[u8]) -> Result<Vec<u8>> {
         match padding {
-            PaddingScheme::PKCS1v15 { ref hash } => {
-                pkcs1v15::sign::<ThreadRng, _>(None, self, hash.as_ref(), input)
+            PaddingScheme::PKCS1v15Sign { ref hash } => {
+                pkcs1v15::sign::<ThreadRng, _>(None, self, hash.as_ref(), digest_in)
             }
             PaddingScheme::PSS {
                 mut salt_rng,
@@ -587,7 +583,7 @@ impl RSAPrivateKey {
                 &mut *salt_rng,
                 None,
                 self,
-                input,
+                digest_in,
                 salt_len,
                 &mut *digest,
             ),
@@ -602,11 +598,11 @@ impl RSAPrivateKey {
         &self,
         rng: &mut R,
         padding: PaddingScheme,
-        input: &[u8],
+        digest_in: &[u8],
     ) -> Result<Vec<u8>> {
         match padding {
-            PaddingScheme::PKCS1v15 { ref hash } => {
-                pkcs1v15::sign(Some(rng), self, hash.as_ref(), input)
+            PaddingScheme::PKCS1v15Sign { ref hash } => {
+                pkcs1v15::sign(Some(rng), self, hash.as_ref(), digest_in)
             }
             PaddingScheme::PSS {
                 mut salt_rng,
@@ -616,7 +612,7 @@ impl RSAPrivateKey {
                 &mut *salt_rng,
                 Some(rng),
                 self,
-                input,
+                digest_in,
                 salt_len,
                 &mut *digest,
             ),
