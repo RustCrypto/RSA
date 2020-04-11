@@ -41,8 +41,8 @@ pub trait PrivateKey: DecryptionPrimitive + PublicKeyParts {}
     serde(crate = "serde_crate")
 )]
 pub struct RSAPublicKey {
-    n: BigUint,
-    e: BigUint,
+    pub(crate) n: BigUint,
+    pub(crate) e: BigUint,
 }
 
 /// Represents a whole RSA key, public and private parts.
@@ -54,13 +54,13 @@ pub struct RSAPublicKey {
 )]
 pub struct RSAPrivateKey {
     /// Modulus
-    n: BigUint,
+    pub(crate) n: BigUint,
     /// Public exponent
-    e: BigUint,
+    pub(crate) e: BigUint,
     /// Private exponent
-    d: BigUint,
+    pub(crate) d: BigUint,
     /// Prime factors of N, contains >= 2 elements.
-    primes: Vec<BigUint>,
+    pub(crate) primes: Vec<BigUint>,
     /// precomputed values to speed up private operations
     #[cfg_attr(feature = "serde", serde(skip))]
     pub(crate) precomputed: Option<PrecomputedValues>,

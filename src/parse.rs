@@ -23,13 +23,13 @@ impl TryFrom<pem::Pem> for RSAPrivateKey {
     /// Expects one of the following `pem` headers:
     /// - `-----BEGIN PRIVATE KEY-----`
     /// - `-----BEGIN RSA PRIVATE KEY-----`
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use std::convert::TryFrom;
     /// use rsa::RSAPrivateKey;
-    /// 
+    ///
     /// # // openssl genrsa -out tiny_key.pem 512
     /// let file_content = r#"
     /// -----BEGIN RSA PRIVATE KEY-----
@@ -42,7 +42,7 @@ impl TryFrom<pem::Pem> for RSAPrivateKey {
     /// JdwDGF7Kanex70KAacmOlw3vfx6XWT+2PH6Qh8tLug==
     /// -----END RSA PRIVATE KEY-----
     /// "#;
-    /// 
+    ///
     /// let pem = rsa::pem::parse(file_content).expect("failed to parse pem file");
     /// let private_key = RSAPrivateKey::try_from(pem).expect("failed to parse key");
     /// ```
@@ -66,13 +66,13 @@ impl TryFrom<pem::Pem> for RSAPublicKey {
     /// Expects one of the following `pem` headers:
     /// - `-----BEGIN PUBLIC KEY-----`
     /// - `-----BEGIN RSA PUBLIC KEY-----`
-    /// 
+    ///
     /// # Example
-    /// 
+    ///
     /// ```
     /// use std::convert::TryFrom;
     /// use rsa::RSAPublicKey;
-    /// 
+    ///
     /// # // openssl rsa -in tiny_key.pem -outform PEM -pubout -out tiny_key.pub.pem
     /// let file_content = r#"
     /// -----BEGIN PUBLIC KEY-----
@@ -80,7 +80,7 @@ impl TryFrom<pem::Pem> for RSAPublicKey {
     /// si2oPAUmNw2Z/qb2Sr/BEBoWpagFf8Gl1K4PRipJSudDl6N/Vdb2CYkCAwEAAQ==
     /// -----END PUBLIC KEY-----
     /// "#;
-    /// 
+    ///
     /// let pem = rsa::pem::parse(file_content).expect("failed to parse pem file");
     /// let public_key = RSAPublicKey::try_from(pem).expect("failed to parse key");
     /// ```
@@ -239,7 +239,7 @@ pub fn parse_private_key_pkcs8(der: &[u8]) -> Result<RSAPrivateKey> {
     parse_private_key_pkcs1(&octet_string)
 }
 
-fn rsa_oid() -> OID {
+pub(crate) fn rsa_oid() -> OID {
     simple_asn1::oid!(1, 2, 840, 113549, 1, 1, 1)
 }
 
