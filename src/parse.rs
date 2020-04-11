@@ -4,6 +4,7 @@ use crate::{
 };
 use simple_asn1::{ASN1Block, ASN1DecodeErr, BigUint, OID};
 
+#[cfg(feature = "pem")]
 use std::convert::TryFrom;
 
 impl From<ASN1DecodeErr> for Error {
@@ -249,8 +250,10 @@ mod tests {
         parse_private_key_pkcs1, parse_private_key_pkcs8, parse_public_key_pkcs1,
         parse_public_key_pkcs8,
     };
-    use crate::{PaddingScheme, PublicKey, RSAPrivateKey, RSAPublicKey};
+    use crate::{PaddingScheme, PublicKey};
 
+    #[cfg(feature = "pem")]
+    use crate::{RSAPrivateKey, RSAPublicKey};
     #[cfg(feature = "pem")]
     use std::convert::TryFrom;
 

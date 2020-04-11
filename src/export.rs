@@ -8,39 +8,108 @@ use num_bigint_other::Sign;
 use num_traits::Zero;
 use simple_asn1::{to_der, ASN1Block};
 
+#[cfg(feature = "pem")]
 impl RSAPrivateKey {
-    #[cfg(feature = "pem")]
+    /// Converts RSA Private key into `PKCS1` encoded bytes in pem format.
+    ///
+    /// Encodes the key with the header:
+    /// `-----BEGIN RSA PRIVATE KEY-----`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rsa::RSAPrivateKey;
+    /// use rand::rngs::OsRng;
+    ///
+    /// let mut rng = OsRng;
+    /// let bits = 2048;
+    /// let private_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+    ///
+    /// let _ = private_key.to_pem_pkcs1();
+    /// ```
     pub fn to_pem_pkcs1(&self) -> Result<String> {
         let pem = pem::Pem {
             tag: String::from("RSA PRIVATE KEY"),
-            contents: self.encode_pkcs1()?,
+            contents: self.to_pkcs1()?,
         };
         Ok(pem::encode(&pem))
     }
-    #[cfg(feature = "pem")]
+
+    /// Converts RSA Private key into `PKCS8` encoded bytes in pem format.
+    ///
+    /// Encodes the key with the header:
+    /// `-----BEGIN PRIVATE KEY-----`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rsa::RSAPrivateKey;
+    /// use rand::rngs::OsRng;
+    ///
+    /// let mut rng = OsRng;
+    /// let bits = 2048;
+    /// let private_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+    ///
+    /// let _ = private_key.to_pem_pkcs8();
+    /// ```
     pub fn to_pem_pkcs8(&self) -> Result<String> {
         let pem = pem::Pem {
             tag: String::from("PRIVATE KEY"),
-            contents: self.encode_pkcs8()?,
+            contents: self.to_pkcs8()?,
         };
         Ok(pem::encode(&pem))
     }
 }
 
+#[cfg(feature = "pem")]
 impl RSAPublicKey {
-    #[cfg(feature = "pem")]
+    /// Converts RSA Public key into `PKCS1` encoded bytes in pem format.
+    ///
+    /// Encodes the key with the header:
+    /// `-----BEGIN RSA PUBLIC KEY-----`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rsa::{RSAPrivateKey, RSAPublicKey};
+    /// use rand::rngs::OsRng;
+    ///
+    /// let mut rng = OsRng;
+    /// let bits = 2048;
+    /// let private_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+    /// let public_key = RSAPublicKey::from(&private_key);
+    ///
+    /// let _ = public_key.to_pem_pkcs1();
+    /// ```
     pub fn to_pem_pkcs1(&self) -> Result<String> {
         let pem = pem::Pem {
             tag: String::from("RSA PUBLIC KEY"),
-            contents: self.encode_pkcs1()?,
+            contents: self.to_pkcs1()?,
         };
         Ok(pem::encode(&pem))
     }
-    #[cfg(feature = "pem")]
+    /// Converts RSA Public key into `PKCS8` encoded bytes in pem format.
+    ///
+    /// Encodes the key with the header:
+    /// `-----BEGIN PUBLIC KEY-----`
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use rsa::{RSAPrivateKey, RSAPublicKey};
+    /// use rand::rngs::OsRng;
+    ///
+    /// let mut rng = OsRng;
+    /// let bits = 2048;
+    /// let private_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+    /// let public_key = RSAPublicKey::from(&private_key);
+    ///
+    /// let _ = public_key.to_pem_pkcs8();
+    /// ```
     pub fn to_pem_pkcs8(&self) -> Result<String> {
         let pem = pem::Pem {
             tag: String::from("PUBLIC KEY"),
-            contents: self.encode_pkcs8()?,
+            contents: self.to_pkcs8()?,
         };
         Ok(pem::encode(&pem))
     }
@@ -52,9 +121,13 @@ fn to_bigint(value: &crate::BigUint) -> simple_asn1::BigInt {
 }
 
 impl RSAPrivateKey {
-    /// TODO docs
+    /// Encodes an RSA Private key to into `PKCS1` bytes.
+    ///
+    /// This data will be `base64` encoded which would be used
+    /// following a `-----BEGIN RSA PRIVATE KEY-----` header.
+    ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    pub fn encode_pkcs1(&self) -> Result<Vec<u8>> {
+    pub fn to_pkcs1(&self) -> Result<Vec<u8>> {
         // TODO should version be changed to anything?
         let version = ASN1Block::Integer(0, to_bigint(&BigUint::zero()));
         let n = ASN1Block::Integer(0, to_bigint(&self.n));
@@ -73,17 +146,17 @@ impl RSAPrivateKey {
         })
     }
 
-    /// Parse a `PKCS8` encoded RSA Private Key.
+    /// Encodes an RSA Private key to into `PKCS8` bytes.
     ///
-    /// The `der` data is expected to be the `base64` decoded content
+    /// This data will be `base64` encoded which would be used
     /// following a `-----BEGIN PRIVATE KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    pub fn encode_pkcs8(&self) -> Result<Vec<u8>> {
+    pub fn to_pkcs8(&self) -> Result<Vec<u8>> {
         let version = ASN1Block::Integer(0, to_bigint(&BigUint::zero()));
         let oid = ASN1Block::ObjectIdentifier(0, rsa_oid());
         let alg = ASN1Block::Sequence(0, vec![oid]);
-        let octet_string = ASN1Block::OctetString(0, self.encode_pkcs1()?);
+        let octet_string = ASN1Block::OctetString(0, self.to_pkcs1()?);
         let blocks = vec![version, alg, octet_string];
 
         to_der(&ASN1Block::Sequence(0, blocks)).map_err(|e| Error::EncodeError {
@@ -93,13 +166,13 @@ impl RSAPrivateKey {
 }
 
 impl RSAPublicKey {
-    /// Parse a `PKCS1` encoded RSA Public Key.
+    /// Encodes an RSA Public key to into `PKCS1` bytes.
     ///
-    /// The `der` data is expected to be the `base64` decoded content
+    /// This data will be `base64` encoded which would be used
     /// following a `-----BEGIN RSA PUBLIC KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    pub fn encode_pkcs1(&self) -> Result<Vec<u8>> {
+    pub fn to_pkcs1(&self) -> Result<Vec<u8>> {
         let n = ASN1Block::Integer(0, to_bigint(&self.n));
         let e = ASN1Block::Integer(0, to_bigint(&self.e));
         let blocks = vec![n, e];
@@ -108,17 +181,17 @@ impl RSAPublicKey {
             reason: format!("failed to encode ASN.1 sequence of blocks: {}", e),
         })
     }
-    /// Parse a `PKCS8` encoded RSA Public Key.
+    /// Encodes an RSA Public key to into `PKCS8` bytes.
     ///
-    /// The `der` data is expected to be the `base64` decoded content
+    /// This data will be `base64` encoded which would be used
     /// following a `-----BEGIN PUBLIC KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    pub fn encode_pkcs8(&self) -> Result<Vec<u8>> {
+    pub fn to_pkcs8(&self) -> Result<Vec<u8>> {
         let oid = ASN1Block::ObjectIdentifier(0, rsa_oid());
         let alg = ASN1Block::Sequence(0, vec![oid]);
 
-        let bz = self.encode_pkcs1()?;
+        let bz = self.to_pkcs1()?;
         let octet_string = ASN1Block::BitString(0, bz.len(), bz);
         let blocks = vec![alg, octet_string];
 
@@ -131,21 +204,14 @@ impl RSAPublicKey {
 #[cfg(all(test, feature = "pem"))]
 mod tests {
     use crate::{RSAPrivateKey, RSAPublicKey};
-
     use rand::thread_rng;
-
-    use std::convert::TryFrom;
-
     use rand::SeedableRng;
     use rand_xorshift::XorShiftRng;
-
-    const PKCS8_PRIVATE_KEY: &str = "-----BEGIN PRIVATE KEY-----\r\nMEACAQAwCwYJKoZIhvcNAQEBBC4wLAIBAAIJAJGyCM1NTAwDAgMBAAECCQCMDHwC\r\nEdIqAQIFAMEBAQECBQDBQAkD\r\n-----END PRIVATE KEY-----\r\n";
-    const PKCS1_PRIVATE_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\r\nMCwCAQACCQCRsgjNTUwMAwIDAQABAgkAjAx8AhHSKgECBQDBAQEBAgUAwUAJAw==\r\n-----END RSA PRIVATE KEY-----\r\n";
-    const PKCS8_PUBLIC_KEY: &str = "-----BEGIN PUBLIC KEY-----\r\nMCIwCwYJKoZIhvcNAQEBAxN+MBACCQCRsgjNTUwMAwIDAQAB\r\n-----END PUBLIC KEY-----\r\n";
-    const PKCS1_PUBLIC_KEY: &str = "-----BEGIN RSA PUBLIC KEY-----\r\nMBACCQCRsgjNTUwMAwIDAQAB\r\n-----END RSA PUBLIC KEY-----\r\n";
+    use std::convert::TryFrom;
 
     #[test]
     fn priv_pem_encoding_pkcs8() {
+        const PKCS8_PRIVATE_KEY: &str = "-----BEGIN PRIVATE KEY-----\r\nMEACAQAwCwYJKoZIhvcNAQEBBC4wLAIBAAIJAJGyCM1NTAwDAgMBAAECCQCMDHwC\r\nEdIqAQIFAMEBAQECBQDBQAkD\r\n-----END PRIVATE KEY-----\r\n";
         let mut rng = XorShiftRng::from_seed([1; 16]);
         let key = RSAPrivateKey::new(&mut rng, 64).expect("failed to generate key");
         let pem_str = key
@@ -155,6 +221,7 @@ mod tests {
     }
     #[test]
     fn priv_pem_encoding_pkcs1() {
+        const PKCS1_PRIVATE_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\r\nMCwCAQACCQCRsgjNTUwMAwIDAQABAgkAjAx8AhHSKgECBQDBAQEBAgUAwUAJAw==\r\n-----END RSA PRIVATE KEY-----\r\n";
         let mut rng = XorShiftRng::from_seed([1; 16]);
         let key = RSAPrivateKey::new(&mut rng, 64).expect("failed to generate key");
         let pem_str = key
@@ -165,6 +232,7 @@ mod tests {
 
     #[test]
     fn pub_pem_encoding_pkcs8() {
+        const PKCS8_PUBLIC_KEY: &str = "-----BEGIN PUBLIC KEY-----\r\nMCIwCwYJKoZIhvcNAQEBAxN+MBACCQCRsgjNTUwMAwIDAQAB\r\n-----END PUBLIC KEY-----\r\n";
         let mut rng = XorShiftRng::from_seed([1; 16]);
         let key = RSAPrivateKey::new(&mut rng, 64)
             .expect("failed to generate key")
@@ -177,6 +245,8 @@ mod tests {
 
     #[test]
     fn pub_pem_encoding_pkcs1() {
+        const PKCS1_PUBLIC_KEY: &str = "-----BEGIN RSA PUBLIC KEY-----\r\nMBACCQCRsgjNTUwMAwIDAQAB\r\n-----END RSA PUBLIC KEY-----\r\n";
+
         let mut rng = XorShiftRng::from_seed([1; 16]);
         let key = RSAPrivateKey::new(&mut rng, 64)
             .expect("failed to generate key")
