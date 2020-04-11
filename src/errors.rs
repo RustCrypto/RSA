@@ -35,4 +35,6 @@ pub enum Error {
     ParseError { reason: String },
     #[error("internal error")]
     Internal,
+    #[error("label too long")]
+    LabelTooLong,
 }

@@ -1,11 +1,15 @@
 use rand::Rng;
 
 use digest::DynDigest;
-use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 
 use crate::algorithms::mgf1_xor;
 use crate::errors::{Error, Result};
 use crate::key::{self, PrivateKey, PublicKey};
+
+// 2**61 -1 (pow is not const yet)
+// TODO: This is the maximum for SHA-1, unclear from the RFC what the values are for other hashing functions.
+const MAX_LABEL_LEN: u64 = 2_305_843_009_213_693_951;
 
 /// Encrypts the given message with RSA and the padding
 /// scheme from PKCS#1 OAEP.  The message must be no longer than the
@@ -28,10 +32,10 @@ pub fn encrypt<R: Rng, K: PublicKey>(
         return Err(Error::MessageTooLong);
     }
 
-    let label = match label {
-        Some(l) => l,
-        None => "".to_owned(),
-    };
+    let label = label.unwrap_or_default();
+    if label.len() as u64 > MAX_LABEL_LEN {
+        return Err(Error::LabelTooLong);
+    }
 
     let mut em = vec![0u8; k];
 
@@ -72,20 +76,19 @@ pub fn decrypt<R: Rng, SK: PrivateKey>(
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
-    let (valid, out, index) = decrypt_inner(rng, priv_key, ciphertext, digest, label)?;
-    if valid == 0 {
+    let res = decrypt_inner(rng, priv_key, ciphertext, digest, label)?;
+    if res.is_none().into() {
         return Err(Error::Decryption);
     }
+
+    let (out, index) = res.unwrap();
 
     Ok(out[index as usize..].to_vec())
 }
 
 /// Decrypts ciphertext using `priv_key` and blinds the operation if
 /// `rng` is given. It returns one or zero in valid that indicates whether the
-/// plaintext was correctly structured. In either case, the plaintext is
-/// returned in em so that it may be read independently of whether it was valid
-/// in order to maintain constant memory access patterns. If the plaintext was
-/// valid then index contains the index of the original message in em.
+/// plaintext was correctly structured.
 #[inline]
 fn decrypt_inner<R: Rng, SK: PrivateKey>(
     rng: Option<&mut R>,
@@ -93,7 +96,7 @@ fn decrypt_inner<R: Rng, SK: PrivateKey>(
     ciphertext: &[u8],
     digest: &mut dyn DynDigest,
     label: Option<String>,
-) -> Result<(u8, Vec<u8>, u32)> {
+) -> Result<CtOption<(Vec<u8>, u32)>> {
     let k = priv_key.size();
     if k < 11 {
         return Err(Error::Decryption);
@@ -101,16 +104,16 @@ fn decrypt_inner<R: Rng, SK: PrivateKey>(
 
     let h_size = digest.output_size();
 
-    if ciphertext.len() > k || k < h_size * 2 + 2 {
+    if ciphertext.len() != k || k < h_size * 2 + 2 {
         return Err(Error::Decryption);
     }
 
     let mut em = priv_key.raw_decryption_primitive(rng, ciphertext, priv_key.size())?;
 
-    let label = match label {
-        Some(l) => l,
-        None => "".to_owned(),
-    };
+    let label = label.unwrap_or_default();
+    if label.len() as u64 > MAX_LABEL_LEN {
+        return Err(Error::LabelTooLong);
+    }
 
     digest.input(label.as_bytes());
 
@@ -131,23 +134,19 @@ fn decrypt_inner<R: Rng, SK: PrivateKey>(
     //   looking_for_index: 1 if we are still looking for the 0x01
     //   index: the offset of the first 0x01 byte
     //   zero_before_one: 1 if we saw a non-zero byte before the 1
-    let mut looking_for_index = 1u8;
+    let mut looking_for_index = Choice::from(1u8);
     let mut index = 0u32;
-    let mut zero_before_one = 0u8;
+    let mut nonzero_before_one = Choice::from(0u8);
 
     for (i, el) in db.iter().skip(h_size).enumerate() {
         let equals0 = el.ct_eq(&0u8);
         let equals1 = el.ct_eq(&1u8);
-        index.conditional_assign(&(i as u32), Choice::from(looking_for_index) & equals1);
-        looking_for_index.conditional_assign(&0u8, equals1);
-        zero_before_one.conditional_assign(&1u8, Choice::from(looking_for_index) & !equals0);
+        index.conditional_assign(&(i as u32), looking_for_index & equals1);
+        looking_for_index &= !equals1;
+        nonzero_before_one |= looking_for_index & !equals0;
     }
 
-    let valid = first_byte_is_zero
-        & hash_are_equal
-        & !Choice::from(zero_before_one)
-        & !Choice::from(looking_for_index);
-    index = u32::conditional_select(&0, &(index + 2 + (h_size * 2) as u32), valid);
+    let valid = first_byte_is_zero & hash_are_equal & !nonzero_before_one & !looking_for_index;
 
-    Ok((valid.unwrap_u8(), em, index))
+    Ok(CtOption::new((em, index + 2 + (h_size * 2) as u32), valid))
 }
