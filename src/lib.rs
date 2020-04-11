@@ -62,7 +62,7 @@ pub mod padding;
 #[cfg(feature = "pem")]
 pub use pem;
 
-mod export;
+mod encode;
 mod key;
 mod parse;
 mod pkcs1v15;

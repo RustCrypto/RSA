@@ -3,8 +3,7 @@ use crate::{
     parse::rsa_oid,
     RSAPrivateKey, RSAPublicKey,
 };
-use num_bigint::BigUint;
-use num_bigint_other::Sign;
+use num_bigint::{BigUint, ToBigInt};
 use num_traits::Zero;
 use simple_asn1::{to_der, ASN1Block};
 
@@ -117,7 +116,8 @@ impl RSAPublicKey {
 
 fn to_bigint(value: &crate::BigUint) -> simple_asn1::BigInt {
     // TODO can be switched if simple_asn1 BigInt type is updated
-    simple_asn1::BigInt::from_bytes_le(Sign::Plus, &value.to_bytes_le())
+    // This is not very clean because of the exports available from simple_asn1
+    simple_asn1::BigInt::from_signed_bytes_le(&value.to_bigint().unwrap().to_signed_bytes_le())
 }
 
 impl RSAPrivateKey {
