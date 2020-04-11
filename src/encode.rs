@@ -1,5 +1,6 @@
 use crate::{
     errors::{Error, Result},
+    key::PublicKeyParts,
     parse::rsa_oid,
     RSAPrivateKey, RSAPublicKey,
 };
@@ -130,8 +131,8 @@ impl RSAPrivateKey {
     pub fn to_pkcs1(&self) -> Result<Vec<u8>> {
         // TODO should version be changed to anything?
         let version = ASN1Block::Integer(0, to_bigint(&BigUint::zero()));
-        let n = ASN1Block::Integer(0, to_bigint(&self.n));
-        let e = ASN1Block::Integer(0, to_bigint(&self.e));
+        let n = ASN1Block::Integer(0, to_bigint(&self.n()));
+        let e = ASN1Block::Integer(0, to_bigint(&self.e()));
         let d = ASN1Block::Integer(0, to_bigint(&self.d));
         let mut blocks = vec![version, n, e, d];
 
@@ -173,8 +174,8 @@ impl RSAPublicKey {
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
     pub fn to_pkcs1(&self) -> Result<Vec<u8>> {
-        let n = ASN1Block::Integer(0, to_bigint(&self.n));
-        let e = ASN1Block::Integer(0, to_bigint(&self.e));
+        let n = ASN1Block::Integer(0, to_bigint(&self.n()));
+        let e = ASN1Block::Integer(0, to_bigint(&self.e()));
         let blocks = vec![n, e];
 
         to_der(&ASN1Block::Sequence(0, blocks)).map_err(|e| Error::EncodeError {
