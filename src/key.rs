@@ -336,6 +336,21 @@ impl<'a> PrivateKey for &'a RSAPrivateKey {}
 
 impl RSAPrivateKey {
     /// Generate a new RSA key pair of the given bit size using the passed in `rng`.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// extern crate rsa;
+    /// extern crate rand;
+    ///
+    /// use rsa::{PublicKey, RSAPrivateKey, PaddingScheme};
+    /// use rand::rngs::OsRng;
+    ///
+    /// let mut rng = OsRng;
+    /// let bits = 2048;
+    /// let key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+    /// ```
+    ///
     pub fn new<R: Rng>(rng: &mut R, bit_size: usize) -> Result<RSAPrivateKey> {
         generate_multi_prime_key(rng, 2, bit_size)
     }
