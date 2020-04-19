@@ -2,14 +2,14 @@ use crate::{
     errors::{Error, Result},
     key::PublicKeyParts,
     parse::rsa_oid,
-    RSAPrivateKey, RSAPublicKey,
+    PublicKey, RSAPrivateKey, RSAPublicKey,
 };
 use num_bigint::{BigUint, ToBigInt};
 use num_traits::Zero;
 use simple_asn1::{to_der, ASN1Block};
 
 #[cfg(feature = "pem")]
-impl RSAPrivateKey {
+pub trait PrivateKeyPemEncoding: PrivateKeyEncoding {
     /// Converts RSA Private key into `PKCS1` encoded bytes in pem format.
     ///
     /// Encodes the key with the header:
@@ -18,7 +18,7 @@ impl RSAPrivateKey {
     /// # Example
     ///
     /// ```
-    /// use rsa::RSAPrivateKey;
+    /// use rsa::{RSAPrivateKey, PrivateKeyPemEncoding};
     /// use rand::rngs::OsRng;
     ///
     /// let mut rng = OsRng;
@@ -27,13 +27,7 @@ impl RSAPrivateKey {
     ///
     /// let _ = private_key.to_pem_pkcs1();
     /// ```
-    pub fn to_pem_pkcs1(&self) -> Result<String> {
-        let pem = pem::Pem {
-            tag: String::from("RSA PRIVATE KEY"),
-            contents: self.to_pkcs1()?,
-        };
-        Ok(pem::encode(&pem))
-    }
+    fn to_pem_pkcs1(&self) -> Result<String>;
 
     /// Converts RSA Private key into `PKCS8` encoded bytes in pem format.
     ///
@@ -43,7 +37,7 @@ impl RSAPrivateKey {
     /// # Example
     ///
     /// ```
-    /// use rsa::RSAPrivateKey;
+    /// use rsa::{RSAPrivateKey, PrivateKeyPemEncoding};
     /// use rand::rngs::OsRng;
     ///
     /// let mut rng = OsRng;
@@ -52,7 +46,20 @@ impl RSAPrivateKey {
     ///
     /// let _ = private_key.to_pem_pkcs8();
     /// ```
-    pub fn to_pem_pkcs8(&self) -> Result<String> {
+    fn to_pem_pkcs8(&self) -> Result<String>;
+}
+
+#[cfg(feature = "pem")]
+impl PrivateKeyPemEncoding for RSAPrivateKey {
+    fn to_pem_pkcs1(&self) -> Result<String> {
+        let pem = pem::Pem {
+            tag: String::from("RSA PRIVATE KEY"),
+            contents: self.to_pkcs1()?,
+        };
+        Ok(pem::encode(&pem))
+    }
+
+    fn to_pem_pkcs8(&self) -> Result<String> {
         let pem = pem::Pem {
             tag: String::from("PRIVATE KEY"),
             contents: self.to_pkcs8()?,
@@ -62,7 +69,7 @@ impl RSAPrivateKey {
 }
 
 #[cfg(feature = "pem")]
-impl RSAPublicKey {
+pub trait PublicKeyPemEncoding: PublicKeyEncoding {
     /// Converts RSA Public key into `PKCS1` encoded bytes in pem format.
     ///
     /// Encodes the key with the header:
@@ -71,7 +78,7 @@ impl RSAPublicKey {
     /// # Example
     ///
     /// ```
-    /// use rsa::{RSAPrivateKey, RSAPublicKey};
+    /// use rsa::{RSAPrivateKey, RSAPublicKey, PublicKeyPemEncoding};
     /// use rand::rngs::OsRng;
     ///
     /// let mut rng = OsRng;
@@ -81,7 +88,7 @@ impl RSAPublicKey {
     ///
     /// let _ = public_key.to_pem_pkcs1();
     /// ```
-    pub fn to_pem_pkcs1(&self) -> Result<String> {
+    fn to_pem_pkcs1(&self) -> Result<String> {
         let pem = pem::Pem {
             tag: String::from("RSA PUBLIC KEY"),
             contents: self.to_pkcs1()?,
@@ -96,7 +103,7 @@ impl RSAPublicKey {
     /// # Example
     ///
     /// ```
-    /// use rsa::{RSAPrivateKey, RSAPublicKey};
+    /// use rsa::{RSAPrivateKey, RSAPublicKey, PublicKeyPemEncoding};
     /// use rand::rngs::OsRng;
     ///
     /// let mut rng = OsRng;
@@ -106,7 +113,7 @@ impl RSAPublicKey {
     ///
     /// let _ = public_key.to_pem_pkcs8();
     /// ```
-    pub fn to_pem_pkcs8(&self) -> Result<String> {
+    fn to_pem_pkcs8(&self) -> Result<String> {
         let pem = pem::Pem {
             tag: String::from("PUBLIC KEY"),
             contents: self.to_pkcs8()?,
@@ -115,20 +122,34 @@ impl RSAPublicKey {
     }
 }
 
+impl PublicKeyPemEncoding for RSAPublicKey {}
+
 fn to_bigint(value: &crate::BigUint) -> simple_asn1::BigInt {
     // TODO can be switched if simple_asn1 BigInt type is updated
     // This is not very clean because of the exports available from simple_asn1
     simple_asn1::BigInt::from_signed_bytes_le(&value.to_bigint().unwrap().to_signed_bytes_le())
 }
 
-impl RSAPrivateKey {
+pub trait PrivateKeyEncoding {
     /// Encodes an RSA Private key to into `PKCS1` bytes.
     ///
     /// This data will be `base64` encoded which would be used
     /// following a `-----BEGIN RSA PRIVATE KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    pub fn to_pkcs1(&self) -> Result<Vec<u8>> {
+    fn to_pkcs1(&self) -> Result<Vec<u8>>;
+
+    /// Encodes an RSA Private key to into `PKCS8` bytes.
+    ///
+    /// This data will be `base64` encoded which would be used
+    /// following a `-----BEGIN PRIVATE KEY-----` header.
+    ///
+    /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
+    fn to_pkcs8(&self) -> Result<Vec<u8>>;
+}
+
+impl PrivateKeyEncoding for RSAPrivateKey {
+    fn to_pkcs1(&self) -> Result<Vec<u8>> {
         // TODO should version be changed to anything?
         let version = ASN1Block::Integer(0, to_bigint(&BigUint::zero()));
         let n = ASN1Block::Integer(0, to_bigint(&self.n()));
@@ -147,13 +168,7 @@ impl RSAPrivateKey {
         })
     }
 
-    /// Encodes an RSA Private key to into `PKCS8` bytes.
-    ///
-    /// This data will be `base64` encoded which would be used
-    /// following a `-----BEGIN PRIVATE KEY-----` header.
-    ///
-    /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    pub fn to_pkcs8(&self) -> Result<Vec<u8>> {
+    fn to_pkcs8(&self) -> Result<Vec<u8>> {
         let version = ASN1Block::Integer(0, to_bigint(&BigUint::zero()));
         let oid = ASN1Block::ObjectIdentifier(0, rsa_oid());
         let alg = ASN1Block::Sequence(0, vec![oid]);
@@ -166,14 +181,14 @@ impl RSAPrivateKey {
     }
 }
 
-impl RSAPublicKey {
+pub trait PublicKeyEncoding: PublicKey {
     /// Encodes an RSA Public key to into `PKCS1` bytes.
     ///
     /// This data will be `base64` encoded which would be used
     /// following a `-----BEGIN RSA PUBLIC KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    pub fn to_pkcs1(&self) -> Result<Vec<u8>> {
+    fn to_pkcs1(&self) -> Result<Vec<u8>> {
         let n = ASN1Block::Integer(0, to_bigint(&self.n()));
         let e = ASN1Block::Integer(0, to_bigint(&self.e()));
         let blocks = vec![n, e];
@@ -188,7 +203,7 @@ impl RSAPublicKey {
     /// following a `-----BEGIN PUBLIC KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    pub fn to_pkcs8(&self) -> Result<Vec<u8>> {
+    fn to_pkcs8(&self) -> Result<Vec<u8>> {
         let oid = ASN1Block::ObjectIdentifier(0, rsa_oid());
         let alg = ASN1Block::Sequence(0, vec![oid]);
 
@@ -202,8 +217,11 @@ impl RSAPublicKey {
     }
 }
 
+impl PublicKeyEncoding for RSAPublicKey {}
+
 #[cfg(all(test, feature = "pem"))]
 mod tests {
+    use super::{PrivateKeyPemEncoding, PublicKeyPemEncoding};
     use crate::{RSAPrivateKey, RSAPublicKey};
     use rand::thread_rng;
     use rand::SeedableRng;

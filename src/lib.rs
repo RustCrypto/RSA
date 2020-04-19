@@ -68,6 +68,9 @@ mod parse;
 mod pkcs1v15;
 mod raw;
 
+pub use self::encode::{
+    PrivateKeyEncoding, PrivateKeyPemEncoding, PublicKeyEncoding, PublicKeyPemEncoding,
+};
 pub use self::key::{PublicKey, RSAPrivateKey, RSAPublicKey};
 pub use self::padding::PaddingScheme;
 
