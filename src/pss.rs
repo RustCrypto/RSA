@@ -57,19 +57,17 @@ fn sign_pss_with_salt<T: Rng, SK: PrivateKey>(
     digest: &mut dyn DynDigest,
 ) -> Result<Vec<u8>> {
     let em_bits = priv_key.n().bits() - 1;
-    let mut em = vec![0; (em_bits + 7) / 8];
-    emsa_pss_encode(&mut em, hashed, em_bits, salt, digest)?;
+    let em = emsa_pss_encode(hashed, em_bits, salt, digest)?;
 
     priv_key.raw_decryption_primitive(blind_rng, &em, priv_key.size())
 }
 
 fn emsa_pss_encode(
-    em: &mut [u8],
     m_hash: &[u8],
     em_bits: usize,
     salt: &[u8],
     hash: &mut dyn DynDigest,
-) -> Result<()> {
+) -> Result<Vec<u8>> {
     // See [1], section 9.1.1
     let h_len = hash.output_size();
     let s_len = salt.len();
@@ -90,11 +88,9 @@ fn emsa_pss_encode(
         return Err(Error::Internal);
     }
 
-    if em.len() != em_len {
-        return Err(Error::Internal);
-    }
+    let mut em = vec![0; em_len];
 
-    let (db, h) = em.split_at_mut(em_len - s_len - h_len - 2 + 1 + s_len);
+    let (db, h) = em.split_at_mut(em_len - h_len - 1);
     let h = &mut h[..(em_len - 1) - db.len()];
 
     // 4. Generate a random octet string salt of length s_len; if s_len = 0,
@@ -136,7 +132,7 @@ fn emsa_pss_encode(
     // 12. Let EM = maskedDB || H || 0xbc.
     em[em_len - 1] = 0xBC;
 
-    return Ok(());
+    Ok(em)
 }
 
 fn emsa_pss_verify(
@@ -158,7 +154,7 @@ fn emsa_pss_verify(
 
     // 3. If emLen < hLen + sLen + 2, output "inconsistent" and stop.
     let em_len = em.len(); //(em_bits + 7) / 8;
-    if em_len < h_len + 2 {
+    if em_len < h_len + s_len.unwrap_or_default() + 2 {
         return Err(Error::Verification);
     }
 
@@ -171,7 +167,7 @@ fn emsa_pss_verify(
     // 5. Let maskedDB be the leftmost emLen - hLen - 1 octets of EM, and
     //    let H be the next hLen octets.
     let (db, h) = em.split_at_mut(em_len - h_len - 1);
-    let h = &mut h[..(em_len - 1) - (em_len - h_len - 1)];
+    let h = &mut h[..h_len];
 
     // 6. If the leftmost 8 * em_len - em_bits bits of the leftmost octet in
     //    maskedDB are not all equal to zero, output "inconsistent" and
@@ -204,14 +200,11 @@ fn emsa_pss_verify(
             //     or if the octet at position emLen - hLen - sLen - 1 (the leftmost
             //     position is "position 1") does not have hexadecimal value 0x01,
             //     output "inconsistent" and stop.
-            for e in &db[..em_len - h_len - s_len - 2] {
-                if *e != 0x00 {
-                    return Err(Error::Verification);
-                }
-            }
-            if db[em_len - h_len - s_len - 2] != 0x01 {
+            let (zeroes, rest) = db.split_at(em_len - h_len - s_len - 2);
+            if zeroes.iter().any(|e| *e != 0x00) || rest[0] != 0x01 {
                 return Err(Error::Verification);
             }
+
             s_len
         }
     };
@@ -233,7 +226,7 @@ fn emsa_pss_verify(
     let h0 = hash.finalize_reset();
 
     // 14. If H = H', output "consistent." Otherwise, output "inconsistent."
-    if Into::<bool>::into(h0.ct_eq(h)) {
+    if h0.ct_eq(h).into() {
         Ok(())
     } else {
         Err(Error::Verification)
