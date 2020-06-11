@@ -31,7 +31,9 @@ fn bench_rsa_2048_pkcsv1_decrypt(b: &mut Bencher) {
     let x = base64::decode(DECRYPT_VAL).unwrap();
 
     b.iter(|| {
-        let res = priv_key.decrypt(PaddingScheme::new_pkcs1v15(), &x).unwrap();
+        let res = priv_key
+            .decrypt(PaddingScheme::new_pkcs1v15_encrypt(), &x)
+            .unwrap();
         test::black_box(res);
     });
 }
@@ -46,7 +48,7 @@ fn bench_rsa_2048_pkcsv1_sign_blinded(b: &mut Bencher) {
         let res = priv_key
             .sign_blinded(
                 &mut rng,
-                PaddingScheme::new_pkcs1v15_with_hash(Hash::SHA2_256),
+                PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA2_256)),
                 &digest,
             )
             .unwrap();
