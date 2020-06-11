@@ -109,11 +109,11 @@ fn emsa_pss_encode(
     // 6.  Let H = Hash(M'), an octet string of length h_len.
     let prefix = [0u8; 8];
 
-    hash.input(&prefix);
-    hash.input(m_hash);
-    hash.input(salt);
+    hash.update(&prefix);
+    hash.update(m_hash);
+    hash.update(salt);
 
-    let hashed = hash.result_reset();
+    let hashed = hash.finalize_reset();
     h.copy_from_slice(&hashed);
 
     // 7.  Generate an octet string PS consisting of em_len - s_len - h_len - 2
@@ -227,10 +227,10 @@ fn emsa_pss_verify(
     // 13. Let H' = Hash(M'), an octet string of length hLen.
     let prefix = [0u8; 8];
 
-    hash.input(&prefix[..]);
-    hash.input(m_hash);
-    hash.input(salt);
-    let h0 = hash.result_reset();
+    hash.update(&prefix[..]);
+    hash.update(m_hash);
+    hash.update(salt);
+    let h0 = hash.finalize_reset();
 
     // 14. If H = H', output "consistent." Otherwise, output "inconsistent."
     if Into::<bool>::into(h0.ct_eq(h)) {

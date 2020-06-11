@@ -46,8 +46,8 @@ pub fn encrypt<R: Rng, K: PublicKey>(
     // Data block DB =  pHash || PS || 01 || M
     let db_len = k - h_size - 1;
 
-    digest.input(label.as_bytes());
-    let p_hash = digest.result_reset();
+    digest.update(label.as_bytes());
+    let p_hash = digest.finalize_reset();
     db[0..h_size].copy_from_slice(&*p_hash);
     db[db_len - msg.len() - 1] = 1;
     db[db_len - msg.len()..].copy_from_slice(msg);
@@ -115,9 +115,9 @@ fn decrypt_inner<R: Rng, SK: PrivateKey>(
         return Err(Error::LabelTooLong);
     }
 
-    digest.input(label.as_bytes());
+    digest.update(label.as_bytes());
 
-    let expected_p_hash = &*digest.result_reset();
+    let expected_p_hash = &*digest.finalize_reset();
 
     let first_byte_is_zero = em[0].ct_eq(&0u8);
 

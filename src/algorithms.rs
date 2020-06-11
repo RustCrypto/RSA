@@ -127,8 +127,8 @@ pub fn mgf1_xor(out: &mut [u8], digest: &mut dyn DynDigest, seed: &[u8]) {
         digest_input[0..seed.len()].copy_from_slice(seed);
         digest_input[seed.len()..].copy_from_slice(&counter);
 
-        digest.input(digest_input.as_slice());
-        let digest_output = &*digest.result_reset();
+        digest.update(digest_input.as_slice());
+        let digest_output = &*digest.finalize_reset();
         let mut j = 0;
         loop {
             if j >= digest_output.len() || i >= out.len() {
