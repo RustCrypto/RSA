@@ -41,8 +41,9 @@ hex = "0.4.0"
 serde_test = "1.0.89"
 rand_xorshift = "0.2.0"
 pem = "0.8"
-#sha-1 = "0.9.0"
-#sha3 = "0.9.0"
+sha-1 = { default-features = false, version = "0.9.0" }
+sha2 = { default-features = false, version = "0.9.0" }
+sha3 = { default-features = false, version = "0.9.0" }
 
 [[bench]]
 name = "key"
@@ -59,5 +60,5 @@ nightly = ["subtle/nightly", "num-bigint/nightly"]
 serde = ["num-bigint/serde", "serde_crate"]
 serde1 = ["serde"] # deprecated
 expose-internals = []
-std = ["alloc", "simple_asn1", "digest/std"]
+std = ["alloc", "simple_asn1", "digest/std", "rand/std"]
 alloc = ["digest/alloc"]
