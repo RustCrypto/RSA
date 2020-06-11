@@ -1,6 +1,5 @@
 # RSA
-[![crates.io](https://img.shields.io/crates/v/rsa.svg)](https://crates.io/crates/rsa) [![Documentation](https://docs.rs/rsa/badge.svg)](https://docs.rs/rsa) [![Build Status](https://travis-ci.org/RustCrypto/RSA.svg?branch=master)](https://travis-ci.org/RustCrypto/RSA) [![dependency status](https://deps.rs/repo/github/RustCrypto/RSA/status.svg)](https://deps.rs/repo/github/RustCrypto/RSA)
-![minimum rustc 1.36](https://img.shields.io/badge/rustc-1.36+-red.svg)
+[![crates.io](https://img.shields.io/crates/v/rsa.svg)](https://crates.io/crates/rsa) [![Documentation](https://docs.rs/rsa/badge.svg)](https://docs.rs/rsa) [![Build Status](https://travis-ci.org/RustCrypto/RSA.svg?branch=master)](https://travis-ci.org/RustCrypto/RSA) ![minimum rustc 1.36](https://img.shields.io/badge/rustc-1.41+-blue.svg)
 
 A portable RSA implementation in pure Rust.
 
