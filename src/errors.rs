@@ -37,4 +37,6 @@ pub enum Error {
     EncodeError { reason: String },
     #[error("internal error")]
     Internal,
+    #[error("label too long")]
+    LabelTooLong,
 }

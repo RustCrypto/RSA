@@ -9,7 +9,7 @@ use crate::key::{self, PrivateKey, PublicKey};
 // scheme from PKCS#1 v1.5.  The message must be no longer than the
 // length of the public modulus minus 11 bytes.
 #[inline]
-pub fn encrypt<R: Rng, K: PublicKey>(rng: &mut R, pub_key: &K, msg: &[u8]) -> Result<Vec<u8>> {
+pub fn encrypt<R: Rng, PK: PublicKey>(rng: &mut R, pub_key: &PK, msg: &[u8]) -> Result<Vec<u8>> {
     key::check_public(pub_key)?;
 
     let k = pub_key.size();
@@ -24,7 +24,7 @@ pub fn encrypt<R: Rng, K: PublicKey>(rng: &mut R, pub_key: &K, msg: &[u8]) -> Re
     em[k - msg.len() - 1] = 0;
     em[k - msg.len()..].copy_from_slice(msg);
 
-    pub_key.raw_encryption_primitive(&em)
+    pub_key.raw_encryption_primitive(&em, pub_key.size())
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5.
@@ -65,10 +65,10 @@ pub fn decrypt<R: Rng, SK: PrivateKey>(
 // messages to signatures and identify the signed messages. As ever,
 // signatures provide authenticity, not confidentiality.
 #[inline]
-pub fn sign<R: Rng, SK: PrivateKey, H: Hash>(
+pub fn sign<R: Rng, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
-    hash: Option<&H>,
+    hash: Option<&Hash>,
     hashed: &[u8],
 ) -> Result<Vec<u8>> {
     let (hash_len, prefix) = hash_info(hash, hashed.len())?;
@@ -87,14 +87,14 @@ pub fn sign<R: Rng, SK: PrivateKey, H: Hash>(
     em[k - t_len..k - hash_len].copy_from_slice(&prefix);
     em[k - hash_len..k].copy_from_slice(hashed);
 
-    priv_key.raw_decryption_primitive(rng, &em)
+    priv_key.raw_decryption_primitive(rng, &em, priv_key.size())
 }
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
 #[inline]
-pub fn verify<H: Hash, K: PublicKey>(
-    pub_key: &K,
-    hash: Option<&H>,
+pub fn verify<PK: PublicKey>(
+    pub_key: &PK,
+    hash: Option<&Hash>,
     hashed: &[u8],
     sig: &[u8],
 ) -> Result<()> {
@@ -106,7 +106,7 @@ pub fn verify<H: Hash, K: PublicKey>(
         return Err(Error::Verification);
     }
 
-    let em = pub_key.raw_encryption_primitive(sig)?;
+    let em = pub_key.raw_encryption_primitive(sig, pub_key.size())?;
 
     // EM = 0x00 || 0x01 || PS || 0x00 || T
     let mut ok = em[0].ct_eq(&0u8);
@@ -127,7 +127,7 @@ pub fn verify<H: Hash, K: PublicKey>(
 }
 
 #[inline]
-fn hash_info<H: Hash>(hash: Option<&H>, digest_len: usize) -> Result<(usize, Vec<u8>)> {
+fn hash_info(hash: Option<&Hash>, digest_len: usize) -> Result<(usize, &'static [u8])> {
     match hash {
         Some(hash) => {
             let hash_len = hash.size();
@@ -138,7 +138,7 @@ fn hash_info<H: Hash>(hash: Option<&H>, digest_len: usize) -> Result<(usize, Vec
             Ok((hash_len, hash.asn1_prefix()))
         }
         // this means the data is signed directly
-        None => Ok((digest_len, Vec::new())),
+        None => Ok((digest_len, &[])),
     }
 }
 
@@ -159,7 +159,7 @@ fn decrypt_inner<R: Rng, SK: PrivateKey>(
         return Err(Error::Decryption);
     }
 
-    let em = priv_key.raw_decryption_primitive(rng, ciphertext)?;
+    let em = priv_key.raw_decryption_primitive(rng, ciphertext, priv_key.size())?;
 
     let first_byte_is_zero = em[0].ct_eq(&0u8);
     let second_byte_is_two = em[1].ct_eq(&2u8);
@@ -218,9 +218,7 @@ mod tests {
     use rand::thread_rng;
     use sha1::{Digest, Sha1};
 
-    use crate::hash::Hashes;
-    use crate::key::{PublicKeyParts, RSAPrivateKey, RSAPublicKey};
-    use crate::padding::PaddingScheme;
+    use crate::{Hash, PaddingScheme, PublicKey, PublicKeyParts, RSAPrivateKey, RSAPublicKey};
 
     #[test]
     fn test_non_zero_bytes() {
@@ -277,7 +275,10 @@ mod tests {
 
         for test in &tests {
             let out = priv_key
-                .decrypt(PaddingScheme::PKCS1v15, &base64::decode(test[0]).unwrap())
+                .decrypt(
+                    PaddingScheme::new_pkcs1v15_encrypt(),
+                    &base64::decode(test[0]).unwrap(),
+                )
                 .unwrap();
             assert_eq!(out, test[1].as_bytes());
         }
@@ -318,7 +319,7 @@ mod tests {
             let expected = hex::decode(test[1]).unwrap();
 
             let out = priv_key
-                .sign(PaddingScheme::PKCS1v15, Some(&Hashes::SHA1), &digest)
+                .sign(PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)), &digest)
                 .unwrap();
             assert_ne!(out, digest);
             assert_eq!(out, expected);
@@ -327,8 +328,7 @@ mod tests {
             let out2 = priv_key
                 .sign_blinded(
                     &mut rng,
-                    PaddingScheme::PKCS1v15,
-                    Some(&Hashes::SHA1),
+                    PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)),
                     &digest,
                 )
                 .unwrap();
@@ -350,7 +350,11 @@ mod tests {
             let sig = hex::decode(test[1]).unwrap();
 
             pub_key
-                .verify(PaddingScheme::PKCS1v15, Some(&Hashes::SHA1), &digest, &sig)
+                .verify(
+                    PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)),
+                    &digest,
+                    &sig,
+                )
                 .expect("failed to verify");
         }
     }
@@ -362,13 +366,13 @@ mod tests {
         let priv_key = get_private_key();
 
         let sig = priv_key
-            .sign::<Hashes>(PaddingScheme::PKCS1v15, None, msg)
+            .sign(PaddingScheme::new_pkcs1v15_sign(None), msg)
             .unwrap();
         assert_eq!(expected_sig, sig);
 
         let pub_key: RSAPublicKey = priv_key.into();
         pub_key
-            .verify::<Hashes>(PaddingScheme::PKCS1v15, None, msg, &sig)
+            .verify(PaddingScheme::new_pkcs1v15_sign(None), msg, &sig)
             .expect("failed to verify");
     }
 }
