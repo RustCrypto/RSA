@@ -11,7 +11,7 @@ env:
 
 jobs:
   build:
-    name: ${{ matrix.name }}
+    name: ${{ matrix.rust }} - ${{ matrix.target }}
     runs-on: ubuntu-latest
 
     # The build matrix does not yet support 'allow failures' at job level.
@@ -22,9 +22,18 @@ jobs:
           - 1.36.0
           - stable
           - nightly
+        target:
+          - x86_64-unknown-linux-gnu
+          - thumbv7m-none-eabi
         include:
           - rust: nightly
+            target: x86_64-unknown-linux-gnu
             args: --all-features
+          - target: thumbv7m-none-eabi
+            args: --no-default-features --features=alloc
+        exclude:
+          - rust: 1.36.0
+            target: thumbv7m-none-eabi
 
     steps:
       - name: Checkout
@@ -34,24 +43,28 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: ${{ matrix.rust || 'stable' }}
+          target: ${{ matrix.target }}
           profile: minimal
           override: true
 
       - name: Build
         uses: actions-rs/cargo@v1
         with:
+          use-cross: true
           command: build
-          args: --verbose ${{ matrix.args }}
+          args: --target ${{ matrix.target }} --verbose ${{ matrix.args }}
 
       - name: Test
         uses: actions-rs/cargo@v1
         with:
+          use-cross: true
           command: test
-          args: --verbose ${{ matrix.args }}
+          args: --target ${{ matrix.target }} --verbose ${{ matrix.args }}
 
       - name: Bench
         uses: actions-rs/cargo@v1
         with:
+          use-cross: true
           command: bench
-          args: --verbose --no-run ${{ matrix.args }}
+          args: --target ${{ matrix.target }} --verbose --no-run ${{ matrix.args }}
         if: matrix.rust == 'nightly'

@@ -1,42 +1,51 @@
-use thiserror::Error;
+use alloc::string::String;
 
-pub type Result<T> = ::std::result::Result<T, Error>;
+pub type Result<T> = core::result::Result<T, Error>;
 
 /// Error types
-#[derive(Debug, Error)]
+#[derive(Debug)]
 pub enum Error {
-    #[error("invalid padding scheme")]
     InvalidPaddingScheme,
-    #[error("decryption error")]
     Decryption,
-    #[error("verification error")]
     Verification,
-    #[error("message too long")]
     MessageTooLong,
-    #[error("input must be hashed")]
     InputNotHashed,
-    #[error("nprimes must be >= 2")]
     NprimesTooSmall,
-    #[error("too few primes of given length to generate an RSA key")]
     TooFewPrimes,
-    #[error("invalid prime value")]
     InvalidPrime,
-    #[error("invalid modulus")]
     InvalidModulus,
-    #[error("invalid exponent")]
     InvalidExponent,
-    #[error("invalid coefficient")]
     InvalidCoefficient,
-    #[error("public exponent too small")]
     PublicExponentTooSmall,
-    #[error("public exponent too large")]
     PublicExponentTooLarge,
-    #[error("parse error: {}", reason)]
     ParseError { reason: String },
-    #[error("encoding error: {}", reason)]
     EncodeError { reason: String },
-    #[error("internal error")]
     Internal,
-    #[error("label too long")]
     LabelTooLong,
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for Error {}
+impl core::fmt::Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        match self {
+            Error::InvalidPaddingScheme => write!(f, "invalid padding scheme"),
+            Error::Decryption => write!(f, "decryption error"),
+            Error::Verification => write!(f, "verification error"),
+            Error::MessageTooLong => write!(f, "message too long"),
+            Error::InputNotHashed => write!(f, "input must be hashed"),
+            Error::NprimesTooSmall => write!(f, "nprimes must be >= 2"),
+            Error::TooFewPrimes => write!(f, "too few primes of given length to generate an RSA key"),
+            Error::InvalidPrime => write!(f, "invalid prime value"),
+            Error::InvalidModulus => write!(f, "invalid modulus"),
+            Error::InvalidExponent => write!(f, "invalid exponent"),
+            Error::InvalidCoefficient => write!(f, "invalid coefficient"),
+            Error::PublicExponentTooSmall => write!(f, "public exponent too small"),
+            Error::PublicExponentTooLarge => write!(f, "public exponent too large"),
+            Error::ParseError { reason } => write!(f, "parse error: {}", reason),
+            Error::EncodeError { reason } => write!(f, "encoding error: {}", reason),
+            Error::Internal => write!(f, "internal error"),
+            Error::LabelTooLong => write!(f, "label too long"),
+        }
+    }
 }

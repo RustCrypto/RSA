@@ -1,4 +1,5 @@
-use std::vec::Vec;
+use alloc::vec;
+use alloc::vec::Vec;
 
 use digest::DynDigest;
 use rand::{Rng, RngCore};

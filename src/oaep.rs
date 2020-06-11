@@ -1,4 +1,7 @@
 use rand::Rng;
+use alloc::vec;
+use alloc::vec::Vec;
+use alloc::string::String;
 
 use digest::DynDigest;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};

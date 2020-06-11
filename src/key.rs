@@ -2,11 +2,12 @@ use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
 use num_traits::{FromPrimitive, One};
-use rand::{rngs::ThreadRng, Rng};
+use rand::{rngs::StdRng, Rng};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
-use std::ops::Deref;
+use core::ops::Deref;
 use zeroize::Zeroize;
+use alloc::vec::Vec;
 
 use crate::algorithms::{generate_multi_prime_key, generate_multi_prime_key_with_exp};
 use crate::errors::{Error, Result};
@@ -247,6 +248,7 @@ impl RSAPublicKey {
     /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
     /// let public_key = RSAPublicKey::from_pkcs1(&der_bytes).expect("failed to parse key");
     /// ```
+    #[cfg(feature = "std")]
     pub fn from_pkcs1(der: &[u8]) -> Result<RSAPublicKey> {
         crate::parse::parse_public_key_pkcs1(der)
     }
@@ -281,6 +283,7 @@ impl RSAPublicKey {
     /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
     /// let public_key = RSAPublicKey::from_pkcs8(&der_bytes).expect("failed to parse key");
     /// ```
+    #[cfg(feature = "std")]
     pub fn from_pkcs8(der: &[u8]) -> Result<RSAPublicKey> {
         crate::parse::parse_public_key_pkcs8(der)
     }
@@ -405,6 +408,7 @@ impl RSAPrivateKey {
     /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
     /// let private_key = RSAPrivateKey::from_pkcs1(&der_bytes).expect("failed to parse key");
     /// ```
+    #[cfg(feature = "std")]
     pub fn from_pkcs1(der: &[u8]) -> Result<RSAPrivateKey> {
         crate::parse::parse_private_key_pkcs1(der)
     }
@@ -445,6 +449,7 @@ impl RSAPrivateKey {
     /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
     /// let private_key = RSAPrivateKey::from_pkcs8(&der_bytes).expect("failed to parse key");
     /// ```
+    #[cfg(feature = "std")]
     pub fn from_pkcs8(der: &[u8]) -> Result<RSAPrivateKey> {
         crate::parse::parse_private_key_pkcs8(der)
     }
@@ -554,10 +559,10 @@ impl RSAPrivateKey {
         match padding {
             // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
             PaddingScheme::PKCS1v15Encrypt => {
-                pkcs1v15::decrypt::<ThreadRng, _>(None, self, ciphertext)
+                pkcs1v15::decrypt::<StdRng, _>(None, self, ciphertext)
             }
             PaddingScheme::OAEP { mut digest, label } => {
-                oaep::decrypt::<ThreadRng, _>(None, self, ciphertext, &mut *digest, label)
+                oaep::decrypt::<StdRng, _>(None, self, ciphertext, &mut *digest, label)
             }
             _ => Err(Error::InvalidPaddingScheme),
         }
@@ -584,14 +589,15 @@ impl RSAPrivateKey {
     /// Sign the given digest.
     pub fn sign(&self, padding: PaddingScheme, digest_in: &[u8]) -> Result<Vec<u8>> {
         match padding {
+            // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
             PaddingScheme::PKCS1v15Sign { ref hash } => {
-                pkcs1v15::sign::<ThreadRng, _>(None, self, hash.as_ref(), digest_in)
+                pkcs1v15::sign::<StdRng, _>(None, self, hash.as_ref(), digest_in)
             }
             PaddingScheme::PSS {
                 mut salt_rng,
                 mut digest,
                 salt_len,
-            } => pss::sign::<_, ThreadRng, _>(
+            } => pss::sign::<_, StdRng, _>(
                 &mut *salt_rng,
                 None,
                 self,

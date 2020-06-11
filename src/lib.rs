@@ -47,6 +47,12 @@
 //! let dec_data = private_key.decrypt(padding, &enc_data).expect("failed to decrypt");
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
+#![no_std]
+
+#[cfg(feature = "alloc")]
+extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std;
 
 #[macro_use]
 extern crate lazy_static;
@@ -81,6 +87,7 @@ pub use pem;
 mod encode;
 mod key;
 mod oaep;
+#[cfg(feature = "std")]
 mod parse;
 mod pkcs1v15;
 mod pss;

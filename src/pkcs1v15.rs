@@ -1,5 +1,7 @@
 use rand::Rng;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use alloc::vec;
+use alloc::vec::Vec;
 
 use crate::errors::{Error, Result};
 use crate::hash::Hash;
