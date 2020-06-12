@@ -103,7 +103,7 @@ fn big_uint(value: &simple_asn1::BigInt) -> Result<crate::BigUint> {
             Ok(crate::BigUint::from_bytes_le(&value.to_bytes_le()))
         }
         None => Err(Error::ParseError {
-            reason: format!("BigInt::to_biguint failed"),
+            reason: "BigInt::to_biguint failed".to_string(),
         }),
     }
 }
@@ -206,7 +206,7 @@ pub fn parse_public_key_pkcs8(der: &[u8]) -> Result<RSAPublicKey> {
 
     if oid != rsa_oid() {
         return Err(Error::ParseError {
-            reason: format!("oid mismatch: not an rsa key"),
+            reason: "oid mismatch: not an rsa key".to_string(),
         });
     }
 
@@ -231,7 +231,7 @@ pub fn parse_private_key_pkcs8(der: &[u8]) -> Result<RSAPrivateKey> {
 
     if oid != rsa_oid() {
         return Err(Error::ParseError {
-            reason: format!("oid mismatch: not an rsa key"),
+            reason: "oid mismatch: not an rsa key".to_string(),
         });
     }
 
