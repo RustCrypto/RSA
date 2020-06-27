@@ -335,7 +335,12 @@ impl<'a> PrivateKey for &'a RSAPrivateKey {}
 impl RSAPrivateKey {
     /// Generate a new RSA key pair of the given bit size using the passed in `rng`.
     pub fn new<R: Rng>(rng: &mut R, bit_size: usize) -> Result<RSAPrivateKey> {
-        generate_multi_prime_key(rng, 2, bit_size)
+        generate_multi_prime_key(rng, 2, bit_size, None)
+    }
+
+    /// Generate a new RSA key pair of the given bit size and exponent using the passed in `rng`.
+    pub fn with_e<R: Rng>(rng: &mut R, bit_size: usize, e: usize) -> Result<RSAPrivateKey> {
+        generate_multi_prime_key(rng, 2, bit_size, e)
     }
 
     /// Constructs an RSA key pair from the individual components.
@@ -690,14 +695,14 @@ mod tests {
             fn $name() {
                 let mut rng = thread_rng();
 
-                for _ in 0..10 {
-                    let private_key = if $multi == 2 {
-                        RSAPrivateKey::new(&mut rng, $size).expect("failed to generate key")
-                    } else {
-                        generate_multi_prime_key(&mut rng, $multi, $size).unwrap()
+                for i in 0..10 {
+                    let private_key = match (i, $multi) {
+                        (3, 2) => RSAPrivateKey::with_e(&mut rng, $size, 3).unwrap(),
+                        (_, 2) => RSAPrivateKey::new(&mut rng, $size).unwrap(),
+                        (_, m) => generate_multi_prime_key(&mut rng, m, $size, None).unwrap(),
                     };
-                    assert_eq!(private_key.n().bits(), $size);
 
+                    assert_eq!(private_key.n().bits(), $size);
                     test_key_basics(&private_key);
                 }
             }
@@ -721,9 +726,9 @@ mod tests {
         let mut rng = thread_rng();
         for i in 0..32 {
             let _ = RSAPrivateKey::new(&mut rng, i).is_err();
-            let _ = generate_multi_prime_key(&mut rng, 3, i);
-            let _ = generate_multi_prime_key(&mut rng, 4, i);
-            let _ = generate_multi_prime_key(&mut rng, 5, i);
+            let _ = generate_multi_prime_key(&mut rng, 3, i, None);
+            let _ = generate_multi_prime_key(&mut rng, 4, i, None);
+            let _ = generate_multi_prime_key(&mut rng, 5, i, None);
         }
     }
 

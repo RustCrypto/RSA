@@ -1,14 +1,14 @@
 use digest::DynDigest;
 use num_bigint::traits::ModInverse;
 use num_bigint::{BigUint, RandPrime};
-use num_traits::{FromPrimitive, One, Zero};
+use num_traits::{One, Zero};
 use rand::Rng;
 
 use crate::errors::{Error, Result};
 use crate::key::RSAPrivateKey;
 
 /// Default exponent for RSA keys.
-const EXP: u64 = 65537;
+const EXP: usize = 65537;
 
 // Generates a multi-prime RSA keypair of the given bit
 // size and the given random source, as suggested in [1]. Although the public
@@ -25,6 +25,7 @@ pub fn generate_multi_prime_key<R: Rng>(
     rng: &mut R,
     nprimes: usize,
     bit_size: usize,
+    exp: impl Into<Option<usize>>,
 ) -> Result<RSAPrivateKey> {
     if nprimes < 2 {
         return Err(Error::NprimesTooSmall);
@@ -49,6 +50,7 @@ pub fn generate_multi_prime_key<R: Rng>(
     let mut primes = vec![BigUint::zero(); nprimes];
     let n_final: BigUint;
     let d_final: BigUint;
+    let exp: BigUint = exp.into().unwrap_or(EXP).into();
 
     'next: loop {
         let mut todo = bit_size;
@@ -96,8 +98,7 @@ pub fn generate_multi_prime_key<R: Rng>(
             continue 'next;
         }
 
-        let exp = BigUint::from_u64(EXP).expect("invalid static exponent");
-        if let Some(d) = exp.mod_inverse(totient) {
+        if let Some(d) = exp.clone().mod_inverse(totient) {
             n_final = n;
             d_final = d.to_biguint().unwrap();
             break;
@@ -105,10 +106,7 @@ pub fn generate_multi_prime_key<R: Rng>(
     }
 
     Ok(RSAPrivateKey::from_components(
-        n_final,
-        BigUint::from_u64(EXP).expect("invalid static exponent"),
-        d_final,
-        primes,
+        n_final, exp, d_final, primes,
     ))
 }
 
