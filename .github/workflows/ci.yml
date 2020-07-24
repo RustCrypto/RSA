@@ -48,3 +48,10 @@ jobs:
         with:
           command: test
           args: --verbose ${{ matrix.args }}
+
+      - name: Bench
+        uses: actions-rs/cargo@v1
+        with:
+          command: bench
+          args: --verbose --no-run ${{ matrix.args }}
+        if: matrix.rust == 'nightly'
