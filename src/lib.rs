@@ -7,9 +7,12 @@
 //! Using PKCS1v15.
 //! ```
 //! use rsa::{PublicKey, RSAPrivateKey, RSAPublicKey, PaddingScheme};
+//! # /*
 //! use rand::rngs::OsRng;
-//!
 //! let mut rng = OsRng;
+//! # */
+//! # use rand::{SeedableRng, rngs::StdRng};
+//! # let mut rng = rand::rngs::StdRng::seed_from_u64(0);
 //! let bits = 2048;
 //! let private_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
 //! let public_key = RSAPublicKey::from(&private_key);
@@ -29,9 +32,13 @@
 //! Using OAEP.
 //! ```
 //! use rsa::{PublicKey, RSAPrivateKey, RSAPublicKey, PaddingScheme};
+//! # /*
 //! use rand::rngs::OsRng;
-//!
 //! let mut rng = OsRng;
+//! # */
+//! # use rand::{SeedableRng, rngs::StdRng};
+//! # let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+//!
 //! let bits = 2048;
 //! let private_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
 //! let public_key = RSAPublicKey::from(&private_key);
