@@ -30,6 +30,7 @@ jobs:
             target: x86_64-unknown-linux-gnu
             args: --all-features
           - target: thumbv7m-none-eabi
+            test-target: arm-unknown-linux-gnueabi
             args: --no-default-features --features=alloc
         exclude:
           - rust: 1.36.0
@@ -59,12 +60,12 @@ jobs:
         with:
           use-cross: true
           command: test
-          args: --target ${{ matrix.target }} --verbose ${{ matrix.args }}
+          args: --target ${{ matrix.test-target || matrix.target }} --verbose ${{ matrix.args }}
 
       - name: Bench
         uses: actions-rs/cargo@v1
         with:
           use-cross: true
           command: bench
-          args: --target ${{ matrix.target }} --verbose --no-run ${{ matrix.args }}
+          args: --target ${{ matrix.test-target || matrix.target }} --verbose --no-run ${{ matrix.args }}
         if: matrix.rust == 'nightly'
