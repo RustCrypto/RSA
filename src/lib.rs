@@ -78,6 +78,7 @@ pub mod padding;
 #[cfg(feature = "pem")]
 pub use pem;
 
+mod encode;
 mod key;
 mod oaep;
 mod parse;
@@ -85,6 +86,9 @@ mod pkcs1v15;
 mod pss;
 mod raw;
 
+pub use self::encode::{
+    PrivateKeyEncoding, PrivateKeyPemEncoding, PublicKeyEncoding, PublicKeyPemEncoding,
+};
 pub use self::hash::Hash;
 pub use self::key::{PublicKey, PublicKeyParts, RSAPrivateKey, RSAPublicKey};
 pub use self::padding::PaddingScheme;

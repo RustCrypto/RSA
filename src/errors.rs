@@ -33,6 +33,8 @@ pub enum Error {
     PublicExponentTooLarge,
     #[error("parse error: {}", reason)]
     ParseError { reason: String },
+    #[error("encoding error: {}", reason)]
+    EncodeError { reason: String },
     #[error("internal error")]
     Internal,
     #[error("label too long")]

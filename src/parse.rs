@@ -4,6 +4,7 @@ use crate::{
 };
 use simple_asn1::{ASN1Block, ASN1DecodeErr, BigUint, OID};
 
+#[cfg(feature = "pem")]
 use std::convert::TryFrom;
 
 impl From<ASN1DecodeErr> for Error {
@@ -102,7 +103,7 @@ fn big_uint(value: &simple_asn1::BigInt) -> Result<crate::BigUint> {
             Ok(crate::BigUint::from_bytes_le(&value.to_bytes_le()))
         }
         None => Err(Error::ParseError {
-            reason: format!("BigInt::to_biguint failed"),
+            reason: "BigInt::to_biguint failed".to_string(),
         }),
     }
 }
@@ -205,7 +206,7 @@ pub fn parse_public_key_pkcs8(der: &[u8]) -> Result<RSAPublicKey> {
 
     if oid != rsa_oid() {
         return Err(Error::ParseError {
-            reason: format!("oid mismatch: not an rsa key"),
+            reason: "oid mismatch: not an rsa key".to_string(),
         });
     }
 
@@ -230,7 +231,7 @@ pub fn parse_private_key_pkcs8(der: &[u8]) -> Result<RSAPrivateKey> {
 
     if oid != rsa_oid() {
         return Err(Error::ParseError {
-            reason: format!("oid mismatch: not an rsa key"),
+            reason: "oid mismatch: not an rsa key".to_string(),
         });
     }
 
@@ -239,7 +240,7 @@ pub fn parse_private_key_pkcs8(der: &[u8]) -> Result<RSAPrivateKey> {
     parse_private_key_pkcs1(&octet_string)
 }
 
-fn rsa_oid() -> OID {
+pub(crate) fn rsa_oid() -> OID {
     simple_asn1::oid!(1, 2, 840, 113549, 1, 1, 1)
 }
 
@@ -249,8 +250,10 @@ mod tests {
         parse_private_key_pkcs1, parse_private_key_pkcs8, parse_public_key_pkcs1,
         parse_public_key_pkcs8,
     };
-    use crate::{PaddingScheme, PublicKey, RSAPrivateKey, RSAPublicKey};
+    use crate::{PaddingScheme, PublicKey};
 
+    #[cfg(feature = "pem")]
+    use crate::{RSAPrivateKey, RSAPublicKey};
     #[cfg(feature = "pem")]
     use std::convert::TryFrom;
 

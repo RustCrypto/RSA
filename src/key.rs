@@ -59,9 +59,9 @@ pub struct RSAPrivateKey {
     /// Public components of the private key.
     pubkey_components: RSAPublicKey,
     /// Private exponent
-    d: BigUint,
+    pub(crate) d: BigUint,
     /// Prime factors of N, contains >= 2 elements.
-    primes: Vec<BigUint>,
+    pub(crate) primes: Vec<BigUint>,
     /// precomputed values to speed up private operations
     #[cfg_attr(feature = "serde", serde(skip))]
     pub(crate) precomputed: Option<PrecomputedValues>,
