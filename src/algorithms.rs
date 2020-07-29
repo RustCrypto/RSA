@@ -10,21 +10,46 @@ use crate::key::RSAPrivateKey;
 /// Default exponent for RSA keys.
 const EXP: u64 = 65537;
 
-// Generates a multi-prime RSA keypair of the given bit
-// size and the given random source, as suggested in [1]. Although the public
-// keys are compatible (actually, indistinguishable) from the 2-prime case,
-// the private keys are not. Thus it may not be possible to export multi-prime
-// private keys in certain formats or to subsequently import them into other
-// code.
-//
-// Table 1 in [2] suggests maximum numbers of primes for a given size.
-//
-// [1] US patent 4405829 (1972, expired)
-// [2] http://www.cacr.math.uwaterloo.ca/techreports/2006/cacr2006-16.pdf
+/// Generates a multi-prime RSA keypair of the given bit size,
+/// and the given random source, as suggested in [1]. Although the public
+/// keys are compatible (actually, indistinguishable) from the 2-prime case,
+/// the private keys are not. Thus it may not be possible to export multi-prime
+/// private keys in certain formats or to subsequently import them into other
+/// code.
+///
+/// Uses default public key exponent of `65537`. If you want to use a custom
+/// public key exponent value, use `algorithms::generate_multi_prime_key_with_exp`
+/// instead.
+///
+/// Table 1 in [2] suggests maximum numbers of primes for a given size.
+///
+/// [1] US patent 4405829 (1972, expired)
+/// [2] http://www.cacr.math.uwaterloo.ca/techreports/2006/cacr2006-16.pdf
 pub fn generate_multi_prime_key<R: Rng>(
     rng: &mut R,
     nprimes: usize,
     bit_size: usize,
+) -> Result<RSAPrivateKey> {
+    let exp = BigUint::from_u64(EXP).expect("invalid static exponent");
+    generate_multi_prime_key_with_exp(rng, nprimes, bit_size, &exp)
+}
+
+/// Generates a multi-prime RSA keypair of the given bit size, public exponent,
+/// and the given random source, as suggested in [1]. Although the public
+/// keys are compatible (actually, indistinguishable) from the 2-prime case,
+/// the private keys are not. Thus it may not be possible to export multi-prime
+/// private keys in certain formats or to subsequently import them into other
+/// code.
+///
+/// Table 1 in [2] suggests maximum numbers of primes for a given size.
+///
+/// [1] US patent 4405829 (1972, expired)
+/// [2] http://www.cacr.math.uwaterloo.ca/techreports/2006/cacr2006-16.pdf
+pub fn generate_multi_prime_key_with_exp<R: Rng>(
+    rng: &mut R,
+    nprimes: usize,
+    bit_size: usize,
+    exp: &BigUint,
 ) -> Result<RSAPrivateKey> {
     if nprimes < 2 {
         return Err(Error::NprimesTooSmall);
@@ -96,7 +121,6 @@ pub fn generate_multi_prime_key<R: Rng>(
             continue 'next;
         }
 
-        let exp = BigUint::from_u64(EXP).expect("invalid static exponent");
         if let Some(d) = exp.mod_inverse(totient) {
             n_final = n;
             d_final = d.to_biguint().unwrap();
@@ -106,7 +130,7 @@ pub fn generate_multi_prime_key<R: Rng>(
 
     Ok(RSAPrivateKey::from_components(
         n_final,
-        BigUint::from_u64(EXP).expect("invalid static exponent"),
+        exp.clone(),
         d_final,
         primes,
     ))

@@ -8,7 +8,7 @@ use serde_crate::{Deserialize, Serialize};
 use std::ops::Deref;
 use zeroize::Zeroize;
 
-use crate::algorithms::generate_multi_prime_key;
+use crate::algorithms::{generate_multi_prime_key, generate_multi_prime_key_with_exp};
 use crate::errors::{Error, Result};
 
 use crate::padding::PaddingScheme;
@@ -336,6 +336,18 @@ impl RSAPrivateKey {
     /// Generate a new RSA key pair of the given bit size using the passed in `rng`.
     pub fn new<R: Rng>(rng: &mut R, bit_size: usize) -> Result<RSAPrivateKey> {
         generate_multi_prime_key(rng, 2, bit_size)
+    }
+
+    /// Generate a new RSA key pair of the given bit size and the public exponent
+    /// using the passed in `rng`.
+    ///
+    /// Unless you have specific needs, you should use `RSAPrivateKey::new` instead.
+    pub fn new_with_exp<R: Rng>(
+        rng: &mut R,
+        bit_size: usize,
+        exp: &BigUint,
+    ) -> Result<RSAPrivateKey> {
+        generate_multi_prime_key_with_exp(rng, 2, bit_size, exp)
     }
 
     /// Constructs an RSA key pair from the individual components.
