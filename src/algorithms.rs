@@ -2,8 +2,8 @@ use digest::DynDigest;
 use num_bigint::traits::ModInverse;
 use num_bigint::{BigUint, RandPrime};
 use num_traits::{FromPrimitive, One, Zero};
-#[cfg(not(feature = "std"))]
-use num_traits::{Float};
+#[allow(unused_imports)]
+use num_traits::Float;
 use rand::Rng;
 use alloc::vec;
 

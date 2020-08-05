@@ -281,7 +281,7 @@ mod test {
             let sig = hex::decode(test[1]).unwrap();
 
             let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
-            let mut rng = StdRng::seed_from_u64(seed.as_secs());
+            let rng = StdRng::seed_from_u64(seed.as_secs());
             pub_key
                 .verify(
                     PaddingScheme::new_pss::<Sha1, _>(rng),
@@ -299,7 +299,7 @@ mod test {
         let tests = ["test\n"];
 
         let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
-        let mut rng = StdRng::seed_from_u64(seed.as_secs());
+        let rng = StdRng::seed_from_u64(seed.as_secs());
 
         for test in &tests {
             let digest = Sha1::digest(test.as_bytes()).to_vec();
