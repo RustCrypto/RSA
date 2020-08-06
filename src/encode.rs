@@ -8,6 +8,8 @@ use num_bigint::{BigUint, ToBigInt};
 use num_traits::Zero;
 use pem::{EncodeConfig, LineEnding};
 use simple_asn1::{to_der, ASN1Block};
+use std::prelude::v1::*;
+use std::{vec, format};
 
 const DEFAULT_ENCODING_CONFIG: EncodeConfig = EncodeConfig {
     line_ending: LineEnding::LF,

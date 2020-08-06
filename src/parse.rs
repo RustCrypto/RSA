@@ -6,6 +6,7 @@ use simple_asn1::{ASN1Block, ASN1DecodeErr, BigUint, OID};
 
 use alloc::format;
 use alloc::vec;
+use alloc::string::ToString;
 use alloc::vec::Vec;
 #[cfg(feature = "pem")]
 use core::convert::TryFrom;
