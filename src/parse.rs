@@ -4,8 +4,12 @@ use crate::{
 };
 use simple_asn1::{ASN1Block, ASN1DecodeErr, BigUint, OID};
 
+use alloc::format;
+use alloc::vec;
+use alloc::string::ToString;
+use alloc::vec::Vec;
 #[cfg(feature = "pem")]
-use std::convert::TryFrom;
+use core::convert::TryFrom;
 
 impl From<ASN1DecodeErr> for Error {
     fn from(e: ASN1DecodeErr) -> Error {

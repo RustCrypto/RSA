@@ -1,8 +1,10 @@
 use num_bigint::{BigInt, BigUint, IntoBigInt, IntoBigUint, ModInverse, RandBigInt, ToBigInt};
 use num_traits::{One, Signed, Zero};
 use rand::Rng;
-use std::borrow::Cow;
+use alloc::borrow::Cow;
 use zeroize::Zeroize;
+use alloc::vec::Vec;
+use alloc::vec;
 
 use crate::errors::{Error, Result};
 use crate::key::{PublicKeyParts, RSAPrivateKey};

@@ -1,4 +1,5 @@
-use std::vec::Vec;
+use alloc::vec;
+use alloc::vec::Vec;
 
 use digest::DynDigest;
 use rand::{Rng, RngCore};
@@ -239,8 +240,9 @@ mod test {
 
     use num_bigint::BigUint;
     use num_traits::{FromPrimitive, Num};
-    use rand::thread_rng;
     use sha1::{Digest, Sha1};
+    use std::time::SystemTime;
+    use rand::{SeedableRng, rngs::StdRng};
 
     fn get_private_key() -> RSAPrivateKey {
         // In order to generate new test vectors you'll need the PEM form of this key:
@@ -278,9 +280,11 @@ mod test {
             let digest = Sha1::digest(test[0].as_bytes()).to_vec();
             let sig = hex::decode(test[1]).unwrap();
 
+            let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+            let rng = StdRng::seed_from_u64(seed.as_secs());
             pub_key
                 .verify(
-                    PaddingScheme::new_pss::<Sha1, _>(thread_rng()),
+                    PaddingScheme::new_pss::<Sha1, _>(rng),
                     &digest,
                     &sig,
                 )
@@ -294,19 +298,22 @@ mod test {
 
         let tests = ["test\n"];
 
+        let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        let rng = StdRng::seed_from_u64(seed.as_secs());
+
         for test in &tests {
             let digest = Sha1::digest(test.as_bytes()).to_vec();
             let sig = priv_key
                 .sign_blinded(
-                    &mut thread_rng(),
-                    PaddingScheme::new_pss::<Sha1, _>(thread_rng()),
+                    &mut rng.clone(),
+                    PaddingScheme::new_pss::<Sha1, _>(rng.clone()),
                     &digest,
                 )
                 .expect("failed to sign");
 
             priv_key
                 .verify(
-                    PaddingScheme::new_pss::<Sha1, _>(thread_rng()),
+                    PaddingScheme::new_pss::<Sha1, _>(rng.clone()),
                     &digest,
                     &sig,
                 )

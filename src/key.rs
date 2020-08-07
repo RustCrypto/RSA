@@ -2,11 +2,12 @@ use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
 use num_traits::{FromPrimitive, One};
-use rand::{rngs::ThreadRng, Rng};
+use rand::{rngs::StdRng, Rng};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
-use std::ops::Deref;
+use core::ops::Deref;
 use zeroize::Zeroize;
+use alloc::vec::Vec;
 
 use crate::algorithms::{generate_multi_prime_key, generate_multi_prime_key_with_exp};
 use crate::errors::{Error, Result};
@@ -247,6 +248,7 @@ impl RSAPublicKey {
     /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
     /// let public_key = RSAPublicKey::from_pkcs1(&der_bytes).expect("failed to parse key");
     /// ```
+    #[cfg(feature = "std")]
     pub fn from_pkcs1(der: &[u8]) -> Result<RSAPublicKey> {
         crate::parse::parse_public_key_pkcs1(der)
     }
@@ -281,6 +283,7 @@ impl RSAPublicKey {
     /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
     /// let public_key = RSAPublicKey::from_pkcs8(&der_bytes).expect("failed to parse key");
     /// ```
+    #[cfg(feature = "std")]
     pub fn from_pkcs8(der: &[u8]) -> Result<RSAPublicKey> {
         crate::parse::parse_public_key_pkcs8(der)
     }
@@ -405,6 +408,7 @@ impl RSAPrivateKey {
     /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
     /// let private_key = RSAPrivateKey::from_pkcs1(&der_bytes).expect("failed to parse key");
     /// ```
+    #[cfg(feature = "std")]
     pub fn from_pkcs1(der: &[u8]) -> Result<RSAPrivateKey> {
         crate::parse::parse_private_key_pkcs1(der)
     }
@@ -445,6 +449,7 @@ impl RSAPrivateKey {
     /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
     /// let private_key = RSAPrivateKey::from_pkcs8(&der_bytes).expect("failed to parse key");
     /// ```
+    #[cfg(feature = "std")]
     pub fn from_pkcs8(der: &[u8]) -> Result<RSAPrivateKey> {
         crate::parse::parse_private_key_pkcs8(der)
     }
@@ -554,10 +559,10 @@ impl RSAPrivateKey {
         match padding {
             // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
             PaddingScheme::PKCS1v15Encrypt => {
-                pkcs1v15::decrypt::<ThreadRng, _>(None, self, ciphertext)
+                pkcs1v15::decrypt::<StdRng, _>(None, self, ciphertext)
             }
             PaddingScheme::OAEP { mut digest, label } => {
-                oaep::decrypt::<ThreadRng, _>(None, self, ciphertext, &mut *digest, label)
+                oaep::decrypt::<StdRng, _>(None, self, ciphertext, &mut *digest, label)
             }
             _ => Err(Error::InvalidPaddingScheme),
         }
@@ -584,14 +589,15 @@ impl RSAPrivateKey {
     /// Sign the given digest.
     pub fn sign(&self, padding: PaddingScheme, digest_in: &[u8]) -> Result<Vec<u8>> {
         match padding {
+            // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
             PaddingScheme::PKCS1v15Sign { ref hash } => {
-                pkcs1v15::sign::<ThreadRng, _>(None, self, hash.as_ref(), digest_in)
+                pkcs1v15::sign::<StdRng, _>(None, self, hash.as_ref(), digest_in)
             }
             PaddingScheme::PSS {
                 mut salt_rng,
                 mut digest,
                 salt_len,
-            } => pss::sign::<_, ThreadRng, _>(
+            } => pss::sign::<_, StdRng, _>(
                 &mut *salt_rng,
                 None,
                 self,
@@ -652,9 +658,10 @@ mod tests {
     use super::*;
     use crate::internals;
 
+    use std::time::SystemTime;
     use digest::{Digest, DynDigest};
     use num_traits::{FromPrimitive, ToPrimitive};
-    use rand::{distributions::Alphanumeric, rngs::ThreadRng, thread_rng};
+    use rand::{distributions::Alphanumeric, rngs::StdRng, SeedableRng};
     use sha1::Sha1;
     use sha2::{Sha224, Sha256, Sha384, Sha512};
     use sha3::{Sha3_256, Sha3_384, Sha3_512};
@@ -687,10 +694,11 @@ mod tests {
         let pub_key: RSAPublicKey = private_key.clone().into();
         let m = BigUint::from_u64(42).expect("invalid 42");
         let c = internals::encrypt(&pub_key, &m);
-        let m2 = internals::decrypt::<ThreadRng>(None, &private_key, &c)
+        let m2 = internals::decrypt::<StdRng>(None, &private_key, &c)
             .expect("unable to decrypt without blinding");
         assert_eq!(m, m2);
-        let mut rng = thread_rng();
+        let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        let mut rng = StdRng::seed_from_u64(seed.as_secs());
         let m3 = internals::decrypt(Some(&mut rng), &private_key, &c)
             .expect("unable to decrypt with blinding");
         assert_eq!(m, m3);
@@ -700,7 +708,8 @@ mod tests {
         ($name:ident, $multi:expr, $size:expr) => {
             #[test]
             fn $name() {
-                let mut rng = thread_rng();
+                let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+                let mut rng = StdRng::seed_from_u64(seed.as_secs());
 
                 for _ in 0..10 {
                     let private_key = if $multi == 2 {
@@ -730,7 +739,8 @@ mod tests {
     #[test]
     fn test_impossible_keys() {
         // make sure not infinite loops are hit here.
-        let mut rng = thread_rng();
+        let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        let mut rng = StdRng::seed_from_u64(seed.as_secs());
         for i in 0..32 {
             let _ = RSAPrivateKey::new(&mut rng, i).is_err();
             let _ = generate_multi_prime_key(&mut rng, 3, i);
@@ -902,7 +912,8 @@ mod tests {
     }
 
     fn do_test_encrypt_decrypt_oaep<D: 'static + Digest + DynDigest>(prk: &RSAPrivateKey) {
-        let mut rng = thread_rng();
+        let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        let mut rng = StdRng::seed_from_u64(seed.as_secs());
 
         let k = prk.size();
 
@@ -913,7 +924,7 @@ mod tests {
             }
             let has_label: bool = rng.gen();
             let label: Option<String> = if has_label {
-                Some(rng.sample_iter(&Alphanumeric).take(30).collect())
+                Some(rng.clone().sample_iter(&Alphanumeric).take(30).collect())
             } else {
                 None
             };
@@ -949,7 +960,8 @@ mod tests {
 
     #[test]
     fn test_decrypt_oaep_invalid_hash() {
-        let mut rng = thread_rng();
+        let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        let mut rng = StdRng::seed_from_u64(seed.as_secs());
         let priv_key = get_private_key();
         let pub_key: RSAPublicKey = (&priv_key).into();
         let ciphertext = pub_key
