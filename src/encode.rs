@@ -26,6 +26,8 @@ pub trait PrivateKeyPemEncoding: PrivateKeyEncoding {
     /// Encodes the key with the header:
     /// `-----BEGIN <name> PRIVATE KEY-----`
     ///
+    /// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info 
+    ///
     /// # Example
     ///
     /// ```
@@ -43,6 +45,8 @@ pub trait PrivateKeyPemEncoding: PrivateKeyEncoding {
     }
 
     /// Converts a Private key into `PKCS1` encoded bytes in pem format with encoding config.
+    ///
+    /// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info 
     ///
     /// # Example
     /// ```
@@ -70,6 +74,8 @@ pub trait PrivateKeyPemEncoding: PrivateKeyEncoding {
     /// Encodes the key with the header:
     /// `-----BEGIN PRIVATE KEY-----`
     ///
+    /// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info 
+    ///
     /// # Example
     ///
     /// ```
@@ -87,6 +93,8 @@ pub trait PrivateKeyPemEncoding: PrivateKeyEncoding {
     }
 
     /// Converts a Private key into `PKCS8` encoded bytes in pem format with encoding config.
+    ///
+    /// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info 
     ///
     /// # Example
     /// ```
@@ -229,9 +237,9 @@ pub trait PrivateKeyEncoding {
     /// This data will be `base64` encoded which would be used
     /// following a `-----BEGIN <name> PRIVATE KEY-----` header.
     ///
-    /// Important: Encoding multi prime keys isn't supported
-    ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
+    ///
+    /// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info 
     fn to_pkcs1(&self) -> Result<Vec<u8>>;
 
     /// Encodes a Private key to into `PKCS8` bytes.
@@ -239,9 +247,9 @@ pub trait PrivateKeyEncoding {
     /// This data will be `base64` encoded which would be used
     /// following a `-----BEGIN PRIVATE KEY-----` header.
     ///
-    /// Important: Encoding multi prime keys isn't supported
-    ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
+    ///
+    /// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info 
     fn to_pkcs8(&self) -> Result<Vec<u8>>;
 }
 
@@ -250,7 +258,7 @@ impl PrivateKeyEncoding for RSAPrivateKey {
         // Check if the key is multi prime
         if self.primes.len() > 2 {
             return Err(Error::EncodeError {
-                reason: "multi prime key encoding isn't supported".into(),
+                reason: "multi prime key encoding isn't supported. see RustCrypto/RSA#66".into(),
             });
         }
 
