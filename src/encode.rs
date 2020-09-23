@@ -11,6 +11,7 @@ use simple_asn1::{to_der, ASN1Block, BigInt};
 use std::prelude::v1::*;
 use std::{vec, format};
 
+const BYTE_BIT_SIZE: usize = 8;
 const DEFAULT_ENCODING_CONFIG: EncodeConfig = EncodeConfig {
     line_ending: LineEnding::LF,
 };
@@ -329,7 +330,7 @@ pub trait PublicKeyEncoding: PublicKey {
         let alg = ASN1Block::Sequence(0, vec![oid]);
 
         let bz = self.to_pkcs1()?;
-        let octet_string = ASN1Block::BitString(0, bz.len() * 8, bz);
+        let octet_string = ASN1Block::BitString(0, bz.len() * BYTE_BIT_SIZE, bz);
         let blocks = vec![alg, octet_string];
 
         to_der(&ASN1Block::Sequence(0, blocks)).map_err(|e| Error::EncodeError {
