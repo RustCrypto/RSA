@@ -228,6 +228,8 @@ pub trait PrivateKeyEncoding {
     /// This data will be `base64` encoded which would be used
     /// following a `-----BEGIN <name> PRIVATE KEY-----` header.
     ///
+    /// Important: Encoding multi prime keys isn't supported
+    ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
     fn to_pkcs1(&self) -> Result<Vec<u8>>;
 
@@ -236,13 +238,23 @@ pub trait PrivateKeyEncoding {
     /// This data will be `base64` encoded which would be used
     /// following a `-----BEGIN PRIVATE KEY-----` header.
     ///
+    /// Important: Encoding multi prime keys isn't supported
+    ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
     fn to_pkcs8(&self) -> Result<Vec<u8>>;
 }
 
 impl PrivateKeyEncoding for RSAPrivateKey {
     fn to_pkcs1(&self) -> Result<Vec<u8>> {
-        // TODO should version be changed to anything?
+        // Check if the key is multi prime
+        if self.primes.len() > 2 {
+            return Err(Error::EncodeError {
+                reason: "multi prime key encoding isn't supported".into(),
+            });
+        }
+
+        // Version 0 = "regular" (two prime) key
+        // Version 1 = multi prime key
         let version = ASN1Block::Integer(0, to_bigint(&BigUint::zero()));
         let n = ASN1Block::Integer(0, to_bigint(&self.n()));
         let e = ASN1Block::Integer(0, to_bigint(&self.e()));
@@ -253,19 +265,20 @@ impl PrivateKeyEncoding for RSAPrivateKey {
         blocks.extend(
             self.primes
                 .iter()
+                .take(2)
                 .map(|p| ASN1Block::Integer(0, to_bigint(p))),
         );
         // Encode exponents
-        blocks.extend(self.primes.iter().map(|p| {
-            ASN1Block::Integer(
-                0,
-                to_bigint(&self.d.modpow(&BigUint::from(1u32), &(p - 1u16))),
-            )
+        blocks.extend(self.primes.iter().take(2).map(|p| {
+            let exponent = &self.d % (p - 1u8);
+            ASN1Block::Integer(0, to_bigint(&exponent))
         }));
         // Encode coefficient
         let coefficient = (&self.primes[1])
             .mod_inverse(&self.primes[0])
-            .ok_or(Error::InvalidModulus)?;
+            .ok_or(Error::EncodeError {
+                reason: "mod inverse failed".into()
+            })?;
         blocks.push(ASN1Block::Integer(
             0,
             BigInt::from_signed_bytes_le(&coefficient.to_signed_bytes_le()),
