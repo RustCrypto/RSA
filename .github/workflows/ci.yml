@@ -21,7 +21,7 @@ jobs:
         rust:
           - 1.36.0
           - stable
-          - nightly
+          # - nightly
         target:
           - x86_64-unknown-linux-gnu
           - thumbv7m-none-eabi
