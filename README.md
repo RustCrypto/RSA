@@ -14,7 +14,7 @@ use rand::rngs::OsRng;
 let mut rng = OsRng;
 let bits = 2048;
 let priv_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
-let pub_key = RSAPublicKey::from(&private_key);
+let pub_key = RSAPublicKey::from(&priv_key);
 
 // Encrypt
 let data = b"hello world";
