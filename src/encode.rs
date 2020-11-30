@@ -17,6 +17,9 @@ const DEFAULT_ENCODING_CONFIG: EncodeConfig = EncodeConfig {
 };
 
 #[cfg(feature = "pem")]
+/// Trait for encoding the private key in the PEM format
+/// 
+/// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info
 pub trait PrivateKeyPemEncoding: PrivateKeyEncoding {
     const PKCS1_HEADER: &'static str;
     const PKCS8_HEADER: &'static str = "PRIVATE KEY";
@@ -25,8 +28,6 @@ pub trait PrivateKeyPemEncoding: PrivateKeyEncoding {
     ///
     /// Encodes the key with the header:
     /// `-----BEGIN <name> PRIVATE KEY-----`
-    ///
-    /// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info 
     ///
     /// # Example
     ///
@@ -45,8 +46,6 @@ pub trait PrivateKeyPemEncoding: PrivateKeyEncoding {
     }
 
     /// Converts a Private key into `PKCS1` encoded bytes in pem format with encoding config.
-    ///
-    /// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info 
     ///
     /// # Example
     /// ```
@@ -74,8 +73,6 @@ pub trait PrivateKeyPemEncoding: PrivateKeyEncoding {
     /// Encodes the key with the header:
     /// `-----BEGIN PRIVATE KEY-----`
     ///
-    /// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info 
-    ///
     /// # Example
     ///
     /// ```
@@ -93,8 +90,6 @@ pub trait PrivateKeyPemEncoding: PrivateKeyEncoding {
     }
 
     /// Converts a Private key into `PKCS8` encoded bytes in pem format with encoding config.
-    ///
-    /// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info 
     ///
     /// # Example
     /// ```
@@ -231,15 +226,16 @@ fn to_bigint(value: &crate::BigUint) -> simple_asn1::BigInt {
     simple_asn1::BigInt::from_signed_bytes_le(&value.to_bigint().unwrap().to_signed_bytes_le())
 }
 
+/// Trait for encoding the private key in the PKCS#1/PKCS#8 format
+/// 
+/// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info
 pub trait PrivateKeyEncoding {
     /// Encodes a Private key to into `PKCS1` bytes.
     ///
     /// This data will be `base64` encoded which would be used
     /// following a `-----BEGIN <name> PRIVATE KEY-----` header.
     ///
-    /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    ///
-    /// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info 
+    /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem> 
     fn to_pkcs1(&self) -> Result<Vec<u8>>;
 
     /// Encodes a Private key to into `PKCS8` bytes.
@@ -248,8 +244,6 @@ pub trait PrivateKeyEncoding {
     /// following a `-----BEGIN PRIVATE KEY-----` header.
     ///
     /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    ///
-    /// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info 
     fn to_pkcs8(&self) -> Result<Vec<u8>>;
 }
 
