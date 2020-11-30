@@ -3,7 +3,7 @@
 
 A portable RSA implementation in pure Rust.
 
-:warning: **WARNING:** This library has __not__ been audited, so please do not use for production code.
+:warning: **WARNING:** This crate has been audited by a 3rd party, but a full blog post with the results and the updates made since the audit has not been officially released yet. See [#60](https://github.com/RustCrypto/RSA/issues/60) for more information.
 
 ## Example
 
