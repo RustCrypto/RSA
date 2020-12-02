@@ -51,6 +51,12 @@ There will be three phases before `1.0` :ship: can be released.
     - [ ] Security Audits
 
 
+## Minimum Supported Rust Version (MSRV)
+
+All crates in this repository support Rust 1.44 or higher. In future
+minimally supported version of Rust can be changed, but it will be done with
+a minor version bump.
+
 ## License
 
 Licensed under either of
