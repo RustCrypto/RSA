@@ -12,7 +12,7 @@ categories = ["cryptography"]
 readme = "README.md"
 
 [dependencies]
-num-bigint = { version = "0.6", features = ["i128", "u64_digit", "prime", "zeroize"], default-features = false, package = "num-bigint-dig" }
+num-bigint = { version = "0.6.1", features = ["i128", "u64_digit", "prime", "zeroize"], default-features = false, package = "num-bigint-dig" }
 num-traits = { version= "0.2.9", default-features = false, features = ["libm"] }
 num-integer = { version = "0.1.39", default-features = false }
 num-iter = { version = "0.1.37", default-features = false }
