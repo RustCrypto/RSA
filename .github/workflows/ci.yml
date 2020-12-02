@@ -19,21 +19,21 @@ jobs:
     strategy:
       matrix:
         rust:
-          - 1.36.0
+          - 1.44.0
           - stable
-          # - nightly
+          - nightly
         target:
           - x86_64-unknown-linux-gnu
           - thumbv7m-none-eabi
         include:
-            #- rust: nightly
-            #target: x86_64-unknown-linux-gnu
-            #args: --all-features
+          - rust: nightly
+            target: x86_64-unknown-linux-gnu
+            args: --all-features
           - target: thumbv7m-none-eabi
             test-target: arm-unknown-linux-gnueabi
             args: --no-default-features --features=alloc
         exclude:
-          - rust: 1.36.0
+          - rust: 1.44.0
             target: thumbv7m-none-eabi
 
     steps:
