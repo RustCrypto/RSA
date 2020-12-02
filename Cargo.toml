@@ -58,7 +58,6 @@ name = "key"
 default = ["std", "pem"]
 nightly = ["subtle/nightly", "num-bigint/nightly"]
 serde = ["num-bigint/serde", "serde_crate"]
-serde1 = ["serde"] # deprecated
 expose-internals = []
 std = ["alloc", "simple_asn1", "digest/std", "rand/std"]
 alloc = ["digest/alloc"]
