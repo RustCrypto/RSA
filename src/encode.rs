@@ -4,18 +4,22 @@ use crate::{
     parse::rsa_oid,
     PublicKey, RSAPrivateKey, RSAPublicKey,
 };
-use num_bigint::{BigUint, ToBigInt};
+use num_bigint::{BigUint, ToBigInt, ModInverse};
 use num_traits::Zero;
 use pem::{EncodeConfig, LineEnding};
-use simple_asn1::{to_der, ASN1Block};
+use simple_asn1::{to_der, ASN1Block, BigInt};
 use std::prelude::v1::*;
 use std::{vec, format};
 
+const BYTE_BIT_SIZE: usize = 8;
 const DEFAULT_ENCODING_CONFIG: EncodeConfig = EncodeConfig {
     line_ending: LineEnding::LF,
 };
 
 #[cfg(feature = "pem")]
+/// Trait for encoding the private key in the PEM format
+/// 
+/// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info
 pub trait PrivateKeyPemEncoding: PrivateKeyEncoding {
     const PKCS1_HEADER: &'static str;
     const PKCS8_HEADER: &'static str = "PRIVATE KEY";
@@ -222,13 +226,16 @@ fn to_bigint(value: &crate::BigUint) -> simple_asn1::BigInt {
     simple_asn1::BigInt::from_signed_bytes_le(&value.to_bigint().unwrap().to_signed_bytes_le())
 }
 
+/// Trait for encoding the private key in the PKCS#1/PKCS#8 format
+/// 
+/// Important: Encoding multi prime keys isn't supported. See [RustCrypto/RSA#66](https://github.com/RustCrypto/RSA/issues/66) for more info
 pub trait PrivateKeyEncoding {
     /// Encodes a Private key to into `PKCS1` bytes.
     ///
     /// This data will be `base64` encoded which would be used
     /// following a `-----BEGIN <name> PRIVATE KEY-----` header.
     ///
-    /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
+    /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem> 
     fn to_pkcs1(&self) -> Result<Vec<u8>>;
 
     /// Encodes a Private key to into `PKCS8` bytes.
@@ -242,7 +249,15 @@ pub trait PrivateKeyEncoding {
 
 impl PrivateKeyEncoding for RSAPrivateKey {
     fn to_pkcs1(&self) -> Result<Vec<u8>> {
-        // TODO should version be changed to anything?
+        // Check if the key is multi prime
+        if self.primes.len() > 2 {
+            return Err(Error::EncodeError {
+                reason: "multi prime key encoding isn't supported. see RustCrypto/RSA#66".into(),
+            });
+        }
+
+        // Version 0 = "regular" (two prime) key
+        // Version 1 = multi prime key
         let version = ASN1Block::Integer(0, to_bigint(&BigUint::zero()));
         let n = ASN1Block::Integer(0, to_bigint(&self.n()));
         let e = ASN1Block::Integer(0, to_bigint(&self.e()));
@@ -253,8 +268,25 @@ impl PrivateKeyEncoding for RSAPrivateKey {
         blocks.extend(
             self.primes
                 .iter()
+                .take(2)
                 .map(|p| ASN1Block::Integer(0, to_bigint(p))),
         );
+        // Encode exponents
+        blocks.extend(self.primes.iter().take(2).map(|p| {
+            let exponent = &self.d % (p - 1u8);
+            ASN1Block::Integer(0, to_bigint(&exponent))
+        }));
+        // Encode coefficient
+        let coefficient = (&self.primes[1])
+            .mod_inverse(&self.primes[0])
+            .ok_or(Error::EncodeError {
+                reason: "mod inverse failed".into()
+            })?;
+        blocks.push(ASN1Block::Integer(
+            0,
+            BigInt::from_signed_bytes_le(&coefficient.to_signed_bytes_le()),
+        ));
+
         to_der(&ASN1Block::Sequence(0, blocks)).map_err(|e| Error::EncodeError {
             reason: format!("failed to encode ASN.1 sequence of blocks: {}", e),
         })
@@ -300,7 +332,7 @@ pub trait PublicKeyEncoding: PublicKey {
         let alg = ASN1Block::Sequence(0, vec![oid]);
 
         let bz = self.to_pkcs1()?;
-        let octet_string = ASN1Block::BitString(0, bz.len(), bz);
+        let octet_string = ASN1Block::BitString(0, bz.len() * BYTE_BIT_SIZE, bz);
         let blocks = vec![alg, octet_string];
 
         to_der(&ASN1Block::Sequence(0, blocks)).map_err(|e| Error::EncodeError {
@@ -322,7 +354,7 @@ mod tests {
 
     #[test]
     fn priv_pem_encoding_pkcs8() {
-        const PKCS8_PRIVATE_KEY: &str = "-----BEGIN PRIVATE KEY-----\nMEACAQAwCwYJKoZIhvcNAQEBBC4wLAIBAAIJAJGyCM1NTAwDAgMBAAECCQCMDHwC\nEdIqAQIFAMEBAQECBQDBQAkD\n-----END PRIVATE KEY-----\n";
+        const PKCS8_PRIVATE_KEY: &str = "-----BEGIN PRIVATE KEY-----\nMFICAQAwCwYJKoZIhvcNAQEBBEAwPgIBAAIJAJGyCM1NTAwDAgMBAAECCQCMDHwC\nEdIqAQIFAMEBAQECBQDBQAkDAgMDBAECBAHfV/cCBQC7RXbf\n-----END PRIVATE KEY-----\n";
         let mut rng = XorShiftRng::from_seed([1; 16]);
         let key = RSAPrivateKey::new(&mut rng, 64).expect("failed to generate key");
         let pem_str = key
@@ -332,7 +364,7 @@ mod tests {
     }
     #[test]
     fn priv_pem_encoding_pkcs1() {
-        const PKCS1_PRIVATE_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\nMCwCAQACCQCRsgjNTUwMAwIDAQABAgkAjAx8AhHSKgECBQDBAQEBAgUAwUAJAw==\n-----END RSA PRIVATE KEY-----\n";
+        const PKCS1_PRIVATE_KEY: &str = "-----BEGIN RSA PRIVATE KEY-----\nMD4CAQACCQCRsgjNTUwMAwIDAQABAgkAjAx8AhHSKgECBQDBAQEBAgUAwUAJAwID\nAwQBAgQB31f3AgUAu0V23w==\n-----END RSA PRIVATE KEY-----\n";
         let mut rng = XorShiftRng::from_seed([1; 16]);
         let key = RSAPrivateKey::new(&mut rng, 64).expect("failed to generate key");
         let pem_str = key
@@ -343,7 +375,7 @@ mod tests {
 
     #[test]
     fn pub_pem_encoding_pkcs8() {
-        const PKCS8_PUBLIC_KEY: &str = "-----BEGIN PUBLIC KEY-----\nMCIwCwYJKoZIhvcNAQEBAxN+MBACCQCRsgjNTUwMAwIDAQAB\n-----END PUBLIC KEY-----\n";
+        const PKCS8_PUBLIC_KEY: &str = "-----BEGIN PUBLIC KEY-----\nMCIwCwYJKoZIhvcNAQEBAxMAMBACCQCRsgjNTUwMAwIDAQAB\n-----END PUBLIC KEY-----\n";
         let mut rng = XorShiftRng::from_seed([1; 16]);
         let key = RSAPrivateKey::new(&mut rng, 64)
             .expect("failed to generate key")
@@ -406,8 +438,8 @@ mod tests {
 
     #[test]
     fn pem_encoding_config() {
-        const PKCS8_PRIVATE_KEY: &str = "-----BEGIN PRIVATE KEY-----\r\nMEACAQAwCwYJKoZIhvcNAQEBBC4wLAIBAAIJAJGyCM1NTAwDAgMBAAECCQCMDHwC\r\nEdIqAQIFAMEBAQECBQDBQAkD\r\n-----END PRIVATE KEY-----\r\n";
-        const PKCS8_PUBLIC_KEY: &str = "-----BEGIN PUBLIC KEY-----\r\nMCIwCwYJKoZIhvcNAQEBAxN+MBACCQCRsgjNTUwMAwIDAQAB\r\n-----END PUBLIC KEY-----\r\n";
+        const PKCS8_PRIVATE_KEY: &str = "-----BEGIN PRIVATE KEY-----\r\nMFICAQAwCwYJKoZIhvcNAQEBBEAwPgIBAAIJAJGyCM1NTAwDAgMBAAECCQCMDHwC\r\nEdIqAQIFAMEBAQECBQDBQAkDAgMDBAECBAHfV/cCBQC7RXbf\r\n-----END PRIVATE KEY-----\r\n";
+        const PKCS8_PUBLIC_KEY: &str = "-----BEGIN PUBLIC KEY-----\r\nMCIwCwYJKoZIhvcNAQEBAxMAMBACCQCRsgjNTUwMAwIDAQAB\r\n-----END PUBLIC KEY-----\r\n";
         let mut rng = XorShiftRng::from_seed([1; 16]);
         let key = RSAPrivateKey::new(&mut rng, 64).expect("failed to generate key");
         let pub_key = key.to_public_key();
