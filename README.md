@@ -1,5 +1,6 @@
 # RSA
-[![crates.io](https://img.shields.io/crates/v/rsa.svg)](https://crates.io/crates/rsa) [![Documentation](https://docs.rs/rsa/badge.svg)](https://docs.rs/rsa) [![Build Status](https://travis-ci.org/RustCrypto/RSA.svg?branch=master)](https://travis-ci.org/RustCrypto/RSA) ![minimum rustc 1.36](https://img.shields.io/badge/rustc-1.41+-blue.svg)
+
+[![crates.io](https://img.shields.io/crates/v/rsa.svg)](https://crates.io/crates/rsa) [![Documentation](https://docs.rs/rsa/badge.svg)](https://docs.rs/rsa) [![Build Status](https://github.com/rustcrypto/RSA/workflows/CI/badge.svg)](https://github.com/RustCrypto/RSA/actions) ![minimum rustc 1.44](https://img.shields.io/badge/rustc-1.44+-blue.svg)
 
 A portable RSA implementation in pure Rust.
 
@@ -49,6 +50,12 @@ There will be three phases before `1.0` :ship: can be released.
     - [ ] Fuzz testing
     - [ ] Security Audits
 
+
+## Minimum Supported Rust Version (MSRV)
+
+All crates in this repository support Rust 1.44 or higher. In future
+minimally supported version of Rust can be changed, but it will be done with
+a minor version bump.
 
 ## License
 
