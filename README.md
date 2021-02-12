@@ -1,6 +1,5 @@
 # RSA
 
-
 [![crates.io][crate-image]][crate-link]
 [![Documentation][doc-image]][doc-link]
 [![Build Status][build-image]][build-link]
