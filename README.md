@@ -1,6 +1,11 @@
 # RSA
 
-[![crates.io](https://img.shields.io/crates/v/rsa.svg)](https://crates.io/crates/rsa) [![Documentation](https://docs.rs/rsa/badge.svg)](https://docs.rs/rsa) [![Build Status](https://github.com/rustcrypto/RSA/workflows/CI/badge.svg)](https://github.com/RustCrypto/RSA/actions) ![minimum rustc 1.44](https://img.shields.io/badge/rustc-1.44+-blue.svg)
+[![crates.io][crate-image]][crate-link]
+[![Documentation][doc-image]][doc-link]
+[![Build Status][build-image]][build-link]
+![minimum rustc 1.44][msrv-image]
+[![Project Chat][chat-image]][chat-link]
+[![dependency status][deps-image]][deps-link]
 
 A portable RSA implementation in pure Rust.
 
@@ -71,3 +76,17 @@ at your option.
 Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
+
+[//]: # (badges)
+
+[crate-image]: https://img.shields.io/crates/v/rsa.svg
+[crate-link]: https://crates.io/crates/rsa
+[doc-image]: https://docs.rs/rsa/badge.svg
+[doc-link]: https://docs.rs/rsa
+[build-image]: https://github.com/rustcrypto/RSA/workflows/CI/badge.svg
+[build-link]: https://github.com/RustCrypto/RSA/actions?query=workflow%3ACI+branch%3Amaster
+[msrv-image]: https://img.shields.io/badge/rustc-1.44+-blue.svg
+[chat-image]: https://img.shields.io/badge/zulip-join_chat-blue.svg
+[chat-link]: https://rustcrypto.zulipchat.com/#narrow/stream/260047-RSA
+[deps-image]: https://deps.rs/repo/github/RustCrypto/RSA/status.svg
+[deps-link]: https://deps.rs/repo/github/RustCrypto/RSA
