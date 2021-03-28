@@ -924,7 +924,7 @@ mod tests {
             }
             let has_label: bool = rng.gen();
             let label: Option<String> = if has_label {
-                Some(rng.clone().sample_iter(&Alphanumeric).take(30).collect())
+                Some(rng.clone().sample_iter(&Alphanumeric).take(30).map(char::from).collect())
             } else {
                 None
             };
