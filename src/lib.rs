@@ -116,9 +116,9 @@ mod pss;
 mod raw;
 
 #[cfg(feature = "std")]
-pub use self::encode::{
-    PrivateKeyEncoding, PrivateKeyPemEncoding, PublicKeyEncoding, PublicKeyPemEncoding,
-};
+pub use self::encode::{PrivateKeyEncoding, PublicKeyEncoding};
+#[cfg(all(feature = "std", feature = "pem"))]
+pub use self::encode::{PrivateKeyPemEncoding, PublicKeyPemEncoding};
 #[cfg(feature = "alloc")]
 pub use self::hash::Hash;
 #[cfg(feature = "alloc")]

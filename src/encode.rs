@@ -6,12 +6,14 @@ use crate::{
 };
 use num_bigint::{BigUint, ToBigInt, ModInverse};
 use num_traits::Zero;
+#[cfg(feature = "pem")]
 use pem::{EncodeConfig, LineEnding};
 use simple_asn1::{to_der, ASN1Block, BigInt};
 use std::prelude::v1::*;
 use std::{vec, format};
 
 const BYTE_BIT_SIZE: usize = 8;
+#[cfg(feature = "pem")]
 const DEFAULT_ENCODING_CONFIG: EncodeConfig = EncodeConfig {
     line_ending: LineEnding::LF,
 };
@@ -216,6 +218,7 @@ pub trait PublicKeyPemEncoding: PublicKeyEncoding {
     }
 }
 
+#[cfg(feature = "pem")]
 impl PublicKeyPemEncoding for RSAPublicKey {
     const PKCS1_HEADER: &'static str = "RSA PUBLIC KEY";
 }
