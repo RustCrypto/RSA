@@ -32,6 +32,9 @@ jobs:
           - target: thumbv7m-none-eabi
             test-target: arm-unknown-linux-gnueabi
             args: --no-default-features --features=alloc
+          - rust: stable
+            target: x86_64-unknown-linux-gnu
+            args: --no-default-features --features=std
         exclude:
           - rust: 1.44.0
             target: thumbv7m-none-eabi
