@@ -248,7 +248,6 @@ impl RSAPublicKey {
     /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
     /// let public_key = RSAPublicKey::from_pkcs1(&der_bytes).expect("failed to parse key");
     /// ```
-    #[cfg(feature = "std")]
     pub fn from_pkcs1(der: &[u8]) -> Result<RSAPublicKey> {
         crate::parse::parse_public_key_pkcs1(der)
     }
@@ -283,7 +282,6 @@ impl RSAPublicKey {
     /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
     /// let public_key = RSAPublicKey::from_pkcs8(&der_bytes).expect("failed to parse key");
     /// ```
-    #[cfg(feature = "std")]
     pub fn from_pkcs8(der: &[u8]) -> Result<RSAPublicKey> {
         crate::parse::parse_public_key_pkcs8(der)
     }
@@ -408,7 +406,6 @@ impl RSAPrivateKey {
     /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
     /// let private_key = RSAPrivateKey::from_pkcs1(&der_bytes).expect("failed to parse key");
     /// ```
-    #[cfg(feature = "std")]
     pub fn from_pkcs1(der: &[u8]) -> Result<RSAPrivateKey> {
         crate::parse::parse_private_key_pkcs1(der)
     }
@@ -449,7 +446,6 @@ impl RSAPrivateKey {
     /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
     /// let private_key = RSAPrivateKey::from_pkcs8(&der_bytes).expect("failed to parse key");
     /// ```
-    #[cfg(feature = "std")]
     pub fn from_pkcs8(der: &[u8]) -> Result<RSAPrivateKey> {
         crate::parse::parse_private_key_pkcs8(der)
     }

@@ -106,7 +106,6 @@ mod encode;
 mod key;
 #[cfg(feature = "alloc")]
 mod oaep;
-#[cfg(feature = "std")]
 mod parse;
 #[cfg(feature = "alloc")]
 mod pkcs1v15;
