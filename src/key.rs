@@ -103,19 +103,19 @@ impl Deref for RsaPrivateKey {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct PrecomputedValues {
+pub struct PrecomputedValues {
     /// D mod (P-1)
-    pub(crate) dp: BigUint,
+    pub dp: BigUint,
     /// D mod (Q-1)
-    pub(crate) dq: BigUint,
+    pub dq: BigUint,
     /// Q^-1 mod P
-    pub(crate) qinv: BigInt,
+    pub qinv: BigInt,
 
     /// CRTValues is used for the 3rd and subsequent primes. Due to a
     /// historical accident, the CRT for the first two primes is handled
     /// differently in PKCS#1 and interoperability is sufficiently
     /// important that we mirror this.
-    pub(crate) crt_values: Vec<CRTValue>,
+    pub crt_values: Vec<CRTValue>,
 }
 
 impl Zeroize for PrecomputedValues {
@@ -138,13 +138,13 @@ impl Drop for PrecomputedValues {
 
 /// Contains the precomputed Chinese remainder theorem values.
 #[derive(Debug, Clone)]
-pub(crate) struct CRTValue {
+pub struct CRTValue {
     /// D mod (prime - 1)
-    pub(crate) exp: BigInt,
+    pub exp: BigInt,
     /// R·Coeff ≡ 1 mod Prime.
-    pub(crate) coeff: BigInt,
+    pub coeff: BigInt,
     /// product of primes prior to this (inc p and q)
-    pub(crate) r: BigInt,
+    pub r: BigInt,
 }
 
 impl Zeroize for CRTValue {
@@ -332,9 +332,9 @@ impl RsaPrivateKey {
     }
 
     /// Performs some calculations to speed up private key operations.
-    pub fn precompute(&mut self) -> Result<()> {
-        if self.precomputed.is_some() {
-            return Ok(());
+    pub fn precompute(&mut self) -> Result<PrecomputedValues> {
+        if let Some(p) = self.precomputed.clone() {
+            return Ok(p);
         }
 
         let dp = &self.d % (&self.primes[0] - BigUint::one());
@@ -367,14 +367,15 @@ impl RsaPrivateKey {
             values
         };
 
-        self.precomputed = Some(PrecomputedValues {
+        let p = PrecomputedValues {
             dp,
             dq,
             qinv,
             crt_values,
-        });
+        };
+        self.precomputed = Some(p.clone());
 
-        Ok(())
+        Ok(p)
     }
 
     /// Clears precomputed values by setting to None
