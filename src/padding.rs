@@ -16,6 +16,7 @@ pub enum PaddingScheme {
     /// Encryption and Decryption using OAEP padding.
     OAEP {
         digest: Box<dyn DynDigest>,
+        mgf_digest: Box<dyn DynDigest>,
         label: Option<String>,
     },
     /// Sign and Verify using PSS padding.
@@ -54,16 +55,32 @@ impl PaddingScheme {
         PaddingScheme::PKCS1v15Sign { hash }
     }
 
-    pub fn new_oaep<T: 'static + Digest + DynDigest>() -> Self {
+    pub fn new_oaep_with_mgf_hash<T: 'static + Digest + DynDigest, U: 'static + Digest + DynDigest>() -> Self {
         PaddingScheme::OAEP {
             digest: Box::new(T::new()),
+            mgf_digest: Box::new(U::new()),
+            label: None,
+        }
+    }
+    pub fn new_oaep<T: 'static + Digest + DynDigest>() -> Self {
+         PaddingScheme::OAEP {
+            digest: Box::new(T::new()),
+            mgf_digest: Box::new(T::new()),
             label: None,
         }
     }
 
-    pub fn new_oaep_with_label<T: 'static + Digest + DynDigest, S: AsRef<str>>(label: S) -> Self {
+    pub fn new_oaep_with_mgf_hash_with_label<T: 'static + Digest + DynDigest, U: 'static + Digest + DynDigest,  S: AsRef<str>>(label: S) -> Self {
         PaddingScheme::OAEP {
             digest: Box::new(T::new()),
+            mgf_digest: Box::new(U::new()),
+            label: Some(label.as_ref().to_string()),
+        }
+    }
+     pub fn new_oaep_with_label<T: 'static + Digest + DynDigest,  S: AsRef<str>>(label: S) -> Self {
+        PaddingScheme::OAEP {
+            digest: Box::new(T::new()),
+            mgf_digest: Box::new(T::new()),
             label: Some(label.as_ref().to_string()),
         }
     }
