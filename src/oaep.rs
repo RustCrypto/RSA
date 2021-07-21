@@ -15,7 +15,7 @@ use crate::key::{self, PrivateKey, PublicKey};
 const MAX_LABEL_LEN: u64 = 2_305_843_009_213_693_951;
 
 /// Encrypts the given message with RSA and the padding
-/// scheme from PKCS#1 OAEP.  The message must be no longer than the
+/// scheme from [PKCS#1 OAEP](https://datatracker.ietf.org/doc/html/rfc3447#section-7.1.1).  The message must be no longer than the
 /// length of the public modulus minus (2+ 2*hash.size()).
 #[inline]
 pub fn encrypt<R: Rng, K: PublicKey>(
@@ -62,7 +62,7 @@ pub fn encrypt<R: Rng, K: PublicKey>(
     pub_key.raw_encryption_primitive(&em, pub_key.size())
 }
 
-/// Decrypts a plaintext using RSA and the padding scheme from pkcs1# OAEP
+/// Decrypts a plaintext using RSA and the padding scheme from [pkcs1# OAEP](https://datatracker.ietf.org/doc/html/rfc3447#section-7.1.2)
 /// If an `rng` is passed, it uses RSA blinding to avoid timing side-channel attacks.
 ///
 /// Note that whether this function returns an error or not discloses secret
