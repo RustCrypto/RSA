@@ -191,8 +191,8 @@ impl PublicKey for RSAPublicKey {
     fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15Encrypt => pkcs1v15::encrypt(rng, self, msg),
-            PaddingScheme::OAEP { mut digest, label } => {
-                oaep::encrypt(rng, self, msg, &mut *digest, label)
+            PaddingScheme::OAEP { mut digest, mut mgf_digest, label } => {
+                oaep::encrypt(rng, self, msg, &mut *digest, &mut *mgf_digest, label)
             }
             _ => Err(Error::InvalidPaddingScheme),
         }
@@ -561,8 +561,8 @@ impl RSAPrivateKey {
             PaddingScheme::PKCS1v15Encrypt => {
                 pkcs1v15::decrypt::<StdRng, _>(None, self, ciphertext)
             }
-            PaddingScheme::OAEP { mut digest, label } => {
-                oaep::decrypt::<StdRng, _>(None, self, ciphertext, &mut *digest, label)
+            PaddingScheme::OAEP { mut digest,mut mgf_digest, label } => {
+                oaep::decrypt::<StdRng, _>(None, self, ciphertext, &mut *digest, &mut *mgf_digest, label)
             }
             _ => Err(Error::InvalidPaddingScheme),
         }
@@ -579,8 +579,8 @@ impl RSAPrivateKey {
     ) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15Encrypt => pkcs1v15::decrypt(Some(rng), self, ciphertext),
-            PaddingScheme::OAEP { mut digest, label } => {
-                oaep::decrypt(Some(rng), self, ciphertext, &mut *digest, label)
+            PaddingScheme::OAEP { mut digest, mut mgf_digest, label } => {
+                oaep::decrypt(Some(rng), self, ciphertext, &mut *digest, &mut *mgf_digest, label)
             }
             _ => Err(Error::InvalidPaddingScheme),
         }
@@ -909,6 +909,15 @@ mod tests {
         do_test_encrypt_decrypt_oaep::<Sha3_256>(&priv_key);
         do_test_encrypt_decrypt_oaep::<Sha3_384>(&priv_key);
         do_test_encrypt_decrypt_oaep::<Sha3_512>(&priv_key);
+
+        do_test_oaep_with_different_hashes::<Sha1,Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes::<Sha224, Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes::<Sha256, Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes::<Sha384,Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes::<Sha512,Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes::<Sha3_256,Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes::<Sha3_384,Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes::<Sha3_512,Sha1>(&priv_key);
     }
 
     fn do_test_encrypt_decrypt_oaep<D: 'static + Digest + DynDigest>(prk: &RSAPrivateKey) {
@@ -958,6 +967,52 @@ mod tests {
         }
     }
 
+    fn do_test_oaep_with_different_hashes<D: 'static + Digest + DynDigest,U: 'static + Digest + DynDigest>(prk: &RSAPrivateKey) {
+        let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        let mut rng = StdRng::seed_from_u64(seed.as_secs());
+
+        let k = prk.size();
+
+        for i in 1..8 {
+            let mut input: Vec<u8> = (0..i * 8).map(|_| rng.gen()).collect();
+            if input.len() > k - 11 {
+                input = input[0..k - 11].to_vec();
+            }
+            let has_label: bool = rng.gen();
+            let label: Option<String> = if has_label {
+                Some(rng.clone().sample_iter(&Alphanumeric).take(30).map(char::from).collect())
+            } else {
+                None
+            };
+
+            let pub_key: RSAPublicKey = prk.into();
+
+            let ciphertext = if let Some(ref label) = label {
+                let padding = PaddingScheme::new_oaep_with_mgf_hash_with_label::<D,U, _>(label);
+                pub_key.encrypt(&mut rng, padding, &input).unwrap()
+            } else {
+                let padding = PaddingScheme::new_oaep_with_mgf_hash::<D, U>();
+                pub_key.encrypt(&mut rng, padding, &input).unwrap()
+            };
+
+            assert_ne!(input, ciphertext);
+            let blind: bool = rng.gen();
+
+            let padding = if let Some(ref label) = label {
+                PaddingScheme::new_oaep_with_mgf_hash_with_label::<D,U, _>(label)
+            } else {
+                PaddingScheme::new_oaep_with_mgf_hash::<D, U>()
+            };
+
+            let plaintext = if blind {
+                prk.decrypt(padding, &ciphertext).unwrap()
+            } else {
+                prk.decrypt_blinded(&mut rng, padding, &ciphertext).unwrap()
+            };
+
+            assert_eq!(input, plaintext);
+        }
+    }
     #[test]
     fn test_decrypt_oaep_invalid_hash() {
         let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
