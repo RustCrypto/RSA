@@ -93,7 +93,6 @@ impl PaddingScheme {
     }
 
     /// Create a new OAEP `PaddingScheme`, using `T` as the hash function for both the default (empty) label and for MGF1.
-    /// Further, the same hash function is used for the MGF1 mask generation function.
     ///
     /// # Example
     /// ```
