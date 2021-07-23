@@ -14,15 +14,15 @@ pub enum PaddingScheme {
     /// Sign and Verify using PKCS1v15 padding.
     PKCS1v15Sign { hash: Option<Hash> },
     /// Encryption and Decryption using [OAEP padding](https://datatracker.ietf.org/doc/html/rfc3447#section-7.1.1).
-    /// The OAEP padding scheme relays on a hash function `digest`, which fixes the output length of the various
-    /// padding blocks and hence fixes the max length of the plain-text to be `m = n - 2 * h_len - 2`, where `n` is the size of the 
-    /// modulus of the public key. Further, if a label is specified, it represents the hash function used to hash the label.
-    /// On the other hand, to prevent chosen plain-text attacks, a mask generation function is used. For OAEP this 
-    /// is [MGF1](https://datatracker.ietf.org/doc/html/rfc2437#section-10.2.1), which is a mask generation function
-    /// based on a hash function `mgf_digest`. 
-    /// 
-    /// The two hash functions can, but don't need to be the same. A prominent example is the `AndroidKeyStore`, which
-    /// uses a OAEP padding with `digest` being SHA-256 _but_ `mgf_digest` being SHA-1.
+    ///
+    /// - `digest` is used to hash the label. The maximum possible plaintext length is `m = k - 2 * h_len - 2`,
+    /// where `k` is the size of the RSA modulus.
+    /// - `mgf_digest` specifies the hash function that is used in the [MGF1](https://datatracker.ietf.org/doc/html/rfc2437#section-10.2.1).
+    /// - `label` is optional data that can be associated with the message.
+    ///
+    /// The two hash functions can, but don't need to be the same.
+    /// A prominent example is the [`AndroidKeyStore`](https://developer.android.com/guide/topics/security/cryptography#oaep-mgf1-digest).
+    /// It uses SHA-1 for `mgf_digest` and a user-chosen SHA flavour for `digest`.
     OAEP {
         digest: Box<dyn DynDigest>,
         mgf_digest: Box<dyn DynDigest>,
@@ -64,16 +64,16 @@ impl PaddingScheme {
         PaddingScheme::PKCS1v15Sign { hash }
     }
 
-    /// Create a new OAEP `PaddingScheme`, using `T` for the OAEP hash function, and `U` for the MGF1 hash function.
+    /// Create a new OAEP `PaddingScheme`, using `T` as the hash function for the default (empty) label, and `U` as the hash function for MGF1.
     /// If a label is needed use `PaddingScheme::new_oaep_with_label` or `PaddingScheme::new_oaep_with_mgf_hash_with_label`.
-    /// 
+    ///
     /// # Example
     /// ```
     ///     use sha1::Sha1;
     ///     use sha2::Sha256;
     ///     use rand::rngs::OsRng;
     ///     use rsa::{BigUint, RSAPublicKey, PaddingScheme, PublicKey};
-
+    ///
     ///     let n = base64::decode("ALHgDoZmBQIx+jTmgeeHW6KsPOrj11f6CvWsiRleJlQpW77AwSZhd21ZDmlTKfaIHBSUxRUsuYNh7E2SHx8rkFVCQA2/gXkZ5GK2IUbzSTio9qXA25MWHvVxjMfKSL8ZAxZyKbrG94FLLszFAFOaiLLY8ECs7g+dXOriYtBwLUJK+lppbd+El+8ZA/zH0bk7vbqph5pIoiWggxwdq3mEz4LnrUln7r6dagSQzYErKewY8GADVpXcq5mfHC1xF2DFBub7bFjMVM5fHq7RK+pG5xjNDiYITbhLYrbVv3X0z75OvN0dY49ITWjM7xyvMWJXVJS7sJlgmCCL6RwWgP8PhcE=").unwrap();
     ///     let e = base64::decode("AQAB").unwrap();
     ///     
@@ -92,9 +92,9 @@ impl PaddingScheme {
         }
     }
 
-    /// Create a new OAEP `PaddingScheme` with the specified hash function.
+    /// Create a new OAEP `PaddingScheme`, using `T` as the hash function for both the default (empty) label and for MGF1.
     /// Further, the same hash function is used for the MGF1 mask generation function.
-    /// 
+    ///
     /// # Example
     /// ```
     ///     use sha1::Sha1;
@@ -117,9 +117,7 @@ impl PaddingScheme {
         }
     }
 
-    /// Create a new OAEP `PaddingScheme`, with `T` being the OAEP hash function and `U`
-    /// being the hash function used for the MGF1 mask generation function. Note that `T`
-    /// is also used to hash the label.
+    /// Create a new OAEP `PaddingScheme` with an associated `label`, using `T` as the hash function for the label, and `U` as the hash function for MGF1.
     pub fn new_oaep_with_mgf_hash_with_label<
         T: 'static + Digest + DynDigest,
         U: 'static + Digest + DynDigest,
@@ -134,9 +132,7 @@ impl PaddingScheme {
         }
     }
 
-    /// Create a new OAEP `PaddingScheme` with the specified hash function.
-    /// The _same_ hash function will be used for hashing the label as well as
-    /// for the mask generation function.
+    /// Create a new OAEP `PaddingScheme` with an associated `label`, using `T` as the hash function for both the label and for MGF1.
     pub fn new_oaep_with_label<T: 'static + Digest + DynDigest, S: AsRef<str>>(label: S) -> Self {
         PaddingScheme::OAEP {
             digest: Box::new(T::new()),
