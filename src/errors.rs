@@ -1,9 +1,8 @@
-use alloc::string::String;
-
 pub type Result<T> = core::result::Result<T, Error>;
 
 /// Error types
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     InvalidPaddingScheme,
     Decryption,
@@ -18,8 +17,8 @@ pub enum Error {
     InvalidCoefficient,
     PublicExponentTooSmall,
     PublicExponentTooLarge,
-    ParseError { reason: String },
-    EncodeError { reason: String },
+    Pkcs1(pkcs1::Error),
+    Pkcs8(pkcs8::Error),
     Internal,
     LabelTooLong,
 }
@@ -44,10 +43,22 @@ impl core::fmt::Display for Error {
             Error::InvalidCoefficient => write!(f, "invalid coefficient"),
             Error::PublicExponentTooSmall => write!(f, "public exponent too small"),
             Error::PublicExponentTooLarge => write!(f, "public exponent too large"),
-            Error::ParseError { reason } => write!(f, "parse error: {}", reason),
-            Error::EncodeError { reason } => write!(f, "encoding error: {}", reason),
+            Error::Pkcs1(err) => write!(f, "{}", err),
+            Error::Pkcs8(err) => write!(f, "{}", err),
             Error::Internal => write!(f, "internal error"),
             Error::LabelTooLong => write!(f, "label too long"),
         }
+    }
+}
+
+impl From<pkcs1::Error> for Error {
+    fn from(err: pkcs1::Error) -> Error {
+        Error::Pkcs1(err)
+    }
+}
+
+impl From<pkcs8::Error> for Error {
+    fn from(err: pkcs8::Error) -> Error {
+        Error::Pkcs8(err)
     }
 }
