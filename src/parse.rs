@@ -2,7 +2,7 @@ use crate::{
     errors::{Error, Result},
     RSAPrivateKey, RSAPublicKey,
 };
-use simple_asn1::{ASN1Block, ASN1DecodeErr, BigUint, OID};
+use simple_asn1::{ASN1Block, ASN1DecodeErr, OID};
 
 use alloc::format;
 use alloc::string::ToString;

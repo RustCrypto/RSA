@@ -64,19 +64,6 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-#[macro_use]
-extern crate lazy_static;
-
-#[cfg(feature = "serde")]
-extern crate serde_crate;
-
-#[cfg(test)]
-extern crate base64;
-#[cfg(test)]
-extern crate hex;
-#[cfg(all(test, feature = "serde"))]
-extern crate serde_test;
-
 #[cfg(feature = "alloc")]
 pub use num_bigint::BigUint;
 
