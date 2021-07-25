@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use core::ops::Deref;
+use lazy_static::lazy_static;
 use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
