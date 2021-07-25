@@ -240,9 +240,9 @@ mod test {
 
     use num_bigint::BigUint;
     use num_traits::{FromPrimitive, Num};
+    use rand::{rngs::StdRng, SeedableRng};
     use sha1::{Digest, Sha1};
     use std::time::SystemTime;
-    use rand::{SeedableRng, rngs::StdRng};
 
     fn get_private_key() -> RSAPrivateKey {
         // In order to generate new test vectors you'll need the PEM form of this key:
@@ -280,14 +280,12 @@ mod test {
             let digest = Sha1::digest(test[0].as_bytes()).to_vec();
             let sig = hex::decode(test[1]).unwrap();
 
-            let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+            let seed = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap();
             let rng = StdRng::seed_from_u64(seed.as_secs());
             pub_key
-                .verify(
-                    PaddingScheme::new_pss::<Sha1, _>(rng),
-                    &digest,
-                    &sig,
-                )
+                .verify(PaddingScheme::new_pss::<Sha1, _>(rng), &digest, &sig)
                 .expect("failed to verify");
         }
     }
@@ -298,7 +296,9 @@ mod test {
 
         let tests = ["test\n"];
 
-        let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        let seed = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
         let rng = StdRng::seed_from_u64(seed.as_secs());
 
         for test in &tests {

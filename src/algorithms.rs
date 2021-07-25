@@ -1,11 +1,11 @@
+use alloc::vec;
 use digest::DynDigest;
 use num_bigint::traits::ModInverse;
 use num_bigint::{BigUint, RandPrime};
-use num_traits::{FromPrimitive, One, Zero};
 #[allow(unused_imports)]
 use num_traits::Float;
+use num_traits::{FromPrimitive, One, Zero};
 use rand::Rng;
-use alloc::vec;
 
 use crate::errors::{Error, Result};
 use crate::key::RSAPrivateKey;

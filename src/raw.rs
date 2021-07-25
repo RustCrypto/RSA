@@ -1,7 +1,7 @@
+use alloc::vec::Vec;
 use num_bigint::BigUint;
 use rand::Rng;
 use zeroize::Zeroize;
-use alloc::vec::Vec;
 
 use crate::errors::{Error, Result};
 use crate::internals;
