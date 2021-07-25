@@ -35,7 +35,9 @@ impl core::fmt::Display for Error {
             Error::MessageTooLong => write!(f, "message too long"),
             Error::InputNotHashed => write!(f, "input must be hashed"),
             Error::NprimesTooSmall => write!(f, "nprimes must be >= 2"),
-            Error::TooFewPrimes => write!(f, "too few primes of given length to generate an RSA key"),
+            Error::TooFewPrimes => {
+                write!(f, "too few primes of given length to generate an RSA key")
+            }
             Error::InvalidPrime => write!(f, "invalid prime value"),
             Error::InvalidModulus => write!(f, "invalid modulus"),
             Error::InvalidExponent => write!(f, "invalid exponent"),

@@ -1,6 +1,6 @@
-use core::fmt;
-use alloc::string::{String, ToString};
 use alloc::boxed::Box;
+use alloc::string::{String, ToString};
+use core::fmt;
 
 use digest::{Digest, DynDigest};
 use rand::RngCore;

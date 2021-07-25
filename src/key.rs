@@ -1,3 +1,5 @@
+use alloc::vec::Vec;
+use core::ops::Deref;
 use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
@@ -5,9 +7,7 @@ use num_traits::{FromPrimitive, One};
 use rand::{rngs::StdRng, Rng};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
-use core::ops::Deref;
 use zeroize::Zeroize;
-use alloc::vec::Vec;
 
 use crate::algorithms::{generate_multi_prime_key, generate_multi_prime_key_with_exp};
 use crate::errors::{Error, Result};
@@ -658,13 +658,13 @@ mod tests {
     use super::*;
     use crate::internals;
 
-    use std::time::SystemTime;
     use digest::{Digest, DynDigest};
     use num_traits::{FromPrimitive, ToPrimitive};
     use rand::{distributions::Alphanumeric, rngs::StdRng, SeedableRng};
     use sha1::Sha1;
     use sha2::{Sha224, Sha256, Sha384, Sha512};
     use sha3::{Sha3_256, Sha3_384, Sha3_512};
+    use std::time::SystemTime;
 
     #[test]
     fn test_from_into() {
@@ -697,7 +697,9 @@ mod tests {
         let m2 = internals::decrypt::<StdRng>(None, &private_key, &c)
             .expect("unable to decrypt without blinding");
         assert_eq!(m, m2);
-        let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        let seed = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
         let mut rng = StdRng::seed_from_u64(seed.as_secs());
         let m3 = internals::decrypt(Some(&mut rng), &private_key, &c)
             .expect("unable to decrypt with blinding");
@@ -708,7 +710,9 @@ mod tests {
         ($name:ident, $multi:expr, $size:expr) => {
             #[test]
             fn $name() {
-                let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+                let seed = SystemTime::now()
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap();
                 let mut rng = StdRng::seed_from_u64(seed.as_secs());
 
                 for _ in 0..10 {
@@ -739,7 +743,9 @@ mod tests {
     #[test]
     fn test_impossible_keys() {
         // make sure not infinite loops are hit here.
-        let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        let seed = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
         let mut rng = StdRng::seed_from_u64(seed.as_secs());
         for i in 0..32 {
             let _ = RSAPrivateKey::new(&mut rng, i).is_err();
@@ -912,7 +918,9 @@ mod tests {
     }
 
     fn do_test_encrypt_decrypt_oaep<D: 'static + Digest + DynDigest>(prk: &RSAPrivateKey) {
-        let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        let seed = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
         let mut rng = StdRng::seed_from_u64(seed.as_secs());
 
         let k = prk.size();
@@ -924,7 +932,13 @@ mod tests {
             }
             let has_label: bool = rng.gen();
             let label: Option<String> = if has_label {
-                Some(rng.clone().sample_iter(&Alphanumeric).take(30).map(char::from).collect())
+                Some(
+                    rng.clone()
+                        .sample_iter(&Alphanumeric)
+                        .take(30)
+                        .map(char::from)
+                        .collect(),
+                )
             } else {
                 None
             };
@@ -960,7 +974,9 @@ mod tests {
 
     #[test]
     fn test_decrypt_oaep_invalid_hash() {
-        let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        let seed = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
         let mut rng = StdRng::seed_from_u64(seed.as_secs());
         let priv_key = get_private_key();
         let pub_key: RSAPublicKey = (&priv_key).into();

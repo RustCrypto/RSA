@@ -1,7 +1,7 @@
-use rand::Rng;
-use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use alloc::vec;
 use alloc::vec::Vec;
+use rand::Rng;
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 use crate::errors::{Error, Result};
 use crate::hash::Hash;
@@ -217,7 +217,7 @@ mod tests {
     use num_bigint::BigUint;
     use num_traits::FromPrimitive;
     use num_traits::Num;
-    use rand::{SeedableRng, rngs::StdRng};
+    use rand::{rngs::StdRng, SeedableRng};
     use sha1::{Digest, Sha1};
     use std::time::SystemTime;
 
@@ -226,7 +226,9 @@ mod tests {
     #[test]
     fn test_non_zero_bytes() {
         for _ in 0..10 {
-            let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+            let seed = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap();
             let mut rng = StdRng::seed_from_u64(seed.as_secs());
             let mut b = vec![0u8; 512];
             non_zero_random_bytes(&mut rng, &mut b);
@@ -290,7 +292,9 @@ mod tests {
 
     #[test]
     fn test_encrypt_decrypt_pkcs1v15() {
-        let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+        let seed = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap();
         let mut rng = StdRng::seed_from_u64(seed.as_secs());
         let priv_key = get_private_key();
         let k = priv_key.size();
@@ -329,7 +333,9 @@ mod tests {
             assert_ne!(out, digest);
             assert_eq!(out, expected);
 
-            let seed = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).unwrap();
+            let seed = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap();
             let mut rng = StdRng::seed_from_u64(seed.as_secs());
             let out2 = priv_key
                 .sign_blinded(
