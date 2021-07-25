@@ -15,7 +15,7 @@ use crate::key::{self, PrivateKey, PublicKey};
 const MAX_LABEL_LEN: u64 = 2_305_843_009_213_693_951;
 
 /// Encrypts the given message with RSA and the padding
-/// scheme from PKCS#1 OAEP.  The message must be no longer than the
+/// scheme from [PKCS#1 OAEP](https://datatracker.ietf.org/doc/html/rfc3447#section-7.1.1).  The message must be no longer than the
 /// length of the public modulus minus (2+ 2*hash.size()).
 #[inline]
 pub fn encrypt<R: Rng, K: PublicKey>(
@@ -23,6 +23,7 @@ pub fn encrypt<R: Rng, K: PublicKey>(
     pub_key: &K,
     msg: &[u8],
     digest: &mut dyn DynDigest,
+    mgf_digest: &mut dyn DynDigest,
     label: Option<String>,
 ) -> Result<Vec<u8>> {
     key::check_public(pub_key)?;
@@ -55,13 +56,13 @@ pub fn encrypt<R: Rng, K: PublicKey>(
     db[db_len - msg.len() - 1] = 1;
     db[db_len - msg.len()..].copy_from_slice(msg);
 
-    mgf1_xor(db, digest, seed);
-    mgf1_xor(seed, digest, db);
+    mgf1_xor(db, mgf_digest, seed);
+    mgf1_xor(seed, mgf_digest, db);
 
     pub_key.raw_encryption_primitive(&em, pub_key.size())
 }
 
-/// Decrypts a plaintext using RSA and the padding scheme from pkcs1# OAEP
+/// Decrypts a plaintext using RSA and the padding scheme from [pkcs1# OAEP](https://datatracker.ietf.org/doc/html/rfc3447#section-7.1.2)
 /// If an `rng` is passed, it uses RSA blinding to avoid timing side-channel attacks.
 ///
 /// Note that whether this function returns an error or not discloses secret
@@ -75,11 +76,12 @@ pub fn decrypt<R: Rng, SK: PrivateKey>(
     priv_key: &SK,
     ciphertext: &[u8],
     digest: &mut dyn DynDigest,
+    mgf_digest: &mut dyn DynDigest,
     label: Option<String>,
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
-    let res = decrypt_inner(rng, priv_key, ciphertext, digest, label)?;
+    let res = decrypt_inner(rng, priv_key, ciphertext, digest, mgf_digest, label)?;
     if res.is_none().into() {
         return Err(Error::Decryption);
     }
@@ -98,6 +100,7 @@ fn decrypt_inner<R: Rng, SK: PrivateKey>(
     priv_key: &SK,
     ciphertext: &[u8],
     digest: &mut dyn DynDigest,
+    mgf_digest: &mut dyn DynDigest,
     label: Option<String>,
 ) -> Result<CtOption<(Vec<u8>, u32)>> {
     let k = priv_key.size();
@@ -127,8 +130,8 @@ fn decrypt_inner<R: Rng, SK: PrivateKey>(
     let (_, payload) = em.split_at_mut(1);
     let (seed, db) = payload.split_at_mut(h_size);
 
-    mgf1_xor(seed, digest, db);
-    mgf1_xor(db, digest, seed);
+    mgf1_xor(seed, mgf_digest, db);
+    mgf1_xor(db, mgf_digest, seed);
 
     let hash_are_equal = db[0..h_size].ct_eq(expected_p_hash);
 
