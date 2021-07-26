@@ -220,76 +220,6 @@ impl RSAPublicKey {
 
         Ok(k)
     }
-
-    /// Parse a `PKCS1` encoded RSA Public Key.
-    ///
-    /// The `der` data is expected to be the `base64` decoded content
-    /// following a `-----BEGIN RSA PUBLIC KEY-----` header.
-    ///
-    /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use rsa::RSAPublicKey;
-    ///
-    /// # // openssl rsa -pubin -in tiny_key.pub.pem -RSAPublicKey_out
-    /// let file_content = r#"
-    /// -----BEGIN RSA PUBLIC KEY-----
-    /// MEgCQQCuWe45NapeQ6rkb5T5hYMgQwr3T0NE9rItqDwFJjcNmf6m9kq/wRAaFqWo
-    /// BX/BpdSuD0YqSUrnQ5ejf1XW9gmJAgMBAAE=
-    /// -----END RSA PUBLIC KEY-----
-    /// "#;
-    ///
-    /// let der_encoded = file_content
-    ///     .lines()
-    ///     .filter(|line| !line.starts_with("-"))
-    ///     .fold(String::new(), |mut data, line| {
-    ///         data.push_str(&line);
-    ///         data
-    ///     });
-    /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
-    /// let public_key = RSAPublicKey::from_pkcs1(&der_bytes).expect("failed to parse key");
-    /// ```
-    #[cfg(feature = "std")]
-    pub fn from_pkcs1(der: &[u8]) -> Result<RSAPublicKey> {
-        crate::parse::parse_public_key_pkcs1(der)
-    }
-
-    /// Parse a `PKCS8` encoded RSA Public Key.
-    ///
-    /// The `der` data is expected to be the `base64` decoded content
-    /// following a `-----BEGIN PUBLIC KEY-----` header.
-    ///
-    /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use rsa::RSAPublicKey;
-    ///
-    /// # // openssl rsa -in tiny_key.pem -outform PEM -pubout -out tiny_key.pub.pem
-    /// let file_content = r#"
-    /// -----BEGIN PUBLIC KEY-----
-    /// MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBAK5Z7jk1ql5DquRvlPmFgyBDCvdPQ0T2
-    /// si2oPAUmNw2Z/qb2Sr/BEBoWpagFf8Gl1K4PRipJSudDl6N/Vdb2CYkCAwEAAQ==
-    /// -----END PUBLIC KEY-----
-    /// "#;
-    ///
-    /// let der_encoded = file_content
-    ///     .lines()
-    ///     .filter(|line| !line.starts_with("-"))
-    ///     .fold(String::new(), |mut data, line| {
-    ///         data.push_str(&line);
-    ///         data
-    ///     });
-    /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
-    /// let public_key = RSAPublicKey::from_pkcs8(&der_bytes).expect("failed to parse key");
-    /// ```
-    #[cfg(feature = "std")]
-    pub fn from_pkcs8(der: &[u8]) -> Result<RSAPublicKey> {
-        crate::parse::parse_public_key_pkcs8(der)
-    }
 }
 
 impl<'a> PublicKeyParts for &'a RSAPublicKey {
@@ -374,87 +304,6 @@ impl RSAPrivateKey {
         let _ = k.precompute();
 
         k
-    }
-
-    /// Parse a `PKCS1` encoded RSA Private Key.
-    ///
-    /// The `der` data is expected to be the `base64` decoded content
-    /// following a `-----BEGIN RSA PRIVATE KEY-----` header.
-    ///
-    /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use rsa::RSAPrivateKey;
-    ///
-    /// # // openssl genrsa -out tiny_key.pem 512
-    /// let file_content = r#"
-    /// -----BEGIN RSA PRIVATE KEY-----
-    /// MIIBOwIBAAJBAK5Z7jk1ql5DquRvlPmFgyBDCvdPQ0T2si2oPAUmNw2Z/qb2Sr/B
-    /// EBoWpagFf8Gl1K4PRipJSudDl6N/Vdb2CYkCAwEAAQJBAI3vWCfqsE8c9zoQPE8F
-    /// icHx0jOSq0ixLExO8M2gVqESq3SJpWbEbvPPbRb1sIqZHe5wV3Xmj09zvUzfdeB7
-    /// C6ECIQDjoB/kp7QlRiNhgudhQPct8XUf6Cgp7hBxL2K9Q9UzawIhAMQVvtH1TUOd
-    /// aSWiqrFx7w+54o58fIpkecI5Kl0TaWfbAiBrnye1Kn2IKhNMZWIUn2y+8izYeyGS
-    /// QZbQjQD4T3wcJQIgKGgWv2teNZ29ai0AIbrJuaLjhdsvStFzqctf6Hg0k1sCIQCj
-    /// JdwDGF7Kanex70KAacmOlw3vfx6XWT+2PH6Qh8tLug==
-    /// -----END RSA PRIVATE KEY-----
-    /// "#;
-    ///
-    /// let der_encoded = file_content
-    ///     .lines()
-    ///     .filter(|line| !line.starts_with("-"))
-    ///     .fold(String::new(), |mut data, line| {
-    ///         data.push_str(&line);
-    ///         data
-    ///     });
-    /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
-    /// let private_key = RSAPrivateKey::from_pkcs1(&der_bytes).expect("failed to parse key");
-    /// ```
-    #[cfg(feature = "std")]
-    pub fn from_pkcs1(der: &[u8]) -> Result<RSAPrivateKey> {
-        crate::parse::parse_private_key_pkcs1(der)
-    }
-
-    /// Parse a `PKCS8` encoded RSA Private Key.
-    ///
-    /// The `der` data is expected to be the `base64` decoded content
-    /// following a `-----BEGIN PRIVATE KEY-----` header.
-    ///
-    /// <https://tls.mbed.org/kb/cryptography/asn1-key-structures-in-der-and-pem>
-    ///
-    /// # Example
-    ///
-    /// ```
-    /// use rsa::RSAPrivateKey;
-    ///
-    /// # // openssl pkcs8 -topk8 -inform PEM -outform PEM -in tiny_key.pem -out tiny_key.pkcs8.pem -nocrypt
-    /// let file_content = r#"
-    /// -----BEGIN PRIVATE KEY-----
-    /// MIIBVQIBADANBgkqhkiG9w0BAQEFAASCAT8wggE7AgEAAkEArlnuOTWqXkOq5G+U
-    /// +YWDIEMK909DRPayLag8BSY3DZn+pvZKv8EQGhalqAV/waXUrg9GKklK50OXo39V
-    /// 1vYJiQIDAQABAkEAje9YJ+qwTxz3OhA8TwWJwfHSM5KrSLEsTE7wzaBWoRKrdIml
-    /// ZsRu889tFvWwipkd7nBXdeaPT3O9TN914HsLoQIhAOOgH+SntCVGI2GC52FA9y3x
-    /// dR/oKCnuEHEvYr1D1TNrAiEAxBW+0fVNQ51pJaKqsXHvD7nijnx8imR5wjkqXRNp
-    /// Z9sCIGufJ7UqfYgqE0xlYhSfbL7yLNh7IZJBltCNAPhPfBwlAiAoaBa/a141nb1q
-    /// LQAhusm5ouOF2y9K0XOpy1/oeDSTWwIhAKMl3AMYXspqd7HvQoBpyY6XDe9/HpdZ
-    /// P7Y8fpCHy0u6
-    /// -----END PRIVATE KEY-----
-    /// "#;
-    ///
-    /// let der_encoded = file_content
-    ///     .lines()
-    ///     .filter(|line| !line.starts_with("-"))
-    ///     .fold(String::new(), |mut data, line| {
-    ///         data.push_str(&line);
-    ///         data
-    ///     });
-    /// let der_bytes = base64::decode(&der_encoded).expect("failed to decode base64 content");
-    /// let private_key = RSAPrivateKey::from_pkcs8(&der_bytes).expect("failed to parse key");
-    /// ```
-    #[cfg(feature = "std")]
-    pub fn from_pkcs8(der: &[u8]) -> Result<RSAPrivateKey> {
-        crate::parse::parse_private_key_pkcs8(der)
     }
 
     /// Get the public key from the private key, cloning `n` and `e`.
@@ -679,6 +528,7 @@ mod tests {
     use super::*;
     use crate::internals;
 
+    use alloc::string::String;
     use digest::{Digest, DynDigest};
     use num_traits::{FromPrimitive, ToPrimitive};
     use rand::{distributions::Alphanumeric, rngs::StdRng, SeedableRng};
