@@ -5,7 +5,7 @@
 //!
 //! Using PKCS1v15.
 //! ```
-//! use rsa::{PublicKey, RSAPrivateKey, RSAPublicKey, PaddingScheme};
+//! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
 //! # /*
 //! use rand::rngs::OsRng;
 //! let mut rng = OsRng;
@@ -13,8 +13,8 @@
 //! # use rand::{SeedableRng, rngs::StdRng};
 //! # let mut rng = rand::rngs::StdRng::seed_from_u64(0);
 //! let bits = 2048;
-//! let private_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
-//! let public_key = RSAPublicKey::from(&private_key);
+//! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+//! let public_key = RsaPublicKey::from(&private_key);
 //!
 //! // Encrypt
 //! let data = b"hello world";
@@ -30,7 +30,7 @@
 //!
 //! Using OAEP.
 //! ```
-//! use rsa::{PublicKey, RSAPrivateKey, RSAPublicKey, PaddingScheme};
+//! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
 //! # /*
 //! use rand::rngs::OsRng;
 //! let mut rng = OsRng;
@@ -39,8 +39,8 @@
 //! # let mut rng = rand::rngs::StdRng::seed_from_u64(0);
 //!
 //! let bits = 2048;
-//! let private_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
-//! let public_key = RSAPublicKey::from(&private_key);
+//! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+//! let public_key = RsaPublicKey::from(&private_key);
 //!
 //! // Encrypt
 //! let data = b"hello world";
@@ -68,8 +68,8 @@
 //!
 //! Most modern applications use the newer PKCS#8 format instead (see below).
 //!
-//! The following traits can be used to decode/encode [`RSAPrivateKey`] and
-//! [`RSAPublicKey`] as PKCS#1. Note that [`pkcs1`] is re-exported from the
+//! The following traits can be used to decode/encode [`RsaPrivateKey`] and
+//! [`RsaPublicKey`] as PKCS#1. Note that [`pkcs1`] is re-exported from the
 //! toplevel of the `rsa` crate:
 //!
 //! - [`pkcs1::FromRsaPrivateKey`]: decode RSA private keys from PKCS#1
@@ -83,7 +83,7 @@
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # #[cfg(feature = "pem")]
 //! # {
-//! use rsa::{RSAPublicKey, pkcs1::FromRsaPublicKey};
+//! use rsa::{RsaPublicKey, pkcs1::FromRsaPublicKey};
 //!
 //! let pem = "-----BEGIN RSA PUBLIC KEY-----
 //! MIIBCgKCAQEAtsQsUV8QpqrygsY+2+JCQ6Fw8/omM71IM2N/R8pPbzbgOl0p78MZ
@@ -94,7 +94,7 @@
 //! cFjqJbE/Xilcvqxt6DirjFCvYeKYl1uHLwIDAQAB
 //! -----END RSA PUBLIC KEY-----";
 //!
-//! let public_key = RSAPublicKey::from_pkcs1_pem(pem)?;
+//! let public_key = RsaPublicKey::from_pkcs1_pem(pem)?;
 //! # }
 //! # Ok(())
 //! # }
@@ -112,8 +112,8 @@
 //! -----BEGIN PRIVATE KEY-----
 //! ```
 //!
-//! The following traits can be used to decode/encode [`RSAPrivateKey`] and
-//! [`RSAPublicKey`] as PKCS#8. Note that [`pkcs8`] is re-exported from the
+//! The following traits can be used to decode/encode [`RsaPrivateKey`] and
+//! [`RsaPublicKey`] as PKCS#8. Note that [`pkcs8`] is re-exported from the
 //! toplevel of the `rsa` crate:
 //!
 //! - [`pkcs8::FromPrivateKey`]: decode private keys from PKCS#8
@@ -127,7 +127,7 @@
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # #[cfg(feature = "pem")]
 //! # {
-//! use rsa::{RSAPublicKey, pkcs8::FromPublicKey};
+//! use rsa::{RsaPublicKey, pkcs8::FromPublicKey};
 //!
 //! let pem = "-----BEGIN PUBLIC KEY-----
 //! MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtsQsUV8QpqrygsY+2+JC
@@ -139,7 +139,7 @@
 //! LwIDAQAB
 //! -----END PUBLIC KEY-----";
 //!
-//! let public_key = RSAPublicKey::from_public_key_pem(pem)?;
+//! let public_key = RsaPublicKey::from_public_key_pem(pem)?;
 //! # }
 //! # Ok(())
 //! # }
@@ -204,7 +204,7 @@ pub use pkcs8;
 #[cfg(feature = "alloc")]
 pub use self::hash::Hash;
 #[cfg(feature = "alloc")]
-pub use self::key::{PublicKey, PublicKeyParts, RSAPrivateKey, RSAPublicKey};
+pub use self::key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 #[cfg(feature = "alloc")]
 pub use self::padding::PaddingScheme;
 

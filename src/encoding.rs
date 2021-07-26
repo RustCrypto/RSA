@@ -1,6 +1,6 @@
 //! PKCS#1 encoding support
 
-use crate::{key::PublicKeyParts, BigUint, RSAPrivateKey, RSAPublicKey};
+use crate::{key::PublicKeyParts, BigUint, RsaPrivateKey, RsaPublicKey};
 use num_bigint::ModInverse;
 use pkcs1::{
     FromRsaPrivateKey, FromRsaPublicKey, RsaPrivateKeyDocument, RsaPublicKeyDocument,
@@ -8,7 +8,7 @@ use pkcs1::{
 };
 use zeroize::Zeroizing;
 
-impl FromRsaPrivateKey for RSAPrivateKey {
+impl FromRsaPrivateKey for RsaPrivateKey {
     fn from_pkcs1_private_key(pkcs1_key: pkcs1::RsaPrivateKey<'_>) -> pkcs1::Result<Self> {
         let n = BigUint::from_bytes_be(pkcs1_key.modulus.as_bytes());
         let e = BigUint::from_bytes_be(pkcs1_key.public_exponent.as_bytes());
@@ -16,19 +16,19 @@ impl FromRsaPrivateKey for RSAPrivateKey {
         let prime1 = BigUint::from_bytes_be(pkcs1_key.prime1.as_bytes());
         let prime2 = BigUint::from_bytes_be(pkcs1_key.prime2.as_bytes());
         let primes = vec![prime1, prime2];
-        Ok(RSAPrivateKey::from_components(n, e, d, primes))
+        Ok(RsaPrivateKey::from_components(n, e, d, primes))
     }
 }
 
-impl FromRsaPublicKey for RSAPublicKey {
+impl FromRsaPublicKey for RsaPublicKey {
     fn from_pkcs1_public_key(pkcs1_key: pkcs1::RsaPublicKey<'_>) -> pkcs1::Result<Self> {
         let n = BigUint::from_bytes_be(pkcs1_key.modulus.as_bytes());
         let e = BigUint::from_bytes_be(pkcs1_key.public_exponent.as_bytes());
-        RSAPublicKey::new(n, e).map_err(|_| pkcs1::Error::Crypto)
+        RsaPublicKey::new(n, e).map_err(|_| pkcs1::Error::Crypto)
     }
 }
 
-impl ToRsaPrivateKey for RSAPrivateKey {
+impl ToRsaPrivateKey for RsaPrivateKey {
     fn to_pkcs1_der(&self) -> pkcs1::Result<RsaPrivateKeyDocument> {
         // Check if the key is multi prime
         if self.primes.len() > 2 {
@@ -65,7 +65,7 @@ impl ToRsaPrivateKey for RSAPrivateKey {
     }
 }
 
-impl ToRsaPublicKey for RSAPublicKey {
+impl ToRsaPublicKey for RsaPublicKey {
     fn to_pkcs1_der(&self) -> pkcs1::Result<RsaPublicKeyDocument> {
         let modulus = self.n().to_bytes_be();
         let public_exponent = self.e().to_bytes_be();

@@ -7,7 +7,7 @@ use rand::Rng;
 use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
-use crate::key::{PublicKeyParts, RSAPrivateKey};
+use crate::key::{PublicKeyParts, RsaPrivateKey};
 
 /// Raw RSA encryption of m with the public key. No padding is performed.
 #[inline]
@@ -20,7 +20,7 @@ pub fn encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> BigUint {
 #[inline]
 pub fn decrypt<R: Rng>(
     mut rng: Option<&mut R>,
-    priv_key: &RSAPrivateKey,
+    priv_key: &RsaPrivateKey,
     c: &BigUint,
 ) -> Result<BigUint> {
     if c >= priv_key.n() {
@@ -110,7 +110,7 @@ pub fn decrypt<R: Rng>(
 #[inline]
 pub fn decrypt_and_check<R: Rng>(
     rng: Option<&mut R>,
-    priv_key: &RSAPrivateKey,
+    priv_key: &RsaPrivateKey,
     c: &BigUint,
 ) -> Result<BigUint> {
     let m = decrypt(rng, priv_key, c)?;
