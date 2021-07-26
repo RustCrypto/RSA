@@ -45,7 +45,7 @@ pub trait PrivateKey: DecryptionPrimitive + PublicKeyParts {}
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate")
 )]
-pub struct RSAPublicKey {
+pub struct RsaPublicKey {
     n: BigUint,
     e: BigUint,
 }
@@ -57,9 +57,9 @@ pub struct RSAPublicKey {
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate")
 )]
-pub struct RSAPrivateKey {
+pub struct RsaPrivateKey {
     /// Public components of the private key.
-    pubkey_components: RSAPublicKey,
+    pubkey_components: RsaPublicKey,
     /// Private exponent
     pub(crate) d: BigUint,
     /// Prime factors of N, contains >= 2 elements.
@@ -69,18 +69,18 @@ pub struct RSAPrivateKey {
     pub(crate) precomputed: Option<PrecomputedValues>,
 }
 
-impl PartialEq for RSAPrivateKey {
+impl PartialEq for RsaPrivateKey {
     #[inline]
-    fn eq(&self, other: &RSAPrivateKey) -> bool {
+    fn eq(&self, other: &RsaPrivateKey) -> bool {
         self.pubkey_components == other.pubkey_components
             && self.d == other.d
             && self.primes == other.primes
     }
 }
 
-impl Eq for RSAPrivateKey {}
+impl Eq for RsaPrivateKey {}
 
-impl Zeroize for RSAPrivateKey {
+impl Zeroize for RsaPrivateKey {
     fn zeroize(&mut self) {
         self.d.zeroize();
         for prime in self.primes.iter_mut() {
@@ -93,15 +93,15 @@ impl Zeroize for RSAPrivateKey {
     }
 }
 
-impl Drop for RSAPrivateKey {
+impl Drop for RsaPrivateKey {
     fn drop(&mut self) {
         self.zeroize();
     }
 }
 
-impl Deref for RSAPrivateKey {
-    type Target = RSAPublicKey;
-    fn deref(&self) -> &RSAPublicKey {
+impl Deref for RsaPrivateKey {
+    type Target = RsaPublicKey;
+    fn deref(&self) -> &RsaPublicKey {
         &self.pubkey_components
     }
 }
@@ -151,18 +151,18 @@ pub(crate) struct CRTValue {
     pub(crate) r: BigInt,
 }
 
-impl From<RSAPrivateKey> for RSAPublicKey {
-    fn from(private_key: RSAPrivateKey) -> Self {
+impl From<RsaPrivateKey> for RsaPublicKey {
+    fn from(private_key: RsaPrivateKey) -> Self {
         (&private_key).into()
     }
 }
 
-impl From<&RSAPrivateKey> for RSAPublicKey {
-    fn from(private_key: &RSAPrivateKey) -> Self {
+impl From<&RsaPrivateKey> for RsaPublicKey {
+    fn from(private_key: &RsaPrivateKey) -> Self {
         let n = private_key.n.clone();
         let e = private_key.e.clone();
 
-        RSAPublicKey { n, e }
+        RsaPublicKey { n, e }
     }
 }
 
@@ -178,7 +178,7 @@ pub trait PublicKey: EncryptionPrimitive + PublicKeyParts {
     fn verify(&self, padding: PaddingScheme, hashed: &[u8], sig: &[u8]) -> Result<()>;
 }
 
-impl PublicKeyParts for RSAPublicKey {
+impl PublicKeyParts for RsaPublicKey {
     fn n(&self) -> &BigUint {
         &self.n
     }
@@ -188,7 +188,7 @@ impl PublicKeyParts for RSAPublicKey {
     }
 }
 
-impl PublicKey for RSAPublicKey {
+impl PublicKey for RsaPublicKey {
     fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15Encrypt => pkcs1v15::encrypt(rng, self, msg),
@@ -212,17 +212,17 @@ impl PublicKey for RSAPublicKey {
     }
 }
 
-impl RSAPublicKey {
+impl RsaPublicKey {
     /// Create a new key from its components.
     pub fn new(n: BigUint, e: BigUint) -> Result<Self> {
-        let k = RSAPublicKey { n, e };
+        let k = RsaPublicKey { n, e };
         check_public(&k)?;
 
         Ok(k)
     }
 }
 
-impl<'a> PublicKeyParts for &'a RSAPublicKey {
+impl<'a> PublicKeyParts for &'a RsaPublicKey {
     /// Returns the modulus of the key.
     fn n(&self) -> &BigUint {
         &self.n
@@ -234,7 +234,7 @@ impl<'a> PublicKeyParts for &'a RSAPublicKey {
     }
 }
 
-impl<'a> PublicKey for &'a RSAPublicKey {
+impl<'a> PublicKey for &'a RsaPublicKey {
     fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
         (*self).encrypt(rng, padding, msg)
     }
@@ -244,7 +244,7 @@ impl<'a> PublicKey for &'a RSAPublicKey {
     }
 }
 
-impl PublicKeyParts for RSAPrivateKey {
+impl PublicKeyParts for RsaPrivateKey {
     fn n(&self) -> &BigUint {
         &self.n
     }
@@ -254,9 +254,9 @@ impl PublicKeyParts for RSAPrivateKey {
     }
 }
 
-impl PrivateKey for RSAPrivateKey {}
+impl PrivateKey for RsaPrivateKey {}
 
-impl<'a> PublicKeyParts for &'a RSAPrivateKey {
+impl<'a> PublicKeyParts for &'a RsaPrivateKey {
     fn n(&self) -> &BigUint {
         &self.n
     }
@@ -266,23 +266,23 @@ impl<'a> PublicKeyParts for &'a RSAPrivateKey {
     }
 }
 
-impl<'a> PrivateKey for &'a RSAPrivateKey {}
+impl<'a> PrivateKey for &'a RsaPrivateKey {}
 
-impl RSAPrivateKey {
-    /// Generate a new RSA key pair of the given bit size using the passed in `rng`.
-    pub fn new<R: Rng>(rng: &mut R, bit_size: usize) -> Result<RSAPrivateKey> {
+impl RsaPrivateKey {
+    /// Generate a new Rsa key pair of the given bit size using the passed in `rng`.
+    pub fn new<R: Rng>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
         generate_multi_prime_key(rng, 2, bit_size)
     }
 
     /// Generate a new RSA key pair of the given bit size and the public exponent
     /// using the passed in `rng`.
     ///
-    /// Unless you have specific needs, you should use `RSAPrivateKey::new` instead.
+    /// Unless you have specific needs, you should use `RsaPrivateKey::new` instead.
     pub fn new_with_exp<R: Rng>(
         rng: &mut R,
         bit_size: usize,
         exp: &BigUint,
-    ) -> Result<RSAPrivateKey> {
+    ) -> Result<RsaPrivateKey> {
         generate_multi_prime_key_with_exp(rng, 2, bit_size, exp)
     }
 
@@ -292,9 +292,9 @@ impl RSAPrivateKey {
         e: BigUint,
         d: BigUint,
         primes: Vec<BigUint>,
-    ) -> RSAPrivateKey {
-        let mut k = RSAPrivateKey {
-            pubkey_components: RSAPublicKey { n, e },
+    ) -> RsaPrivateKey {
+        let mut k = RsaPrivateKey {
+            pubkey_components: RsaPublicKey { n, e },
             d,
             primes,
             precomputed: None,
@@ -308,11 +308,11 @@ impl RSAPrivateKey {
 
     /// Get the public key from the private key, cloning `n` and `e`.
     ///
-    /// Generally this is not needed since `RSAPrivateKey` implements the `PublicKey` trait,
+    /// Generally this is not needed since `RsaPrivateKey` implements the `PublicKey` trait,
     /// but it can occationally be useful to discard the private information entirely.
-    pub fn to_public_key(&self) -> RSAPublicKey {
+    pub fn to_public_key(&self) -> RsaPublicKey {
         // Safe to unwrap since n and e are already verified.
-        RSAPublicKey::new(self.n().clone(), self.e().clone()).unwrap()
+        RsaPublicKey::new(self.n().clone(), self.e().clone()).unwrap()
     }
 
     /// Performs some calculations to speed up private key operations.
@@ -539,8 +539,8 @@ mod tests {
 
     #[test]
     fn test_from_into() {
-        let private_key = RSAPrivateKey {
-            pubkey_components: RSAPublicKey {
+        let private_key = RsaPrivateKey {
+            pubkey_components: RsaPublicKey {
                 n: BigUint::from_u64(100).unwrap(),
                 e: BigUint::from_u64(200).unwrap(),
             },
@@ -548,13 +548,13 @@ mod tests {
             primes: vec![],
             precomputed: None,
         };
-        let public_key: RSAPublicKey = private_key.into();
+        let public_key: RsaPublicKey = private_key.into();
 
         assert_eq!(public_key.n().to_u64(), Some(100));
         assert_eq!(public_key.e().to_u64(), Some(200));
     }
 
-    fn test_key_basics(private_key: &RSAPrivateKey) {
+    fn test_key_basics(private_key: &RsaPrivateKey) {
         private_key.validate().expect("invalid private key");
 
         assert!(
@@ -562,7 +562,7 @@ mod tests {
             "private exponent too large"
         );
 
-        let pub_key: RSAPublicKey = private_key.clone().into();
+        let pub_key: RsaPublicKey = private_key.clone().into();
         let m = BigUint::from_u64(42).expect("invalid 42");
         let c = internals::encrypt(&pub_key, &m);
         let m2 = internals::decrypt::<StdRng>(None, &private_key, &c)
@@ -588,7 +588,7 @@ mod tests {
 
                 for _ in 0..10 {
                     let private_key = if $multi == 2 {
-                        RSAPrivateKey::new(&mut rng, $size).expect("failed to generate key")
+                        RsaPrivateKey::new(&mut rng, $size).expect("failed to generate key")
                     } else {
                         generate_multi_prime_key(&mut rng, $multi, $size).unwrap()
                     };
@@ -619,7 +619,7 @@ mod tests {
             .unwrap();
         let mut rng = StdRng::seed_from_u64(seed.as_secs());
         for i in 0..32 {
-            let _ = RSAPrivateKey::new(&mut rng, i).is_err();
+            let _ = RsaPrivateKey::new(&mut rng, i).is_err();
             let _ = generate_multi_prime_key(&mut rng, 3, i);
             let _ = generate_multi_prime_key(&mut rng, 4, i);
             let _ = generate_multi_prime_key(&mut rng, 5, i);
@@ -628,7 +628,7 @@ mod tests {
 
     #[test]
     fn test_negative_decryption_value() {
-        let private_key = RSAPrivateKey::from_components(
+        let private_key = RsaPrivateKey::from_components(
             BigUint::from_bytes_le(&vec![
                 99, 192, 208, 179, 0, 220, 7, 29, 49, 151, 75, 107, 75, 73, 200, 180,
             ]),
@@ -655,16 +655,16 @@ mod tests {
         use serde_test::{assert_tokens, Token};
 
         let mut rng = XorShiftRng::from_seed([1; 16]);
-        let priv_key = RSAPrivateKey::new(&mut rng, 64).expect("failed to generate key");
+        let priv_key = RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
 
         let priv_tokens = [
             Token::Struct {
-                name: "RSAPrivateKey",
+                name: "RsaPrivateKey",
                 len: 3,
             },
             Token::Str("pubkey_components"),
             Token::Struct {
-                name: "RSAPublicKey",
+                name: "RsaPublicKey",
                 len: 2,
             },
             Token::Str("n"),
@@ -697,7 +697,7 @@ mod tests {
 
         let priv_tokens = [
             Token::Struct {
-                name: "RSAPublicKey",
+                name: "RsaPublicKey",
                 len: 2,
             },
             Token::Str("n"),
@@ -711,7 +711,7 @@ mod tests {
             Token::SeqEnd,
             Token::StructEnd,
         ];
-        assert_tokens(&RSAPublicKey::from(priv_key), &priv_tokens);
+        assert_tokens(&RsaPublicKey::from(priv_key), &priv_tokens);
     }
 
     #[test]
@@ -727,7 +727,7 @@ mod tests {
             base64::decode("CUWC+hRWOT421kwRllgVjy6FYv6jQUcgDNHeAiYZnf5HjS9iK2ki7v8G5dL/0f+Yf+NhE/4q8w4m8go51hACrVpP1p8GJDjiT09+RsOzITsHwl+ceEKoe56ZW6iDHBLlrNw5/MtcYhKpjNU9KJ2udm5J/c9iislcjgckrZG2IB8ADgXHMEByZ5DgaMl4AKZ1Gx8/q6KftTvmOT5rNTMLi76VN5KWQcDWK/DqXiOiZHM7Nr4dX4me3XeRgABJyNR8Fqxj3N1+HrYLe/zs7LOaK0++F9Ul3tLelhrhsvLxei3oCZkF9A/foD3on3luYA+1cRcxWpSY3h2J4/22+yo4+Q==").unwrap(),
         ];
 
-        RSAPrivateKey::from_components(
+        RsaPrivateKey::from_components(
             BigUint::from_bytes_be(&n),
             BigUint::from_bytes_be(&e),
             BigUint::from_bytes_be(&d),
@@ -735,7 +735,7 @@ mod tests {
         );
     }
 
-    fn get_private_key() -> RSAPrivateKey {
+    fn get_private_key() -> RsaPrivateKey {
         // -----BEGIN RSA PRIVATE KEY-----
         // MIIEpAIBAAKCAQEA05e4TZikwmE47RtpWoEG6tkdVTvwYEG2LT/cUKBB4iK49FKW
         // icG4LF5xVU9d1p+i9LYVjPDb61eBGg/DJ+HyjnT+dNO8Fmweq9wbi1e5NMqL5bAL
@@ -764,7 +764,7 @@ mod tests {
         // BoB0er/UmDm4Ly/97EO9A0PKMOE5YbMq9s3t3RlWcsdrU7dvw+p2+A==
         // -----END RSA PRIVATE KEY-----
 
-        RSAPrivateKey::from_components(
+        RsaPrivateKey::from_components(
             BigUint::parse_bytes(b"00d397b84d98a4c26138ed1b695a8106ead91d553bf06041b62d3fdc50a041e222b8f4529689c1b82c5e71554f5dd69fa2f4b6158cf0dbeb57811a0fc327e1f28e74fe74d3bc166c1eabdc1b8b57b934ca8be5b00b4f29975bcc99acaf415b59bb28a6782bb41a2c3c2976b3c18dbadef62f00c6bb226640095096c0cc60d22fe7ef987d75c6a81b10d96bf292028af110dc7cc1bbc43d22adab379a0cd5d8078cc780ff5cd6209dea34c922cf784f7717e428d75b5aec8ff30e5f0141510766e2e0ab8d473c84e8710b2b98227c3db095337ad3452f19e2b9bfbccdd8148abf6776fa552775e6e75956e45229ae5a9c46949bab1e622f0e48f56524a84ed3483b", 16).unwrap(),
             BigUint::from_u64(65537).unwrap(),
             BigUint::parse_bytes(b"00c4e70c689162c94c660828191b52b4d8392115df486a9adbe831e458d73958320dc1b755456e93701e9702d76fb0b92f90e01d1fe248153281fe79aa9763a92fae69d8d7ecd144de29fa135bd14f9573e349e45031e3b76982f583003826c552e89a397c1a06bd2163488630d92e8c2bb643d7abef700da95d685c941489a46f54b5316f62b5d2c3a7f1bbd134cb37353a44683fdc9d95d36458de22f6c44057fe74a0a436c4308f73f4da42f35c47ac16a7138d483afc91e41dc3a1127382e0c0f5119b0221b4fc639d6b9c38177a6de9b526ebd88c38d7982c07f98a0efd877d508aae275b946915c02e2e1106d175d74ec6777f5e80d12c053d9c7be1e341", 16).unwrap(),
@@ -797,7 +797,7 @@ mod tests {
         do_test_oaep_with_different_hashes::<Sha3_512, Sha1>(&priv_key);
     }
 
-    fn do_test_encrypt_decrypt_oaep<D: 'static + Digest + DynDigest>(prk: &RSAPrivateKey) {
+    fn do_test_encrypt_decrypt_oaep<D: 'static + Digest + DynDigest>(prk: &RsaPrivateKey) {
         let seed = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap();
@@ -823,7 +823,7 @@ mod tests {
                 None
             };
 
-            let pub_key: RSAPublicKey = prk.into();
+            let pub_key: RsaPublicKey = prk.into();
 
             let ciphertext = if let Some(ref label) = label {
                 let padding = PaddingScheme::new_oaep_with_label::<D, _>(label);
@@ -856,7 +856,7 @@ mod tests {
         D: 'static + Digest + DynDigest,
         U: 'static + Digest + DynDigest,
     >(
-        prk: &RSAPrivateKey,
+        prk: &RsaPrivateKey,
     ) {
         let seed = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
@@ -883,7 +883,7 @@ mod tests {
                 None
             };
 
-            let pub_key: RSAPublicKey = prk.into();
+            let pub_key: RsaPublicKey = prk.into();
 
             let ciphertext = if let Some(ref label) = label {
                 let padding = PaddingScheme::new_oaep_with_mgf_hash_with_label::<D, U, _>(label);
@@ -918,7 +918,7 @@ mod tests {
             .unwrap();
         let mut rng = StdRng::seed_from_u64(seed.as_secs());
         let priv_key = get_private_key();
-        let pub_key: RSAPublicKey = (&priv_key).into();
+        let pub_key: RsaPublicKey = (&priv_key).into();
         let ciphertext = pub_key
             .encrypt(
                 &mut rng,

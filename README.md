@@ -14,13 +14,13 @@ A portable RSA implementation in pure Rust.
 ## Example
 
 ```rust
-use rsa::{PublicKey, RSAPrivateKey, PaddingScheme};
+use rsa::{PublicKey, RsaPrivateKey, PaddingScheme};
 use rand::rngs::OsRng;
 
 let mut rng = OsRng;
 let bits = 2048;
-let priv_key = RSAPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
-let pub_key = RSAPublicKey::from(&priv_key);
+let priv_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+let pub_key = RsaPublicKey::from(&priv_key);
 
 // Encrypt
 let data = b"hello world";
@@ -32,7 +32,7 @@ let dec_data = priv_key.decrypt(PaddingScheme::new_pkcs1v15(), &enc_data).expect
 assert_eq!(&data[..], &dec_data[..]);
 ```
 
-> **Note:** If you encounter unusually slow key generation time while using `RSAPrivateKey::new` you can try to compile in release mode or add the following to your `Cargo.toml`. Key generation is much faster when building with higher optimization levels, but this will increase the compile time a bit.
+> **Note:** If you encounter unusually slow key generation time while using `RsaPrivateKey::new` you can try to compile in release mode or add the following to your `Cargo.toml`. Key generation is much faster when building with higher optimization levels, but this will increase the compile time a bit.
 > ```toml
 > [profile.debug]
 > opt-level = 3

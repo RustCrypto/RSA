@@ -236,7 +236,7 @@ fn emsa_pss_verify(
 
 #[cfg(test)]
 mod test {
-    use crate::{PaddingScheme, PublicKey, RSAPrivateKey, RSAPublicKey};
+    use crate::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 
     use num_bigint::BigUint;
     use num_traits::{FromPrimitive, Num};
@@ -244,7 +244,7 @@ mod test {
     use sha1::{Digest, Sha1};
     use std::time::SystemTime;
 
-    fn get_private_key() -> RSAPrivateKey {
+    fn get_private_key() -> RsaPrivateKey {
         // In order to generate new test vectors you'll need the PEM form of this key:
         // -----BEGIN RSA PRIVATE KEY-----
         // MIIBOgIBAAJBALKZD0nEffqM1ACuak0bijtqE2QrI/KLADv7l3kK3ppMyCuLKoF0
@@ -256,7 +256,7 @@ mod test {
         // tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         // -----END RSA PRIVATE KEY-----
 
-        RSAPrivateKey::from_components(
+        RsaPrivateKey::from_components(
             BigUint::from_str_radix("9353930466774385905609975137998169297361893554149986716853295022578535724979677252958524466350471210367835187480748268864277464700638583474144061408845077", 10).unwrap(),
             BigUint::from_u64(65537).unwrap(),
             BigUint::from_str_radix("7266398431328116344057699379749222532279343923819063639497049039389899328538543087657733766554155839834519529439851673014800261285757759040931985506583861", 10).unwrap(),
@@ -274,7 +274,7 @@ mod test {
         let tests = [[
             "test\n", "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
         ]];
-        let pub_key: RSAPublicKey = priv_key.into();
+        let pub_key: RsaPublicKey = priv_key.into();
 
         for test in &tests {
             let digest = Sha1::digest(test[0].as_bytes()).to_vec();

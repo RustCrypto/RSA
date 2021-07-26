@@ -5,7 +5,7 @@ use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
 use crate::internals;
-use crate::key::{RSAPrivateKey, RSAPublicKey};
+use crate::key::{RsaPrivateKey, RsaPublicKey};
 
 pub trait EncryptionPrimitive {
     /// Do NOT use directly! Only for implementors.
@@ -22,7 +22,7 @@ pub trait DecryptionPrimitive {
     ) -> Result<Vec<u8>>;
 }
 
-impl EncryptionPrimitive for RSAPublicKey {
+impl EncryptionPrimitive for RsaPublicKey {
     fn raw_encryption_primitive(&self, plaintext: &[u8], pad_size: usize) -> Result<Vec<u8>> {
         let mut m = BigUint::from_bytes_be(plaintext);
         let mut c = internals::encrypt(self, &m);
@@ -42,13 +42,13 @@ impl EncryptionPrimitive for RSAPublicKey {
     }
 }
 
-impl<'a> EncryptionPrimitive for &'a RSAPublicKey {
+impl<'a> EncryptionPrimitive for &'a RsaPublicKey {
     fn raw_encryption_primitive(&self, plaintext: &[u8], pad_size: usize) -> Result<Vec<u8>> {
         (*self).raw_encryption_primitive(plaintext, pad_size)
     }
 }
 
-impl DecryptionPrimitive for RSAPrivateKey {
+impl DecryptionPrimitive for RsaPrivateKey {
     fn raw_decryption_primitive<R: Rng>(
         &self,
         rng: Option<&mut R>,
@@ -69,7 +69,7 @@ impl DecryptionPrimitive for RSAPrivateKey {
     }
 }
 
-impl<'a> DecryptionPrimitive for &'a RSAPrivateKey {
+impl<'a> DecryptionPrimitive for &'a RsaPrivateKey {
     fn raw_decryption_primitive<R: Rng>(
         &self,
         rng: Option<&mut R>,

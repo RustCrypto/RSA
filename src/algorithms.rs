@@ -8,7 +8,7 @@ use num_traits::{FromPrimitive, One, Zero};
 use rand::Rng;
 
 use crate::errors::{Error, Result};
-use crate::key::RSAPrivateKey;
+use crate::key::RsaPrivateKey;
 
 /// Default exponent for RSA keys.
 const EXP: u64 = 65537;
@@ -32,7 +32,7 @@ pub fn generate_multi_prime_key<R: Rng>(
     rng: &mut R,
     nprimes: usize,
     bit_size: usize,
-) -> Result<RSAPrivateKey> {
+) -> Result<RsaPrivateKey> {
     let exp = BigUint::from_u64(EXP).expect("invalid static exponent");
     generate_multi_prime_key_with_exp(rng, nprimes, bit_size, &exp)
 }
@@ -53,7 +53,7 @@ pub fn generate_multi_prime_key_with_exp<R: Rng>(
     nprimes: usize,
     bit_size: usize,
     exp: &BigUint,
-) -> Result<RSAPrivateKey> {
+) -> Result<RsaPrivateKey> {
     if nprimes < 2 {
         return Err(Error::NprimesTooSmall);
     }
@@ -131,7 +131,7 @@ pub fn generate_multi_prime_key_with_exp<R: Rng>(
         }
     }
 
-    Ok(RSAPrivateKey::from_components(
+    Ok(RsaPrivateKey::from_components(
         n_final,
         exp.clone(),
         d_final,
