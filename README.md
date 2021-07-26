@@ -32,6 +32,12 @@ let dec_data = priv_key.decrypt(PaddingScheme::new_pkcs1v15(), &enc_data).expect
 assert_eq!(&data[..], &dec_data[..]);
 ```
 
+> **Note:** If you encounter unusually slow key generation time while using `RSAPrivateKey::new` you can try to compile in release mode or add the following to your `Cargo.toml`. Key generation is much faster when building with higher optimization levels, but this will increase the compile time a bit.
+> ```
+> [profile.debug]
+> opt-level = 3
+> ```
+
 ## Status
 
 Currently at Phase 1 (v) :construction:.
