@@ -9,7 +9,7 @@
 
 A portable RSA implementation in pure Rust.
 
-:warning: **WARNING:** This crate has been audited by a 3rd party, but a full blog post with the results and the updates made since the audit has not been officially released yet. See [#60](https://github.com/RustCrypto/RSA/issues/60) for more information.
+⚠️ **WARNING:** This crate has been audited by a 3rd party, but a full blog post with the results and the updates made since the audit has not been officially released yet. See [#60](https://github.com/RustCrypto/RSA/issues/60) for more information.
 
 ## Example
 
@@ -47,24 +47,24 @@ assert_eq!(&data[..], &dec_data[..]);
 
 ## Status
 
-Currently at Phase 1 (v) :construction:.
+Currently at Phase 1 (v) 🚧
 
-There will be three phases before `1.0` :ship: can be released.
+There will be three phases before `1.0` 🚢 can be released.
 
-1. :construction:  Make it work
-    - [x] Prime generation :white_check_mark:
-    - [x] Key generation :white_check_mark:
-    - [x] PKCS1v1.5: Encryption & Decryption :white_check_mark:
-    - [x] PKCS1v1.5: Sign & Verify :white_check_mark:
+1. 🚧  Make it work
+    - [x] Prime generation ✅
+    - [x] Key generation ✅
+    - [x] PKCS1v1.5: Encryption & Decryption ✅
+    - [x] PKCS1v1.5: Sign & Verify ✅
     - [ ] PKCS1v1.5 (session key): Encryption & Decryption
     - [x] OAEP: Encryption & Decryption
     - [x] PSS: Sign & Verify
     - [x] Key import & export
-2. :rocket: Make it fast
-    - [x] Benchmarks :white_check_mark:
-    - [ ] compare to other implementations :construction:
-    - [ ] optimize :construction:
-3. :lock: Make it secure
+2. 🚀 Make it fast
+    - [x] Benchmarks ✅
+    - [ ] compare to other implementations 🚧
+    - [ ] optimize 🚧
+3. 🔐 Make it secure
     - [ ] Fuzz testing
     - [ ] Security Audits
 
