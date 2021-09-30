@@ -39,7 +39,7 @@ pub trait PublicKeyParts {
 pub trait PrivateKey: DecryptionPrimitive + PublicKeyParts {}
 
 /// Represents the public part of an RSA key.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
