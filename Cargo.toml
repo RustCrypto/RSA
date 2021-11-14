@@ -63,6 +63,7 @@ std = ["alloc", "digest/std", "pkcs1/std", "pkcs8/std", "rand/std"]
 alloc = ["digest/alloc", "pkcs1/alloc", "pkcs8/alloc", "pkcs8/pkcs1"]
 pem = ["alloc", "pkcs1/pem", "pkcs8/pem"]
 pkcs5 = ["pkcs8/encryption"]
+sha1 = ["pkcs8/sha1"]
 
 [package.metadata.docs.rs]
 features = ["std", "pem", "serde"]
