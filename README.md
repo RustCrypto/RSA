@@ -14,7 +14,7 @@ A portable RSA implementation in pure Rust.
 ## Example
 
 ```rust
-use rsa::{PublicKey, RsaPrivateKey, PaddingScheme};
+use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
 use rand::rngs::OsRng;
 
 let mut rng = OsRng;
