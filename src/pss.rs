@@ -124,7 +124,7 @@ fn emsa_pss_encode(
     // 9.  Let dbMask = MGF(H, emLen - hLen - 1).
     //
     // 10. Let maskedDB = DB \xor dbMask.
-    mgf1_xor(db, hash, &h);
+    mgf1_xor(db, hash, h);
 
     // 11. Set the leftmost 8 * em_len - em_bits bits of the leftmost octet in
     //     maskedDB to zero.

@@ -86,7 +86,7 @@ pub fn sign<R: Rng, SK: PrivateKey>(
     em[0] = 0;
     em[1] = 1;
     em[k - t_len - 1] = 0;
-    em[k - t_len..k - hash_len].copy_from_slice(&prefix);
+    em[k - t_len..k - hash_len].copy_from_slice(prefix);
     em[k - hash_len..k].copy_from_slice(hashed);
 
     priv_key.raw_decryption_primitive(rng, &em, priv_key.size())
@@ -114,7 +114,7 @@ pub fn verify<PK: PublicKey>(
     let mut ok = em[0].ct_eq(&0u8);
     ok &= em[1].ct_eq(&1u8);
     ok &= em[k - hash_len..k].ct_eq(hashed);
-    ok &= em[k - t_len..k - hash_len].ct_eq(&prefix);
+    ok &= em[k - t_len..k - hash_len].ct_eq(prefix);
     ok &= em[k - t_len - 1].ct_eq(&0u8);
 
     for el in em.iter().skip(2).take(k - t_len - 3) {
