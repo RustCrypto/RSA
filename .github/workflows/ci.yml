@@ -62,8 +62,8 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           use-cross: true
-          command: build --examples --all
-          args: --target ${{ matrix.target }} --verbose ${{ matrix.args }}
+          command: build 
+          args: --examples --all --target ${{ matrix.target }} --verbose ${{ matrix.args }}
 
       - name: Test
         uses: actions-rs/cargo@v1
