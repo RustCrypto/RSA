@@ -1,10 +1,9 @@
 use alloc::vec::Vec;
 use core::ops::Deref;
-use lazy_static::lazy_static;
 use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
-use num_traits::{FromPrimitive, One};
+use num_traits::{One, ToPrimitive};
 use rand::{rngs::StdRng, Rng};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
@@ -17,10 +16,8 @@ use crate::padding::PaddingScheme;
 use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
 use crate::{oaep, pkcs1v15, pss};
 
-lazy_static! {
-    static ref MIN_PUB_EXPONENT: BigUint = BigUint::from_u64(2).unwrap();
-    static ref MAX_PUB_EXPONENT: BigUint = BigUint::from_u64(1 << (31 - 1)).unwrap();
-}
+static MIN_PUB_EXPONENT: u64 = 2;
+static MAX_PUB_EXPONENT: u64 = 1 << (31 - 1);
 
 pub trait PublicKeyParts {
     /// Returns the modulus of the key.
@@ -512,11 +509,13 @@ impl RsaPrivateKey {
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
 pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
-    if public_key.e() < &*MIN_PUB_EXPONENT {
+    let public_key = public_key.e().to_u64().ok_or(Error::PublicExponentTooLarge)?;
+
+    if public_key < MIN_PUB_EXPONENT {
         return Err(Error::PublicExponentTooSmall);
     }
 
-    if public_key.e() > &*MAX_PUB_EXPONENT {
+    if public_key > MAX_PUB_EXPONENT {
         return Err(Error::PublicExponentTooLarge);
     }
 
