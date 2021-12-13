@@ -358,6 +358,11 @@ impl RsaPrivateKey {
         Ok(())
     }
 
+    /// Clears precomputed values by setting to None
+    pub fn clear_precomputed(&mut self) {
+        self.precomputed = None;
+    }
+
     /// Returns the private exponent of the key.
     pub fn d(&self) -> &BigUint {
         &self.d
