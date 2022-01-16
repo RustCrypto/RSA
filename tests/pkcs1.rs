@@ -4,7 +4,7 @@
 
 use hex_literal::hex;
 use rsa::{
-    pkcs1::{FromRsaPrivateKey, FromRsaPublicKey, ToRsaPrivateKey, ToRsaPublicKey},
+    pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},
     PublicKeyParts, RsaPrivateKey, RsaPublicKey,
 };
 
@@ -170,7 +170,7 @@ fn decode_rsa4096_pub_pem() {
 #[cfg(feature = "pem")]
 fn encode_rsa2048_priv_pem() {
     let key = RsaPrivateKey::from_pkcs1_pem(RSA_2048_PRIV_PEM).unwrap();
-    let pem = key.to_pkcs1_pem().unwrap();
+    let pem = key.to_pkcs1_pem(Default::default()).unwrap();
     assert_eq!(&*pem, RSA_2048_PRIV_PEM)
 }
 
@@ -178,7 +178,7 @@ fn encode_rsa2048_priv_pem() {
 #[cfg(feature = "pem")]
 fn encode_rsa4096_priv_pem() {
     let key = RsaPrivateKey::from_pkcs1_pem(RSA_4096_PRIV_PEM).unwrap();
-    let pem = key.to_pkcs1_pem().unwrap();
+    let pem = key.to_pkcs1_pem(Default::default()).unwrap();
     assert_eq!(&*pem, RSA_4096_PRIV_PEM)
 }
 
@@ -186,7 +186,7 @@ fn encode_rsa4096_priv_pem() {
 #[cfg(feature = "pem")]
 fn encode_rsa2048_pub_pem() {
     let key = RsaPublicKey::from_pkcs1_pem(RSA_2048_PUB_PEM).unwrap();
-    let pem = key.to_pkcs1_pem().unwrap();
+    let pem = key.to_pkcs1_pem(Default::default()).unwrap();
     assert_eq!(&*pem, RSA_2048_PUB_PEM)
 }
 
@@ -194,6 +194,6 @@ fn encode_rsa2048_pub_pem() {
 #[cfg(feature = "pem")]
 fn encode_rsa4096_pub_pem() {
     let key = RsaPublicKey::from_pkcs1_pem(RSA_4096_PUB_PEM).unwrap();
-    let pem = key.to_pkcs1_pem().unwrap();
+    let pem = key.to_pkcs1_pem(Default::default()).unwrap();
     assert_eq!(&*pem, RSA_4096_PUB_PEM)
 }

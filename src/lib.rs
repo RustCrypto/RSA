@@ -83,7 +83,7 @@
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # #[cfg(feature = "pem")]
 //! # {
-//! use rsa::{RsaPublicKey, pkcs1::FromRsaPublicKey};
+//! use rsa::{RsaPublicKey, pkcs1::DecodeRsaPublicKey};
 //!
 //! let pem = "-----BEGIN RSA PUBLIC KEY-----
 //! MIIBCgKCAQEAtsQsUV8QpqrygsY+2+JCQ6Fw8/omM71IM2N/R8pPbzbgOl0p78MZ
@@ -127,7 +127,7 @@
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # #[cfg(feature = "pem")]
 //! # {
-//! use rsa::{RsaPublicKey, pkcs8::FromPublicKey};
+//! use rsa::{RsaPublicKey, pkcs8::DecodePublicKey};
 //!
 //! let pem = "-----BEGIN PUBLIC KEY-----
 //! MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtsQsUV8QpqrygsY+2+JC
