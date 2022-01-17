@@ -514,7 +514,10 @@ impl RsaPrivateKey {
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
 pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
-    let public_key = public_key.e().to_u64().ok_or(Error::PublicExponentTooLarge)?;
+    let public_key = public_key
+        .e()
+        .to_u64()
+        .ok_or(Error::PublicExponentTooLarge)?;
 
     if public_key < MIN_PUB_EXPONENT {
         return Err(Error::PublicExponentTooSmall);
