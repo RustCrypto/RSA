@@ -53,7 +53,7 @@ name = "key"
 
 [features]
 default = ["std", "pem"]
-nightly = ["subtle/nightly", "num-bigint/nightly"]
+nightly = ["num-bigint/nightly"]
 serde = ["num-bigint/serde", "serde_crate"]
 expose-internals = []
 std = ["alloc", "digest/std", "pkcs1/std", "pkcs8/std", "rand/std"]
