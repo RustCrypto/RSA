@@ -24,7 +24,7 @@ pkcs1 = { version = "0.3.3", default-features = false, features = ["pkcs8"] }
 pkcs8 = { version = "0.8", default-features = false }
 
 [dependencies.zeroize]
-version = ">=1, <1.5" # zeroize 1.4 is MSRV 1.51+
+version = ">=1, <1.6" # zeroize 1.4 is MSRV 1.51+
 features = ["alloc", "zeroize_derive"]
 
 [dependencies.serde_crate]
