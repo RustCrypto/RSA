@@ -138,7 +138,7 @@ impl Drop for PrecomputedValues {
 }
 
 /// Contains the precomputed Chinese remainder theorem values.
-#[derive(Debug, Clone, Zeroize)]
+#[derive(Debug, Clone)]
 pub(crate) struct CRTValue {
     /// D mod (prime - 1)
     pub(crate) exp: BigInt,
@@ -146,6 +146,14 @@ pub(crate) struct CRTValue {
     pub(crate) coeff: BigInt,
     /// product of primes prior to this (inc p and q)
     pub(crate) r: BigInt,
+}
+
+impl Zeroize for CRTValue {
+    fn zeroize(&mut self) {
+        self.exp.zeroize();
+        self.coeff.zeroize();
+        self.r.zeroize();
+    }
 }
 
 impl From<RsaPrivateKey> for RsaPublicKey {
