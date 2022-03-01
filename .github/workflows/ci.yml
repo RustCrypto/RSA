@@ -72,3 +72,8 @@ jobs:
           command: bench
           args: --target ${{ matrix.test-target || matrix.target }} --verbose --no-run ${{ matrix.args }}
         if: matrix.rust == 'nightly'
+
+  minimal-versions:
+    uses: RustCrypto/actions/.github/workflows/minimal-versions.yml@master
+    with:
+        working-directory: ${{ github.workflow }}
