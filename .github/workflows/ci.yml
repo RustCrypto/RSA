@@ -74,6 +74,15 @@ jobs:
         if: matrix.rust == 'nightly'
 
   minimal-versions:
-    uses: RustCrypto/actions/.github/workflows/minimal-versions.yml@master
-    with:
-        working-directory: ${{ github.workflow }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: RustCrypto/actions/cargo-cache@master
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: nightly
+          override: true
+          profile: minimal
+      - uses: RustCrypto/actions/cargo-hack-install@master
+      - run: cargo update -Z minimal-versions
+      - run: cargo hack test --release --feature-powerset
