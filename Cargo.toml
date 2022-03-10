@@ -2,7 +2,7 @@
 name = "rsa"
 version = "0.5.0"
 authors = ["RustCrypto Developers", "dignifiedquire <dignifiedquire@gmail.com>"]
-edition = "2018"
+edition = "2021"
 description = "Pure Rust RSA implementation"
 license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/rsa"
@@ -10,9 +10,10 @@ repository = "https://github.com/RustCrypto/RSA"
 keywords = ["rsa", "encryption", "security", "crypto"]
 categories = ["cryptography"]
 readme = "README.md"
+rust-version = "1.56"
 
 [dependencies]
-num-bigint = { version = "0.7.0", features = ["i128", "u64_digit", "prime", "zeroize"], default-features = false, package = "num-bigint-dig" }
+num-bigint = { version = "0.8.1", features = ["i128", "u64_digit", "prime", "zeroize"], default-features = false, package = "num-bigint-dig" }
 num-traits = { version= "0.2.9", default-features = false, features = ["libm"] }
 num-integer = { version = "0.1.39", default-features = false }
 num-iter = { version = "0.1.37", default-features = false }
@@ -52,7 +53,7 @@ name = "key"
 
 [features]
 default = ["std", "pem"]
-nightly = ["subtle/nightly", "num-bigint/nightly"]
+nightly = ["num-bigint/nightly"]
 serde = ["num-bigint/serde", "serde_crate"]
 expose-internals = []
 std = ["alloc", "digest/std", "pkcs1/std", "pkcs8/std", "rand/std"]
