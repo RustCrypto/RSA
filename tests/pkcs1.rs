@@ -1,7 +1,5 @@
 //! PKCS#1 encoding tests
 
-#![cfg(feature = "alloc")]
-
 use hex_literal::hex;
 use rsa::{
     pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},

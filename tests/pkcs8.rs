@@ -1,7 +1,5 @@
 //! PKCS#8 encoding tests
 
-#![cfg(feature = "alloc")]
-
 /// RSA-2048 PKCS#8 private key encoded as ASN.1 DER
 const RSA_2048_PRIV_DER: &[u8] = include_bytes!("examples/pkcs8/rsa2048-priv.der");
 

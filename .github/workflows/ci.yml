@@ -6,69 +6,56 @@ on:
     branches:
       - master
 
-env:
-  RUST_BACKTRACE: 1
-
 jobs:
   build:
-    name: ${{ matrix.rust }} - ${{ matrix.target }}
     runs-on: ubuntu-latest
-
-    # The build matrix does not yet support 'allow failures' at job level.
-    # See `jobs.nightly` for the active nightly job definition.
     strategy:
       matrix:
         rust:
-          - 1.56.0
+          - 1.56.0 # MSRV
           - stable
-          - nightly
         target:
-          - x86_64-unknown-linux-gnu
-          - thumbv7m-none-eabi
-        include:
-          - rust: nightly
-            target: x86_64-unknown-linux-gnu
-            args: --all-features
-          - target: thumbv7m-none-eabi
-            test-target: arm-unknown-linux-gnueabi
-            args: --no-default-features --features=alloc
-          - rust: stable
-            target: x86_64-unknown-linux-gnu
-            args: --no-default-features --features=std
-        exclude:
-          - rust: 1.56.0
-            target: thumbv7m-none-eabi
-
+          - thumbv7em-none-eabi
+          - wasm32-unknown-unknown
     steps:
-      - name: Checkout
-        uses: actions/checkout@v1
-
-      - name: Install rust
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v2
+      - uses: RustCrypto/actions/cargo-cache@master
+      - uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.rust || 'stable' }}
-          target: ${{ matrix.target }}
           profile: minimal
+          toolchain: ${{ matrix.rust }}
+          target: ${{ matrix.target }}
           override: true
+      - run: cargo build --no-default-features --target ${{ matrix.target }}
 
-      - name: Build
-        uses: actions-rs/cargo@v1
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust:
+          - 1.56.0 # MSRV
+          - stable
+    steps:
+      - uses: actions/checkout@v2
+      - uses: RustCrypto/actions/cargo-cache@master
+      - uses: actions-rs/toolchain@v1
         with:
-          use-cross: true
-          command: build
-          args: --target ${{ matrix.target }} --verbose ${{ matrix.args }}
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          override: true
+      - uses: RustCrypto/actions/cargo-hack-install@master
+      - run: cargo hack test --release --feature-powerset --exclude-features nightly,getrandom,serde
+      - run: cargo test --release --features getrandom
+      - run: cargo test --release --features serde
 
-      - name: Test
-        uses: actions-rs/cargo@v1
+  nightly:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: RustCrypto/actions/cargo-cache@master
+      - uses: actions-rs/toolchain@v1
         with:
-          use-cross: true
-          command: test
-          args: --target ${{ matrix.test-target || matrix.target }} --verbose ${{ matrix.args }}
-
-      - name: Bench
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: bench
-          args: --target ${{ matrix.test-target || matrix.target }} --verbose --no-run ${{ matrix.args }}
-        if: matrix.rust == 'nightly'
+          profile: minimal
+          toolchain: nightly
+          override: true
+      - run: cargo test --release --features nightly

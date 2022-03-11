@@ -2,10 +2,10 @@
 
 extern crate test;
 
-use base64;
+use base64ct::{Base64, Encoding};
 use num_bigint::BigUint;
 use num_traits::{FromPrimitive, Num};
-use rand::{rngs::StdRng, SeedableRng};
+use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 use rsa::{Hash, PaddingScheme, RsaPrivateKey};
 use sha2::{Digest, Sha256};
 use test::Bencher;
@@ -28,7 +28,7 @@ fn get_key() -> RsaPrivateKey {
 #[bench]
 fn bench_rsa_2048_pkcsv1_decrypt(b: &mut Bencher) {
     let priv_key = get_key();
-    let x = base64::decode(DECRYPT_VAL).unwrap();
+    let x = Base64::decode_vec(DECRYPT_VAL).unwrap();
 
     b.iter(|| {
         let res = priv_key
@@ -42,7 +42,7 @@ fn bench_rsa_2048_pkcsv1_decrypt(b: &mut Bencher) {
 fn bench_rsa_2048_pkcsv1_sign_blinded(b: &mut Bencher) {
     let priv_key = get_key();
     let digest = Sha256::digest(b"testing").to_vec();
-    let mut rng = StdRng::from_seed([1u8; 32]);
+    let mut rng = ChaCha8Rng::from_seed([42; 32]);
 
     b.iter(|| {
         let res = priv_key
