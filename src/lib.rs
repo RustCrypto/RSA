@@ -6,12 +6,9 @@
 //! Using PKCS1v15.
 //! ```
 //! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
-//! # /*
-//! use rand::rngs::OsRng;
-//! let mut rng = OsRng;
-//! # */
-//! # use rand::{SeedableRng, rngs::StdRng};
-//! # let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+//!
+//! let mut rng = rand::thread_rng();
+//!
 //! let bits = 2048;
 //! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
 //! let public_key = RsaPublicKey::from(&private_key);
@@ -31,12 +28,8 @@
 //! Using OAEP.
 //! ```
 //! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
-//! # /*
-//! use rand::rngs::OsRng;
-//! let mut rng = OsRng;
-//! # */
-//! # use rand::{SeedableRng, rngs::StdRng};
-//! # let mut rng = rand::rngs::StdRng::seed_from_u64(0);
+//!
+//! let mut rng = rand::thread_rng();
 //!
 //! let bits = 2048;
 //! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
@@ -81,7 +74,7 @@
 //!
 //! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # #[cfg(feature = "pem")]
+//! # #[cfg(all(feature = "pem", feature = "std"))]
 //! # {
 //! use rsa::{RsaPublicKey, pkcs1::DecodeRsaPublicKey};
 //!
@@ -125,7 +118,7 @@
 //!
 //! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # #[cfg(feature = "pem")]
+//! # #[cfg(all(feature = "pem", feature = "std"))]
 //! # {
 //! use rsa::{RsaPublicKey, pkcs8::DecodePublicKey};
 //!
@@ -149,73 +142,42 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/RustCrypto/meta/master/logo_small.png")]
 
-#[cfg(not(feature = "alloc"))]
-compile_error!("This crate does not yet support environments without liballoc. See https://github.com/RustCrypto/RSA/issues/51.");
-
-#[cfg(feature = "alloc")]
 #[macro_use]
 extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-#[cfg(feature = "alloc")]
+pub use rand_core;
 pub use num_bigint::BigUint;
 
 /// Useful algorithms.
-#[cfg(feature = "alloc")]
 pub mod algorithms;
-
 /// Error types.
-#[cfg(feature = "alloc")]
 pub mod errors;
-
 /// Supported hash functions.
-#[cfg(feature = "alloc")]
 pub mod hash;
-
 /// Supported padding schemes.
-#[cfg(feature = "alloc")]
 pub mod padding;
 
-#[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 mod encoding;
-#[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 mod key;
-#[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 mod oaep;
-#[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 mod pkcs1v15;
-#[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 mod pss;
-#[cfg(feature = "alloc")]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
 mod raw;
 
-#[cfg(feature = "alloc")]
 pub use pkcs1;
-#[cfg(feature = "alloc")]
 pub use pkcs8;
 
-#[cfg(feature = "alloc")]
 pub use self::hash::Hash;
-#[cfg(feature = "alloc")]
 pub use self::key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
-#[cfg(feature = "alloc")]
 pub use self::padding::PaddingScheme;
 
-// Optionally expose internals if requested via feature-flag.
-
+/// Internal raw RSA functions.
 #[cfg(not(feature = "expose-internals"))]
-#[cfg(feature = "alloc")]
 mod internals;
 
 /// Internal raw RSA functions.
-#[cfg(all(feature = "alloc", feature = "expose-internals"))]
-#[cfg_attr(docsrs, doc(cfg(feature = "alloc")))]
+#[cfg(feature = "expose-internals")]
 #[cfg_attr(docsrs, doc(cfg(feature = "expose-internals")))]
 pub mod internals;

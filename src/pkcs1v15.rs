@@ -1,6 +1,6 @@
 use alloc::vec;
 use alloc::vec::Vec;
-use rand::Rng;
+use rand_core::{CryptoRng, RngCore};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 use crate::errors::{Error, Result};
@@ -11,7 +11,11 @@ use crate::key::{self, PrivateKey, PublicKey};
 // scheme from PKCS#1 v1.5.  The message must be no longer than the
 // length of the public modulus minus 11 bytes.
 #[inline]
-pub fn encrypt<R: Rng, PK: PublicKey>(rng: &mut R, pub_key: &PK, msg: &[u8]) -> Result<Vec<u8>> {
+pub fn encrypt<R: RngCore + CryptoRng, PK: PublicKey>(
+    rng: &mut R,
+    pub_key: &PK,
+    msg: &[u8],
+) -> Result<Vec<u8>> {
     key::check_public(pub_key)?;
 
     let k = pub_key.size();
@@ -38,7 +42,7 @@ pub fn encrypt<R: Rng, PK: PublicKey>(rng: &mut R, pub_key: &PK, msg: &[u8]) -> 
 // forge signatures as if they had the private key. See
 // `decrypt_session_key` for a way of solving this problem.
 #[inline]
-pub fn decrypt<R: Rng, SK: PrivateKey>(
+pub fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
@@ -67,7 +71,7 @@ pub fn decrypt<R: Rng, SK: PrivateKey>(
 // messages to signatures and identify the signed messages. As ever,
 // signatures provide authenticity, not confidentiality.
 #[inline]
-pub fn sign<R: Rng, SK: PrivateKey>(
+pub fn sign<R: RngCore + CryptoRng, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     hash: Option<&Hash>,
@@ -151,7 +155,7 @@ fn hash_info(hash: Option<&Hash>, digest_len: usize) -> Result<(usize, &'static 
 /// in order to maintain constant memory access patterns. If the plaintext was
 /// valid then index contains the index of the original message in em.
 #[inline]
-fn decrypt_inner<R: Rng, SK: PrivateKey>(
+fn decrypt_inner<R: RngCore + CryptoRng, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
@@ -196,14 +200,14 @@ fn decrypt_inner<R: Rng, SK: PrivateKey>(
 /// Fills the provided slice with random values, which are guranteed
 /// to not be zero.
 #[inline]
-fn non_zero_random_bytes<R: Rng>(rng: &mut R, data: &mut [u8]) {
-    rng.fill(data);
+fn non_zero_random_bytes<R: RngCore + CryptoRng>(rng: &mut R, data: &mut [u8]) {
+    rng.fill_bytes(data);
 
     for el in data {
         if *el == 0u8 {
             // TODO: break after a certain amount of time
             while *el == 0u8 {
-                *el = rng.gen();
+                rng.fill_bytes(core::slice::from_mut(el));
             }
         }
     }
@@ -212,24 +216,20 @@ fn non_zero_random_bytes<R: Rng>(rng: &mut R, data: &mut [u8]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64;
-    use hex;
+    use base64ct::{Base64, Encoding};
+    use hex_literal::hex;
     use num_bigint::BigUint;
     use num_traits::FromPrimitive;
     use num_traits::Num;
-    use rand::{rngs::StdRng, SeedableRng};
+    use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
     use sha1::{Digest, Sha1};
-    use std::time::SystemTime;
 
     use crate::{Hash, PaddingScheme, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 
     #[test]
     fn test_non_zero_bytes() {
         for _ in 0..10 {
-            let seed = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap();
-            let mut rng = StdRng::seed_from_u64(seed.as_secs());
+            let mut rng = ChaCha8Rng::from_entropy();
             let mut b = vec![0u8; 512];
             non_zero_random_bytes(&mut rng, &mut b);
             for el in &b {
@@ -283,7 +283,7 @@ mod tests {
             let out = priv_key
                 .decrypt(
                     PaddingScheme::new_pkcs1v15_encrypt(),
-                    &base64::decode(test[0]).unwrap(),
+                    &Base64::decode_vec(test[0]).unwrap(),
                 )
                 .unwrap();
             assert_eq!(out, test[1].as_bytes());
@@ -292,15 +292,13 @@ mod tests {
 
     #[test]
     fn test_encrypt_decrypt_pkcs1v15() {
-        let seed = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        let mut rng = StdRng::seed_from_u64(seed.as_secs());
+        let mut rng = ChaCha8Rng::from_entropy();
         let priv_key = get_private_key();
         let k = priv_key.size();
 
         for i in 1..100 {
-            let mut input: Vec<u8> = (0..i * 8).map(|_| rng.gen()).collect();
+            let mut input = vec![0u8; i * 8];
+            rng.fill_bytes(&mut input);
             if input.len() > k - 11 {
                 input = input[0..k - 11].to_vec();
             }
@@ -308,7 +306,8 @@ mod tests {
             let pub_key: RsaPublicKey = priv_key.clone().into();
             let ciphertext = encrypt(&mut rng, &pub_key, &input).unwrap();
             assert_ne!(input, ciphertext);
-            let blind: bool = rng.gen();
+
+            let blind: bool = rng.next_u32() < (1u32 << 31);
             let blinder = if blind { Some(&mut rng) } else { None };
             let plaintext = decrypt(blinder, &priv_key, &ciphertext).unwrap();
             assert_eq!(input, plaintext);
@@ -319,13 +318,16 @@ mod tests {
     fn test_sign_pkcs1v15() {
         let priv_key = get_private_key();
 
-        let tests = [[
-            "Test.\n", "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e336ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
-	]];
+        let tests = [(
+            "Test.\n",
+            hex!(
+                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+            ),
+        )];
 
-        for test in &tests {
-            let digest = Sha1::digest(test[0].as_bytes()).to_vec();
-            let expected = hex::decode(test[1]).unwrap();
+        for (text, expected) in &tests {
+            let digest = Sha1::digest(text.as_bytes()).to_vec();
 
             let out = priv_key
                 .sign(PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)), &digest)
@@ -333,10 +335,7 @@ mod tests {
             assert_ne!(out, digest);
             assert_eq!(out, expected);
 
-            let seed = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap();
-            let mut rng = StdRng::seed_from_u64(seed.as_secs());
+            let mut rng = ChaCha8Rng::from_entropy();
             let out2 = priv_key
                 .sign_blinded(
                     &mut rng,
@@ -352,20 +351,23 @@ mod tests {
     fn test_verify_pkcs1v15() {
         let priv_key = get_private_key();
 
-        let tests = [[
-            "Test.\n", "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e336ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
-	]];
+        let tests = [(
+            "Test.\n",
+            hex!(
+                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+            ),
+        )];
         let pub_key: RsaPublicKey = priv_key.into();
 
-        for test in &tests {
-            let digest = Sha1::digest(test[0].as_bytes()).to_vec();
-            let sig = hex::decode(test[1]).unwrap();
+        for (text, sig) in &tests {
+            let digest = Sha1::digest(text.as_bytes()).to_vec();
 
             pub_key
                 .verify(
                     PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)),
                     &digest,
-                    &sig,
+                    sig,
                 )
                 .expect("failed to verify");
         }
@@ -374,7 +376,7 @@ mod tests {
     #[test]
     fn test_unpadded_signature() {
         let msg = b"Thu Dec 19 18:06:16 EST 2013\n";
-        let expected_sig = base64::decode("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
+        let expected_sig = Base64::decode_vec("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
         let priv_key = get_private_key();
 
         let sig = priv_key

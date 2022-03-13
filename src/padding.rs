@@ -3,7 +3,7 @@ use alloc::string::{String, ToString};
 use core::fmt;
 
 use digest::{Digest, DynDigest};
-use rand::RngCore;
+use rand_core::RngCore;
 
 use crate::hash::Hash;
 
@@ -69,17 +69,18 @@ impl PaddingScheme {
     ///
     /// # Example
     /// ```
-    ///     use sha1::Sha1;
-    ///     use sha2::Sha256;
-    ///     use rand::rngs::OsRng;
-    ///     use rsa::{BigUint, RsaPublicKey, PaddingScheme, PublicKey};
+    /// use sha1::Sha1;
+    /// use sha2::Sha256;
+    /// use rsa::{BigUint, RsaPublicKey, PaddingScheme, PublicKey};
+    /// use base64ct::{Base64, Encoding};
     ///
-    ///     let n = base64::decode("ALHgDoZmBQIx+jTmgeeHW6KsPOrj11f6CvWsiRleJlQpW77AwSZhd21ZDmlTKfaIHBSUxRUsuYNh7E2SHx8rkFVCQA2/gXkZ5GK2IUbzSTio9qXA25MWHvVxjMfKSL8ZAxZyKbrG94FLLszFAFOaiLLY8ECs7g+dXOriYtBwLUJK+lppbd+El+8ZA/zH0bk7vbqph5pIoiWggxwdq3mEz4LnrUln7r6dagSQzYErKewY8GADVpXcq5mfHC1xF2DFBub7bFjMVM5fHq7RK+pG5xjNDiYITbhLYrbVv3X0z75OvN0dY49ITWjM7xyvMWJXVJS7sJlgmCCL6RwWgP8PhcE=").unwrap();
-    ///     let e = base64::decode("AQAB").unwrap();
-    ///     
-    ///     let key = RsaPublicKey::new(BigUint::from_bytes_be(&n), BigUint::from_bytes_be(&e)).unwrap();
-    ///     let padding = PaddingScheme::new_oaep_with_mgf_hash::<Sha256, Sha1>();
-    ///     let encrypted_data = key.encrypt(&mut OsRng, padding, b"secret").unwrap();
+    /// let n = Base64::decode_vec("ALHgDoZmBQIx+jTmgeeHW6KsPOrj11f6CvWsiRleJlQpW77AwSZhd21ZDmlTKfaIHBSUxRUsuYNh7E2SHx8rkFVCQA2/gXkZ5GK2IUbzSTio9qXA25MWHvVxjMfKSL8ZAxZyKbrG94FLLszFAFOaiLLY8ECs7g+dXOriYtBwLUJK+lppbd+El+8ZA/zH0bk7vbqph5pIoiWggxwdq3mEz4LnrUln7r6dagSQzYErKewY8GADVpXcq5mfHC1xF2DFBub7bFjMVM5fHq7RK+pG5xjNDiYITbhLYrbVv3X0z75OvN0dY49ITWjM7xyvMWJXVJS7sJlgmCCL6RwWgP8PhcE=").unwrap();
+    /// let e = Base64::decode_vec("AQAB").unwrap();
+    ///
+    /// let mut rng = rand::thread_rng();
+    /// let key = RsaPublicKey::new(BigUint::from_bytes_be(&n), BigUint::from_bytes_be(&e)).unwrap();
+    /// let padding = PaddingScheme::new_oaep_with_mgf_hash::<Sha256, Sha1>();
+    /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();
     /// ```
     pub fn new_oaep_with_mgf_hash<
         T: 'static + Digest + DynDigest,
@@ -96,17 +97,18 @@ impl PaddingScheme {
     ///
     /// # Example
     /// ```
-    ///     use sha1::Sha1;
-    ///     use sha2::Sha256;
-    ///     use rand::rngs::OsRng;
-    ///     use rsa::{BigUint, RsaPublicKey, PaddingScheme, PublicKey};
-
-    ///     let n = base64::decode("ALHgDoZmBQIx+jTmgeeHW6KsPOrj11f6CvWsiRleJlQpW77AwSZhd21ZDmlTKfaIHBSUxRUsuYNh7E2SHx8rkFVCQA2/gXkZ5GK2IUbzSTio9qXA25MWHvVxjMfKSL8ZAxZyKbrG94FLLszFAFOaiLLY8ECs7g+dXOriYtBwLUJK+lppbd+El+8ZA/zH0bk7vbqph5pIoiWggxwdq3mEz4LnrUln7r6dagSQzYErKewY8GADVpXcq5mfHC1xF2DFBub7bFjMVM5fHq7RK+pG5xjNDiYITbhLYrbVv3X0z75OvN0dY49ITWjM7xyvMWJXVJS7sJlgmCCL6RwWgP8PhcE=").unwrap();
-    ///     let e = base64::decode("AQAB").unwrap();
-    ///     
-    ///     let key = RsaPublicKey::new(BigUint::from_bytes_be(&n), BigUint::from_bytes_be(&e)).unwrap();
-    ///     let padding = PaddingScheme::new_oaep::<Sha256>();
-    ///     let encrypted_data = key.encrypt(&mut OsRng, padding, b"secret").unwrap();
+    /// use sha1::Sha1;
+    /// use sha2::Sha256;
+    /// use rsa::{BigUint, RsaPublicKey, PaddingScheme, PublicKey};
+    /// use base64ct::{Base64, Encoding};
+    ///
+    /// let n = Base64::decode_vec("ALHgDoZmBQIx+jTmgeeHW6KsPOrj11f6CvWsiRleJlQpW77AwSZhd21ZDmlTKfaIHBSUxRUsuYNh7E2SHx8rkFVCQA2/gXkZ5GK2IUbzSTio9qXA25MWHvVxjMfKSL8ZAxZyKbrG94FLLszFAFOaiLLY8ECs7g+dXOriYtBwLUJK+lppbd+El+8ZA/zH0bk7vbqph5pIoiWggxwdq3mEz4LnrUln7r6dagSQzYErKewY8GADVpXcq5mfHC1xF2DFBub7bFjMVM5fHq7RK+pG5xjNDiYITbhLYrbVv3X0z75OvN0dY49ITWjM7xyvMWJXVJS7sJlgmCCL6RwWgP8PhcE=").unwrap();
+    /// let e = Base64::decode_vec("AQAB").unwrap();
+    ///
+    /// let mut rng = rand::thread_rng();
+    /// let key = RsaPublicKey::new(BigUint::from_bytes_be(&n), BigUint::from_bytes_be(&e)).unwrap();
+    /// let padding = PaddingScheme::new_oaep::<Sha256>();
+    /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();
     /// ```
     pub fn new_oaep<T: 'static + Digest + DynDigest>() -> Self {
         PaddingScheme::OAEP {

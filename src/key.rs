@@ -4,7 +4,7 @@ use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
 use num_traits::{One, ToPrimitive};
-use rand::{rngs::StdRng, Rng};
+use rand_core::{CryptoRng, RngCore};
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 use zeroize::Zeroize;
@@ -174,7 +174,12 @@ impl From<&RsaPrivateKey> for RsaPublicKey {
 /// Generic trait for operations on a public key.
 pub trait PublicKey: EncryptionPrimitive + PublicKeyParts {
     /// Encrypt the given message.
-    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>>;
+    fn encrypt<R: RngCore + CryptoRng>(
+        &self,
+        rng: &mut R,
+        padding: PaddingScheme,
+        msg: &[u8],
+    ) -> Result<Vec<u8>>;
 
     /// Verify a signed message.
     /// `hashed`must be the result of hashing the input using the hashing function
@@ -194,7 +199,12 @@ impl PublicKeyParts for RsaPublicKey {
 }
 
 impl PublicKey for RsaPublicKey {
-    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
+    fn encrypt<R: RngCore + CryptoRng>(
+        &self,
+        rng: &mut R,
+        padding: PaddingScheme,
+        msg: &[u8],
+    ) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15Encrypt => pkcs1v15::encrypt(rng, self, msg),
             PaddingScheme::OAEP {
@@ -240,7 +250,12 @@ impl<'a> PublicKeyParts for &'a RsaPublicKey {
 }
 
 impl<'a> PublicKey for &'a RsaPublicKey {
-    fn encrypt<R: Rng>(&self, rng: &mut R, padding: PaddingScheme, msg: &[u8]) -> Result<Vec<u8>> {
+    fn encrypt<R: RngCore + CryptoRng>(
+        &self,
+        rng: &mut R,
+        padding: PaddingScheme,
+        msg: &[u8],
+    ) -> Result<Vec<u8>> {
         (*self).encrypt(rng, padding, msg)
     }
 
@@ -275,7 +290,7 @@ impl<'a> PrivateKey for &'a RsaPrivateKey {}
 
 impl RsaPrivateKey {
     /// Generate a new Rsa key pair of the given bit size using the passed in `rng`.
-    pub fn new<R: Rng>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
+    pub fn new<R: RngCore + CryptoRng>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
         generate_multi_prime_key(rng, 2, bit_size)
     }
 
@@ -283,7 +298,7 @@ impl RsaPrivateKey {
     /// using the passed in `rng`.
     ///
     /// Unless you have specific needs, you should use `RsaPrivateKey::new` instead.
-    pub fn new_with_exp<R: Rng>(
+    pub fn new_with_exp<R: RngCore + CryptoRng>(
         rng: &mut R,
         bit_size: usize,
         exp: &BigUint,
@@ -421,13 +436,13 @@ impl RsaPrivateKey {
         match padding {
             // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
             PaddingScheme::PKCS1v15Encrypt => {
-                pkcs1v15::decrypt::<StdRng, _>(None, self, ciphertext)
+                pkcs1v15::decrypt::<DummyRng, _>(None, self, ciphertext)
             }
             PaddingScheme::OAEP {
                 mut digest,
                 mut mgf_digest,
                 label,
-            } => oaep::decrypt::<StdRng, _>(
+            } => oaep::decrypt::<DummyRng, _>(
                 None,
                 self,
                 ciphertext,
@@ -442,7 +457,7 @@ impl RsaPrivateKey {
     /// Decrypt the given message.
     ///
     /// Uses `rng` to blind the decryption process.
-    pub fn decrypt_blinded<R: Rng>(
+    pub fn decrypt_blinded<R: RngCore + CryptoRng>(
         &self,
         rng: &mut R,
         padding: PaddingScheme,
@@ -471,13 +486,13 @@ impl RsaPrivateKey {
         match padding {
             // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
             PaddingScheme::PKCS1v15Sign { ref hash } => {
-                pkcs1v15::sign::<StdRng, _>(None, self, hash.as_ref(), digest_in)
+                pkcs1v15::sign::<DummyRng, _>(None, self, hash.as_ref(), digest_in)
             }
             PaddingScheme::PSS {
                 mut salt_rng,
                 mut digest,
                 salt_len,
-            } => pss::sign::<_, StdRng, _>(
+            } => pss::sign::<_, DummyRng, _>(
                 &mut *salt_rng,
                 None,
                 self,
@@ -492,7 +507,7 @@ impl RsaPrivateKey {
     /// Sign the given digest.
     ///
     /// Use `rng` for blinding.
-    pub fn sign_blinded<R: Rng>(
+    pub fn sign_blinded<R: RngCore + CryptoRng>(
         &self,
         rng: &mut R,
         padding: PaddingScheme,
@@ -538,6 +553,31 @@ pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
     Ok(())
 }
 
+/// This is a dummy RNG for cases when we need a concrete RNG type
+/// which does not get used.
+#[derive(Copy, Clone)]
+struct DummyRng;
+
+impl RngCore for DummyRng {
+    fn next_u32(&mut self) -> u32 {
+        unimplemented!();
+    }
+
+    fn next_u64(&mut self) -> u64 {
+        unimplemented!();
+    }
+
+    fn fill_bytes(&mut self, _: &mut [u8]) {
+        unimplemented!();
+    }
+
+    fn try_fill_bytes(&mut self, _: &mut [u8]) -> core::result::Result<(), rand_core::Error> {
+        unimplemented!();
+    }
+}
+
+impl CryptoRng for DummyRng {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -546,11 +586,13 @@ mod tests {
     use alloc::string::String;
     use digest::{Digest, DynDigest};
     use num_traits::{FromPrimitive, ToPrimitive};
-    use rand::{distributions::Alphanumeric, rngs::StdRng, SeedableRng};
+    use rand_chacha::{
+        rand_core::{RngCore, SeedableRng},
+        ChaCha8Rng,
+    };
     use sha1::Sha1;
     use sha2::{Sha224, Sha256, Sha384, Sha512};
     use sha3::{Sha3_256, Sha3_384, Sha3_512};
-    use std::time::SystemTime;
 
     #[test]
     fn test_from_into() {
@@ -580,13 +622,10 @@ mod tests {
         let pub_key: RsaPublicKey = private_key.clone().into();
         let m = BigUint::from_u64(42).expect("invalid 42");
         let c = internals::encrypt(&pub_key, &m);
-        let m2 = internals::decrypt::<StdRng>(None, &private_key, &c)
+        let m2 = internals::decrypt::<ChaCha8Rng>(None, &private_key, &c)
             .expect("unable to decrypt without blinding");
         assert_eq!(m, m2);
-        let seed = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        let mut rng = StdRng::seed_from_u64(seed.as_secs());
+        let mut rng = ChaCha8Rng::from_entropy();
         let m3 = internals::decrypt(Some(&mut rng), &private_key, &c)
             .expect("unable to decrypt with blinding");
         assert_eq!(m, m3);
@@ -596,10 +635,7 @@ mod tests {
         ($name:ident, $multi:expr, $size:expr) => {
             #[test]
             fn $name() {
-                let seed = SystemTime::now()
-                    .duration_since(SystemTime::UNIX_EPOCH)
-                    .unwrap();
-                let mut rng = StdRng::seed_from_u64(seed.as_secs());
+                let mut rng = ChaCha8Rng::from_entropy();
 
                 for _ in 0..10 {
                     let private_key = if $multi == 2 {
@@ -628,11 +664,7 @@ mod tests {
 
     #[test]
     fn test_impossible_keys() {
-        // make sure not infinite loops are hit here.
-        let seed = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        let mut rng = StdRng::seed_from_u64(seed.as_secs());
+        let mut rng = ChaCha8Rng::from_entropy();
         for i in 0..32 {
             let _ = RsaPrivateKey::new(&mut rng, i).is_err();
             let _ = generate_multi_prime_key(&mut rng, 3, i);
@@ -663,13 +695,12 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "serde1")]
+    #[cfg(feature = "serde")]
     fn test_serde() {
-        use rand::SeedableRng;
-        use rand_xorshift::XorShiftRng;
+        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
         use serde_test::{assert_tokens, Token};
 
-        let mut rng = XorShiftRng::from_seed([1; 16]);
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
 
         let priv_tokens = [
@@ -684,8 +715,8 @@ mod tests {
             },
             Token::Str("n"),
             Token::Seq { len: Some(2) },
-            Token::U32(1296829443),
-            Token::U32(2444363981),
+            Token::U32(3814409919),
+            Token::U32(3429654832),
             Token::SeqEnd,
             Token::Str("e"),
             Token::Seq { len: Some(1) },
@@ -694,16 +725,16 @@ mod tests {
             Token::StructEnd,
             Token::Str("d"),
             Token::Seq { len: Some(2) },
-            Token::U32(298985985),
-            Token::U32(2349628418),
+            Token::U32(1482162201),
+            Token::U32(1675500232),
             Token::SeqEnd,
             Token::Str("primes"),
             Token::Seq { len: Some(2) },
             Token::Seq { len: Some(1) },
-            Token::U32(3238068481),
+            Token::U32(4133289821),
             Token::SeqEnd,
             Token::Seq { len: Some(1) },
-            Token::U32(3242199299),
+            Token::U32(3563808971),
             Token::SeqEnd,
             Token::SeqEnd,
             Token::StructEnd,
@@ -717,8 +748,8 @@ mod tests {
             },
             Token::Str("n"),
             Token::Seq { len: Some(2) },
-            Token::U32(1296829443),
-            Token::U32(2444363981),
+            Token::U32(3814409919),
+            Token::U32(3429654832),
             Token::SeqEnd,
             Token::Str("e"),
             Token::Seq { len: Some(1) },
@@ -731,15 +762,17 @@ mod tests {
 
     #[test]
     fn invalid_coeff_private_key_regression() {
-        let n = base64::decode("wC8GyQvTCZOK+iiBR5fGQCmzRCTWX9TQ3aRG5gGFk0wB6EFoLMAyEEqeG3gS8xhAm2rSWYx9kKufvNat3iWlbSRVqkcbpVAYlj2vTrpqDpJl+6u+zxFYoUEBevlJJkAhl8EuCccOA30fVpcfRvXPTtvRd3yFT9E9EwZljtgSI02w7gZwg7VIxaGeajh5Euz6ZVQZ+qNRKgXrRC7gPRqVyI6Dt0Jc+Su5KBGNn0QcPDzOahWha1ieaeMkFisZ9mdpsJoZ4tw5eicLaUomKzALHXQVt+/rcZSrCd6/7uUo11B/CYBM4UfSpwXaL88J9AE6A5++no9hmJzaF2LLp+Qwx4yY3j9TDutxSAjsraxxJOGZ3XyA9nG++Ybt3cxZ5fP7ROjxCfROBmVv5dYn0O9OBIqYeCH6QraNpZMadlLNIhyMv8Y+P3r5l/PaK4VJaEi5pPosnEPawp0W0yZDzmjk2z1LthaRx0aZVrAjlH0Rb/6goLUQ9qu1xsDtQVVpN4A89ZUmtTWORnnJr0+595eHHxssd2gpzqf4bPjNITdAEuOCCtpvyi4ls23zwuzryUYjcUOEnsXNQ+DrZpLKxdtsD/qNV/j1hfeyBoPllC3cV+6bcGOFcVGbjYqb+Kw1b0+jL69RSKQqgmS+qYqr8c48nDRxyq3QXhR8qtzUwBFSLVk=").unwrap();
-        let e = base64::decode("AQAB").unwrap();
-        let d = base64::decode("qQazSQ+FRN7nVK1bRsROMRB8AmsDwLVEHivlz1V3Td2Dr+oW3YUMgxedhztML1IdQJPq/ad6qErJ6yRFNySVIjDaxzBTOEoB1eHa1btOnBJWb8rVvvjaorixvJ6Tn3i4EuhsvVy9DoR1k4rGj3qSIiFjUVvLRDAbLyhpGgEfsr0Z577yJmTC5E8JLRMOKX8Tmxsk3jPVpsgd65Hu1s8S/ZmabwuHCf9SkdMeY/1bd/9i7BqqJeeDLE4B5x1xcC3z3scqDUTzqGO+vZPhjgprPDRlBamVwgenhr7KwCn8iaLamFinRVwOAag8BeBqOJj7lURiOsKQa9FIX1kdFUS1QMQxgtPycLjkbvCJjriqT7zWKsmJ7l8YLs6Wmm9/+QJRwNCEVdMTXKfCP1cJjudaiskEQThfUldtgu8gUDNYbQ/Filb2eKfiX4h1TiMxZqUZHVZyb9nShbQoXJ3vj/MGVF0QM8TxhXM8r2Lv9gDYU5t9nQlUMLhs0jVjai48jHABbFNyH3sEcOmJOIwJrCXw1dzG7AotwyaEVUHOmL04TffmwCFfnyrLjbFgnyOeoyIIBYjcY7QFRm/9nupXMTH5hZ2qrHfCJIp0KK4tNBdQqmnHapFl5l6Le1s4qBS5bEIzjitobLvAFm9abPlDGfxmY6mlrMK4+nytwF9Ct7wc1AE=").unwrap();
+        use base64ct::{Base64, Encoding};
+
+        let n = Base64::decode_vec("wC8GyQvTCZOK+iiBR5fGQCmzRCTWX9TQ3aRG5gGFk0wB6EFoLMAyEEqeG3gS8xhAm2rSWYx9kKufvNat3iWlbSRVqkcbpVAYlj2vTrpqDpJl+6u+zxFYoUEBevlJJkAhl8EuCccOA30fVpcfRvXPTtvRd3yFT9E9EwZljtgSI02w7gZwg7VIxaGeajh5Euz6ZVQZ+qNRKgXrRC7gPRqVyI6Dt0Jc+Su5KBGNn0QcPDzOahWha1ieaeMkFisZ9mdpsJoZ4tw5eicLaUomKzALHXQVt+/rcZSrCd6/7uUo11B/CYBM4UfSpwXaL88J9AE6A5++no9hmJzaF2LLp+Qwx4yY3j9TDutxSAjsraxxJOGZ3XyA9nG++Ybt3cxZ5fP7ROjxCfROBmVv5dYn0O9OBIqYeCH6QraNpZMadlLNIhyMv8Y+P3r5l/PaK4VJaEi5pPosnEPawp0W0yZDzmjk2z1LthaRx0aZVrAjlH0Rb/6goLUQ9qu1xsDtQVVpN4A89ZUmtTWORnnJr0+595eHHxssd2gpzqf4bPjNITdAEuOCCtpvyi4ls23zwuzryUYjcUOEnsXNQ+DrZpLKxdtsD/qNV/j1hfeyBoPllC3cV+6bcGOFcVGbjYqb+Kw1b0+jL69RSKQqgmS+qYqr8c48nDRxyq3QXhR8qtzUwBFSLVk=").unwrap();
+        let e = Base64::decode_vec("AQAB").unwrap();
+        let d = Base64::decode_vec("qQazSQ+FRN7nVK1bRsROMRB8AmsDwLVEHivlz1V3Td2Dr+oW3YUMgxedhztML1IdQJPq/ad6qErJ6yRFNySVIjDaxzBTOEoB1eHa1btOnBJWb8rVvvjaorixvJ6Tn3i4EuhsvVy9DoR1k4rGj3qSIiFjUVvLRDAbLyhpGgEfsr0Z577yJmTC5E8JLRMOKX8Tmxsk3jPVpsgd65Hu1s8S/ZmabwuHCf9SkdMeY/1bd/9i7BqqJeeDLE4B5x1xcC3z3scqDUTzqGO+vZPhjgprPDRlBamVwgenhr7KwCn8iaLamFinRVwOAag8BeBqOJj7lURiOsKQa9FIX1kdFUS1QMQxgtPycLjkbvCJjriqT7zWKsmJ7l8YLs6Wmm9/+QJRwNCEVdMTXKfCP1cJjudaiskEQThfUldtgu8gUDNYbQ/Filb2eKfiX4h1TiMxZqUZHVZyb9nShbQoXJ3vj/MGVF0QM8TxhXM8r2Lv9gDYU5t9nQlUMLhs0jVjai48jHABbFNyH3sEcOmJOIwJrCXw1dzG7AotwyaEVUHOmL04TffmwCFfnyrLjbFgnyOeoyIIBYjcY7QFRm/9nupXMTH5hZ2qrHfCJIp0KK4tNBdQqmnHapFl5l6Le1s4qBS5bEIzjitobLvAFm9abPlDGfxmY6mlrMK4+nytwF9Ct7wc1AE=").unwrap();
         let primes = vec![
-            base64::decode("9kQWEAzsbzOcdPa+s5wFfw4XDd7bB1q9foZ31b1+TNjGNxbSBCFlDF1q98vwpV6nM8bWDh/wtbNoETSQDgpEnYOQ26LWEw6YY1+q1Q2GGEFceYUf+Myk8/vTc8TN6Zw0bKZBWy10Qo8h7xk4JpzuI7NcxvjJYTkS9aErFxi3vVH0aiZC0tmfaCqr8a2rJxyVwqreRpOjwAWrotMsf2wGsF4ofx5ScoFy5GB5fJkkdOrW1LyTvZAUCX3cstPr19+TNC5zZOk7WzZatnCkN5H5WzalWtZuu0oVL205KPOa3R8V2yv5e6fm0v5fTmqSuvjmaMJLXCN4QJkmIzojO99ckQ==").unwrap(),
-            base64::decode("x8exdMjVA2CiI+Thx7loHtVcevoeE2sZ7btRVAvmBqo+lkHwxb7FHRnWvuj6eJSlD2f0T50EewIhhiW3R9BmktCk7hXjbSCnC1u9Oxc1IAUm/7azRqyfCMx43XhLxpD+xkBCpWkKDLxGczsRwTuaP3lKS3bSdBrNlGmdblubvVBIq4YZ2vXVlnYtza0cS+dgCK7BGTqUsrCUd/ZbIvwcwZkZtpkhj1KQfto9X/0OMurBzAqbkeq1cyRHXHkOfN/qbUIIRqr9Ii7Eswf9Vk8xp2O1Nt8nzcYS9PFD12M5eyaeFEkEYfpNMNGuTzp/31oqVjbpoCxS6vuWAZyADxhISQ==").unwrap(),
-            base64::decode("is7d0LY4HoXszlC2NO7gejkq7XqL4p1W6hZJPYTNx+r37t1CC2n3Vvzg6kNdpRixDhIpXVTLjN9O7UO/XuqSumYKJIKoP52eb4Tg+a3hw5Iz2Zsb5lUTNSLgkQSBPAf71LHxbL82JL4g1nBUog8ae60BwnVArThKY4EwlJguGNw09BAU4lwf6csDl/nX2vfVwiAloYpeZkHL+L8m+bueGZM5KE2jEz+7ztZCI+T+E5i69rZEYDjx0lfLKlEhQlCW3HbCPELqXgNJJkRfi6MP9kXa9lSfnZmoT081RMvqonB/FUa4HOcKyCrw9XZEtnbNCIdbitfDVEX+pSSD7596wQ==").unwrap(),
-            base64::decode("GPs0injugfycacaeIP5jMa/WX55VEnKLDHom4k6WlfDF4L4gIGoJdekcPEUfxOI5faKvHyFwRP1wObkPoRBDM0qZxRfBl4zEtpvjHrd5MibSyJkM8+J0BIKk/nSjbRIGeb3hV5O56PvGB3S0dKhCUnuVObiC+ne7izplsD4OTG70l1Yud33UFntyoMxrxGYLUSqhBMmZfHquJg4NOWOzKNY/K+EcHDLj1Kjvkcgv9Vf7ocsVxvpFdD9uGPceQ6kwRDdEl6mb+6FDgWuXVyqR9+904oanEIkbJ7vfkthagLbEf57dyG6nJlqh5FBZWxGIR72YGypPuAh7qnnqXXjY2Q==").unwrap(),
-            base64::decode("CUWC+hRWOT421kwRllgVjy6FYv6jQUcgDNHeAiYZnf5HjS9iK2ki7v8G5dL/0f+Yf+NhE/4q8w4m8go51hACrVpP1p8GJDjiT09+RsOzITsHwl+ceEKoe56ZW6iDHBLlrNw5/MtcYhKpjNU9KJ2udm5J/c9iislcjgckrZG2IB8ADgXHMEByZ5DgaMl4AKZ1Gx8/q6KftTvmOT5rNTMLi76VN5KWQcDWK/DqXiOiZHM7Nr4dX4me3XeRgABJyNR8Fqxj3N1+HrYLe/zs7LOaK0++F9Ul3tLelhrhsvLxei3oCZkF9A/foD3on3luYA+1cRcxWpSY3h2J4/22+yo4+Q==").unwrap(),
+            Base64::decode_vec("9kQWEAzsbzOcdPa+s5wFfw4XDd7bB1q9foZ31b1+TNjGNxbSBCFlDF1q98vwpV6nM8bWDh/wtbNoETSQDgpEnYOQ26LWEw6YY1+q1Q2GGEFceYUf+Myk8/vTc8TN6Zw0bKZBWy10Qo8h7xk4JpzuI7NcxvjJYTkS9aErFxi3vVH0aiZC0tmfaCqr8a2rJxyVwqreRpOjwAWrotMsf2wGsF4ofx5ScoFy5GB5fJkkdOrW1LyTvZAUCX3cstPr19+TNC5zZOk7WzZatnCkN5H5WzalWtZuu0oVL205KPOa3R8V2yv5e6fm0v5fTmqSuvjmaMJLXCN4QJkmIzojO99ckQ==").unwrap(),
+            Base64::decode_vec("x8exdMjVA2CiI+Thx7loHtVcevoeE2sZ7btRVAvmBqo+lkHwxb7FHRnWvuj6eJSlD2f0T50EewIhhiW3R9BmktCk7hXjbSCnC1u9Oxc1IAUm/7azRqyfCMx43XhLxpD+xkBCpWkKDLxGczsRwTuaP3lKS3bSdBrNlGmdblubvVBIq4YZ2vXVlnYtza0cS+dgCK7BGTqUsrCUd/ZbIvwcwZkZtpkhj1KQfto9X/0OMurBzAqbkeq1cyRHXHkOfN/qbUIIRqr9Ii7Eswf9Vk8xp2O1Nt8nzcYS9PFD12M5eyaeFEkEYfpNMNGuTzp/31oqVjbpoCxS6vuWAZyADxhISQ==").unwrap(),
+            Base64::decode_vec("is7d0LY4HoXszlC2NO7gejkq7XqL4p1W6hZJPYTNx+r37t1CC2n3Vvzg6kNdpRixDhIpXVTLjN9O7UO/XuqSumYKJIKoP52eb4Tg+a3hw5Iz2Zsb5lUTNSLgkQSBPAf71LHxbL82JL4g1nBUog8ae60BwnVArThKY4EwlJguGNw09BAU4lwf6csDl/nX2vfVwiAloYpeZkHL+L8m+bueGZM5KE2jEz+7ztZCI+T+E5i69rZEYDjx0lfLKlEhQlCW3HbCPELqXgNJJkRfi6MP9kXa9lSfnZmoT081RMvqonB/FUa4HOcKyCrw9XZEtnbNCIdbitfDVEX+pSSD7596wQ==").unwrap(),
+            Base64::decode_vec("GPs0injugfycacaeIP5jMa/WX55VEnKLDHom4k6WlfDF4L4gIGoJdekcPEUfxOI5faKvHyFwRP1wObkPoRBDM0qZxRfBl4zEtpvjHrd5MibSyJkM8+J0BIKk/nSjbRIGeb3hV5O56PvGB3S0dKhCUnuVObiC+ne7izplsD4OTG70l1Yud33UFntyoMxrxGYLUSqhBMmZfHquJg4NOWOzKNY/K+EcHDLj1Kjvkcgv9Vf7ocsVxvpFdD9uGPceQ6kwRDdEl6mb+6FDgWuXVyqR9+904oanEIkbJ7vfkthagLbEf57dyG6nJlqh5FBZWxGIR72YGypPuAh7qnnqXXjY2Q==").unwrap(),
+            Base64::decode_vec("CUWC+hRWOT421kwRllgVjy6FYv6jQUcgDNHeAiYZnf5HjS9iK2ki7v8G5dL/0f+Yf+NhE/4q8w4m8go51hACrVpP1p8GJDjiT09+RsOzITsHwl+ceEKoe56ZW6iDHBLlrNw5/MtcYhKpjNU9KJ2udm5J/c9iislcjgckrZG2IB8ADgXHMEByZ5DgaMl4AKZ1Gx8/q6KftTvmOT5rNTMLi76VN5KWQcDWK/DqXiOiZHM7Nr4dX4me3XeRgABJyNR8Fqxj3N1+HrYLe/zs7LOaK0++F9Ul3tLelhrhsvLxei3oCZkF9A/foD3on3luYA+1cRcxWpSY3h2J4/22+yo4+Q==").unwrap(),
         ];
 
         RsaPrivateKey::from_components(
@@ -812,31 +845,36 @@ mod tests {
         do_test_oaep_with_different_hashes::<Sha3_512, Sha1>(&priv_key);
     }
 
+    fn get_label(rng: &mut ChaCha8Rng) -> Option<String> {
+        const GEN_ASCII_STR_CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
+                abcdefghijklmnopqrstuvwxyz\
+                0123456789=+";
+
+        let mut buf = [0u8; 32];
+        rng.fill_bytes(&mut buf);
+        if buf[0] < (1 << 7) {
+            for v in buf.iter_mut() {
+                *v = GEN_ASCII_STR_CHARSET[(*v >> 2) as usize];
+            }
+            Some(core::str::from_utf8(&buf).unwrap().to_string())
+        } else {
+            None
+        }
+    }
+
     fn do_test_encrypt_decrypt_oaep<D: 'static + Digest + DynDigest>(prk: &RsaPrivateKey) {
-        let seed = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        let mut rng = StdRng::seed_from_u64(seed.as_secs());
+        let mut rng = ChaCha8Rng::from_entropy();
 
         let k = prk.size();
 
         for i in 1..8 {
-            let mut input: Vec<u8> = (0..i * 8).map(|_| rng.gen()).collect();
+            let mut input = vec![0u8; i * 8];
+            rng.fill_bytes(&mut input);
+
             if input.len() > k - 11 {
                 input = input[0..k - 11].to_vec();
             }
-            let has_label: bool = rng.gen();
-            let label: Option<String> = if has_label {
-                Some(
-                    rng.clone()
-                        .sample_iter(&Alphanumeric)
-                        .take(30)
-                        .map(char::from)
-                        .collect(),
-                )
-            } else {
-                None
-            };
+            let label = get_label(&mut rng);
 
             let pub_key: RsaPublicKey = prk.into();
 
@@ -849,7 +887,7 @@ mod tests {
             };
 
             assert_ne!(input, ciphertext);
-            let blind: bool = rng.gen();
+            let blind: bool = rng.next_u32() < (1 << 31);
 
             let padding = if let Some(ref label) = label {
                 PaddingScheme::new_oaep_with_label::<D, _>(label)
@@ -873,30 +911,18 @@ mod tests {
     >(
         prk: &RsaPrivateKey,
     ) {
-        let seed = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        let mut rng = StdRng::seed_from_u64(seed.as_secs());
+        let mut rng = ChaCha8Rng::from_entropy();
 
         let k = prk.size();
 
         for i in 1..8 {
-            let mut input: Vec<u8> = (0..i * 8).map(|_| rng.gen()).collect();
+            let mut input = vec![0u8; i * 8];
+            rng.fill_bytes(&mut input);
+
             if input.len() > k - 11 {
                 input = input[0..k - 11].to_vec();
             }
-            let has_label: bool = rng.gen();
-            let label: Option<String> = if has_label {
-                Some(
-                    rng.clone()
-                        .sample_iter(&Alphanumeric)
-                        .take(30)
-                        .map(char::from)
-                        .collect(),
-                )
-            } else {
-                None
-            };
+            let label = get_label(&mut rng);
 
             let pub_key: RsaPublicKey = prk.into();
 
@@ -909,7 +935,7 @@ mod tests {
             };
 
             assert_ne!(input, ciphertext);
-            let blind: bool = rng.gen();
+            let blind: bool = rng.next_u32() < (1 << 31);
 
             let padding = if let Some(ref label) = label {
                 PaddingScheme::new_oaep_with_mgf_hash_with_label::<D, U, _>(label)
@@ -928,10 +954,7 @@ mod tests {
     }
     #[test]
     fn test_decrypt_oaep_invalid_hash() {
-        let seed = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap();
-        let mut rng = StdRng::seed_from_u64(seed.as_secs());
+        let mut rng = ChaCha8Rng::from_entropy();
         let priv_key = get_private_key();
         let pub_key: RsaPublicKey = (&priv_key).into();
         let ciphertext = pub_key
