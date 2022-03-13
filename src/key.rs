@@ -625,7 +625,7 @@ mod tests {
         let m2 = internals::decrypt::<ChaCha8Rng>(None, &private_key, &c)
             .expect("unable to decrypt without blinding");
         assert_eq!(m, m2);
-        let mut rng = ChaCha8Rng::from_entropy();
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let m3 = internals::decrypt(Some(&mut rng), &private_key, &c)
             .expect("unable to decrypt with blinding");
         assert_eq!(m, m3);
@@ -635,7 +635,7 @@ mod tests {
         ($name:ident, $multi:expr, $size:expr) => {
             #[test]
             fn $name() {
-                let mut rng = ChaCha8Rng::from_entropy();
+                let mut rng = ChaCha8Rng::from_seed([42; 32]);
 
                 for _ in 0..10 {
                     let private_key = if $multi == 2 {
@@ -664,7 +664,7 @@ mod tests {
 
     #[test]
     fn test_impossible_keys() {
-        let mut rng = ChaCha8Rng::from_entropy();
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
         for i in 0..32 {
             let _ = RsaPrivateKey::new(&mut rng, i).is_err();
             let _ = generate_multi_prime_key(&mut rng, 3, i);
@@ -863,7 +863,7 @@ mod tests {
     }
 
     fn do_test_encrypt_decrypt_oaep<D: 'static + Digest + DynDigest>(prk: &RsaPrivateKey) {
-        let mut rng = ChaCha8Rng::from_entropy();
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
 
         let k = prk.size();
 
@@ -911,7 +911,7 @@ mod tests {
     >(
         prk: &RsaPrivateKey,
     ) {
-        let mut rng = ChaCha8Rng::from_entropy();
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
 
         let k = prk.size();
 
@@ -954,7 +954,7 @@ mod tests {
     }
     #[test]
     fn test_decrypt_oaep_invalid_hash() {
-        let mut rng = ChaCha8Rng::from_entropy();
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = get_private_key();
         let pub_key: RsaPublicKey = (&priv_key).into();
         let ciphertext = pub_key
