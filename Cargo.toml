@@ -25,10 +25,13 @@ pkcs1 = { version = "0.3.3", default-features = false, features = ["pkcs8", "all
 pkcs8 = { version = "0.8", default-features = false, features = ["alloc"] }
 zeroize = { version = "1", features = ["alloc"] }
 
+# Temporary workaround until https://github.com/dignifiedquire/num-bigint/pull/42 lands
+smallvec = { version = "1.2", default-features = false }
+
 [dependencies.serde_crate]
 package = "serde"
 optional = true
-version = "1.0.89"
+version = "1.0.103"
 default-features = false
 features = ["derive"]
 
