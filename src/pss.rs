@@ -283,7 +283,7 @@ mod test {
 
         for (text, sig) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
-            let rng = ChaCha8Rng::from_entropy();
+            let rng = ChaCha8Rng::from_seed([42; 32]);
             pub_key
                 .verify(PaddingScheme::new_pss::<Sha1, _>(rng), &digest, sig)
                 .expect("failed to verify");
@@ -295,7 +295,7 @@ mod test {
         let priv_key = get_private_key();
 
         let tests = ["test\n"];
-        let rng = ChaCha8Rng::from_entropy();
+        let rng = ChaCha8Rng::from_seed([42; 32]);
 
         for test in &tests {
             let digest = Sha1::digest(test.as_bytes()).to_vec();

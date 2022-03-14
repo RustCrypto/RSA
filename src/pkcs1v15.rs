@@ -229,7 +229,7 @@ mod tests {
     #[test]
     fn test_non_zero_bytes() {
         for _ in 0..10 {
-            let mut rng = ChaCha8Rng::from_entropy();
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
             let mut b = vec![0u8; 512];
             non_zero_random_bytes(&mut rng, &mut b);
             for el in &b {
@@ -292,7 +292,7 @@ mod tests {
 
     #[test]
     fn test_encrypt_decrypt_pkcs1v15() {
-        let mut rng = ChaCha8Rng::from_entropy();
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = get_private_key();
         let k = priv_key.size();
 
@@ -335,7 +335,7 @@ mod tests {
             assert_ne!(out, digest);
             assert_eq!(out, expected);
 
-            let mut rng = ChaCha8Rng::from_entropy();
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
             let out2 = priv_key
                 .sign_blinded(
                     &mut rng,

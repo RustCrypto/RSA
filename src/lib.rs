@@ -147,8 +147,8 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-pub use rand_core;
 pub use num_bigint::BigUint;
+pub use rand_core;
 
 /// Useful algorithms.
 pub mod algorithms;
