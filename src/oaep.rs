@@ -5,6 +5,7 @@ use rand_core::{CryptoRng, RngCore};
 
 use digest::DynDigest;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
+use zeroize::Zeroizing;
 
 use crate::algorithms::mgf1_xor;
 use crate::errors::{Error, Result};
@@ -41,7 +42,7 @@ pub fn encrypt<R: RngCore + CryptoRng, K: PublicKey>(
         return Err(Error::LabelTooLong);
     }
 
-    let mut em = vec![0u8; k];
+    let mut em = Zeroizing::new(vec![0u8; k]);
 
     let (_, payload) = em.split_at_mut(1);
     let (seed, db) = payload.split_at_mut(h_size);
