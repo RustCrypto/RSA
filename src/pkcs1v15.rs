@@ -2,6 +2,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use rand_core::{CryptoRng, RngCore};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
+use zeroize::Zeroizing;
 
 use crate::errors::{Error, Result};
 use crate::hash::Hash;
@@ -24,7 +25,7 @@ pub fn encrypt<R: RngCore + CryptoRng, PK: PublicKey>(
     }
 
     // EM = 0x00 || 0x02 || PS || 0x00 || M
-    let mut em = vec![0u8; k];
+    let mut em = Zeroizing::new(vec![0u8; k]);
     em[1] = 2;
     non_zero_random_bytes(rng, &mut em[2..k - msg.len() - 1]);
     em[k - msg.len() - 1] = 0;
