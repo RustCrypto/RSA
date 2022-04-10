@@ -65,10 +65,10 @@
 //! [`RsaPublicKey`] as PKCS#1. Note that [`pkcs1`] is re-exported from the
 //! toplevel of the `rsa` crate:
 //!
-//! - [`pkcs1::FromRsaPrivateKey`]: decode RSA private keys from PKCS#1
-//! - [`pkcs1::FromRsaPublicKey`]: decode RSA public keys from PKCS#1
-//! - [`pkcs1::ToRsaPrivateKey`]: encode RSA private keys to PKCS#1
-//! - [`pkcs1::ToRsaPublicKey`]: encode RSA public keys to PKCS#1
+//! - [`pkcs1::DecodeRsaPrivateKey`]: decode RSA private keys from PKCS#1
+//! - [`pkcs1::DecodeRsaPublicKey`]: decode RSA public keys from PKCS#1
+//! - [`pkcs1::EncodeRsaPrivateKey`]: encode RSA private keys to PKCS#1
+//! - [`pkcs1::EncodeRsaPublicKey`]: encode RSA public keys to PKCS#1
 //!
 //! ### Example
 //!
@@ -109,10 +109,10 @@
 //! [`RsaPublicKey`] as PKCS#8. Note that [`pkcs8`] is re-exported from the
 //! toplevel of the `rsa` crate:
 //!
-//! - [`pkcs8::FromPrivateKey`]: decode private keys from PKCS#8
-//! - [`pkcs8::FromPublicKey`]: decode public keys from PKCS#8
-//! - [`pkcs8::ToPrivateKey`]: encode private keys to PKCS#8
-//! - [`pkcs8::ToPublicKey`]: encode public keys to PKCS#8
+//! - [`pkcs8::DecodePrivateKey`]: decode private keys from PKCS#8
+//! - [`pkcs8::DecodePublicKey`]: decode public keys from PKCS#8
+//! - [`pkcs8::EncodePrivateKey`]: encode private keys to PKCS#8
+//! - [`pkcs8::EncodePublicKey`]: encode public keys to PKCS#8
 //!
 //! ### Example
 //!

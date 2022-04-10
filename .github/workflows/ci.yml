@@ -6,6 +6,10 @@ on:
     branches:
       - master
 
+env:
+  RUSTFLAGS: "-Dwarnings"
+  RUSTDOCFLAGS: "-Dwarnings"
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -47,6 +51,18 @@ jobs:
       - run: cargo hack test --release --feature-powerset --exclude-features nightly,getrandom,serde
       - run: cargo test --release --features getrandom
       - run: cargo test --release --features serde
+
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: RustCrypto/actions/cargo-cache@master
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+      - run: cargo doc --all-features
 
   minimal-versions:
     runs-on: ubuntu-latest
