@@ -396,6 +396,11 @@ impl RsaPrivateKey {
         &self.primes
     }
 
+    /// Compute CRT coefficient: `(1/q) mod p`.
+    pub fn crt_coefficient(&self) -> Option<BigUint> {
+        (&self.primes[1]).mod_inverse(&self.primes[0])?.to_biguint()
+    }
+
     /// Performs basic sanity checks on the key.
     /// Returns `Ok(())` if everything is good, otherwise an approriate error.
     pub fn validate(&self) -> Result<()> {

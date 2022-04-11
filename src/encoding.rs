@@ -5,7 +5,6 @@
 
 use crate::{key::PublicKeyParts, BigUint, RsaPrivateKey, RsaPublicKey};
 use core::convert::{TryFrom, TryInto};
-use num_bigint::ModInverse;
 use pkcs8::{
     DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey, PrivateKeyDocument,
     PublicKeyDocument,
@@ -78,11 +77,9 @@ impl EncodePrivateKey for RsaPrivateKey {
         let exponent1 = Zeroizing::new((self.d() % (&self.primes[0] - 1u8)).to_bytes_be());
         let exponent2 = Zeroizing::new((self.d() % (&self.primes[1] - 1u8)).to_bytes_be());
         let coefficient = Zeroizing::new(
-            (&self.primes[1])
-                .mod_inverse(&self.primes[0])
+            self.crt_coefficient()
                 .ok_or(pkcs1::Error::Crypto)?
-                .to_bytes_be()
-                .1,
+                .to_bytes_be(),
         );
 
         let private_key = pkcs1::RsaPrivateKey {
