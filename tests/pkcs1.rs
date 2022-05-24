@@ -90,14 +90,14 @@ fn decode_rsa4096_pub_der() {
 fn encode_rsa2048_priv_der() {
     let key = RsaPrivateKey::from_pkcs1_der(RSA_2048_PRIV_DER).unwrap();
     let der = key.to_pkcs1_der().unwrap();
-    assert_eq!(der.as_ref(), RSA_2048_PRIV_DER)
+    assert_eq!(der.as_bytes(), RSA_2048_PRIV_DER)
 }
 
 #[test]
 fn encode_rsa4096_priv_der() {
     let key = RsaPrivateKey::from_pkcs1_der(RSA_4096_PRIV_DER).unwrap();
     let der = key.to_pkcs1_der().unwrap();
-    assert_eq!(der.as_ref(), RSA_4096_PRIV_DER)
+    assert_eq!(der.as_bytes(), RSA_4096_PRIV_DER)
 }
 
 #[test]

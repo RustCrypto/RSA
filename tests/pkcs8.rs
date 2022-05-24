@@ -45,7 +45,7 @@ fn decode_rsa2048_pub_der() {
 fn encode_rsa2048_priv_der() {
     let key = RsaPrivateKey::from_pkcs8_der(RSA_2048_PRIV_DER).unwrap();
     let der = key.to_pkcs8_der().unwrap();
-    assert_eq!(der.as_ref(), RSA_2048_PRIV_DER)
+    assert_eq!(der.as_bytes(), RSA_2048_PRIV_DER)
 }
 
 #[test]
