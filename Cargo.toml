@@ -63,3 +63,6 @@ getrandom = ["rand_core/getrandom"]
 [package.metadata.docs.rs]
 features = ["std", "pem", "serde", "expose-internals"]
 rustdoc-args = ["--cfg", "docsrs"]
+
+[profile.dev]
+opt-level = 2

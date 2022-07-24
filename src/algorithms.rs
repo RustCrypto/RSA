@@ -131,12 +131,7 @@ pub fn generate_multi_prime_key_with_exp<R: RngCore + CryptoRng>(
         }
     }
 
-    Ok(RsaPrivateKey::from_components(
-        n_final,
-        exp.clone(),
-        d_final,
-        primes,
-    ))
+    RsaPrivateKey::from_components(n_final, exp.clone(), d_final, primes)
 }
 
 /// Mask generation function.
