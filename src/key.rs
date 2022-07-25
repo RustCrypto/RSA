@@ -312,7 +312,13 @@ impl RsaPrivateKey {
         e: BigUint,
         d: BigUint,
         primes: Vec<BigUint>,
-    ) -> RsaPrivateKey {
+    ) -> Result<RsaPrivateKey> {
+        // TODO(tarcieri): support recovering `p` and `q` from `d` if `primes` is empty
+        // See method in Appendix C: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br1.pdf
+        if primes.len() < 2 {
+            return Err(Error::NprimesTooSmall);
+        }
+
         let mut k = RsaPrivateKey {
             pubkey_components: RsaPublicKey { n, e },
             d,
@@ -323,7 +329,7 @@ impl RsaPrivateKey {
         // precompute when possible, ignore error otherwise.
         let _ = k.precompute();
 
-        k
+        Ok(k)
     }
 
     /// Get the public key from the private key, cloning `n` and `e`.
@@ -692,7 +698,8 @@ mod tests {
                 BigUint::from_bytes_le(&vec![105, 101, 60, 173, 19, 153, 3, 192]),
                 BigUint::from_bytes_le(&vec![235, 65, 160, 134, 32, 136, 6, 241]),
             ],
-        );
+        )
+        .unwrap();
 
         for _ in 0..1000 {
             test_key_basics(&private_key);
@@ -785,7 +792,8 @@ mod tests {
             BigUint::from_bytes_be(&e),
             BigUint::from_bytes_be(&d),
             primes.iter().map(|p| BigUint::from_bytes_be(p)).collect(),
-        );
+        )
+        .unwrap();
     }
 
     fn get_private_key() -> RsaPrivateKey {
@@ -825,7 +833,7 @@ mod tests {
                 BigUint::parse_bytes(b"00f827bbf3a41877c7cc59aebf42ed4b29c32defcb8ed96863d5b090a05a8930dd624a21c9dcf9838568fdfa0df65b8462a5f2ac913d6c56f975532bd8e78fb07bd405ca99a484bcf59f019bbddcb3933f2bce706300b4f7b110120c5df9018159067c35da3061a56c8635a52b54273b31271b4311f0795df6021e6355e1a42e61",16).unwrap(),
                 BigUint::parse_bytes(b"00da4817ce0089dd36f2ade6a3ff410c73ec34bf1b4f6bda38431bfede11cef1f7f6efa70e5f8063a3b1f6e17296ffb15feefa0912a0325b8d1fd65a559e717b5b961ec345072e0ec5203d03441d29af4d64054a04507410cf1da78e7b6119d909ec66e6ad625bf995b279a4b3c5be7d895cd7c5b9c4c497fde730916fcdb4e41b", 16).unwrap()
             ],
-        )
+        ).unwrap()
     }
 
     #[test]

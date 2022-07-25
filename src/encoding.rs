@@ -41,7 +41,7 @@ impl TryFrom<pkcs8::PrivateKeyInfo<'_>> for RsaPrivateKey {
         let prime1 = BigUint::from_bytes_be(pkcs1_key.prime1.as_bytes());
         let prime2 = BigUint::from_bytes_be(pkcs1_key.prime2.as_bytes());
         let primes = vec![prime1, prime2];
-        Ok(RsaPrivateKey::from_components(n, e, d, primes))
+        RsaPrivateKey::from_components(n, e, d, primes).map_err(|_| pkcs8::Error::KeyMalformed)
     }
 }
 
