@@ -16,10 +16,6 @@ use crate::padding::PaddingScheme;
 use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
 use crate::{oaep, pkcs1v15, pss};
 
-const MIN_PUB_EXPONENT: u64 = 2;
-const MAX_PUB_EXPONENT: u64 = (1 << 33) - 1;
-const MAX_MODULUS_BITS: usize = 16384;
-
 pub trait PublicKeyParts {
     /// Returns the modulus of the key.
     fn n(&self) -> &BigUint;
@@ -229,8 +225,39 @@ impl PublicKey for RsaPublicKey {
 }
 
 impl RsaPublicKey {
-    /// Create a new key from its components.
+    /// Minimum value of the public exponent `e`.
+    pub const MIN_PUB_EXPONENT: u64 = 2;
+
+    /// Maximum value of the public exponent `e`.
+    pub const MAX_PUB_EXPONENT: u64 = (1 << 33) - 1;
+
+    /// Maximum size of the modulus `n` in bits.
+    pub const MAX_SIZE: usize = 4096;
+
+    /// Maximum size of the modulus `n` in bits when using the
+    /// [`RsaPublicKey::new_large`] constructor.
+    pub const MAX_SIZE_LARGE: usize = 16384;
+
+    /// Create a new public key from its components.
+    ///
+    /// This function accepts public keys with a modulus size up to 4096-bits,
+    /// i.e. [`RsaPublicKey::MAX_SIZE`].
     pub fn new(n: BigUint, e: BigUint) -> Result<Self> {
+        if n.bits() <= Self::MAX_SIZE {
+            Self::new_large(n, e)
+        } else {
+            Err(Error::ModulusTooLarge)
+        }
+    }
+
+    /// Create a new public key from its components.
+    ///
+    /// This function accepts unusually large public keys with a modulus size
+    /// up to 16384-bits, i.e. [`RsaPublicKey::MAX_SIZE_LARGE`].
+    ///
+    /// We don't generally recommend using keys that large. This API is
+    /// provided for interoperability with unusual applications only.
+    pub fn new_large(n: BigUint, e: BigUint) -> Result<Self> {
         let k = RsaPublicKey { n, e };
         check_public(&k)?;
 
@@ -339,7 +366,7 @@ impl RsaPrivateKey {
     /// but it can occationally be useful to discard the private information entirely.
     pub fn to_public_key(&self) -> RsaPublicKey {
         // Safe to unwrap since n and e are already verified.
-        RsaPublicKey::new(self.n().clone(), self.e().clone()).unwrap()
+        RsaPublicKey::new_large(self.n().clone(), self.e().clone()).unwrap()
     }
 
     /// Performs some calculations to speed up private key operations.
@@ -549,7 +576,7 @@ impl RsaPrivateKey {
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
 pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
-    if public_key.n().bits() > MAX_MODULUS_BITS {
+    if public_key.n().bits() > RsaPublicKey::MAX_SIZE_LARGE {
         return Err(Error::ModulusTooLarge);
     }
 
@@ -558,11 +585,11 @@ pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
         .to_u64()
         .ok_or(Error::PublicExponentTooLarge)?;
 
-    if e < MIN_PUB_EXPONENT {
+    if e < RsaPublicKey::MIN_PUB_EXPONENT {
         return Err(Error::PublicExponentTooSmall);
     }
 
-    if e > MAX_PUB_EXPONENT {
+    if e > RsaPublicKey::MAX_PUB_EXPONENT {
         return Err(Error::PublicExponentTooLarge);
     }
 
