@@ -102,20 +102,7 @@ pub(crate) fn verify<PK: PublicKey>(
 /// given hash function. The opts argument may be nil, in which case sensible
 /// defaults are used.
 // TODO: bind T with the CryptoRng trait
-pub(crate) fn sign<T: RngCore + ?Sized, S: CryptoRng + RngCore, SK: PrivateKey>(
-    rng: &mut T,
-    blind_rng: Option<&mut S>,
-    priv_key: &SK,
-    hashed: &[u8],
-    salt_len: Option<usize>,
-    digest: &mut dyn DynDigest,
-) -> Result<Vec<u8>> {
-    let salt = generate_salt(rng, priv_key, salt_len, digest);
-
-    sign_pss_with_salt(blind_rng, priv_key, hashed, &salt, digest)
-}
-
-fn sign_int<T: RngCore + CryptoRng, SK: PrivateKey>(
+pub(crate) fn sign<T: RngCore + CryptoRng, SK: PrivateKey>(
     rng: &mut T,
     blind: bool,
     priv_key: &SK,
@@ -360,7 +347,7 @@ impl RandomizedSigner<Signature> for SigningKey {
         mut rng: impl CryptoRng + RngCore,
         digest: &[u8],
     ) -> signature::Result<Signature> {
-        sign_int(
+        sign(
             &mut rng,
             false,
             &self.inner,
@@ -403,7 +390,7 @@ impl RandomizedSigner<Signature> for BlindedSigningKey {
         mut rng: impl CryptoRng + RngCore,
         digest: &[u8],
     ) -> signature::Result<Signature> {
-        sign_int(
+        sign(
             &mut rng,
             true,
             &self.inner,
@@ -540,8 +527,7 @@ mod test {
 
         for (text, sig, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
-            let rng = ChaCha8Rng::from_seed([42; 32]);
-            let result = pub_key.verify(PaddingScheme::new_pss::<Sha1, _>(rng), &digest, sig);
+            let result = pub_key.verify(PaddingScheme::new_pss::<Sha1>(), &digest, sig);
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -600,19 +586,30 @@ mod test {
         for test in &tests {
             let digest = Sha1::digest(test.as_bytes()).to_vec();
             let sig = priv_key
-                .sign_blinded(
-                    &mut rng.clone(),
-                    PaddingScheme::new_pss::<Sha1, _>(rng.clone()),
-                    &digest,
-                )
+                .sign_with_rng(&mut rng.clone(), PaddingScheme::new_pss::<Sha1>(), &digest)
                 .expect("failed to sign");
 
             priv_key
-                .verify(
-                    PaddingScheme::new_pss::<Sha1, _>(rng.clone()),
-                    &digest,
-                    &sig,
-                )
+                .verify(PaddingScheme::new_pss::<Sha1>(), &digest, &sig)
+                .expect("failed to verify");
+        }
+    }
+
+    #[test]
+    fn test_sign_blinded_and_verify_roundtrip() {
+        let priv_key = get_private_key();
+
+        let tests = ["test\n"];
+        let rng = ChaCha8Rng::from_seed([42; 32]);
+
+        for test in &tests {
+            let digest = Sha1::digest(test.as_bytes()).to_vec();
+            let sig = priv_key
+                .sign_blinded(&mut rng.clone(), PaddingScheme::new_pss::<Sha1>(), &digest)
+                .expect("failed to sign");
+
+            priv_key
+                .verify(PaddingScheme::new_pss::<Sha1>(), &digest, &sig)
                 .expect("failed to verify");
         }
     }
