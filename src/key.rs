@@ -10,6 +10,7 @@ use serde_crate::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
 use crate::algorithms::{generate_multi_prime_key, generate_multi_prime_key_with_exp};
+use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 
 use crate::padding::PaddingScheme;
@@ -585,31 +586,6 @@ fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize)
 
     Ok(())
 }
-
-/// This is a dummy RNG for cases when we need a concrete RNG type
-/// which does not get used.
-#[derive(Copy, Clone)]
-struct DummyRng;
-
-impl RngCore for DummyRng {
-    fn next_u32(&mut self) -> u32 {
-        unimplemented!();
-    }
-
-    fn next_u64(&mut self) -> u64 {
-        unimplemented!();
-    }
-
-    fn fill_bytes(&mut self, _: &mut [u8]) {
-        unimplemented!();
-    }
-
-    fn try_fill_bytes(&mut self, _: &mut [u8]) -> core::result::Result<(), rand_core::Error> {
-        unimplemented!();
-    }
-}
-
-impl CryptoRng for DummyRng {}
 
 #[cfg(test)]
 mod tests {

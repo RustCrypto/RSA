@@ -159,6 +159,7 @@ pub mod hash;
 /// Supported padding schemes.
 pub mod padding;
 
+mod dummy_rng;
 mod encoding;
 mod key;
 mod oaep;
