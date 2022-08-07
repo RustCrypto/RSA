@@ -16,8 +16,9 @@ use crate::padding::PaddingScheme;
 use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
 use crate::{oaep, pkcs1v15, pss};
 
-static MIN_PUB_EXPONENT: u64 = 2;
-static MAX_PUB_EXPONENT: u64 = 1 << (31 - 1);
+const MIN_PUB_EXPONENT: u64 = 2;
+const MAX_PUB_EXPONENT: u64 = (1 << 33) - 1;
+const MAX_MODULUS_BITS: usize = 16384;
 
 pub trait PublicKeyParts {
     /// Returns the modulus of the key.
@@ -548,16 +549,20 @@ impl RsaPrivateKey {
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
 pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
-    let public_key = public_key
+    if public_key.n().bits() > MAX_MODULUS_BITS {
+        return Err(Error::ModulusTooLarge);
+    }
+
+    let e = public_key
         .e()
         .to_u64()
         .ok_or(Error::PublicExponentTooLarge)?;
 
-    if public_key < MIN_PUB_EXPONENT {
+    if e < MIN_PUB_EXPONENT {
         return Err(Error::PublicExponentTooSmall);
     }
 
-    if public_key > MAX_PUB_EXPONENT {
+    if e > MAX_PUB_EXPONENT {
         return Err(Error::PublicExponentTooLarge);
     }
 
