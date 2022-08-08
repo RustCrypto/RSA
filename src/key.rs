@@ -422,7 +422,7 @@ impl RsaPrivateKey {
     /// Performs basic sanity checks on the key.
     /// Returns `Ok(())` if everything is good, otherwise an appropriate error.
     pub fn validate(&self) -> Result<()> {
-        check_public_with_max_size(self, RsaPublicKey::MAX_SIZE)?;
+        check_public(self)?;
 
         // Check that Πprimes == n.
         let mut m = BigUint::one();
@@ -618,6 +618,7 @@ mod tests {
 
     use alloc::string::String;
     use digest::{Digest, DynDigest};
+    use hex_literal::hex;
     use num_traits::{FromPrimitive, ToPrimitive};
     use rand_chacha::{
         rand_core::{RngCore, SeedableRng},
@@ -816,6 +817,78 @@ mod tests {
             primes.iter().map(|p| BigUint::from_bytes_be(p)).collect(),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn reject_oversized_private_key() {
+        // -----BEGIN PUBLIC KEY-----
+        // MIIEIjANBgkqhkiG9w0BAQEFAAOCBA8AMIIECgKCBAEAkMBiB8qsNVXAsJR6Xoto
+        // H1r2rtZl/xzUK2tIfy99aPE489u+5tLxCQhQf+a89158vSDpr2/xwgK8w9u0Xpu2
+        // m7XRKjVMS0Y6UIINFoeTc87rVXT92Scr47kNVcGmSFXez4BSDpS+LKpWwXN+0AQu
+        // +cmcfdtsx2862iEbqQvq4PwKGQJOdOR0yldH8O4yeJK/buvIOXRHjb++vtQND/xi
+        // bFGAcd9WJqvaOG7tclhbZ277mbO6ER+y9Lj7AyO8ywybWqNeHaVPHMysPhT7HUWI
+        // 17m59i1OpuVwwEnvzDQQEUf9d5hUmkLYb5qQzuf6Ddnx/04QJCKAgkhyr9CXgnV6
+        // vEZ3PKtpicCHRxk7eqTEmgBlgwqH5vflRFV1iywQMXJnuRhzWOQaXl/vb8v4HIvF
+        // 4TatEZKqfzpbyScLIiYbPEAhHXKdZMd2zY8hkSbicifePApAZmuNpAxxJDZzphh7
+        // r4lD6t8MPT/RUAdtrZfihqaBhduFI6YeVIy6emg05M6YWvlUyer7nYGaPRS1JqD4
+        // 0v7xOtme5I8Qw6APiFPXhTqBK3occr7TgGb3V3lpC8Eq+esNHrji98R1fITkFXJW
+        // KdFcTWjBghPxiobUzMCFUrPIDJcWXeBzrARAryU+hXjEiFfzluXrps0B7RJQ/rLD
+        // LXeTn4vovUeHQVHa7YfoyWMy9pfqeVC+56LBK7SEIAvL0I3lrq5vIv+ZIuOAdbVg
+        // JiRy8DneCOk2LP3RnA8M0HSevYW93DiC+4h/l4ntjjiOfi6yRVOZ8WbVyXZ/83j4
+        // 6+pGWgvi0uMyb+btgOXjBQv7bGqdyHMc5Lqk5bF7ExETx51vKQMYCV4351caS6aX
+        // q16lYZATHgbTADEAZHdroDMJB+HMQaze9O6qU5ZO8wxxAjw89xry0dnoOQD/yA4H
+        // 7CRCo9vVDpV2hqIvHY9RI2T7cek28kmQpKvNvvK+ovmM138dHKViWULHk0fBRt7m
+        // 4wQ+tiL2PmJ/Tr8g1gVhM6S9D1XdE9z0KeDnODCWn1Q8sx2G2ah4ynnYQURDWcwO
+        // McAoP6bdJ7cCt+4F2tEsMPf4S/EwlnjvuNoQjvztxCPahYe9EnyggtQXyHJveIn7
+        // gDJsP6b93VB6x4QbLy5ch4DUhqDWginuKVeo7CTgDkq03j/IEaS1BHwreSDQceny
+        // +bYWONwV+4TMpGytKOHvU5288kmHbyZHdXuaXk8LLqbnqr30fa6Cbp4llCi9sH5a
+        // Kmi5jxQfVTe+elkMs7oVsLsVgkZS6NqPcOuEckAFijNqG223+IJoqvifCzO5Bdcs
+        // JTOLE+YaUYc8LUJwIaPykgcXmtMvQjeT8MCQ3aAlzkHfDpSvvICrXtqbGiaKolU6
+        // mQIDAQAB
+        // -----END PUBLIC KEY-----
+
+        let n = BigUint::from_bytes_be(&hex!(
+            "
+            90c06207caac3555c0b0947a5e8b681f5af6aed665ff1cd42b6b487f2f7d68f1
+            38f3dbbee6d2f10908507fe6bcf75e7cbd20e9af6ff1c202bcc3dbb45e9bb69b
+            b5d12a354c4b463a50820d16879373ceeb5574fdd9272be3b90d55c1a64855de
+            cf80520e94be2caa56c1737ed0042ef9c99c7ddb6cc76f3ada211ba90beae0fc
+            0a19024e74e474ca5747f0ee327892bf6eebc83974478dbfbebed40d0ffc626c
+            518071df5626abda386eed72585b676efb99b3ba111fb2f4b8fb0323bccb0c9b
+            5aa35e1da54f1cccac3e14fb1d4588d7b9b9f62d4ea6e570c049efcc34101147
+            fd7798549a42d86f9a90cee7fa0dd9f1ff4e10242280824872afd09782757abc
+            46773cab6989c08747193b7aa4c49a0065830a87e6f7e54455758b2c10317267
+            b9187358e41a5e5fef6fcbf81c8bc5e136ad1192aa7f3a5bc9270b22261b3c40
+            211d729d64c776cd8f219126e27227de3c0a40666b8da40c71243673a6187baf
+            8943eadf0c3d3fd150076dad97e286a68185db8523a61e548cba7a6834e4ce98
+            5af954c9eafb9d819a3d14b526a0f8d2fef13ad99ee48f10c3a00f8853d7853a
+            812b7a1c72bed38066f75779690bc12af9eb0d1eb8e2f7c4757c84e415725629
+            d15c4d68c18213f18a86d4ccc08552b3c80c97165de073ac0440af253e8578c4
+            8857f396e5eba6cd01ed1250feb2c32d77939f8be8bd47874151daed87e8c963
+            32f697ea7950bee7a2c12bb484200bcbd08de5aeae6f22ff9922e38075b56026
+            2472f039de08e9362cfdd19c0f0cd0749ebd85bddc3882fb887f9789ed8e388e
+            7e2eb2455399f166d5c9767ff378f8ebea465a0be2d2e3326fe6ed80e5e3050b
+            fb6c6a9dc8731ce4baa4e5b17b131113c79d6f290318095e37e7571a4ba697ab
+            5ea56190131e06d300310064776ba0330907e1cc41acdef4eeaa53964ef30c71
+            023c3cf71af2d1d9e83900ffc80e07ec2442a3dbd50e957686a22f1d8f512364
+            fb71e936f24990a4abcdbef2bea2f98cd77f1d1ca5625942c79347c146dee6e3
+            043eb622f63e627f4ebf20d6056133a4bd0f55dd13dcf429e0e73830969f543c
+            b31d86d9a878ca79d841444359cc0e31c0283fa6dd27b702b7ee05dad12c30f7
+            f84bf1309678efb8da108efcedc423da8587bd127ca082d417c8726f7889fb80
+            326c3fa6fddd507ac7841b2f2e5c8780d486a0d68229ee2957a8ec24e00e4ab4
+            de3fc811a4b5047c2b7920d071e9f2f9b61638dc15fb84cca46cad28e1ef539d
+            bcf249876f2647757b9a5e4f0b2ea6e7aabdf47dae826e9e259428bdb07e5a2a
+            68b98f141f5537be7a590cb3ba15b0bb15824652e8da8f70eb847240058a336a
+            1b6db7f88268aaf89f0b33b905d72c25338b13e61a51873c2d427021a3f29207
+            179ad32f423793f0c090dda025ce41df0e94afbc80ab5eda9b1a268aa2553a99"
+        ));
+
+        let e = BigUint::from_u64(65537).unwrap();
+
+        assert_eq!(
+            RsaPublicKey::new(n, e).err().unwrap(),
+            Error::ModulusTooLarge
+        );
     }
 
     fn get_private_key() -> RsaPrivateKey {
