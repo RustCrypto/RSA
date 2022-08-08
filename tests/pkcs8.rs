@@ -83,7 +83,8 @@ fn decode_rsa2048_pub_pem() {
 fn encode_rsa2048_priv_pem() {
     let key = RsaPrivateKey::from_pkcs8_pem(RSA_2048_PRIV_PEM).unwrap();
     let pem = key.to_pkcs8_pem(Default::default()).unwrap();
-    assert_eq!(&*pem, RSA_2048_PRIV_PEM)
+    let c = pem.replace("\r","");
+    assert_eq!(c, RSA_2048_PRIV_PEM)
 }
 
 #[test]
@@ -91,5 +92,6 @@ fn encode_rsa2048_priv_pem() {
 fn encode_rsa2048_pub_pem() {
     let key = RsaPublicKey::from_public_key_pem(RSA_2048_PUB_PEM).unwrap();
     let pem = key.to_public_key_pem(Default::default()).unwrap();
-    assert_eq!(&*pem, RSA_2048_PUB_PEM)
+    let c = pem.replace("\r","");
+    assert_eq!(c, RSA_2048_PUB_PEM)
 }
