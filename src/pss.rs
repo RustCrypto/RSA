@@ -272,21 +272,37 @@ mod test {
     fn test_verify_pss() {
         let priv_key = get_private_key();
 
-        let tests = [(
-            "test\n",
-            hex!(
-                "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
+        let tests = [
+            (
+                "test\n",
+                hex!(
+                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
+                ),
+                true,
             ),
-        )];
+            (
+                "test\n",
+                hex!(
+                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
+                ),
+                false,
+            ),
+        ];
         let pub_key: RsaPublicKey = priv_key.into();
 
-        for (text, sig) in &tests {
+        for (text, sig, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
             let rng = ChaCha8Rng::from_seed([42; 32]);
-            pub_key
-                .verify(PaddingScheme::new_pss::<Sha1, _>(rng), &digest, sig)
-                .expect("failed to verify");
+            let result = pub_key.verify(PaddingScheme::new_pss::<Sha1, _>(rng), &digest, sig);
+            match expected {
+                true => result.expect("failed to verify"),
+                false => {
+                    result.expect_err("expected verifying error");
+                    ()
+                }
+            }
         }
     }
 

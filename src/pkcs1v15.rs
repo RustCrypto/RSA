@@ -352,25 +352,41 @@ mod tests {
     fn test_verify_pkcs1v15() {
         let priv_key = get_private_key();
 
-        let tests = [(
-            "Test.\n",
-            hex!(
-                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+        let tests = [
+            (
+                "Test.\n",
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+                ),
+                true,
             ),
-        )];
+            (
+                "Test.\n",
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
+                ),
+                false,
+            ),
+        ];
         let pub_key: RsaPublicKey = priv_key.into();
 
-        for (text, sig) in &tests {
+        for (text, sig, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
 
-            pub_key
-                .verify(
-                    PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)),
-                    &digest,
-                    sig,
-                )
-                .expect("failed to verify");
+            let result = pub_key.verify(
+                PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)),
+                &digest,
+                sig,
+            );
+            match expected {
+                true => result.expect("failed to verify"),
+                false => {
+                    result.expect_err("expected verifying error");
+                    ()
+                }
+            }
         }
     }
 
