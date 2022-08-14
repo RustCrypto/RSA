@@ -64,3 +64,17 @@ impl From<pkcs8::Error> for Error {
         Error::Pkcs8(err)
     }
 }
+
+#[cfg(feature = "std")]
+impl From<Error> for signature::Error {
+    fn from(err: Error) -> Self {
+        Self::from_source(err)
+    }
+}
+
+#[cfg(not(feature = "std"))]
+impl From<Error> for signature::Error {
+    fn from(_err: Error) -> Self {
+        Self::new()
+    }
+}

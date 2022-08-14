@@ -23,6 +23,8 @@ subtle = { version = "2.1.1", default-features = false }
 digest = { version = "0.10.0", default-features = false, features = ["alloc"] }
 pkcs1 = { version = "0.4", default-features = false, features = ["pkcs8", "alloc"] }
 pkcs8 = { version = "0.9", default-features = false, features = ["alloc"] }
+#To keep the rand_core versions properly pinnen, specify exact version
+signature = { version = ">=1.5, <1.7", default-features = false , features = ["rand-preview"] }
 zeroize = { version = "1", features = ["alloc"] }
 
 # Temporary workaround until https://github.com/dignifiedquire/num-bigint/pull/42 lands
@@ -55,7 +57,7 @@ default = ["std", "pem"]
 nightly = ["num-bigint/nightly"]
 serde = ["num-bigint/serde", "serde_crate"]
 expose-internals = []
-std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std"]
+std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std", "signature/std"]
 pem = ["pkcs1/pem", "pkcs8/pem"]
 pkcs5 = ["pkcs8/encryption"]
 getrandom = ["rand_core/getrandom"]

@@ -158,13 +158,15 @@ pub mod errors;
 pub mod hash;
 /// Supported padding schemes.
 pub mod padding;
+/// RSASSA-PKCS1-v1_5 Signature support
+pub mod pkcs1v15;
+/// RSASSA-PSS Signature support
+pub mod pss;
 
 mod dummy_rng;
 mod encoding;
 mod key;
 mod oaep;
-mod pkcs1v15;
-mod pss;
 mod raw;
 
 pub use pkcs1;
