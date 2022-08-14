@@ -26,7 +26,7 @@ pub fn verify<PK: PublicKey>(
     emsa_pss_verify(hashed, &mut em, em_bits, None, digest)
 }
 
-/// SignPSS calculates the signature of hashed using RSASSA-PSS [1].
+/// SignPSS calculates the signature of hashed using RSASSA-PSS.
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. The opts argument may be nil, in which case sensible
 /// defaults are used.
@@ -47,7 +47,7 @@ pub fn sign<T: RngCore + ?Sized, S: CryptoRng + RngCore, SK: PrivateKey>(
     sign_pss_with_salt(blind_rng, priv_key, hashed, &salt, digest)
 }
 
-/// signPSSWithSalt calculates the signature of hashed using PSS [1] with specified salt.
+/// signPSSWithSalt calculates the signature of hashed using PSS with specified salt.
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. salt is a random sequence of bytes whose length will be
 /// later used to verify the signature.
