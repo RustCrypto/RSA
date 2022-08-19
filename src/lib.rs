@@ -47,6 +47,54 @@
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
 //!
+//! Using PKCS1v15 signatures
+//! ```
+//! use rsa::{Hash, RsaPrivateKey};
+//! use rsa::pkcs1v15::{SigningKey, VerifyingKey};
+//! use sha2::{Digest, Sha256};
+//! use signature::{RandomizedSigner, Signature, Verifier};
+//!
+//! let mut rng = rand::thread_rng();
+//!
+//! let bits = 2048;
+//! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+//! let signing_key = SigningKey::new_with_hash(private_key, Hash::SHA2_256);
+//! let verifying_key: VerifyingKey = (&signing_key).into();
+//!
+//! // Sign
+//! let data = b"hello world";
+//! let digest = Sha256::digest(data).to_vec();
+//! let signature = signing_key.sign_with_rng(&mut rng, &digest);
+//! assert_ne!(signature.as_bytes(), data);
+//!
+//! // Verify
+//! verifying_key.verify(&digest, &signature).expect("failed to verify");
+//! ```
+//!
+//! Using PSS signatures
+//! ```
+//! use rsa::{Hash, RsaPrivateKey};
+//! use rsa::pss::{BlindedSigningKey, VerifyingKey};
+//! use sha2::{Digest, Sha256};
+//! use signature::{RandomizedSigner, Signature, Verifier};
+//!
+//! let mut rng = rand::thread_rng();
+//!
+//! let bits = 2048;
+//! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+//! let signing_key = BlindedSigningKey::new(private_key, Box::new(Sha256::new()));
+//! let verifying_key: VerifyingKey = (&signing_key).into();
+//!
+//! // Sign
+//! let data = b"hello world";
+//! let digest = Sha256::digest(data).to_vec();
+//! let signature = signing_key.sign_with_rng(&mut rng, &digest);
+//! assert_ne!(signature.as_bytes(), data);
+//!
+//! // Verify
+//! verifying_key.verify(&digest, &signature).expect("failed to verify");
+//! ```
+//!
 //! ## PKCS#1 RSA Key Encoding
 //!
 //! PKCS#1 is a legacy format for encoding RSA keys as binary (DER) or text
@@ -158,12 +206,15 @@ pub mod errors;
 pub mod hash;
 /// Supported padding schemes.
 pub mod padding;
+/// RSASSA-PKCS1-v1_5 Signature support
+pub mod pkcs1v15;
+/// RSASSA-PSS Signature support
+pub mod pss;
 
+mod dummy_rng;
 mod encoding;
 mod key;
 mod oaep;
-mod pkcs1v15;
-mod pss;
 mod raw;
 
 pub use pkcs1;

@@ -1,18 +1,89 @@
 use alloc::vec;
 use alloc::vec::Vec;
+use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use rand_core::{CryptoRng, RngCore};
+use signature::{RandomizedSigner, Signature as SignSignature, Signer, Verifier};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;
 
+use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::hash::Hash;
 use crate::key::{self, PrivateKey, PublicKey};
+use crate::{RsaPrivateKey, RsaPublicKey};
+
+#[derive(Clone)]
+pub struct Signature {
+    bytes: Vec<u8>,
+}
+
+impl signature::Signature for Signature {
+    fn from_bytes(bytes: &[u8]) -> signature::Result<Self> {
+        Ok(Signature {
+            bytes: bytes.into(),
+        })
+    }
+
+    fn as_bytes(&self) -> &[u8] {
+        &self.bytes.as_slice()
+    }
+}
+
+impl From<Vec<u8>> for Signature {
+    fn from(bytes: Vec<u8>) -> Self {
+        Self { bytes }
+    }
+}
+
+impl PartialEq for Signature {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_bytes() == other.as_bytes()
+    }
+}
+
+impl Eq for Signature {}
+
+impl Debug for Signature {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> core::result::Result<(), core::fmt::Error> {
+        fmt.debug_list().entries(self.as_bytes().iter()).finish()
+    }
+}
+
+impl AsRef<[u8]> for Signature {
+    fn as_ref(&self) -> &[u8] {
+        &self.as_bytes()
+    }
+}
+
+impl LowerHex for Signature {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        for byte in self.as_bytes() {
+            write!(f, "{:02x}", byte)?;
+        }
+        Ok(())
+    }
+}
+
+impl UpperHex for Signature {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        for byte in self.as_bytes() {
+            write!(f, "{:02X}", byte)?;
+        }
+        Ok(())
+    }
+}
+
+impl Display for Signature {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{:X}", self)
+    }
+}
 
 // Encrypts the given message with RSA and the padding
 // scheme from PKCS#1 v1.5.  The message must be no longer than the
 // length of the public modulus minus 11 bytes.
 #[inline]
-pub fn encrypt<R: RngCore + CryptoRng, PK: PublicKey>(
+pub(crate) fn encrypt<R: RngCore + CryptoRng, PK: PublicKey>(
     rng: &mut R,
     pub_key: &PK,
     msg: &[u8],
@@ -43,7 +114,7 @@ pub fn encrypt<R: RngCore + CryptoRng, PK: PublicKey>(
 // forge signatures as if they had the private key. See
 // `decrypt_session_key` for a way of solving this problem.
 #[inline]
-pub fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
+pub(crate) fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
@@ -72,7 +143,7 @@ pub fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
 // messages to signatures and identify the signed messages. As ever,
 // signatures provide authenticity, not confidentiality.
 #[inline]
-pub fn sign<R: RngCore + CryptoRng, SK: PrivateKey>(
+pub(crate) fn sign<R: RngCore + CryptoRng, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     hash: Option<&Hash>,
@@ -99,7 +170,7 @@ pub fn sign<R: RngCore + CryptoRng, SK: PrivateKey>(
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
 #[inline]
-pub fn verify<PK: PublicKey>(
+pub(crate) fn verify<PK: PublicKey>(
     pub_key: &PK,
     hash: Option<&Hash>,
     hashed: &[u8],
@@ -214,6 +285,100 @@ fn non_zero_random_bytes<R: RngCore + CryptoRng>(rng: &mut R, data: &mut [u8]) {
     }
 }
 
+pub struct SigningKey {
+    inner: RsaPrivateKey,
+    hash: Option<Hash>,
+}
+
+impl SigningKey {
+    pub(crate) fn key(&self) -> &RsaPrivateKey {
+        &self.inner
+    }
+
+    pub(crate) fn hash(&self) -> Option<Hash> {
+        self.hash
+    }
+
+    pub fn new(key: RsaPrivateKey) -> Self {
+        Self {
+            inner: key,
+            hash: None,
+        }
+    }
+
+    pub fn new_with_hash(key: RsaPrivateKey, hash: Hash) -> Self {
+        Self {
+            inner: key,
+            hash: Some(hash),
+        }
+    }
+}
+
+impl Signer<Signature> for SigningKey {
+    fn try_sign(&self, digest: &[u8]) -> signature::Result<Signature> {
+        sign::<DummyRng, _>(None, &self.inner, self.hash.as_ref(), digest)
+            .map(|v| v.into())
+            .map_err(|e| e.into())
+    }
+}
+
+impl RandomizedSigner<Signature> for SigningKey {
+    fn try_sign_with_rng(
+        &self,
+        mut rng: impl CryptoRng + RngCore,
+        digest: &[u8],
+    ) -> signature::Result<Signature> {
+        sign(Some(&mut rng), &self.inner, self.hash.as_ref(), digest)
+            .map(|v| v.into())
+            .map_err(|e| e.into())
+    }
+}
+
+pub struct VerifyingKey {
+    inner: RsaPublicKey,
+    hash: Option<Hash>,
+}
+
+impl VerifyingKey {
+    pub fn new(key: RsaPublicKey) -> Self {
+        Self {
+            inner: key,
+            hash: None,
+        }
+    }
+
+    pub fn new_with_hash(key: RsaPublicKey, hash: Hash) -> Self {
+        Self {
+            inner: key,
+            hash: Some(hash),
+        }
+    }
+}
+
+impl From<SigningKey> for VerifyingKey {
+    fn from(key: SigningKey) -> Self {
+        Self {
+            inner: key.key().into(),
+            hash: key.hash(),
+        }
+    }
+}
+
+impl From<&SigningKey> for VerifyingKey {
+    fn from(key: &SigningKey) -> Self {
+        Self {
+            inner: key.key().into(),
+            hash: key.hash(),
+        }
+    }
+}
+
+impl Verifier<Signature> for VerifyingKey {
+    fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
+        verify(&self.inner, self.hash.as_ref(), msg, signature.as_ref()).map_err(|e| e.into())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -224,6 +389,7 @@ mod tests {
     use num_traits::Num;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
     use sha1::{Digest, Sha1};
+    use signature::{RandomizedSigner, Signature, Signer, Verifier};
 
     use crate::{Hash, PaddingScheme, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 
@@ -349,7 +515,7 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_pkcs1v15() {
+    fn test_sign_pkcs1v15_signer() {
         let priv_key = get_private_key();
 
         let tests = [(
@@ -359,18 +525,100 @@ mod tests {
                 "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
             ),
         )];
-        let pub_key: RsaPublicKey = priv_key.into();
 
-        for (text, sig) in &tests {
+        let signing_key = SigningKey::new_with_hash(priv_key, Hash::SHA1);
+
+        for (text, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
 
-            pub_key
-                .verify(
-                    PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)),
-                    &digest,
-                    sig,
-                )
-                .expect("failed to verify");
+            let out = signing_key.sign(&digest);
+            assert_ne!(out.as_ref(), digest);
+            assert_eq!(out.as_ref(), expected);
+
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
+            let out2 = signing_key.sign_with_rng(&mut rng, &digest);
+            assert_eq!(out2.as_ref(), expected);
+        }
+    }
+
+    #[test]
+    fn test_verify_pkcs1v15() {
+        let priv_key = get_private_key();
+
+        let tests = [
+            (
+                "Test.\n",
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+                ),
+                true,
+            ),
+            (
+                "Test.\n",
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
+                ),
+                false,
+            ),
+        ];
+        let pub_key: RsaPublicKey = priv_key.into();
+
+        for (text, sig, expected) in &tests {
+            let digest = Sha1::digest(text.as_bytes()).to_vec();
+
+            let result = pub_key.verify(
+                PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)),
+                &digest,
+                sig,
+            );
+            match expected {
+                true => result.expect("failed to verify"),
+                false => {
+                    result.expect_err("expected verifying error");
+                    ()
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_verify_pkcs1v15_signer() {
+        let priv_key = get_private_key();
+
+        let tests = [
+            (
+                "Test.\n",
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+                ),
+                true,
+            ),
+            (
+                "Test.\n",
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
+                ),
+                false,
+            ),
+        ];
+        let pub_key: RsaPublicKey = priv_key.into();
+        let verifying_key = VerifyingKey::new_with_hash(pub_key, Hash::SHA1);
+
+        for (text, sig, expected) in &tests {
+            let digest = Sha1::digest(text.as_bytes()).to_vec();
+
+            let result = verifying_key.verify(&digest, &Signature::from_bytes(sig).unwrap());
+            match expected {
+                true => result.expect("failed to verify"),
+                false => {
+                    result.expect_err("expected verifying error");
+                    ()
+                }
+            }
         }
     }
 
@@ -389,5 +637,27 @@ mod tests {
         pub_key
             .verify(PaddingScheme::new_pkcs1v15_sign(None), msg, &sig)
             .expect("failed to verify");
+    }
+
+    #[test]
+    fn test_unpadded_signature_signer() {
+        let msg = b"Thu Dec 19 18:06:16 EST 2013\n";
+        let expected_sig = Base64::decode_vec("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
+        let priv_key = get_private_key();
+
+        let signing_key = SigningKey::new(priv_key);
+        let sig = signing_key.sign(msg);
+        assert_eq!(sig.as_ref(), expected_sig);
+
+        let verifying_key: VerifyingKey = (&signing_key).into();
+        verifying_key
+            .verify(msg, &Signature::from_bytes(&expected_sig).unwrap())
+            .expect("failed to verify");
+
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let sig = signing_key.sign_with_rng(&mut rng, msg);
+        assert_eq!(sig.as_ref(), expected_sig);
+
+        verifying_key.verify(msg, &sig).expect("failed to verify");
     }
 }
