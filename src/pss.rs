@@ -358,15 +358,18 @@ impl RandomizedSigner<Signature> for SigningKey {
     fn try_sign_with_rng(
         &self,
         mut rng: impl CryptoRng + RngCore,
-        digest: &[u8],
+        msg: &[u8],
     ) -> signature::Result<Signature> {
+        let mut digest = self.digest.box_clone();
+        digest.update(msg);
+        let hashed = digest.finalize_reset();
         sign_int(
             &mut rng,
             false,
             &self.inner,
-            digest,
+            &hashed,
             self.salt_len,
-            self.digest.box_clone().as_mut(),
+            digest.as_mut(),
         )
         .map(|v| v.into())
         .map_err(|e| e.into())
@@ -401,15 +404,18 @@ impl RandomizedSigner<Signature> for BlindedSigningKey {
     fn try_sign_with_rng(
         &self,
         mut rng: impl CryptoRng + RngCore,
-        digest: &[u8],
+        msg: &[u8],
     ) -> signature::Result<Signature> {
+        let mut digest = self.digest.box_clone();
+        digest.update(msg);
+        let hashed = digest.finalize_reset();
         sign_int(
             &mut rng,
             true,
             &self.inner,
-            digest,
+            &hashed,
             self.salt_len,
-            self.digest.box_clone().as_mut(),
+            digest.as_mut(),
         )
         .map(|v| v.into())
         .map_err(|e| e.into())
@@ -468,11 +474,14 @@ impl From<&BlindedSigningKey> for VerifyingKey {
 
 impl Verifier<Signature> for VerifyingKey {
     fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
+        let mut digest = self.digest.box_clone();
+        digest.update(msg);
+        let hashed = digest.finalize_reset();
         verify(
             &self.inner,
-            msg,
+            &hashed,
             signature.as_ref(),
-            self.digest.box_clone().as_mut(),
+            digest.as_mut(),
         )
         .map_err(|e| e.into())
     }
@@ -578,8 +587,7 @@ mod test {
         let verifying_key: VerifyingKey = VerifyingKey::new(pub_key, Box::new(Sha1::new()));
 
         for (text, sig, expected) in &tests {
-            let digest = Sha1::digest(text.as_bytes()).to_vec();
-            let result = verifying_key.verify(&digest, &Signature::from_bytes(sig).unwrap());
+            let result = verifying_key.verify(text.as_bytes(), &Signature::from_bytes(sig).unwrap());
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -627,10 +635,9 @@ mod test {
         let verifying_key: VerifyingKey = (&signing_key).into();
 
         for test in &tests {
-            let digest = Sha1::digest(test.as_bytes()).to_vec();
-            let sig = signing_key.sign_with_rng(&mut rng, &digest);
+            let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
             verifying_key
-                .verify(&digest, &sig)
+                .verify(test.as_bytes(), &sig)
                 .expect("failed to verify");
         }
     }
@@ -645,10 +652,9 @@ mod test {
         let verifying_key: VerifyingKey = (&signing_key).into();
 
         for test in &tests {
-            let digest = Sha1::digest(test.as_bytes()).to_vec();
-            let sig = signing_key.sign_with_rng(&mut rng, &digest);
+            let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
             verifying_key
-                .verify(&digest, &sig)
+                .verify(test.as_bytes(), &sig)
                 .expect("failed to verify");
         }
     }

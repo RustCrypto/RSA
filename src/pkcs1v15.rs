@@ -1,6 +1,8 @@
+use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
+use digest::DynDigest;
 use rand_core::{CryptoRng, RngCore};
 use signature::{RandomizedSigner, Signature as SignSignature, Signer, Verifier};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
@@ -288,6 +290,7 @@ fn non_zero_random_bytes<R: RngCore + CryptoRng>(rng: &mut R, data: &mut [u8]) {
 pub struct SigningKey {
     inner: RsaPrivateKey,
     hash: Option<Hash>,
+    digest: Box<dyn DynDigest>,
 }
 
 impl SigningKey {
@@ -299,24 +302,33 @@ impl SigningKey {
         self.hash
     }
 
-    pub fn new(key: RsaPrivateKey) -> Self {
+    pub(crate) fn digest(&self) -> Box<dyn DynDigest> {
+        self.digest.box_clone()
+    }
+
+    pub fn new(key: RsaPrivateKey, digest: Box<dyn DynDigest>) -> Self {
         Self {
             inner: key,
             hash: None,
+            digest,
         }
     }
 
-    pub fn new_with_hash(key: RsaPrivateKey, hash: Hash) -> Self {
+    pub fn new_with_hash(key: RsaPrivateKey, hash: Hash, digest: Box<dyn DynDigest>) -> Self {
         Self {
             inner: key,
             hash: Some(hash),
+            digest,
         }
     }
 }
 
 impl Signer<Signature> for SigningKey {
-    fn try_sign(&self, digest: &[u8]) -> signature::Result<Signature> {
-        sign::<DummyRng, _>(None, &self.inner, self.hash.as_ref(), digest)
+    fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
+        let mut digest = self.digest.box_clone();
+        digest.update(msg);
+        let hashed = digest.finalize_reset();
+        sign::<DummyRng, _>(None, &self.inner, self.hash.as_ref(), &hashed)
             .map(|v| v.into())
             .map_err(|e| e.into())
     }
@@ -326,9 +338,12 @@ impl RandomizedSigner<Signature> for SigningKey {
     fn try_sign_with_rng(
         &self,
         mut rng: impl CryptoRng + RngCore,
-        digest: &[u8],
+        msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign(Some(&mut rng), &self.inner, self.hash.as_ref(), digest)
+        let mut digest = self.digest.box_clone();
+        digest.update(msg);
+        let hashed = digest.finalize_reset();
+        sign(Some(&mut rng), &self.inner, self.hash.as_ref(), &hashed)
             .map(|v| v.into())
             .map_err(|e| e.into())
     }
@@ -337,20 +352,23 @@ impl RandomizedSigner<Signature> for SigningKey {
 pub struct VerifyingKey {
     inner: RsaPublicKey,
     hash: Option<Hash>,
+    digest: Box<dyn DynDigest>,
 }
 
 impl VerifyingKey {
-    pub fn new(key: RsaPublicKey) -> Self {
+    pub fn new(key: RsaPublicKey, digest: Box<dyn DynDigest>) -> Self {
         Self {
             inner: key,
             hash: None,
+            digest,
         }
     }
 
-    pub fn new_with_hash(key: RsaPublicKey, hash: Hash) -> Self {
+    pub fn new_with_hash(key: RsaPublicKey, hash: Hash, digest: Box<dyn DynDigest>) -> Self {
         Self {
             inner: key,
             hash: Some(hash),
+            digest,
         }
     }
 }
@@ -360,6 +378,7 @@ impl From<SigningKey> for VerifyingKey {
         Self {
             inner: key.key().into(),
             hash: key.hash(),
+            digest: key.digest(),
         }
     }
 }
@@ -369,13 +388,17 @@ impl From<&SigningKey> for VerifyingKey {
         Self {
             inner: key.key().into(),
             hash: key.hash(),
+            digest: key.digest(),
         }
     }
 }
 
 impl Verifier<Signature> for VerifyingKey {
     fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify(&self.inner, self.hash.as_ref(), msg, signature.as_ref()).map_err(|e| e.into())
+        let mut digest = self.digest.box_clone();
+        digest.update(msg);
+        let hashed = digest.finalize_reset();
+        verify(&self.inner, self.hash.as_ref(), &hashed, signature.as_ref()).map_err(|e| e.into())
     }
 }
 
@@ -526,17 +549,18 @@ mod tests {
             ),
         )];
 
-        let signing_key = SigningKey::new_with_hash(priv_key, Hash::SHA1);
+        let signing_key = SigningKey::new_with_hash(priv_key, Hash::SHA1, Box::new(Sha1::new()));
 
         for (text, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
 
-            let out = signing_key.sign(&digest);
+            let out = signing_key.sign(text.as_bytes());
+            assert_ne!(out.as_ref(), text.as_bytes());
             assert_ne!(out.as_ref(), digest);
             assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = signing_key.sign_with_rng(&mut rng, &digest);
+            let out2 = signing_key.sign_with_rng(&mut rng, text.as_bytes());
             assert_eq!(out2.as_ref(), expected);
         }
     }
@@ -606,12 +630,10 @@ mod tests {
             ),
         ];
         let pub_key: RsaPublicKey = priv_key.into();
-        let verifying_key = VerifyingKey::new_with_hash(pub_key, Hash::SHA1);
+        let verifying_key = VerifyingKey::new_with_hash(pub_key, Hash::SHA1, Box::new(Sha1::new()));
 
         for (text, sig, expected) in &tests {
-            let digest = Sha1::digest(text.as_bytes()).to_vec();
-
-            let result = verifying_key.verify(&digest, &Signature::from_bytes(sig).unwrap());
+            let result = verifying_key.verify(text.as_bytes(), &Signature::from_bytes(sig).unwrap());
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -642,10 +664,10 @@ mod tests {
     #[test]
     fn test_unpadded_signature_signer() {
         let msg = b"Thu Dec 19 18:06:16 EST 2013\n";
-        let expected_sig = Base64::decode_vec("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
+        let expected_sig = Base64::decode_vec("F8rxGUnrRLYr9nTWrYMZYk3Y0msVzfl9daWt32AZHJNCVENOWUS17OwcFawgmYhyJZDG3leTT6S5QZLaozun/A==").unwrap();
         let priv_key = get_private_key();
 
-        let signing_key = SigningKey::new(priv_key);
+        let signing_key = SigningKey::new(priv_key, Box::new(Sha1::new()));
         let sig = signing_key.sign(msg);
         assert_eq!(sig.as_ref(), expected_sig);
 
