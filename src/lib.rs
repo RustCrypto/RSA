@@ -58,17 +58,16 @@
 //!
 //! let bits = 2048;
 //! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
-//! let signing_key = SigningKey::new_with_hash(private_key, Hash::SHA2_256);
-//! let verifying_key: VerifyingKey = (&signing_key).into();
+//! let signing_key = SigningKey::<Sha256>::new_with_hash(private_key, Hash::SHA2_256);
+//! let verifying_key: VerifyingKey<_> = (&signing_key).into();
 //!
 //! // Sign
 //! let data = b"hello world";
-//! let digest = Sha256::digest(data).to_vec();
-//! let signature = signing_key.sign_with_rng(&mut rng, &digest);
+//! let signature = signing_key.sign_with_rng(&mut rng, data);
 //! assert_ne!(signature.as_bytes(), data);
 //!
 //! // Verify
-//! verifying_key.verify(&digest, &signature).expect("failed to verify");
+//! verifying_key.verify(data, &signature).expect("failed to verify");
 //! ```
 //!
 //! Using PSS signatures

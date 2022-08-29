@@ -1,6 +1,8 @@
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
+use core::marker::PhantomData;
+use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use signature::{RandomizedSigner, Signature as SignSignature, Signer, Verifier};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
@@ -285,12 +287,19 @@ fn non_zero_random_bytes<R: RngCore + CryptoRng>(rng: &mut R, data: &mut [u8]) {
     }
 }
 
-pub struct SigningKey {
+pub struct SigningKey<D>
+where
+    D: Digest,
+{
     inner: RsaPrivateKey,
     hash: Option<Hash>,
+    phantom: PhantomData<D>,
 }
 
-impl SigningKey {
+impl<D> SigningKey<D>
+where
+    D: Digest,
+{
     pub(crate) fn key(&self) -> &RsaPrivateKey {
         &self.inner
     }
@@ -303,6 +312,7 @@ impl SigningKey {
         Self {
             inner: key,
             hash: None,
+            phantom: Default::default(),
         }
     }
 
@@ -310,40 +320,60 @@ impl SigningKey {
         Self {
             inner: key,
             hash: Some(hash),
+            phantom: Default::default(),
         }
     }
 }
 
-impl Signer<Signature> for SigningKey {
-    fn try_sign(&self, digest: &[u8]) -> signature::Result<Signature> {
-        sign::<DummyRng, _>(None, &self.inner, self.hash.as_ref(), digest)
+impl<D> Signer<Signature> for SigningKey<D>
+where
+    D: Digest,
+{
+    fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
+        sign::<DummyRng, _>(None, &self.inner, self.hash.as_ref(), &D::digest(msg))
             .map(|v| v.into())
             .map_err(|e| e.into())
     }
 }
 
-impl RandomizedSigner<Signature> for SigningKey {
+impl<D> RandomizedSigner<Signature> for SigningKey<D>
+where
+    D: Digest,
+{
     fn try_sign_with_rng(
         &self,
         mut rng: impl CryptoRng + RngCore,
-        digest: &[u8],
+        msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign(Some(&mut rng), &self.inner, self.hash.as_ref(), digest)
-            .map(|v| v.into())
-            .map_err(|e| e.into())
+        sign(
+            Some(&mut rng),
+            &self.inner,
+            self.hash.as_ref(),
+            &D::digest(msg),
+        )
+        .map(|v| v.into())
+        .map_err(|e| e.into())
     }
 }
 
-pub struct VerifyingKey {
+pub struct VerifyingKey<D>
+where
+    D: Digest,
+{
     inner: RsaPublicKey,
     hash: Option<Hash>,
+    phantom: PhantomData<D>,
 }
 
-impl VerifyingKey {
+impl<D> VerifyingKey<D>
+where
+    D: Digest,
+{
     pub fn new(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
             hash: None,
+            phantom: Default::default(),
         }
     }
 
@@ -351,31 +381,49 @@ impl VerifyingKey {
         Self {
             inner: key,
             hash: Some(hash),
+            phantom: Default::default(),
         }
     }
 }
 
-impl From<SigningKey> for VerifyingKey {
-    fn from(key: SigningKey) -> Self {
+impl<D> From<SigningKey<D>> for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn from(key: SigningKey<D>) -> Self {
         Self {
             inner: key.key().into(),
             hash: key.hash(),
+            phantom: Default::default(),
         }
     }
 }
 
-impl From<&SigningKey> for VerifyingKey {
-    fn from(key: &SigningKey) -> Self {
+impl<D> From<&SigningKey<D>> for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn from(key: &SigningKey<D>) -> Self {
         Self {
             inner: key.key().into(),
             hash: key.hash(),
+            phantom: Default::default(),
         }
     }
 }
 
-impl Verifier<Signature> for VerifyingKey {
+impl<D> Verifier<Signature> for VerifyingKey<D>
+where
+    D: Digest,
+{
     fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify(&self.inner, self.hash.as_ref(), msg, signature.as_ref()).map_err(|e| e.into())
+        verify(
+            &self.inner,
+            self.hash.as_ref(),
+            &D::digest(msg),
+            signature.as_ref(),
+        )
+        .map_err(|e| e.into())
     }
 }
 
@@ -526,17 +574,16 @@ mod tests {
             ),
         )];
 
-        let signing_key = SigningKey::new_with_hash(priv_key, Hash::SHA1);
+        let signing_key = SigningKey::<Sha1>::new_with_hash(priv_key, Hash::SHA1);
 
         for (text, expected) in &tests {
-            let digest = Sha1::digest(text.as_bytes()).to_vec();
-
-            let out = signing_key.sign(&digest);
-            assert_ne!(out.as_ref(), digest);
+            let out = signing_key.sign(text.as_bytes());
+            assert_ne!(out.as_ref(), text.as_bytes());
+            assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
             assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = signing_key.sign_with_rng(&mut rng, &digest);
+            let out2 = signing_key.sign_with_rng(&mut rng, text.as_bytes());
             assert_eq!(out2.as_ref(), expected);
         }
     }
@@ -606,12 +653,11 @@ mod tests {
             ),
         ];
         let pub_key: RsaPublicKey = priv_key.into();
-        let verifying_key = VerifyingKey::new_with_hash(pub_key, Hash::SHA1);
+        let verifying_key = VerifyingKey::<Sha1>::new_with_hash(pub_key, Hash::SHA1);
 
         for (text, sig, expected) in &tests {
-            let digest = Sha1::digest(text.as_bytes()).to_vec();
-
-            let result = verifying_key.verify(&digest, &Signature::from_bytes(sig).unwrap());
+            let result =
+                verifying_key.verify(text.as_bytes(), &Signature::from_bytes(sig).unwrap());
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -642,14 +688,14 @@ mod tests {
     #[test]
     fn test_unpadded_signature_signer() {
         let msg = b"Thu Dec 19 18:06:16 EST 2013\n";
-        let expected_sig = Base64::decode_vec("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
+        let expected_sig = Base64::decode_vec("F8rxGUnrRLYr9nTWrYMZYk3Y0msVzfl9daWt32AZHJNCVENOWUS17OwcFawgmYhyJZDG3leTT6S5QZLaozun/A==").unwrap();
         let priv_key = get_private_key();
 
-        let signing_key = SigningKey::new(priv_key);
+        let signing_key = SigningKey::<Sha1>::new(priv_key);
         let sig = signing_key.sign(msg);
         assert_eq!(sig.as_ref(), expected_sig);
 
-        let verifying_key: VerifyingKey = (&signing_key).into();
+        let verifying_key: VerifyingKey<_> = (&signing_key).into();
         verifying_key
             .verify(msg, &Signature::from_bytes(&expected_sig).unwrap())
             .expect("failed to verify");
