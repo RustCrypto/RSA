@@ -3,7 +3,6 @@ use alloc::string::{String, ToString};
 use core::fmt;
 
 use digest::{Digest, DynDigest};
-use rand_core::RngCore;
 
 use crate::hash::Hash;
 
@@ -30,7 +29,6 @@ pub enum PaddingScheme {
     },
     /// Sign and Verify using PSS padding.
     PSS {
-        salt_rng: Box<dyn RngCore>,
         digest: Box<dyn DynDigest>,
         salt_len: Option<usize>,
     },
@@ -142,20 +140,15 @@ impl PaddingScheme {
         }
     }
 
-    pub fn new_pss<T: 'static + Digest + DynDigest, S: 'static + RngCore>(rng: S) -> Self {
+    pub fn new_pss<T: 'static + Digest + DynDigest>() -> Self {
         PaddingScheme::PSS {
-            salt_rng: Box::new(rng),
             digest: Box::new(T::new()),
             salt_len: None,
         }
     }
 
-    pub fn new_pss_with_salt<T: 'static + Digest + DynDigest, S: 'static + RngCore>(
-        rng: S,
-        len: usize,
-    ) -> Self {
+    pub fn new_pss_with_salt<T: 'static + Digest + DynDigest>(len: usize) -> Self {
         PaddingScheme::PSS {
-            salt_rng: Box::new(rng),
             digest: Box::new(T::new()),
             salt_len: Some(len),
         }

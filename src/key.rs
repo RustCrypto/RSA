@@ -512,18 +512,24 @@ impl RsaPrivateKey {
             PaddingScheme::PKCS1v15Sign { ref hash } => {
                 pkcs1v15::sign::<DummyRng, _>(None, self, hash.as_ref(), digest_in)
             }
+            _ => Err(Error::InvalidPaddingScheme),
+        }
+    }
+
+    /// Sign the given digest using the provided rng
+    ///
+    /// Use `rng` for signature process.
+    pub fn sign_with_rng<R: RngCore + CryptoRng>(
+        &self,
+        rng: &mut R,
+        padding: PaddingScheme,
+        digest_in: &[u8],
+    ) -> Result<Vec<u8>> {
+        match padding {
             PaddingScheme::PSS {
-                mut salt_rng,
                 mut digest,
                 salt_len,
-            } => pss::sign::<_, DummyRng, _>(
-                &mut *salt_rng,
-                None,
-                self,
-                digest_in,
-                salt_len,
-                &mut *digest,
-            ),
+            } => pss::sign::<R, _>(rng, false, self, digest_in, salt_len, &mut *digest),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
@@ -542,17 +548,9 @@ impl RsaPrivateKey {
                 pkcs1v15::sign(Some(rng), self, hash.as_ref(), digest_in)
             }
             PaddingScheme::PSS {
-                mut salt_rng,
                 mut digest,
                 salt_len,
-            } => pss::sign::<_, R, _>(
-                &mut *salt_rng,
-                Some(rng),
-                self,
-                digest_in,
-                salt_len,
-                &mut *digest,
-            ),
+            } => pss::sign::<R, _>(rng, true, self, digest_in, salt_len, &mut *digest),
             _ => Err(Error::InvalidPaddingScheme),
         }
     }
