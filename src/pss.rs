@@ -5,7 +5,9 @@ use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
 use digest::{Digest, DynDigest, FixedOutputReset};
 use rand_core::{CryptoRng, RngCore};
-use signature::{RandomizedSigner, Signature as SignSignature, Verifier};
+use signature::{
+    DigestVerifier, RandomizedDigestSigner, RandomizedSigner, Signature as SignSignature, Verifier,
+};
 use subtle::ConstantTimeEq;
 
 use crate::algorithms::{mgf1_xor, mgf1_xor_digest};
@@ -556,6 +558,27 @@ where
     }
 }
 
+impl<D> RandomizedDigestSigner<D, Signature> for SigningKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn try_sign_digest_with_rng(
+        &self,
+        mut rng: impl CryptoRng + RngCore,
+        digest: D,
+    ) -> signature::Result<Signature> {
+        sign_digest::<_, _, D>(
+            &mut rng,
+            false,
+            &self.inner,
+            &digest.finalize(),
+            self.salt_len,
+        )
+        .map(|v| v.into())
+        .map_err(|e| e.into())
+    }
+}
+
 pub struct BlindedSigningKey<D>
 where
     D: Digest,
@@ -602,6 +625,27 @@ where
         sign_digest::<_, _, D>(&mut rng, true, &self.inner, &D::digest(msg), self.salt_len)
             .map(|v| v.into())
             .map_err(|e| e.into())
+    }
+}
+
+impl<D> RandomizedDigestSigner<D, Signature> for BlindedSigningKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn try_sign_digest_with_rng(
+        &self,
+        mut rng: impl CryptoRng + RngCore,
+        digest: D,
+    ) -> signature::Result<Signature> {
+        sign_digest::<_, _, D>(
+            &mut rng,
+            true,
+            &self.inner,
+            &digest.finalize(),
+            self.salt_len,
+        )
+        .map(|v| v.into())
+        .map_err(|e| e.into())
     }
 }
 
@@ -683,6 +727,16 @@ where
     }
 }
 
+impl<D> DigestVerifier<D, Signature> for VerifyingKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
+        verify_digest::<_, D>(&self.inner, &digest.finalize(), signature.as_ref())
+            .map_err(|e| e.into())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::pss::{BlindedSigningKey, SigningKey, VerifyingKey};
@@ -693,7 +747,9 @@ mod test {
     use num_traits::{FromPrimitive, Num};
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
     use sha1::{Digest, Sha1};
-    use signature::{RandomizedSigner, Signature, Verifier};
+    use signature::{
+        DigestVerifier, RandomizedDigestSigner, RandomizedSigner, Signature, Verifier,
+    };
 
     fn get_private_key() -> RsaPrivateKey {
         // In order to generate new test vectors you'll need the PEM form of this key:
@@ -794,6 +850,45 @@ mod test {
     }
 
     #[test]
+    fn test_verify_pss_digest_signer() {
+        let priv_key = get_private_key();
+
+        let tests = [
+            (
+                "test\n",
+                hex!(
+                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
+                ),
+                true,
+            ),
+            (
+                "test\n",
+                hex!(
+                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
+                ),
+                false,
+            ),
+        ];
+        let pub_key: RsaPublicKey = priv_key.into();
+        let verifying_key = VerifyingKey::new(pub_key);
+
+        for (text, sig, expected) in &tests {
+            let mut digest = Sha1::new();
+            digest.update(text.as_bytes());
+            let result = verifying_key.verify_digest(digest, &Signature::from_bytes(sig).unwrap());
+            match expected {
+                true => result.expect("failed to verify"),
+                false => {
+                    result.expect_err("expected verifying error");
+                    ()
+                }
+            }
+        }
+    }
+
+    #[test]
     fn test_sign_and_verify_roundtrip() {
         let priv_key = get_private_key();
 
@@ -861,6 +956,50 @@ mod test {
             let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
             verifying_key
                 .verify(test.as_bytes(), &sig)
+                .expect("failed to verify");
+        }
+    }
+
+    #[test]
+    fn test_sign_and_verify_roundtrip_digest_signer() {
+        let priv_key = get_private_key();
+
+        let tests = ["test\n"];
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let signing_key = SigningKey::new(priv_key);
+        let verifying_key = VerifyingKey::from(&signing_key);
+
+        for test in &tests {
+            let mut digest = Sha1::new();
+            digest.update(test.as_bytes());
+            let sig = signing_key.sign_digest_with_rng(&mut rng, digest);
+
+            let mut digest = Sha1::new();
+            digest.update(test.as_bytes());
+            verifying_key
+                .verify_digest(digest, &sig)
+                .expect("failed to verify");
+        }
+    }
+
+    #[test]
+    fn test_sign_and_verify_roundtrip_blinded_digest_signer() {
+        let priv_key = get_private_key();
+
+        let tests = ["test\n"];
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
+        let verifying_key = VerifyingKey::from(&signing_key);
+
+        for test in &tests {
+            let mut digest = Sha1::new();
+            digest.update(test.as_bytes());
+            let sig = signing_key.sign_digest_with_rng(&mut rng, digest);
+
+            let mut digest = Sha1::new();
+            digest.update(test.as_bytes());
+            verifying_key
+                .verify_digest(digest, &sig)
                 .expect("failed to verify");
         }
     }
