@@ -24,7 +24,7 @@ digest = { version = "0.10.0", default-features = false, features = ["alloc"] }
 pkcs1 = { version = "0.4", default-features = false, features = ["pkcs8", "alloc"] }
 pkcs8 = { version = "0.9", default-features = false, features = ["alloc"] }
 #To keep the rand_core versions properly pinnen, specify exact version
-signature = { version = ">=1.5, <1.7", default-features = false , features = ["rand-preview"] }
+signature = { version = ">=1.5, <1.7", default-features = false , features = ["digest-preview", "rand-preview"] }
 zeroize = { version = "1", features = ["alloc"] }
 
 # Temporary workaround until https://github.com/dignifiedquire/num-bigint/pull/42 lands

@@ -4,7 +4,10 @@ use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
-use signature::{RandomizedSigner, Signature as SignSignature, Signer, Verifier};
+use signature::{
+    DigestSigner, DigestVerifier, RandomizedDigestSigner, RandomizedSigner,
+    Signature as SignSignature, Signer, Verifier,
+};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;
 
@@ -356,6 +359,37 @@ where
     }
 }
 
+impl<D> DigestSigner<D, Signature> for SigningKey<D>
+where
+    D: Digest,
+{
+    fn try_sign_digest(&self, digest: D) -> signature::Result<Signature> {
+        sign::<DummyRng, _>(None, &self.inner, self.hash.as_ref(), &digest.finalize())
+            .map(|v| v.into())
+            .map_err(|e| e.into())
+    }
+}
+
+impl<D> RandomizedDigestSigner<D, Signature> for SigningKey<D>
+where
+    D: Digest,
+{
+    fn try_sign_digest_with_rng(
+        &self,
+        mut rng: impl CryptoRng + RngCore,
+        digest: D,
+    ) -> signature::Result<Signature> {
+        sign(
+            Some(&mut rng),
+            &self.inner,
+            self.hash.as_ref(),
+            &digest.finalize(),
+        )
+        .map(|v| v.into())
+        .map_err(|e| e.into())
+    }
+}
+
 pub struct VerifyingKey<D>
 where
     D: Digest,
@@ -421,6 +455,21 @@ where
             &self.inner,
             self.hash.as_ref(),
             &D::digest(msg),
+            signature.as_ref(),
+        )
+        .map_err(|e| e.into())
+    }
+}
+
+impl<D> DigestVerifier<D, Signature> for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
+        verify(
+            &self.inner,
+            self.hash.as_ref(),
+            &digest.finalize(),
             signature.as_ref(),
         )
         .map_err(|e| e.into())
@@ -589,6 +638,36 @@ mod tests {
     }
 
     #[test]
+    fn test_sign_pkcs1v15_digest_signer() {
+        let priv_key = get_private_key();
+
+        let tests = [(
+            "Test.\n",
+            hex!(
+                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+            ),
+        )];
+
+        let signing_key = SigningKey::new_with_hash(priv_key, Hash::SHA1);
+
+        for (text, expected) in &tests {
+            let mut digest = Sha1::new();
+            digest.update(text.as_bytes());
+            let out = signing_key.sign_digest(digest);
+            assert_ne!(out.as_ref(), text.as_bytes());
+            assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
+            assert_eq!(out.as_ref(), expected);
+
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
+            let mut digest = Sha1::new();
+            digest.update(text.as_bytes());
+            let out2 = signing_key.sign_digest_with_rng(&mut rng, digest);
+            assert_eq!(out2.as_ref(), expected);
+        }
+    }
+
+    #[test]
     fn test_verify_pkcs1v15() {
         let priv_key = get_private_key();
 
@@ -668,6 +747,44 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_verify_pkcs1v15_digest_signer() {
+        let priv_key = get_private_key();
+
+        let tests = [
+            (
+                "Test.\n",
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+                ),
+                true,
+            ),
+            (
+                "Test.\n",
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
+                ),
+                false,
+            ),
+        ];
+        let pub_key: RsaPublicKey = priv_key.into();
+        let verifying_key = VerifyingKey::new_with_hash(pub_key, Hash::SHA1);
+
+        for (text, sig, expected) in &tests {
+            let mut digest = Sha1::new();
+            digest.update(text.as_bytes());
+            let result = verifying_key.verify_digest(digest, &Signature::from_bytes(sig).unwrap());
+            match expected {
+                true => result.expect("failed to verify"),
+                false => {
+                    result.expect_err("expected verifying error");
+                    ()
+                }
+            }
+        }
+    }
     #[test]
     fn test_unpadded_signature() {
         let msg = b"Thu Dec 19 18:06:16 EST 2013\n";
