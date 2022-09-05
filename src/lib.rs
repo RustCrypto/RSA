@@ -47,28 +47,32 @@
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
 //!
-//! Using PKCS1v15 signatures
-//! ```
-//! use rsa::{Hash, RsaPrivateKey};
-//! use rsa::pkcs1v15::{SigningKey, VerifyingKey};
-//! use sha2::{Digest, Sha256};
-//! use signature::{RandomizedSigner, Signature, Verifier};
-//!
-//! let mut rng = rand::thread_rng();
-//!
-//! let bits = 2048;
-//! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
-//! let signing_key = SigningKey::<Sha256>::new_with_hash(private_key, Hash::SHA2_256);
-//! let verifying_key: VerifyingKey<_> = (&signing_key).into();
-//!
-//! // Sign
-//! let data = b"hello world";
-//! let signature = signing_key.sign_with_rng(&mut rng, data);
-//! assert_ne!(signature.as_bytes(), data);
-//!
-//! // Verify
-//! verifying_key.verify(data, &signature).expect("failed to verify");
-//! ```
+#![cfg_attr(
+    feature = "sha2",
+    doc = r#"
+Using PKCS1v15 signatures
+```
+use rsa::{Hash, RsaPrivateKey};
+use rsa::pkcs1v15::{SigningKey, VerifyingKey};
+use sha2::{Digest, Sha256};
+use signature::{RandomizedSigner, Signature, Verifier};
+
+let mut rng = rand::thread_rng();
+
+let bits = 2048;
+let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+let signing_key = SigningKey::<Sha256>::new_with_prefix(private_key);
+let verifying_key: VerifyingKey<_> = (&signing_key).into();
+
+// Sign
+let data = b"hello world";
+let signature = signing_key.sign_with_rng(&mut rng, data);
+assert_ne!(signature.as_bytes(), data);
+
+// Verify
+verifying_key.verify(data, &signature).expect("failed to verify");
+```"#
+)]
 //!
 //! Using PSS signatures
 //! ```

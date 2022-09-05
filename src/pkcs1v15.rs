@@ -13,7 +13,7 @@ use zeroize::Zeroizing;
 
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
-use crate::hash::Hash;
+use crate::hash::{AssociatedHash, Hash};
 use crate::key::{self, PrivateKey, PublicKey};
 use crate::{RsaPrivateKey, RsaPublicKey};
 
@@ -318,11 +318,16 @@ where
             phantom: Default::default(),
         }
     }
+}
 
-    pub fn new_with_hash(key: RsaPrivateKey, hash: Hash) -> Self {
+impl<D> SigningKey<D>
+where
+    D: Digest + AssociatedHash,
+{
+    pub fn new_with_prefix(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
-            hash: Some(hash),
+            hash: Some(D::HASH),
             phantom: Default::default(),
         }
     }
@@ -410,11 +415,16 @@ where
             phantom: Default::default(),
         }
     }
+}
 
-    pub fn new_with_hash(key: RsaPublicKey, hash: Hash) -> Self {
+impl<D> VerifyingKey<D>
+where
+    D: Digest + AssociatedHash,
+{
+    pub fn new_with_prefix(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
-            hash: Some(hash),
+            hash: Some(D::HASH),
             phantom: Default::default(),
         }
     }
@@ -486,6 +496,8 @@ mod tests {
     use num_traits::Num;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
     use sha1::{Digest, Sha1};
+    #[cfg(feature = "sha2")]
+    use sha2::Sha256;
     use signature::{RandomizedSigner, Signature, Signer, Verifier};
 
     use crate::{Hash, PaddingScheme, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
@@ -611,6 +623,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "sha2")]
     #[test]
     fn test_sign_pkcs1v15_signer() {
         let priv_key = get_private_key();
@@ -618,12 +631,12 @@ mod tests {
         let tests = [(
             "Test.\n",
             hex!(
-                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+                "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
+                "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451b"
             ),
         )];
 
-        let signing_key = SigningKey::<Sha1>::new_with_hash(priv_key, Hash::SHA1);
+        let signing_key = SigningKey::<Sha256>::new_with_prefix(priv_key);
 
         for (text, expected) in &tests {
             let out = signing_key.sign(text.as_bytes());
@@ -637,6 +650,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "sha2")]
     #[test]
     fn test_sign_pkcs1v15_digest_signer() {
         let priv_key = get_private_key();
@@ -644,15 +658,15 @@ mod tests {
         let tests = [(
             "Test.\n",
             hex!(
-                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+                "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
+                "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451b"
             ),
         )];
 
-        let signing_key = SigningKey::new_with_hash(priv_key, Hash::SHA1);
+        let signing_key = SigningKey::new_with_prefix(priv_key);
 
         for (text, expected) in &tests {
-            let mut digest = Sha1::new();
+            let mut digest = Sha256::new();
             digest.update(text.as_bytes());
             let out = signing_key.sign_digest(digest);
             assert_ne!(out.as_ref(), text.as_bytes());
@@ -660,7 +674,7 @@ mod tests {
             assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let mut digest = Sha1::new();
+            let mut digest = Sha256::new();
             digest.update(text.as_bytes());
             let out2 = signing_key.sign_digest_with_rng(&mut rng, digest);
             assert_eq!(out2.as_ref(), expected);
@@ -709,6 +723,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "sha2")]
     #[test]
     fn test_verify_pkcs1v15_signer() {
         let priv_key = get_private_key();
@@ -717,22 +732,22 @@ mod tests {
             (
                 "Test.\n",
                 hex!(
-                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+                    "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
+                    "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451b"
                 ),
                 true,
             ),
             (
                 "Test.\n",
                 hex!(
-                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
+                    "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
+                    "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451c"
                 ),
                 false,
             ),
         ];
         let pub_key: RsaPublicKey = priv_key.into();
-        let verifying_key = VerifyingKey::<Sha1>::new_with_hash(pub_key, Hash::SHA1);
+        let verifying_key = VerifyingKey::<Sha256>::new_with_prefix(pub_key);
 
         for (text, sig, expected) in &tests {
             let result =
@@ -747,6 +762,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "sha2")]
     #[test]
     fn test_verify_pkcs1v15_digest_signer() {
         let priv_key = get_private_key();
@@ -755,25 +771,25 @@ mod tests {
             (
                 "Test.\n",
                 hex!(
-                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+                    "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
+                    "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451b"
                 ),
                 true,
             ),
             (
                 "Test.\n",
                 hex!(
-                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
+                    "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
+                    "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451c"
                 ),
                 false,
             ),
         ];
         let pub_key: RsaPublicKey = priv_key.into();
-        let verifying_key = VerifyingKey::new_with_hash(pub_key, Hash::SHA1);
+        let verifying_key = VerifyingKey::new_with_prefix(pub_key);
 
         for (text, sig, expected) in &tests {
-            let mut digest = Sha1::new();
+            let mut digest = Sha256::new();
             digest.update(text.as_bytes());
             let result = verifying_key.verify_digest(digest, &Signature::from_bytes(sig).unwrap());
             match expected {
