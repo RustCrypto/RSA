@@ -20,6 +20,9 @@ use rsa::{
     PublicKeyParts, RsaPrivateKey, RsaPublicKey,
 };
 
+#[cfg(feature = "pem")]
+use rsa::pkcs8::LineEnding;
+
 #[test]
 fn decode_rsa2048_priv_der() {
     let key = RsaPrivateKey::from_pkcs8_der(RSA_2048_PRIV_DER).unwrap();
@@ -82,7 +85,7 @@ fn decode_rsa2048_pub_pem() {
 #[cfg(feature = "pem")]
 fn encode_rsa2048_priv_pem() {
     let key = RsaPrivateKey::from_pkcs8_pem(RSA_2048_PRIV_PEM).unwrap();
-    let pem = key.to_pkcs8_pem(Default::default()).unwrap();
+    let pem = key.to_pkcs8_pem(LineEnding::LF).unwrap();
     assert_eq!(&*pem, RSA_2048_PRIV_PEM)
 }
 
@@ -90,6 +93,6 @@ fn encode_rsa2048_priv_pem() {
 #[cfg(feature = "pem")]
 fn encode_rsa2048_pub_pem() {
     let key = RsaPublicKey::from_public_key_pem(RSA_2048_PUB_PEM).unwrap();
-    let pem = key.to_public_key_pem(Default::default()).unwrap();
+    let pem = key.to_public_key_pem(LineEnding::LF).unwrap();
     assert_eq!(&*pem, RSA_2048_PUB_PEM)
 }
