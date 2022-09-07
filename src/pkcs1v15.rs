@@ -2,6 +2,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
+use core::ops::Deref;
 use digest::Digest;
 use rand_core::{CryptoRng, RngCore};
 use signature::{
@@ -37,6 +38,14 @@ impl signature::Signature for Signature {
 impl From<Vec<u8>> for Signature {
     fn from(bytes: Vec<u8>) -> Self {
         Self { bytes }
+    }
+}
+
+impl Deref for Signature {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_bytes()
     }
 }
 
