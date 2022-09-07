@@ -1,14 +1,16 @@
-use alloc::boxed::Box;
 use alloc::vec;
 use alloc::vec::Vec;
 
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
-use digest::DynDigest;
+use core::marker::PhantomData;
+use digest::{Digest, DynDigest, FixedOutputReset};
 use rand_core::{CryptoRng, RngCore};
-use signature::{RandomizedSigner, Signature as SignSignature, Verifier};
+use signature::{
+    DigestVerifier, RandomizedDigestSigner, RandomizedSigner, Signature as SignSignature, Verifier,
+};
 use subtle::ConstantTimeEq;
 
-use crate::algorithms::mgf1_xor;
+use crate::algorithms::{mgf1_xor, mgf1_xor_digest};
 use crate::errors::{Error, Result};
 use crate::key::{PrivateKey, PublicKey};
 use crate::{RsaPrivateKey, RsaPublicKey};
@@ -97,6 +99,22 @@ pub(crate) fn verify<PK: PublicKey>(
     emsa_pss_verify(hashed, &mut em, em_bits, None, digest)
 }
 
+pub(crate) fn verify_digest<PK, D>(pub_key: &PK, hashed: &[u8], sig: &[u8]) -> Result<()>
+where
+    PK: PublicKey,
+    D: Digest + FixedOutputReset,
+{
+    if sig.len() != pub_key.size() {
+        return Err(Error::Verification);
+    }
+
+    let em_bits = pub_key.n().bits() - 1;
+    let em_len = (em_bits + 7) / 8;
+    let mut em = pub_key.raw_encryption_primitive(sig, em_len)?;
+
+    emsa_pss_verify_digest::<D>(hashed, &mut em, em_bits, None)
+}
+
 /// SignPSS calculates the signature of hashed using RSASSA-PSS.
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. The opts argument may be nil, in which case sensible
@@ -110,18 +128,30 @@ pub(crate) fn sign<T: RngCore + CryptoRng, SK: PrivateKey>(
     salt_len: Option<usize>,
     digest: &mut dyn DynDigest,
 ) -> Result<Vec<u8>> {
-    let salt = generate_salt(rng, priv_key, salt_len, digest);
+    let salt = generate_salt(rng, priv_key, salt_len, digest.output_size());
 
     sign_pss_with_salt(blind.then(|| rng), priv_key, hashed, &salt, digest)
+}
+
+pub(crate) fn sign_digest<T: RngCore + CryptoRng, SK: PrivateKey, D: Digest + FixedOutputReset>(
+    rng: &mut T,
+    blind: bool,
+    priv_key: &SK,
+    hashed: &[u8],
+    salt_len: Option<usize>,
+) -> Result<Vec<u8>> {
+    let salt = generate_salt(rng, priv_key, salt_len, <D as Digest>::output_size());
+
+    sign_pss_with_salt_digest::<_, _, D>(blind.then(|| rng), priv_key, hashed, &salt)
 }
 
 fn generate_salt<T: RngCore + ?Sized, SK: PrivateKey>(
     rng: &mut T,
     priv_key: &SK,
     salt_len: Option<usize>,
-    digest: &mut dyn DynDigest,
+    digest_size: usize,
 ) -> Vec<u8> {
-    let salt_len = salt_len.unwrap_or_else(|| priv_key.size() - 2 - digest.output_size());
+    let salt_len = salt_len.unwrap_or_else(|| priv_key.size() - 2 - digest_size);
 
     let mut salt = vec![0; salt_len];
     rng.fill_bytes(&mut salt[..]);
@@ -142,6 +172,22 @@ fn sign_pss_with_salt<T: CryptoRng + RngCore, SK: PrivateKey>(
 ) -> Result<Vec<u8>> {
     let em_bits = priv_key.n().bits() - 1;
     let em = emsa_pss_encode(hashed, em_bits, salt, digest)?;
+
+    priv_key.raw_decryption_primitive(blind_rng, &em, priv_key.size())
+}
+
+fn sign_pss_with_salt_digest<
+    T: CryptoRng + RngCore,
+    SK: PrivateKey,
+    D: Digest + FixedOutputReset,
+>(
+    blind_rng: Option<&mut T>,
+    priv_key: &SK,
+    hashed: &[u8],
+    salt: &[u8],
+) -> Result<Vec<u8>> {
+    let em_bits = priv_key.n().bits() - 1;
+    let em = emsa_pss_encode_digest::<D>(hashed, em_bits, salt)?;
 
     priv_key.raw_decryption_primitive(blind_rng, &em, priv_key.size())
 }
@@ -219,19 +265,91 @@ fn emsa_pss_encode(
     Ok(em)
 }
 
-fn emsa_pss_verify(
+fn emsa_pss_encode_digest<D>(m_hash: &[u8], em_bits: usize, salt: &[u8]) -> Result<Vec<u8>>
+where
+    D: Digest + FixedOutputReset,
+{
+    // See [1], section 9.1.1
+    let h_len = <D as Digest>::output_size();
+    let s_len = salt.len();
+    let em_len = (em_bits + 7) / 8;
+
+    // 1. If the length of M is greater than the input limitation for the
+    //     hash function (2^61 - 1 octets for SHA-1), output "message too
+    //     long" and stop.
+    //
+    // 2.  Let mHash = Hash(M), an octet string of length hLen.
+    if m_hash.len() != h_len {
+        return Err(Error::InputNotHashed);
+    }
+
+    // 3. If em_len < h_len + s_len + 2, output "encoding error" and stop.
+    if em_len < h_len + s_len + 2 {
+        // TODO: Key size too small
+        return Err(Error::Internal);
+    }
+
+    let mut em = vec![0; em_len];
+
+    let (db, h) = em.split_at_mut(em_len - h_len - 1);
+    let h = &mut h[..(em_len - 1) - db.len()];
+
+    // 4. Generate a random octet string salt of length s_len; if s_len = 0,
+    //     then salt is the empty string.
+    //
+    // 5.  Let
+    //       M' = (0x)00 00 00 00 00 00 00 00 || m_hash || salt;
+    //
+    //     M' is an octet string of length 8 + h_len + s_len with eight
+    //     initial zero octets.
+    //
+    // 6.  Let H = Hash(M'), an octet string of length h_len.
+    let prefix = [0u8; 8];
+
+    let mut hash = D::new();
+
+    Digest::update(&mut hash, &prefix);
+    Digest::update(&mut hash, m_hash);
+    Digest::update(&mut hash, salt);
+
+    let hashed = hash.finalize_reset();
+    h.copy_from_slice(&hashed);
+
+    // 7.  Generate an octet string PS consisting of em_len - s_len - h_len - 2
+    //     zero octets. The length of PS may be 0.
+    //
+    // 8.  Let DB = PS || 0x01 || salt; DB is an octet string of length
+    //     emLen - hLen - 1.
+    db[em_len - s_len - h_len - 2] = 0x01;
+    db[em_len - s_len - h_len - 1..].copy_from_slice(salt);
+
+    // 9.  Let dbMask = MGF(H, emLen - hLen - 1).
+    //
+    // 10. Let maskedDB = DB \xor dbMask.
+    mgf1_xor_digest(db, &mut hash, &h);
+
+    // 11. Set the leftmost 8 * em_len - em_bits bits of the leftmost octet in
+    //     maskedDB to zero.
+    db[0] &= 0xFF >> (8 * em_len - em_bits);
+
+    // 12. Let EM = maskedDB || H || 0xbc.
+    em[em_len - 1] = 0xBC;
+
+    Ok(em)
+}
+
+fn emsa_pss_verify_pre<'a>(
     m_hash: &[u8],
-    em: &mut [u8],
+    em: &'a mut [u8],
     em_bits: usize,
     s_len: Option<usize>,
-    hash: &mut dyn DynDigest,
-) -> Result<()> {
+    h_len: usize,
+) -> Result<(&'a mut [u8], &'a mut [u8])> {
     // 1. If the length of M is greater than the input limitation for the
     //    hash function (2^61 - 1 octets for SHA-1), output "inconsistent"
     //    and stop.
     //
     // 2. Let mHash = Hash(M), an octet string of length hLen
-    let h_len = hash.output_size();
     if m_hash.len() != h_len {
         return Err(Error::Verification);
     }
@@ -260,15 +378,15 @@ fn emsa_pss_verify(
         return Err(Error::Verification);
     }
 
-    // 7. Let dbMask = MGF(H, em_len - h_len - 1)
-    //
-    // 8. Let DB = maskedDB \xor dbMask
-    mgf1_xor(db, hash, &*h);
+    Ok((db, h))
+}
 
-    // 9.  Set the leftmost 8 * emLen - emBits bits of the leftmost octet in DB
-    //     to zero.
-    db[0] &= 0xFF >> /*uint*/(8 * em_len - em_bits);
-
+fn emsa_pss_get_salt<'a>(
+    db: &'a [u8],
+    em_len: usize,
+    s_len: Option<usize>,
+    h_len: usize,
+) -> Result<&'a [u8]> {
     let s_len = match s_len {
         None => (0..=em_len - (h_len + 2))
             .rev()
@@ -296,6 +414,32 @@ fn emsa_pss_verify(
     // 11. Let salt be the last s_len octets of DB.
     let salt = &db[db.len() - s_len..];
 
+    Ok(salt)
+}
+
+fn emsa_pss_verify(
+    m_hash: &[u8],
+    em: &mut [u8],
+    em_bits: usize,
+    s_len: Option<usize>,
+    hash: &mut dyn DynDigest,
+) -> Result<()> {
+    let em_len = em.len(); //(em_bits + 7) / 8;
+    let h_len = hash.output_size();
+
+    let (db, h) = emsa_pss_verify_pre(m_hash, em, em_bits, s_len, h_len)?;
+
+    // 7. Let dbMask = MGF(H, em_len - h_len - 1)
+    //
+    // 8. Let DB = maskedDB \xor dbMask
+    mgf1_xor(db, hash, &*h);
+
+    // 9.  Set the leftmost 8 * emLen - emBits bits of the leftmost octet in DB
+    //     to zero.
+    db[0] &= 0xFF >> /*uint*/(8 * em_len - em_bits);
+
+    let salt = emsa_pss_get_salt(db, em_len, s_len, h_len)?;
+
     // 12. Let
     //          M' = (0x)00 00 00 00 00 00 00 00 || mHash || salt ;
     //     M' is an octet string of length 8 + hLen + sLen with eight
@@ -317,151 +461,279 @@ fn emsa_pss_verify(
     }
 }
 
-pub struct SigningKey {
-    inner: RsaPrivateKey,
-    salt_len: Option<usize>,
-    digest: Box<dyn DynDigest>,
+fn emsa_pss_verify_digest<D>(
+    m_hash: &[u8],
+    em: &mut [u8],
+    em_bits: usize,
+    s_len: Option<usize>,
+) -> Result<()>
+where
+    D: Digest + FixedOutputReset,
+{
+    let em_len = em.len(); //(em_bits + 7) / 8;
+    let h_len = <D as Digest>::output_size();
+
+    let (db, h) = emsa_pss_verify_pre(m_hash, em, em_bits, s_len, h_len)?;
+
+    let mut hash = D::new();
+
+    // 7. Let dbMask = MGF(H, em_len - h_len - 1)
+    //
+    // 8. Let DB = maskedDB \xor dbMask
+    mgf1_xor_digest::<D>(db, &mut hash, &*h);
+
+    // 9.  Set the leftmost 8 * emLen - emBits bits of the leftmost octet in DB
+    //     to zero.
+    db[0] &= 0xFF >> /*uint*/(8 * em_len - em_bits);
+
+    let salt = emsa_pss_get_salt(db, em_len, s_len, h_len)?;
+
+    // 12. Let
+    //          M' = (0x)00 00 00 00 00 00 00 00 || mHash || salt ;
+    //     M' is an octet string of length 8 + hLen + sLen with eight
+    //     initial zero octets.
+    //
+    // 13. Let H' = Hash(M'), an octet string of length hLen.
+    let prefix = [0u8; 8];
+
+    Digest::update(&mut hash, &prefix[..]);
+    Digest::update(&mut hash, m_hash);
+    Digest::update(&mut hash, salt);
+    let h0 = hash.finalize_reset();
+
+    // 14. If H = H', output "consistent." Otherwise, output "inconsistent."
+    if h0.ct_eq(h).into() {
+        Ok(())
+    } else {
+        Err(Error::Verification)
+    }
 }
 
-impl SigningKey {
+pub struct SigningKey<D>
+where
+    D: Digest,
+{
+    inner: RsaPrivateKey,
+    salt_len: Option<usize>,
+    phantom: PhantomData<D>,
+}
+
+impl<D> SigningKey<D>
+where
+    D: Digest,
+{
     pub(crate) fn key(&self) -> &RsaPrivateKey {
         &self.inner
     }
 
-    pub(crate) fn digest(&self) -> Box<dyn DynDigest> {
-        self.digest.box_clone()
-    }
-
-    pub fn new(key: RsaPrivateKey, digest: Box<dyn DynDigest>) -> Self {
+    pub fn new(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
             salt_len: None,
-            digest: digest,
+            phantom: Default::default(),
+        }
+    }
+
+    pub fn new_with_salt_len(key: RsaPrivateKey, salt_len: usize) -> Self {
+        Self {
+            inner: key,
+            salt_len: Some(salt_len),
+            phantom: Default::default(),
         }
     }
 }
 
-impl RandomizedSigner<Signature> for SigningKey {
+impl<D> RandomizedSigner<Signature> for SigningKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
     fn try_sign_with_rng(
         &self,
         mut rng: impl CryptoRng + RngCore,
-        digest: &[u8],
+        msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign(
+        sign_digest::<_, _, D>(&mut rng, false, &self.inner, &D::digest(msg), self.salt_len)
+            .map(|v| v.into())
+            .map_err(|e| e.into())
+    }
+}
+
+impl<D> RandomizedDigestSigner<D, Signature> for SigningKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn try_sign_digest_with_rng(
+        &self,
+        mut rng: impl CryptoRng + RngCore,
+        digest: D,
+    ) -> signature::Result<Signature> {
+        sign_digest::<_, _, D>(
             &mut rng,
             false,
             &self.inner,
-            digest,
+            &digest.finalize(),
             self.salt_len,
-            self.digest.box_clone().as_mut(),
         )
         .map(|v| v.into())
         .map_err(|e| e.into())
     }
 }
 
-pub struct BlindedSigningKey {
+pub struct BlindedSigningKey<D>
+where
+    D: Digest,
+{
     inner: RsaPrivateKey,
     salt_len: Option<usize>,
-    digest: Box<dyn DynDigest>,
+    phantom: PhantomData<D>,
 }
 
-impl BlindedSigningKey {
+impl<D> BlindedSigningKey<D>
+where
+    D: Digest,
+{
     pub(crate) fn key(&self) -> &RsaPrivateKey {
         &self.inner
     }
 
-    pub(crate) fn digest(&self) -> Box<dyn DynDigest> {
-        self.digest.box_clone()
-    }
-
-    pub fn new(key: RsaPrivateKey, digest: Box<dyn DynDigest>) -> Self {
+    pub fn new(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
             salt_len: None,
-            digest: digest,
+            phantom: Default::default(),
+        }
+    }
+
+    pub fn new_with_salt_len(key: RsaPrivateKey, salt_len: usize) -> Self {
+        Self {
+            inner: key,
+            salt_len: Some(salt_len),
+            phantom: Default::default(),
         }
     }
 }
 
-impl RandomizedSigner<Signature> for BlindedSigningKey {
+impl<D> RandomizedSigner<Signature> for BlindedSigningKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
     fn try_sign_with_rng(
         &self,
         mut rng: impl CryptoRng + RngCore,
-        digest: &[u8],
+        msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign(
+        sign_digest::<_, _, D>(&mut rng, true, &self.inner, &D::digest(msg), self.salt_len)
+            .map(|v| v.into())
+            .map_err(|e| e.into())
+    }
+}
+
+impl<D> RandomizedDigestSigner<D, Signature> for BlindedSigningKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn try_sign_digest_with_rng(
+        &self,
+        mut rng: impl CryptoRng + RngCore,
+        digest: D,
+    ) -> signature::Result<Signature> {
+        sign_digest::<_, _, D>(
             &mut rng,
             true,
             &self.inner,
-            digest,
+            &digest.finalize(),
             self.salt_len,
-            self.digest.box_clone().as_mut(),
         )
         .map(|v| v.into())
         .map_err(|e| e.into())
     }
 }
 
-pub struct VerifyingKey {
+pub struct VerifyingKey<D>
+where
+    D: Digest,
+{
     inner: RsaPublicKey,
-    digest: Box<dyn DynDigest>,
+    phantom: PhantomData<D>,
 }
 
-impl VerifyingKey {
-    pub fn new(key: RsaPublicKey, digest: Box<dyn DynDigest>) -> Self {
+impl<D> VerifyingKey<D>
+where
+    D: Digest,
+{
+    pub fn new(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
-            digest: digest,
+            phantom: Default::default(),
         }
     }
 }
 
-impl From<SigningKey> for VerifyingKey {
-    fn from(key: SigningKey) -> Self {
+impl<D> From<SigningKey<D>> for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn from(key: SigningKey<D>) -> Self {
         Self {
             inner: key.key().into(),
-            digest: key.digest(),
+            phantom: Default::default(),
         }
     }
 }
 
-impl From<&SigningKey> for VerifyingKey {
-    fn from(key: &SigningKey) -> Self {
+impl<D> From<&SigningKey<D>> for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn from(key: &SigningKey<D>) -> Self {
         Self {
             inner: key.key().into(),
-            digest: key.digest(),
+            phantom: Default::default(),
         }
     }
 }
 
-impl From<BlindedSigningKey> for VerifyingKey {
-    fn from(key: BlindedSigningKey) -> Self {
+impl<D> From<BlindedSigningKey<D>> for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn from(key: BlindedSigningKey<D>) -> Self {
         Self {
             inner: key.key().into(),
-            digest: key.digest(),
+            phantom: Default::default(),
         }
     }
 }
 
-impl From<&BlindedSigningKey> for VerifyingKey {
-    fn from(key: &BlindedSigningKey) -> Self {
+impl<D> From<&BlindedSigningKey<D>> for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn from(key: &BlindedSigningKey<D>) -> Self {
         Self {
             inner: key.key().into(),
-            digest: key.digest(),
+            phantom: Default::default(),
         }
     }
 }
 
-impl Verifier<Signature> for VerifyingKey {
+impl<D> Verifier<Signature> for VerifyingKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
     fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify(
-            &self.inner,
-            msg,
-            signature.as_ref(),
-            self.digest.box_clone().as_mut(),
-        )
-        .map_err(|e| e.into())
+        verify_digest::<_, D>(&self.inner, &D::digest(msg), signature.as_ref())
+            .map_err(|e| e.into())
+    }
+}
+
+impl<D> DigestVerifier<D, Signature> for VerifyingKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
+        verify_digest::<_, D>(&self.inner, &digest.finalize(), signature.as_ref())
+            .map_err(|e| e.into())
     }
 }
 
@@ -470,13 +742,14 @@ mod test {
     use crate::pss::{BlindedSigningKey, SigningKey, VerifyingKey};
     use crate::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 
-    use alloc::boxed::Box;
     use hex_literal::hex;
     use num_bigint::BigUint;
     use num_traits::{FromPrimitive, Num};
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
     use sha1::{Digest, Sha1};
-    use signature::{RandomizedSigner, Signature, Verifier};
+    use signature::{
+        DigestVerifier, RandomizedDigestSigner, RandomizedSigner, Signature, Verifier,
+    };
 
     fn get_private_key() -> RsaPrivateKey {
         // In order to generate new test vectors you'll need the PEM form of this key:
@@ -561,11 +834,50 @@ mod test {
             ),
         ];
         let pub_key: RsaPublicKey = priv_key.into();
-        let verifying_key: VerifyingKey = VerifyingKey::new(pub_key, Box::new(Sha1::new()));
+        let verifying_key: VerifyingKey<Sha1> = VerifyingKey::new(pub_key);
 
         for (text, sig, expected) in &tests {
-            let digest = Sha1::digest(text.as_bytes()).to_vec();
-            let result = verifying_key.verify(&digest, &Signature::from_bytes(sig).unwrap());
+            let result =
+                verifying_key.verify(text.as_bytes(), &Signature::from_bytes(sig).unwrap());
+            match expected {
+                true => result.expect("failed to verify"),
+                false => {
+                    result.expect_err("expected verifying error");
+                    ()
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_verify_pss_digest_signer() {
+        let priv_key = get_private_key();
+
+        let tests = [
+            (
+                "test\n",
+                hex!(
+                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
+                ),
+                true,
+            ),
+            (
+                "test\n",
+                hex!(
+                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
+                ),
+                false,
+            ),
+        ];
+        let pub_key: RsaPublicKey = priv_key.into();
+        let verifying_key = VerifyingKey::new(pub_key);
+
+        for (text, sig, expected) in &tests {
+            let mut digest = Sha1::new();
+            digest.update(text.as_bytes());
+            let result = verifying_key.verify_digest(digest, &Signature::from_bytes(sig).unwrap());
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -620,14 +932,13 @@ mod test {
 
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let signing_key = SigningKey::new(priv_key, Box::new(Sha1::new()));
-        let verifying_key: VerifyingKey = (&signing_key).into();
+        let signing_key = SigningKey::<Sha1>::new(priv_key);
+        let verifying_key = VerifyingKey::from(&signing_key);
 
         for test in &tests {
-            let digest = Sha1::digest(test.as_bytes()).to_vec();
-            let sig = signing_key.sign_with_rng(&mut rng, &digest);
+            let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
             verifying_key
-                .verify(&digest, &sig)
+                .verify(test.as_bytes(), &sig)
                 .expect("failed to verify");
         }
     }
@@ -638,14 +949,57 @@ mod test {
 
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let signing_key = BlindedSigningKey::new(priv_key, Box::new(Sha1::new()));
-        let verifying_key: VerifyingKey = (&signing_key).into();
+        let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
+        let verifying_key = VerifyingKey::from(&signing_key);
 
         for test in &tests {
-            let digest = Sha1::digest(test.as_bytes()).to_vec();
-            let sig = signing_key.sign_with_rng(&mut rng, &digest);
+            let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
             verifying_key
-                .verify(&digest, &sig)
+                .verify(test.as_bytes(), &sig)
+                .expect("failed to verify");
+        }
+    }
+
+    #[test]
+    fn test_sign_and_verify_roundtrip_digest_signer() {
+        let priv_key = get_private_key();
+
+        let tests = ["test\n"];
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let signing_key = SigningKey::new(priv_key);
+        let verifying_key = VerifyingKey::from(&signing_key);
+
+        for test in &tests {
+            let mut digest = Sha1::new();
+            digest.update(test.as_bytes());
+            let sig = signing_key.sign_digest_with_rng(&mut rng, digest);
+
+            let mut digest = Sha1::new();
+            digest.update(test.as_bytes());
+            verifying_key
+                .verify_digest(digest, &sig)
+                .expect("failed to verify");
+        }
+    }
+
+    #[test]
+    fn test_sign_and_verify_roundtrip_blinded_digest_signer() {
+        let priv_key = get_private_key();
+
+        let tests = ["test\n"];
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
+        let verifying_key = VerifyingKey::from(&signing_key);
+
+        for test in &tests {
+            let mut digest = Sha1::new();
+            digest.update(test.as_bytes());
+            let sig = signing_key.sign_digest_with_rng(&mut rng, digest);
+
+            let mut digest = Sha1::new();
+            digest.update(test.as_bytes());
+            verifying_key
+                .verify_digest(digest, &sig)
                 .expect("failed to verify");
         }
     }
