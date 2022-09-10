@@ -200,8 +200,6 @@ pub use rand_core;
 pub mod algorithms;
 /// Error types.
 pub mod errors;
-/// Supported hash functions.
-pub mod hash;
 /// Supported padding schemes.
 pub mod padding;
 /// RSASSA-PKCS1-v1_5 Signature support
@@ -218,7 +216,6 @@ mod raw;
 pub use pkcs1;
 pub use pkcs8;
 
-pub use self::hash::Hash;
 pub use self::key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 pub use self::padding::PaddingScheme;
 

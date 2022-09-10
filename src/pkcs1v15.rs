@@ -218,7 +218,7 @@ pub(crate) fn verify<PK: PublicKey>(
 
 // prefix = 0x30 <oid_len + 8 + digest_len> 0x30 <oid_len + 4> 0x06 <oid_len> oid 0x05 0x00 0x04 <digest_len>
 #[inline]
-fn generate_prefix<D>() -> Vec<u8>
+pub(crate) fn generate_prefix<D>() -> Vec<u8>
 where
     D: Digest + AssociatedOid,
 {
@@ -508,7 +508,7 @@ mod tests {
     use sha3::Sha3_256;
     use signature::{RandomizedSigner, Signature, Signer, Verifier};
 
-    use crate::{Hash, PaddingScheme, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+    use crate::{PaddingScheme, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 
     #[test]
     fn test_non_zero_bytes() {
@@ -614,7 +614,7 @@ mod tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
 
             let out = priv_key
-                .sign(PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)), &digest)
+                .sign(PaddingScheme::new_pkcs1v15_sign::<Sha1>(), &digest)
                 .unwrap();
             assert_ne!(out, digest);
             assert_eq!(out, expected);
@@ -623,7 +623,7 @@ mod tests {
             let out2 = priv_key
                 .sign_blinded(
                     &mut rng,
-                    PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)),
+                    PaddingScheme::new_pkcs1v15_sign::<Sha1>(),
                     &digest,
                 )
                 .unwrap();
@@ -764,11 +764,7 @@ mod tests {
         for (text, sig, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
 
-            let result = pub_key.verify(
-                PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)),
-                &digest,
-                sig,
-            );
+            let result = pub_key.verify(PaddingScheme::new_pkcs1v15_sign::<Sha1>(), &digest, sig);
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -862,13 +858,13 @@ mod tests {
         let priv_key = get_private_key();
 
         let sig = priv_key
-            .sign(PaddingScheme::new_pkcs1v15_sign(None), msg)
+            .sign(PaddingScheme::new_pkcs1v15_sign_raw(), msg)
             .unwrap();
         assert_eq!(expected_sig, sig);
 
         let pub_key: RsaPublicKey = priv_key.into();
         pub_key
-            .verify(PaddingScheme::new_pkcs1v15_sign(None), msg, &sig)
+            .verify(PaddingScheme::new_pkcs1v15_sign_raw(), msg, &sig)
             .expect("failed to verify");
     }
 

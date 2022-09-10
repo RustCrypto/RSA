@@ -3,15 +3,19 @@ use alloc::string::{String, ToString};
 use core::fmt;
 
 use digest::{Digest, DynDigest};
+use pkcs8::AssociatedOid;
 
-use crate::hash::Hash;
+use crate::pkcs1v15;
 
 /// Available padding schemes.
 pub enum PaddingScheme {
     /// Encryption and Decryption using PKCS1v15 padding.
     PKCS1v15Encrypt,
     /// Sign and Verify using PKCS1v15 padding.
-    PKCS1v15Sign { hash: Option<Hash> },
+    PKCS1v15Sign {
+        hash_len: Option<usize>,
+        prefix: Box<[u8]>,
+    },
     /// Encryption and Decryption using [OAEP padding](https://datatracker.ietf.org/doc/html/rfc3447#section-7.1.1).
     ///
     /// - `digest` is used to hash the label. The maximum possible plaintext length is `m = k - 2 * h_len - 2`,
@@ -38,8 +42,8 @@ impl fmt::Debug for PaddingScheme {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             PaddingScheme::PKCS1v15Encrypt => write!(f, "PaddingScheme::PKCS1v15Encrypt"),
-            PaddingScheme::PKCS1v15Sign { ref hash } => {
-                write!(f, "PaddingScheme::PKCS1v15Sign({:?})", hash)
+            PaddingScheme::PKCS1v15Sign { prefix, .. } => {
+                write!(f, "PaddingScheme::PKCS1v15Sign({:?})", prefix)
             }
             PaddingScheme::OAEP { ref label, .. } => {
                 // TODO: How to print the digest name?
@@ -58,8 +62,21 @@ impl PaddingScheme {
         PaddingScheme::PKCS1v15Encrypt
     }
 
-    pub fn new_pkcs1v15_sign(hash: Option<Hash>) -> Self {
-        PaddingScheme::PKCS1v15Sign { hash }
+    pub fn new_pkcs1v15_sign_raw() -> Self {
+        PaddingScheme::PKCS1v15Sign {
+            hash_len: None,
+            prefix: Box::new([]),
+        }
+    }
+
+    pub fn new_pkcs1v15_sign<D>() -> Self
+    where
+        D: Digest + AssociatedOid,
+    {
+        PaddingScheme::PKCS1v15Sign {
+            hash_len: Some(<D as Digest>::output_size()),
+            prefix: pkcs1v15::generate_prefix::<D>().into_boxed_slice(),
+        }
     }
 
     /// Create a new OAEP `PaddingScheme`, using `T` as the hash function for the default (empty) label, and `U` as the hash function for MGF1.
