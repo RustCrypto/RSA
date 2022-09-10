@@ -52,7 +52,7 @@
     doc = r#"
 Using PKCS1v15 signatures
 ```
-use rsa::{Hash, RsaPrivateKey};
+use rsa::RsaPrivateKey;
 use rsa::pkcs1v15::{SigningKey, VerifyingKey};
 use sha2::{Digest, Sha256};
 use signature::{RandomizedSigner, Signature, Verifier};
@@ -76,7 +76,7 @@ verifying_key.verify(data, &signature).expect("failed to verify");
 //!
 //! Using PSS signatures
 //! ```
-//! use rsa::{Hash, RsaPrivateKey};
+//! use rsa::RsaPrivateKey;
 //! use rsa::pss::{BlindedSigningKey, VerifyingKey};
 //! use sha2::{Digest, Sha256};
 //! use signature::{RandomizedSigner, Signature, Verifier};
