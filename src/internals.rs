@@ -168,7 +168,7 @@ pub fn blind<R: RngCore + CryptoRng, K: PublicKeyParts>(
 }
 
 /// Given an m and and unblinding factor, unblind the m.
-pub fn unblind(key: impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> BigUint {
+pub fn unblind(key: &impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> BigUint {
     (m * unblinder) % key.n()
 }
 
