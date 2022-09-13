@@ -156,16 +156,7 @@ impl Zeroize for CRTValue {
 
 impl From<RsaPrivateKey> for RsaPublicKey {
     fn from(private_key: RsaPrivateKey) -> Self {
-        (&private_key).into()
-    }
-}
-
-impl From<&RsaPrivateKey> for RsaPublicKey {
-    fn from(private_key: &RsaPrivateKey) -> Self {
-        let n = private_key.n.clone();
-        let e = private_key.e.clone();
-
-        RsaPublicKey { n, e }
+        private_key.into()
     }
 }
 
