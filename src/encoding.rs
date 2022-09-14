@@ -64,56 +64,70 @@ impl DecodePublicKey for RsaPublicKey {}
 
 impl EncodePrivateKey for RsaPrivateKey {
     fn to_pkcs8_der(&self) -> pkcs8::Result<SecretDocument> {
-        // Check if the key is multi prime
-        if self.primes().len() > 2 {
-            return Err(pkcs1::Error::Version.into());
-        }
-
-        let modulus = self.n().to_bytes_be();
-        let public_exponent = self.e().to_bytes_be();
-        let private_exponent = Zeroizing::new(self.d().to_bytes_be());
-        let prime1 = Zeroizing::new(self.primes()[0].to_bytes_be());
-        let prime2 = Zeroizing::new(self.primes()[1].to_bytes_be());
-        let exponent1 = Zeroizing::new((self.d() % (&self.primes()[0] - 1u8)).to_bytes_be());
-        let exponent2 = Zeroizing::new((self.d() % (&self.primes()[1] - 1u8)).to_bytes_be());
-        let coefficient = Zeroizing::new(
-            self.crt_coefficient()
-                .ok_or(pkcs1::Error::Crypto)?
-                .to_bytes_be(),
-        );
-
-        let private_key = pkcs1::RsaPrivateKey {
-            modulus: pkcs1::UIntRef::new(&modulus)?,
-            public_exponent: pkcs1::UIntRef::new(&public_exponent)?,
-            private_exponent: pkcs1::UIntRef::new(&private_exponent)?,
-            prime1: pkcs1::UIntRef::new(&prime1)?,
-            prime2: pkcs1::UIntRef::new(&prime2)?,
-            exponent1: pkcs1::UIntRef::new(&exponent1)?,
-            exponent2: pkcs1::UIntRef::new(&exponent2)?,
-            coefficient: pkcs1::UIntRef::new(&coefficient)?,
-            other_prime_infos: None,
-        }
-        .to_vec()?;
-
-        pkcs8::PrivateKeyInfo::new(pkcs1::ALGORITHM_ID, private_key.as_ref()).try_into()
+        to_pkcs8_der(self)
     }
+}
+
+pub(crate) fn to_pkcs8_der<SK>(key: &SK) -> pkcs8::Result<SecretDocument>
+where
+    SK: PrivateKeyParts + PublicKeyParts,
+{
+    // Check if the key is multi prime
+    if key.primes().len() > 2 {
+        return Err(pkcs1::Error::Version.into());
+    }
+
+    let modulus = key.n().to_bytes_be();
+    let public_exponent = key.e().to_bytes_be();
+    let private_exponent = Zeroizing::new(key.d().to_bytes_be());
+    let prime1 = Zeroizing::new(key.primes()[0].to_bytes_be());
+    let prime2 = Zeroizing::new(key.primes()[1].to_bytes_be());
+    let exponent1 = Zeroizing::new((key.d() % (&key.primes()[0] - 1u8)).to_bytes_be());
+    let exponent2 = Zeroizing::new((key.d() % (&key.primes()[1] - 1u8)).to_bytes_be());
+    let coefficient = Zeroizing::new(
+        key.crt_coefficient()
+            .ok_or(pkcs1::Error::Crypto)?
+            .to_bytes_be(),
+    );
+
+    let private_key = pkcs1::RsaPrivateKey {
+        modulus: pkcs1::UIntRef::new(&modulus)?,
+        public_exponent: pkcs1::UIntRef::new(&public_exponent)?,
+        private_exponent: pkcs1::UIntRef::new(&private_exponent)?,
+        prime1: pkcs1::UIntRef::new(&prime1)?,
+        prime2: pkcs1::UIntRef::new(&prime2)?,
+        exponent1: pkcs1::UIntRef::new(&exponent1)?,
+        exponent2: pkcs1::UIntRef::new(&exponent2)?,
+        coefficient: pkcs1::UIntRef::new(&coefficient)?,
+        other_prime_infos: None,
+    }
+    .to_vec()?;
+
+    pkcs8::PrivateKeyInfo::new(pkcs1::ALGORITHM_ID, private_key.as_ref()).try_into()
 }
 
 impl EncodePublicKey for RsaPublicKey {
     fn to_public_key_der(&self) -> pkcs8::spki::Result<Document> {
-        let modulus = self.n().to_bytes_be();
-        let public_exponent = self.e().to_bytes_be();
-
-        let subject_public_key = pkcs1::RsaPublicKey {
-            modulus: pkcs1::UIntRef::new(&modulus)?,
-            public_exponent: pkcs1::UIntRef::new(&public_exponent)?,
-        }
-        .to_vec()?;
-
-        pkcs8::SubjectPublicKeyInfo {
-            algorithm: pkcs1::ALGORITHM_ID,
-            subject_public_key: subject_public_key.as_ref(),
-        }
-        .try_into()
+        to_public_key_der(self)
     }
+}
+
+pub(crate) fn to_public_key_der<PK>(key: &PK) -> pkcs8::spki::Result<Document>
+where
+    PK: PublicKeyParts,
+{
+    let modulus = key.n().to_bytes_be();
+    let public_exponent = key.e().to_bytes_be();
+
+    let subject_public_key = pkcs1::RsaPublicKey {
+        modulus: pkcs1::UIntRef::new(&modulus)?,
+        public_exponent: pkcs1::UIntRef::new(&public_exponent)?,
+    }
+    .to_vec()?;
+
+    pkcs8::SubjectPublicKeyInfo {
+        algorithm: pkcs1::ALGORITHM_ID,
+        subject_public_key: subject_public_key.as_ref(),
+    }
+    .try_into()
 }

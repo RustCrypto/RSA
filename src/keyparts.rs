@@ -28,6 +28,12 @@ pub trait PrivateKeyParts {
     fn d(&self) -> &BigUint;
     /// Returns the prime factors.
     fn primes(&self) -> &[BigUint];
+    /// Compute CRT coefficient: `(1/q) mod p`.
+    fn crt_coefficient(&self) -> Option<BigUint> {
+        (&self.primes()[1])
+            .mod_inverse(&self.primes()[0])?
+            .to_biguint()
+    }
 }
 
 /// Internal trait, not to be exported outside of the crate

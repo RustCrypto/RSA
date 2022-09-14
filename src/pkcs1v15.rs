@@ -16,9 +16,12 @@ use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;
 
 use crate::dummy_rng::DummyRng;
+use crate::encoding::{to_pkcs8_der, to_public_key_der};
 use crate::errors::{Error, Result};
-use crate::key::{self, PrivateKey, PublicKey};
-use crate::{RsaPrivateKey, RsaPublicKey};
+use crate::key::{self, PublicKey};
+use crate::keyparts::{PrecomputedValues, PrivateKeyPartsInt, RsaPrivateKeyComponents};
+use crate::raw::DecryptionPrimitive;
+use crate::{BigUint, PrivateKeyParts, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 
 #[derive(Clone)]
 pub struct Signature {
@@ -130,7 +133,7 @@ pub(crate) fn encrypt<R: RngCore + CryptoRng, PK: PublicKey>(
 // forge signatures as if they had the private key. See
 // `decrypt_session_key` for a way of solving this problem.
 #[inline]
-pub(crate) fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
+pub(crate) fn decrypt<R: RngCore + CryptoRng, SK: DecryptionPrimitive + PublicKeyParts>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
@@ -159,7 +162,7 @@ pub(crate) fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
 // messages to signatures and identify the signed messages. As ever,
 // signatures provide authenticity, not confidentiality.
 #[inline]
-pub(crate) fn sign<R: RngCore + CryptoRng, SK: PrivateKey>(
+pub(crate) fn sign<R: RngCore + CryptoRng, SK: DecryptionPrimitive + PublicKeyParts>(
     rng: Option<&mut R>,
     priv_key: &SK,
     prefix: &[u8],
@@ -247,7 +250,7 @@ where
 /// in order to maintain constant memory access patterns. If the plaintext was
 /// valid then index contains the index of the original message in em.
 #[inline]
-fn decrypt_inner<R: RngCore + CryptoRng, SK: PrivateKey>(
+fn decrypt_inner<R: RngCore + CryptoRng, SK: DecryptionPrimitive + PublicKeyParts>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
@@ -310,8 +313,8 @@ pub struct SigningKey<D>
 where
     D: Digest,
 {
-    inner: RsaPrivateKey,
-    prefix: Vec<u8>,
+    privkey: RsaPrivateKeyComponents,
+    verifying_key: VerifyingKey<D>,
     phantom: PhantomData<D>,
 }
 
@@ -319,18 +322,10 @@ impl<D> SigningKey<D>
 where
     D: Digest,
 {
-    pub(crate) fn key(&self) -> &RsaPrivateKey {
-        &self.inner
-    }
-
-    pub(crate) fn prefix(&self) -> Vec<u8> {
-        self.prefix.clone()
-    }
-
     pub fn new(key: RsaPrivateKey) -> Self {
         Self {
-            inner: key,
-            prefix: Vec::new(),
+            verifying_key: VerifyingKey::<D>::new(key.to_public_key()),
+            privkey: key.privkey(),
             phantom: Default::default(),
         }
     }
@@ -350,7 +345,7 @@ where
     D: Digest,
 {
     fn from(key: SigningKey<D>) -> Self {
-        key.inner
+        RsaPrivateKey::new_internal(key.verifying_key.inner, key.privkey)
     }
 }
 
@@ -360,13 +355,14 @@ where
 {
     pub fn new_with_prefix(key: RsaPrivateKey) -> Self {
         Self {
-            inner: key,
-            prefix: generate_prefix::<D>(),
+            verifying_key: VerifyingKey::<D>::new_with_prefix(key.to_public_key()),
+            privkey: key.privkey(),
             phantom: Default::default(),
         }
     }
 }
 
+/*
 impl<D> AsRef<RsaPrivateKey> for SigningKey<D>
 where
     D: Digest,
@@ -375,13 +371,60 @@ where
         &self.inner
     }
 }
+*/
 
 impl<D> EncodePrivateKey for SigningKey<D>
 where
     D: Digest,
 {
     fn to_pkcs8_der(&self) -> pkcs8::Result<SecretDocument> {
-        self.inner.to_pkcs8_der()
+        to_pkcs8_der(self)
+    }
+}
+
+impl<D> PublicKeyParts for SigningKey<D>
+where
+    D: Digest,
+{
+    fn n(&self) -> &BigUint {
+        &self.verifying_key.n()
+    }
+
+    fn e(&self) -> &BigUint {
+        &self.verifying_key.e()
+    }
+}
+
+impl<D> PrivateKeyParts for SigningKey<D>
+where
+    D: Digest,
+{
+    fn d(&self) -> &BigUint {
+        &self.privkey.d()
+    }
+    fn primes(&self) -> &[BigUint] {
+        &self.privkey.primes()
+    }
+    fn crt_coefficient(&self) -> Option<BigUint> {
+        self.privkey.crt_coefficient()
+    }
+}
+
+impl<D> PrivateKeyPartsInt for SigningKey<D>
+where
+    D: Digest,
+{
+    fn precomputed(&self) -> &Option<PrecomputedValues> {
+        &self.privkey.precomputed()
+    }
+}
+
+impl<D> AsRef<VerifyingKey<D>> for SigningKey<D>
+where
+    D: Digest,
+{
+    fn as_ref(&self) -> &VerifyingKey<D> {
+        &self.verifying_key
     }
 }
 
@@ -390,7 +433,7 @@ where
     D: Digest,
 {
     fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
-        sign::<DummyRng, _>(None, &self.inner, &self.prefix, &D::digest(msg))
+        sign::<DummyRng, _>(None, self, &self.verifying_key.prefix, &D::digest(msg))
             .map(|v| v.into())
             .map_err(|e| e.into())
     }
@@ -405,9 +448,14 @@ where
         mut rng: impl CryptoRng + RngCore,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign(Some(&mut rng), &self.inner, &self.prefix, &D::digest(msg))
-            .map(|v| v.into())
-            .map_err(|e| e.into())
+        sign(
+            Some(&mut rng),
+            self,
+            &self.verifying_key.prefix,
+            &D::digest(msg),
+        )
+        .map(|v| v.into())
+        .map_err(|e| e.into())
     }
 }
 
@@ -416,7 +464,7 @@ where
     D: Digest,
 {
     fn try_sign_digest(&self, digest: D) -> signature::Result<Signature> {
-        sign::<DummyRng, _>(None, &self.inner, &self.prefix, &digest.finalize())
+        sign::<DummyRng, _>(None, self, &self.verifying_key.prefix, &digest.finalize())
             .map(|v| v.into())
             .map_err(|e| e.into())
     }
@@ -433,8 +481,8 @@ where
     ) -> signature::Result<Signature> {
         sign(
             Some(&mut rng),
-            &self.inner,
-            &self.prefix,
+            self,
+            &self.verifying_key.prefix,
             &digest.finalize(),
         )
         .map(|v| v.into())
@@ -448,7 +496,7 @@ where
     D: Digest,
 {
     fn sign_prehash(&self, prehash: &[u8]) -> signature::Result<Signature> {
-        sign::<DummyRng, _>(None, &self.inner, &self.prefix, prehash)
+        sign::<DummyRng, _>(None, self, &self.verifying_key.prefix, prehash)
             .map(|v| v.into())
             .map_err(|e| e.into())
     }
@@ -517,16 +565,25 @@ where
     }
 }
 
+impl<D> PublicKeyParts for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn n(&self) -> &BigUint {
+        self.inner.n()
+    }
+
+    fn e(&self) -> &BigUint {
+        self.inner.e()
+    }
+}
+
 impl<D> From<SigningKey<D>> for VerifyingKey<D>
 where
     D: Digest,
 {
     fn from(key: SigningKey<D>) -> Self {
-        Self {
-            inner: key.key().into(),
-            prefix: key.prefix(),
-            phantom: Default::default(),
-        }
+        key.verifying_key
     }
 }
 
@@ -536,8 +593,8 @@ where
 {
     fn from(key: &SigningKey<D>) -> Self {
         Self {
-            inner: key.key().into(),
-            prefix: key.prefix(),
+            inner: key.verifying_key.inner.clone(),
+            prefix: key.verifying_key.prefix.clone(),
             phantom: Default::default(),
         }
     }
@@ -588,7 +645,7 @@ where
     D: Digest,
 {
     fn to_public_key_der(&self) -> pkcs8::spki::Result<Document> {
-        self.inner.to_public_key_der()
+        to_public_key_der(self)
     }
 }
 
@@ -752,6 +809,11 @@ mod tests {
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
             let out2 = signing_key.sign_with_rng(&mut rng, text.as_bytes());
             assert_eq!(out2.as_ref(), expected);
+
+            let verifying_key = signing_key.as_ref();
+            verifying_key
+                .verify(text.as_bytes(), &out2)
+                .expect("failed to verify");
         }
     }
 

@@ -63,6 +63,12 @@ pub struct RsaPrivateKey {
     privkey_components: RsaPrivateKeyComponents,
 }
 
+impl AsRef<RsaPublicKey> for RsaPrivateKey {
+    fn as_ref(&self) -> &RsaPublicKey {
+        &self.pubkey_components
+    }
+}
+
 /*
  * Splitting privkey components to a separate struct breaks Serialization backwards compatibility.
  * cfg(flatten) can not help in this case, as it also changes the representation of the struct to
@@ -349,6 +355,16 @@ impl RsaPrivateKey {
         })
     }
 
+    pub(crate) fn new_internal(
+        pubkey_components: RsaPublicKey,
+        privkey_components: RsaPrivateKeyComponents,
+    ) -> RsaPrivateKey {
+        RsaPrivateKey {
+            pubkey_components,
+            privkey_components,
+        }
+    }
+
     /// Get the public key from the private key, cloning `n` and `e`.
     ///
     /// Generally this is not needed since `RsaPrivateKey` implements the `PublicKey` trait,
@@ -517,6 +533,10 @@ impl RsaPrivateKey {
             } => pss::sign::<R, _>(rng, true, self, digest_in, salt_len, &mut *digest),
             _ => Err(Error::InvalidPaddingScheme),
         }
+    }
+
+    pub(crate) fn privkey(self) -> RsaPrivateKeyComponents {
+        self.privkey_components
     }
 }
 
