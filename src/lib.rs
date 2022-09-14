@@ -216,7 +216,7 @@ mod raw;
 pub use pkcs1;
 pub use pkcs8;
 
-pub use self::key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+pub use self::key::{PrivateKeyParts, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 pub use self::padding::PaddingScheme;
 
 /// Internal raw RSA functions.

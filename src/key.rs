@@ -33,6 +33,34 @@ pub trait PublicKeyParts {
 
 pub trait PrivateKey: DecryptionPrimitive + PublicKeyParts {}
 
+pub trait PrivateKeyParts {
+    /// Returns the private exponent of the key.
+    fn d(&self) -> &BigUint;
+    /// Returns the prime factors.
+    fn primes(&self) -> &[BigUint];
+}
+
+pub(crate) trait PrivateKeyPartsInt: PrivateKeyParts {
+    fn precomputed(&self) -> &Option<PrecomputedValues>;
+}
+
+impl PrivateKeyParts for RsaPrivateKey {
+    /// Returns the private exponent of the key.
+    fn d(&self) -> &BigUint {
+        &self.d
+    }
+    /// Returns the prime factors.
+    fn primes(&self) -> &[BigUint] {
+        &self.primes
+    }
+}
+
+impl PrivateKeyPartsInt for RsaPrivateKey {
+    fn precomputed(&self) -> &Option<PrecomputedValues> {
+        &self.precomputed
+    }
+}
+
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(
@@ -616,7 +644,7 @@ mod tests {
         let pub_key: RsaPublicKey = private_key.clone().into();
         let m = BigUint::from_u64(42).expect("invalid 42");
         let c = internals::encrypt(&pub_key, &m);
-        let m2 = internals::decrypt::<ChaCha8Rng>(None, private_key, &c)
+        let m2 = internals::decrypt::<ChaCha8Rng, _>(None, private_key, &c)
             .expect("unable to decrypt without blinding");
         assert_eq!(m, m2);
         let mut rng = ChaCha8Rng::from_seed([42; 32]);

@@ -7,7 +7,7 @@ use rand_core::{CryptoRng, RngCore};
 use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
-use crate::key::{PublicKeyParts, RsaPrivateKey};
+use crate::key::{PrivateKeyPartsInt, PublicKeyParts};
 
 /// Raw RSA encryption of m with the public key. No padding is performed.
 #[inline]
@@ -18,9 +18,9 @@ pub fn encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> BigUint {
 /// Performs raw RSA decryption with no padding, resulting in a plaintext `BigUint`.
 /// Peforms RSA blinding if an `Rng` is passed.
 #[inline]
-pub(crate) fn decrypt<R: RngCore + CryptoRng>(
+pub(crate) fn decrypt<R: RngCore + CryptoRng, SK: PrivateKeyPartsInt + PublicKeyParts>(
     mut rng: Option<&mut R>,
-    priv_key: &RsaPrivateKey,
+    priv_key: &SK,
     c: &BigUint,
 ) -> Result<BigUint> {
     if c >= priv_key.n() {
@@ -41,7 +41,7 @@ pub(crate) fn decrypt<R: RngCore + CryptoRng>(
         Cow::Borrowed(c)
     };
 
-    let m = match priv_key.precomputed {
+    let m = match priv_key.precomputed() {
         None => c.modpow(priv_key.d(), priv_key.n()),
         Some(ref precomputed) => {
             // We have the precalculated values needed for the CRT.
@@ -108,9 +108,9 @@ pub(crate) fn decrypt<R: RngCore + CryptoRng>(
 /// Peforms RSA blinding if an `Rng` is passed.
 /// This will also check for errors in the CRT computation.
 #[inline]
-pub fn decrypt_and_check<R: RngCore + CryptoRng>(
+pub(crate) fn decrypt_and_check<R: RngCore + CryptoRng, SK: PrivateKeyPartsInt + PublicKeyParts>(
     rng: Option<&mut R>,
-    priv_key: &RsaPrivateKey,
+    priv_key: &SK,
     c: &BigUint,
 ) -> Result<BigUint> {
     let m = decrypt(rng, priv_key, c)?;
