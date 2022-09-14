@@ -3,7 +3,7 @@
 //! Note: PKCS#1 support is achieved through a blanket impl of the
 //! `pkcs1` crate's traits for types which impl the `pkcs8` crate's traits.
 
-use crate::{key::PublicKeyParts, BigUint, RsaPrivateKey, RsaPublicKey};
+use crate::{BigUint, PrivateKeyParts, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 use core::convert::{TryFrom, TryInto};
 use pkcs1::der::Encode;
 use pkcs8::{
@@ -65,17 +65,17 @@ impl DecodePublicKey for RsaPublicKey {}
 impl EncodePrivateKey for RsaPrivateKey {
     fn to_pkcs8_der(&self) -> pkcs8::Result<SecretDocument> {
         // Check if the key is multi prime
-        if self.primes.len() > 2 {
+        if self.primes().len() > 2 {
             return Err(pkcs1::Error::Version.into());
         }
 
         let modulus = self.n().to_bytes_be();
         let public_exponent = self.e().to_bytes_be();
         let private_exponent = Zeroizing::new(self.d().to_bytes_be());
-        let prime1 = Zeroizing::new(self.primes[0].to_bytes_be());
-        let prime2 = Zeroizing::new(self.primes[1].to_bytes_be());
-        let exponent1 = Zeroizing::new((self.d() % (&self.primes[0] - 1u8)).to_bytes_be());
-        let exponent2 = Zeroizing::new((self.d() % (&self.primes[1] - 1u8)).to_bytes_be());
+        let prime1 = Zeroizing::new(self.primes()[0].to_bytes_be());
+        let prime2 = Zeroizing::new(self.primes()[1].to_bytes_be());
+        let exponent1 = Zeroizing::new((self.d() % (&self.primes()[0] - 1u8)).to_bytes_be());
+        let exponent2 = Zeroizing::new((self.d() % (&self.primes()[1] - 1u8)).to_bytes_be());
         let coefficient = Zeroizing::new(
             self.crt_coefficient()
                 .ok_or(pkcs1::Error::Crypto)?

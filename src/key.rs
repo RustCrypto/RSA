@@ -6,6 +6,12 @@ use num_bigint::{BigInt, BigUint};
 use num_traits::{One, ToPrimitive};
 use rand_core::{CryptoRng, RngCore};
 #[cfg(feature = "serde")]
+use serde_crate::de::{
+    self, Deserialize as SerDeserialize, Deserializer, MapAccess, SeqAccess, Visitor,
+};
+#[cfg(feature = "serde")]
+use serde_crate::ser::{Serialize as SerSerialize, SerializeStruct, Serializer};
+#[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
@@ -47,17 +53,17 @@ pub(crate) trait PrivateKeyPartsInt: PrivateKeyParts {
 impl PrivateKeyParts for RsaPrivateKey {
     /// Returns the private exponent of the key.
     fn d(&self) -> &BigUint {
-        &self.d
+        &self.privkey_components.d()
     }
     /// Returns the prime factors.
     fn primes(&self) -> &[BigUint] {
-        &self.primes
+        &self.privkey_components.primes()
     }
 }
 
 impl PrivateKeyPartsInt for RsaPrivateKey {
     fn precomputed(&self) -> &Option<PrecomputedValues> {
-        &self.precomputed
+        &self.privkey_components.precomputed()
     }
 }
 
@@ -73,37 +79,95 @@ pub struct RsaPublicKey {
     e: BigUint,
 }
 
-/// Represents a whole RSA key, public and private parts.
+/// Internal representation of the public part of an RSA key.
 #[derive(Debug, Clone)]
 #[cfg_attr(
     feature = "serde",
     derive(Serialize, Deserialize),
     serde(crate = "serde_crate")
 )]
-pub struct RsaPrivateKey {
-    /// Public components of the private key.
-    pubkey_components: RsaPublicKey,
+pub(crate) struct RsaPrivateKeyComponents {
     /// Private exponent
-    pub(crate) d: BigUint,
+    d: BigUint,
     /// Prime factors of N, contains >= 2 elements.
-    pub(crate) primes: Vec<BigUint>,
+    primes: Vec<BigUint>,
     /// precomputed values to speed up private operations
     #[cfg_attr(feature = "serde", serde(skip))]
-    pub(crate) precomputed: Option<PrecomputedValues>,
+    precomputed: Option<PrecomputedValues>,
 }
 
-impl PartialEq for RsaPrivateKey {
-    #[inline]
-    fn eq(&self, other: &RsaPrivateKey) -> bool {
-        self.pubkey_components == other.pubkey_components
-            && self.d == other.d
-            && self.primes == other.primes
+impl RsaPrivateKeyComponents {
+    pub fn new(d: BigUint, primes: Vec<BigUint>) -> RsaPrivateKeyComponents {
+        let mut k = RsaPrivateKeyComponents {
+            d,
+            primes,
+            precomputed: None,
+        };
+
+        let _ = k.precompute();
+
+        k
+    }
+    /// Performs some calculations to speed up private key operations.
+    pub fn precompute(&mut self) -> Result<()> {
+        if self.precomputed.is_some() {
+            return Ok(());
+        }
+
+        let dp = &self.d % (&self.primes[0] - BigUint::one());
+        let dq = &self.d % (&self.primes[1] - BigUint::one());
+        let qinv = self.primes[1]
+            .clone()
+            .mod_inverse(&self.primes[0])
+            .ok_or(Error::InvalidPrime)?;
+
+        let mut r: BigUint = &self.primes[0] * &self.primes[1];
+        let crt_values: Vec<CRTValue> = {
+            let mut values = Vec::with_capacity(self.primes.len() - 2);
+            for prime in &self.primes[2..] {
+                let res = CRTValue {
+                    exp: BigInt::from_biguint(Plus, &self.d % (prime - BigUint::one())),
+                    r: BigInt::from_biguint(Plus, r.clone()),
+                    coeff: BigInt::from_biguint(
+                        Plus,
+                        r.clone()
+                            .mod_inverse(prime)
+                            .ok_or(Error::InvalidCoefficient)?
+                            .to_biguint()
+                            .unwrap(),
+                    ),
+                };
+                r *= prime;
+
+                values.push(res);
+            }
+            values
+        };
+
+        self.precomputed = Some(PrecomputedValues {
+            dp,
+            dq,
+            qinv,
+            crt_values,
+        });
+
+        Ok(())
+    }
+
+    /// Clears precomputed values by setting to None
+    pub fn clear_precomputed(&mut self) {
+        self.precomputed = None;
     }
 }
 
-impl Eq for RsaPrivateKey {}
+impl PartialEq for RsaPrivateKeyComponents {
+    #[inline]
+    fn eq(&self, other: &RsaPrivateKeyComponents) -> bool {
+        self.d == other.d && self.primes == other.primes
+    }
+}
 
-impl Zeroize for RsaPrivateKey {
+impl Zeroize for RsaPrivateKeyComponents {
     fn zeroize(&mut self) {
         self.d.zeroize();
         for prime in self.primes.iter_mut() {
@@ -116,11 +180,154 @@ impl Zeroize for RsaPrivateKey {
     }
 }
 
-impl Drop for RsaPrivateKey {
+impl Drop for RsaPrivateKeyComponents {
     fn drop(&mut self) {
         self.zeroize();
     }
 }
+
+impl PrivateKeyParts for RsaPrivateKeyComponents {
+    /// Returns the private exponent of the key.
+    fn d(&self) -> &BigUint {
+        &self.d
+    }
+    /// Returns the prime factors.
+    fn primes(&self) -> &[BigUint] {
+        &self.primes
+    }
+}
+
+impl PrivateKeyPartsInt for RsaPrivateKeyComponents {
+    fn precomputed(&self) -> &Option<PrecomputedValues> {
+        &self.precomputed
+    }
+}
+
+/// Represents a whole RSA key, public and private parts.
+#[derive(Debug, Clone)]
+pub struct RsaPrivateKey {
+    /// Public components of the private key.
+    pubkey_components: RsaPublicKey,
+    privkey_components: RsaPrivateKeyComponents,
+}
+
+/*
+ * Splitting privkey components to a separate struct breaks Serialization backwards compatibility.
+ * cfg(flatten) can not help in this case, as it also changes the representation of the struct to
+ * use map tokens.
+ * Implement Serialize/Deserialize manually.
+ */
+
+#[cfg(feature = "serde")]
+impl SerSerialize for RsaPrivateKey {
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("RsaPrivateKey", 3)?;
+        state.serialize_field("pubkey_components", &self.pubkey_components)?;
+        state.serialize_field("d", &self.privkey_components.d())?;
+        state.serialize_field("primes", &self.privkey_components.primes())?;
+        state.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> SerDeserialize<'de> for RsaPrivateKey {
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        use core::fmt;
+        #[derive(Deserialize)]
+        #[serde(field_identifier, rename_all = "snake_case", crate = "serde_crate")]
+        enum Field {
+            PubkeyComponents,
+            D,
+            Primes,
+        }
+        struct RsaPrivateKeyVisitor;
+
+        impl<'de> Visitor<'de> for RsaPrivateKeyVisitor {
+            type Value = RsaPrivateKey;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("struct RsaPrivateKey")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> core::result::Result<RsaPrivateKey, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                let pubkey_components = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let d = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let primes = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(2, &self))?;
+                Ok(RsaPrivateKey {
+                    pubkey_components,
+                    privkey_components: RsaPrivateKeyComponents::new(d, primes),
+                })
+            }
+
+            fn visit_map<V>(self, mut map: V) -> core::result::Result<RsaPrivateKey, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut pubkey_components = None;
+                let mut d = None;
+                let mut primes = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::PubkeyComponents => {
+                            if pubkey_components.is_some() {
+                                return Err(de::Error::duplicate_field("pubkey"));
+                            }
+                            pubkey_components = Some(map.next_value()?);
+                        }
+                        Field::D => {
+                            if d.is_some() {
+                                return Err(de::Error::duplicate_field("pubkey"));
+                            }
+                            d = Some(map.next_value()?);
+                        }
+                        Field::Primes => {
+                            if primes.is_some() {
+                                return Err(de::Error::duplicate_field("pubkey"));
+                            }
+                            primes = Some(map.next_value()?);
+                        }
+                    }
+                }
+                let pubkey_components = pubkey_components
+                    .ok_or_else(|| de::Error::missing_field("pubkey_components"))?;
+                let d = d.ok_or_else(|| de::Error::missing_field("d"))?;
+                let primes = primes.ok_or_else(|| de::Error::missing_field("primes"))?;
+                Ok(RsaPrivateKey {
+                    pubkey_components,
+                    privkey_components: RsaPrivateKeyComponents::new(d, primes),
+                })
+            }
+        }
+
+        const FIELDS: &'static [&'static str] = &["pubkey", "d", "primes"];
+        deserializer.deserialize_struct("RsaPrivateKey", FIELDS, RsaPrivateKeyVisitor)
+    }
+}
+
+impl PartialEq for RsaPrivateKey {
+    #[inline]
+    fn eq(&self, other: &RsaPrivateKey) -> bool {
+        self.pubkey_components == other.pubkey_components
+            && self.privkey_components == other.privkey_components
+    }
+}
+
+impl Eq for RsaPrivateKey {}
 
 impl Deref for RsaPrivateKey {
     type Target = RsaPublicKey;
@@ -184,7 +391,7 @@ impl Zeroize for CRTValue {
 
 impl From<RsaPrivateKey> for RsaPublicKey {
     fn from(private_key: RsaPrivateKey) -> Self {
-        (&private_key).into()
+        private_key.pubkey_components
     }
 }
 
@@ -337,17 +544,10 @@ impl RsaPrivateKey {
             return Err(Error::NprimesTooSmall);
         }
 
-        let mut k = RsaPrivateKey {
+        Ok(RsaPrivateKey {
             pubkey_components: RsaPublicKey { n, e },
-            d,
-            primes,
-            precomputed: None,
-        };
-
-        // precompute when possible, ignore error otherwise.
-        let _ = k.precompute();
-
-        Ok(k)
+            privkey_components: RsaPrivateKeyComponents::new(d, primes),
+        })
     }
 
     /// Get the public key from the private key, cloning `n` and `e`.
@@ -360,68 +560,19 @@ impl RsaPrivateKey {
 
     /// Performs some calculations to speed up private key operations.
     pub fn precompute(&mut self) -> Result<()> {
-        if self.precomputed.is_some() {
-            return Ok(());
-        }
-
-        let dp = &self.d % (&self.primes[0] - BigUint::one());
-        let dq = &self.d % (&self.primes[1] - BigUint::one());
-        let qinv = self.primes[1]
-            .clone()
-            .mod_inverse(&self.primes[0])
-            .ok_or(Error::InvalidPrime)?;
-
-        let mut r: BigUint = &self.primes[0] * &self.primes[1];
-        let crt_values: Vec<CRTValue> = {
-            let mut values = Vec::with_capacity(self.primes.len() - 2);
-            for prime in &self.primes[2..] {
-                let res = CRTValue {
-                    exp: BigInt::from_biguint(Plus, &self.d % (prime - BigUint::one())),
-                    r: BigInt::from_biguint(Plus, r.clone()),
-                    coeff: BigInt::from_biguint(
-                        Plus,
-                        r.clone()
-                            .mod_inverse(prime)
-                            .ok_or(Error::InvalidCoefficient)?
-                            .to_biguint()
-                            .unwrap(),
-                    ),
-                };
-                r *= prime;
-
-                values.push(res);
-            }
-            values
-        };
-
-        self.precomputed = Some(PrecomputedValues {
-            dp,
-            dq,
-            qinv,
-            crt_values,
-        });
-
-        Ok(())
+        self.privkey_components.precompute()
     }
 
     /// Clears precomputed values by setting to None
     pub fn clear_precomputed(&mut self) {
-        self.precomputed = None;
-    }
-
-    /// Returns the private exponent of the key.
-    pub fn d(&self) -> &BigUint {
-        &self.d
-    }
-
-    /// Returns the prime factors.
-    pub fn primes(&self) -> &[BigUint] {
-        &self.primes
+        self.privkey_components.clear_precomputed()
     }
 
     /// Compute CRT coefficient: `(1/q) mod p`.
     pub fn crt_coefficient(&self) -> Option<BigUint> {
-        (&self.primes[1]).mod_inverse(&self.primes[0])?.to_biguint()
+        (&self.primes()[1])
+            .mod_inverse(&self.primes()[0])?
+            .to_biguint()
     }
 
     /// Performs basic sanity checks on the key.
@@ -431,7 +582,7 @@ impl RsaPrivateKey {
 
         // Check that Πprimes == n.
         let mut m = BigUint::one();
-        for prime in &self.primes {
+        for prime in self.primes() {
             // Any primes ≤ 1 will cause divide-by-zero panics later.
             if *prime < BigUint::one() {
                 return Err(Error::InvalidPrime);
@@ -447,9 +598,9 @@ impl RsaPrivateKey {
         // inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
         // exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
         // mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
-        let mut de = self.e.clone();
-        de *= self.d.clone();
-        for prime in &self.primes {
+        let mut de = self.e().clone();
+        de *= self.d().clone();
+        for prime in self.primes() {
             let congruence: BigUint = &de % (prime - BigUint::one());
             if !congruence.is_one() {
                 return Err(Error::InvalidExponent);
@@ -623,9 +774,11 @@ mod tests {
                 n: BigUint::from_u64(100).unwrap(),
                 e: BigUint::from_u64(200).unwrap(),
             },
-            d: BigUint::from_u64(123).unwrap(),
-            primes: vec![],
-            precomputed: None,
+            privkey_components: RsaPrivateKeyComponents {
+                d: BigUint::from_u64(123).unwrap(),
+                primes: vec![],
+                precomputed: None,
+            },
         };
         let public_key: RsaPublicKey = private_key.into();
 
