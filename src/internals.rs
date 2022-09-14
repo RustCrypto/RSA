@@ -18,7 +18,7 @@ pub fn encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> BigUint {
 /// Performs raw RSA decryption with no padding, resulting in a plaintext `BigUint`.
 /// Peforms RSA blinding if an `Rng` is passed.
 #[inline]
-pub fn decrypt<R: RngCore + CryptoRng>(
+pub(crate) fn decrypt<R: RngCore + CryptoRng>(
     mut rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     c: &BigUint,
@@ -127,7 +127,7 @@ pub fn decrypt_and_check<R: RngCore + CryptoRng>(
 }
 
 /// Returns the blinded c, along with the unblinding factor.
-pub fn blind<R: RngCore + CryptoRng, K: PublicKeyParts>(
+fn blind<R: RngCore + CryptoRng, K: PublicKeyParts>(
     rng: &mut R,
     key: &K,
     c: &BigUint,
@@ -168,7 +168,7 @@ pub fn blind<R: RngCore + CryptoRng, K: PublicKeyParts>(
 }
 
 /// Given an m and and unblinding factor, unblind the m.
-pub fn unblind(key: &impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> BigUint {
+fn unblind(key: &impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> BigUint {
     (m * unblinder) % key.n()
 }
 
