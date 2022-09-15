@@ -210,13 +210,15 @@ pub mod pss;
 mod dummy_rng;
 mod encoding;
 mod key;
+mod keyparts;
 mod oaep;
 mod raw;
 
 pub use pkcs1;
 pub use pkcs8;
 
-pub use self::key::{PrivateKeyParts, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+pub use self::key::{PublicKey, RsaPrivateKey, RsaPublicKey};
+pub use self::keyparts::{PrivateKeyParts, PublicKeyParts};
 pub use self::padding::PaddingScheme;
 
 /// Internal raw RSA functions.

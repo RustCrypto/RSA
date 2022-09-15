@@ -5,7 +5,7 @@ use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
 use crate::internals;
-use crate::key::{PrivateKeyPartsInt, PublicKeyParts};
+use crate::keyparts::{PrivateKeyPartsInt, PublicKeyParts};
 
 pub trait EncryptionPrimitive {
     /// Do NOT use directly! Only for implementors.
