@@ -507,6 +507,8 @@ mod tests {
     use sha1::{Digest, Sha1};
     #[cfg(feature = "sha2")]
     use sha2::Sha256;
+    #[cfg(feature = "sha3")]
+    use sha3::Sha3_256;
     use signature::{RandomizedSigner, Signature, Signer, Verifier};
 
     use crate::{Hash, PaddingScheme, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
@@ -632,9 +634,36 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "sha1")]
+    #[test]
+    fn test_sign_pkcs1v15_signer_sha1() {
+        let priv_key = get_private_key();
+
+        let tests = [(
+            "Test.\n",
+            hex!(
+                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+            ),
+        )];
+
+        let signing_key = SigningKey::<Sha1>::new_with_prefix(priv_key);
+
+        for (text, expected) in &tests {
+            let out = signing_key.sign(text.as_bytes());
+            assert_ne!(out.as_ref(), text.as_bytes());
+            assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
+            assert_eq!(out.as_ref(), expected);
+
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
+            let out2 = signing_key.sign_with_rng(&mut rng, text.as_bytes());
+            assert_eq!(out2.as_ref(), expected);
+        }
+    }
+
     #[cfg(feature = "sha2")]
     #[test]
-    fn test_sign_pkcs1v15_signer() {
+    fn test_sign_pkcs1v15_signer_sha2_256() {
         let priv_key = get_private_key();
 
         let tests = [(
@@ -650,7 +679,32 @@ mod tests {
         for (text, expected) in &tests {
             let out = signing_key.sign(text.as_bytes());
             assert_ne!(out.as_ref(), text.as_bytes());
-            assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
+            assert_eq!(out.as_ref(), expected);
+
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
+            let out2 = signing_key.sign_with_rng(&mut rng, text.as_bytes());
+            assert_eq!(out2.as_ref(), expected);
+        }
+    }
+
+    #[cfg(feature = "sha3")]
+    #[test]
+    fn test_sign_pkcs1v15_signer_sha3_256() {
+        let priv_key = get_private_key();
+
+        let tests = [(
+            "Test.\n",
+            hex!(
+                "55e9fba3354dfb51d2c8111794ea552c86afc2cab154652c03324df8c2c51ba7"
+                "2ff7c14de59a6f9ba50d90c13a7537cc3011948369f1f0ec4a49d21eb7e723f9"
+            ),
+        )];
+
+        let signing_key = SigningKey::<Sha3_256>::new_with_prefix(priv_key);
+
+        for (text, expected) in &tests {
+            let out = signing_key.sign(text.as_bytes());
+            assert_ne!(out.as_ref(), text.as_bytes());
             assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
