@@ -42,12 +42,6 @@ impl EncryptionPrimitive for RsaPublicKey {
     }
 }
 
-impl<'a> EncryptionPrimitive for &'a RsaPublicKey {
-    fn raw_encryption_primitive(&self, plaintext: &[u8], pad_size: usize) -> Result<Vec<u8>> {
-        (*self).raw_encryption_primitive(plaintext, pad_size)
-    }
-}
-
 impl DecryptionPrimitive for RsaPrivateKey {
     fn raw_decryption_primitive<R: RngCore + CryptoRng>(
         &self,
@@ -66,16 +60,5 @@ impl DecryptionPrimitive for RsaPrivateKey {
         m_bytes.zeroize();
 
         Ok(plaintext)
-    }
-}
-
-impl<'a> DecryptionPrimitive for &'a RsaPrivateKey {
-    fn raw_decryption_primitive<R: RngCore + CryptoRng>(
-        &self,
-        rng: Option<&mut R>,
-        ciphertext: &[u8],
-        pad_size: usize,
-    ) -> Result<Vec<u8>> {
-        (*self).raw_decryption_primitive(rng, ciphertext, pad_size)
     }
 }

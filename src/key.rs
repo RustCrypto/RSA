@@ -256,33 +256,6 @@ impl RsaPublicKey {
     }
 }
 
-impl<'a> PublicKeyParts for &'a RsaPublicKey {
-    /// Returns the modulus of the key.
-    fn n(&self) -> &BigUint {
-        &self.n
-    }
-
-    /// Returns the public exponent of the key.
-    fn e(&self) -> &BigUint {
-        &self.e
-    }
-}
-
-impl<'a> PublicKey for &'a RsaPublicKey {
-    fn encrypt<R: RngCore + CryptoRng>(
-        &self,
-        rng: &mut R,
-        padding: PaddingScheme,
-        msg: &[u8],
-    ) -> Result<Vec<u8>> {
-        (*self).encrypt(rng, padding, msg)
-    }
-
-    fn verify(&self, padding: PaddingScheme, hashed: &[u8], sig: &[u8]) -> Result<()> {
-        (*self).verify(padding, hashed, sig)
-    }
-}
-
 impl PublicKeyParts for RsaPrivateKey {
     fn n(&self) -> &BigUint {
         &self.n
@@ -294,18 +267,6 @@ impl PublicKeyParts for RsaPrivateKey {
 }
 
 impl PrivateKey for RsaPrivateKey {}
-
-impl<'a> PublicKeyParts for &'a RsaPrivateKey {
-    fn n(&self) -> &BigUint {
-        &self.n
-    }
-
-    fn e(&self) -> &BigUint {
-        &self.e
-    }
-}
-
-impl<'a> PrivateKey for &'a RsaPrivateKey {}
 
 impl RsaPrivateKey {
     /// Generate a new Rsa key pair of the given bit size using the passed in `rng`.
