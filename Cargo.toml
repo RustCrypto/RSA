@@ -1,6 +1,6 @@
 [package]
 name = "rsa"
-version = "0.7.0-pre"
+version = "0.7.0-rc.0"
 authors = ["RustCrypto Developers", "dignifiedquire <dignifiedquire@gmail.com>"]
 edition = "2021"
 description = "Pure Rust RSA implementation"
@@ -23,7 +23,7 @@ subtle = { version = "2.1.1", default-features = false }
 digest = { version = "0.10.5", default-features = false, features = ["alloc", "oid"] }
 pkcs1 = { version = "0.4", default-features = false, features = ["pkcs8", "alloc"] }
 pkcs8 = { version = "0.9", default-features = false, features = ["alloc"] }
-#To keep the rand_core versions properly pinnen, specify exact version
+# To keep the `digest` and `rand_core` versions properly pinned, specify exact version
 signature = { version = ">=1.5, <1.7", default-features = false , features = ["digest-preview", "rand-preview"] }
 zeroize = { version = "1", features = ["alloc"] }
 
