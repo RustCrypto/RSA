@@ -12,6 +12,7 @@ use zeroize::Zeroize;
 use crate::algorithms::{generate_multi_prime_key, generate_multi_prime_key_with_exp};
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
+use crate::hash::Hash;
 
 use crate::padding::PaddingScheme;
 use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
@@ -217,7 +218,8 @@ impl PublicKey for RsaPublicKey {
     fn verify(&self, padding: PaddingScheme, hashed: &[u8], sig: &[u8]) -> Result<()> {
         match padding {
             PaddingScheme::PKCS1v15Sign { ref hash } => {
-                pkcs1v15::verify(self, hash.as_ref(), hashed, sig)
+                let prefix = hash_info(*hash, hashed.len())?;
+                pkcs1v15::verify(self, prefix, hashed, sig)
             }
             PaddingScheme::PSS { mut digest, .. } => pss::verify(self, hashed, sig, &mut *digest),
             _ => Err(Error::InvalidPaddingScheme),
@@ -510,7 +512,8 @@ impl RsaPrivateKey {
         match padding {
             // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
             PaddingScheme::PKCS1v15Sign { ref hash } => {
-                pkcs1v15::sign::<DummyRng, _>(None, self, hash.as_ref(), digest_in)
+                let prefix = hash_info(*hash, digest_in.len())?;
+                pkcs1v15::sign::<DummyRng, _>(None, self, prefix, digest_in)
             }
             _ => Err(Error::InvalidPaddingScheme),
         }
@@ -545,7 +548,8 @@ impl RsaPrivateKey {
     ) -> Result<Vec<u8>> {
         match padding {
             PaddingScheme::PKCS1v15Sign { ref hash } => {
-                pkcs1v15::sign(Some(rng), self, hash.as_ref(), digest_in)
+                let prefix = hash_info(*hash, digest_in.len())?;
+                pkcs1v15::sign(Some(rng), self, prefix, digest_in)
             }
             PaddingScheme::PSS {
                 mut digest,
@@ -553,6 +557,22 @@ impl RsaPrivateKey {
             } => pss::sign::<R, _>(rng, true, self, digest_in, salt_len, &mut *digest),
             _ => Err(Error::InvalidPaddingScheme),
         }
+    }
+}
+
+#[inline]
+fn hash_info(hash: Option<Hash>, digest_len: usize) -> Result<&'static [u8]> {
+    match hash {
+        Some(hash) => {
+            let hash_len = hash.size();
+            if digest_len != hash_len {
+                return Err(Error::InputNotHashed);
+            }
+
+            Ok(hash.asn1_prefix())
+        }
+        // this means the data is signed directly
+        None => Ok(&[]),
     }
 }
 
