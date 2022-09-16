@@ -216,8 +216,13 @@ impl PublicKey for RsaPublicKey {
 
     fn verify(&self, padding: PaddingScheme, hashed: &[u8], sig: &[u8]) -> Result<()> {
         match padding {
-            PaddingScheme::PKCS1v15Sign { ref hash } => {
-                pkcs1v15::verify(self, hash.as_ref(), hashed, sig)
+            PaddingScheme::PKCS1v15Sign { hash_len, prefix } => {
+                if let Some(hash_len) = hash_len {
+                    if hashed.len() != hash_len {
+                        return Err(Error::InputNotHashed);
+                    }
+                }
+                pkcs1v15::verify(self, prefix.as_ref(), hashed, sig)
             }
             PaddingScheme::PSS { mut digest, .. } => pss::verify(self, hashed, sig, &mut *digest),
             _ => Err(Error::InvalidPaddingScheme),
@@ -509,8 +514,13 @@ impl RsaPrivateKey {
     pub fn sign(&self, padding: PaddingScheme, digest_in: &[u8]) -> Result<Vec<u8>> {
         match padding {
             // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
-            PaddingScheme::PKCS1v15Sign { ref hash } => {
-                pkcs1v15::sign::<DummyRng, _>(None, self, hash.as_ref(), digest_in)
+            PaddingScheme::PKCS1v15Sign { hash_len, prefix } => {
+                if let Some(hash_len) = hash_len {
+                    if digest_in.len() != hash_len {
+                        return Err(Error::InputNotHashed);
+                    }
+                }
+                pkcs1v15::sign::<DummyRng, _>(None, self, prefix.as_ref(), digest_in)
             }
             _ => Err(Error::InvalidPaddingScheme),
         }
@@ -544,8 +554,13 @@ impl RsaPrivateKey {
         digest_in: &[u8],
     ) -> Result<Vec<u8>> {
         match padding {
-            PaddingScheme::PKCS1v15Sign { ref hash } => {
-                pkcs1v15::sign(Some(rng), self, hash.as_ref(), digest_in)
+            PaddingScheme::PKCS1v15Sign { hash_len, prefix } => {
+                if let Some(hash_len) = hash_len {
+                    if digest_in.len() != hash_len {
+                        return Err(Error::InputNotHashed);
+                    }
+                }
+                pkcs1v15::sign(Some(rng), self, prefix.as_ref(), digest_in)
             }
             PaddingScheme::PSS {
                 mut digest,

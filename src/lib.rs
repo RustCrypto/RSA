@@ -47,32 +47,28 @@
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
 //!
-#![cfg_attr(
-    feature = "sha2",
-    doc = r#"
-Using PKCS1v15 signatures
-```
-use rsa::RsaPrivateKey;
-use rsa::pkcs1v15::{SigningKey, VerifyingKey};
-use sha2::{Digest, Sha256};
-use signature::{RandomizedSigner, Signature, Verifier};
-
-let mut rng = rand::thread_rng();
-
-let bits = 2048;
-let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
-let signing_key = SigningKey::<Sha256>::new_with_prefix(private_key);
-let verifying_key: VerifyingKey<_> = (&signing_key).into();
-
-// Sign
-let data = b"hello world";
-let signature = signing_key.sign_with_rng(&mut rng, data);
-assert_ne!(signature.as_bytes(), data);
-
-// Verify
-verifying_key.verify(data, &signature).expect("failed to verify");
-```"#
-)]
+//! Using PKCS1v15 signatures
+//! ```
+//! use rsa::RsaPrivateKey;
+//! use rsa::pkcs1v15::{SigningKey, VerifyingKey};
+//! use sha2::{Digest, Sha256};
+//! use signature::{RandomizedSigner, Signature, Verifier};
+//!
+//! let mut rng = rand::thread_rng();
+//!
+//! let bits = 2048;
+//! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+//! let signing_key = SigningKey::<Sha256>::new_with_prefix(private_key);
+//! let verifying_key: VerifyingKey<_> = (&signing_key).into();
+//!
+//! // Sign
+//! let data = b"hello world";
+//! let signature = signing_key.sign_with_rng(&mut rng, data);
+//! assert_ne!(signature.as_bytes(), data);
+//!
+//! // Verify
+//! verifying_key.verify(data, &signature).expect("failed to verify");
+//! ```
 //!
 //! Using PSS signatures
 //! ```
@@ -204,8 +200,6 @@ pub use rand_core;
 pub mod algorithms;
 /// Error types.
 pub mod errors;
-/// Supported hash functions.
-pub mod hash;
 /// Supported padding schemes.
 pub mod padding;
 /// RSASSA-PKCS1-v1_5 Signature support
@@ -222,7 +216,6 @@ mod raw;
 pub use pkcs1;
 pub use pkcs8;
 
-pub use self::hash::Hash;
 pub use self::key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 pub use self::padding::PaddingScheme;
 

@@ -4,6 +4,7 @@ use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
 use core::ops::Deref;
 use digest::Digest;
+use pkcs8::AssociatedOid;
 use rand_core::{CryptoRng, RngCore};
 use signature::{
     DigestSigner, DigestVerifier, RandomizedDigestSigner, RandomizedSigner,
@@ -14,7 +15,6 @@ use zeroize::Zeroizing;
 
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
-use crate::hash::{AssociatedHash, Hash};
 use crate::key::{self, PrivateKey, PublicKey};
 use crate::{RsaPrivateKey, RsaPublicKey};
 
@@ -160,12 +160,11 @@ pub(crate) fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
 pub(crate) fn sign<R: RngCore + CryptoRng, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
-    hash: Option<&Hash>,
+    prefix: &[u8],
     hashed: &[u8],
 ) -> Result<Vec<u8>> {
-    let (hash_len, prefix) = hash_info(hash, hashed.len())?;
-
-    let t_len = prefix.len() + hash_len;
+    let hash_len = hashed.len();
+    let t_len = prefix.len() + hashed.len();
     let k = priv_key.size();
     if k < t_len + 11 {
         return Err(Error::MessageTooLong);
@@ -186,13 +185,12 @@ pub(crate) fn sign<R: RngCore + CryptoRng, SK: PrivateKey>(
 #[inline]
 pub(crate) fn verify<PK: PublicKey>(
     pub_key: &PK,
-    hash: Option<&Hash>,
+    prefix: &[u8],
     hashed: &[u8],
     sig: &[u8],
 ) -> Result<()> {
-    let (hash_len, prefix) = hash_info(hash, hashed.len())?;
-
-    let t_len = prefix.len() + hash_len;
+    let hash_len = hashed.len();
+    let t_len = prefix.len() + hashed.len();
     let k = pub_key.size();
     if k < t_len + 11 {
         return Err(Error::Verification);
@@ -218,20 +216,26 @@ pub(crate) fn verify<PK: PublicKey>(
     Ok(())
 }
 
+// prefix = 0x30 <oid_len + 8 + digest_len> 0x30 <oid_len + 4> 0x06 <oid_len> oid 0x05 0x00 0x04 <digest_len>
 #[inline]
-fn hash_info(hash: Option<&Hash>, digest_len: usize) -> Result<(usize, &'static [u8])> {
-    match hash {
-        Some(hash) => {
-            let hash_len = hash.size();
-            if digest_len != hash_len {
-                return Err(Error::InputNotHashed);
-            }
-
-            Ok((hash_len, hash.asn1_prefix()))
-        }
-        // this means the data is signed directly
-        None => Ok((digest_len, &[])),
-    }
+pub(crate) fn generate_prefix<D>() -> Vec<u8>
+where
+    D: Digest + AssociatedOid,
+{
+    let oid = D::OID.as_bytes();
+    let oid_len = oid.len() as u8;
+    let digest_len = <D as Digest>::output_size() as u8;
+    let mut v = vec![
+        0x30,
+        oid_len + 8 + digest_len,
+        0x30,
+        oid_len + 4,
+        0x6,
+        oid_len,
+    ];
+    v.extend_from_slice(oid);
+    v.extend_from_slice(&[0x05, 0x00, 0x04, digest_len]);
+    v
 }
 
 /// Decrypts ciphertext using `priv_key` and blinds the operation if
@@ -304,7 +308,7 @@ where
     D: Digest,
 {
     inner: RsaPrivateKey,
-    hash: Option<Hash>,
+    prefix: Vec<u8>,
     phantom: PhantomData<D>,
 }
 
@@ -316,14 +320,14 @@ where
         &self.inner
     }
 
-    pub(crate) fn hash(&self) -> Option<Hash> {
-        self.hash
+    pub(crate) fn prefix(&self) -> Vec<u8> {
+        self.prefix.clone()
     }
 
     pub fn new(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
-            hash: None,
+            prefix: Vec::new(),
             phantom: Default::default(),
         }
     }
@@ -331,12 +335,12 @@ where
 
 impl<D> SigningKey<D>
 where
-    D: Digest + AssociatedHash,
+    D: Digest + AssociatedOid,
 {
     pub fn new_with_prefix(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
-            hash: Some(D::HASH),
+            prefix: generate_prefix::<D>(),
             phantom: Default::default(),
         }
     }
@@ -347,7 +351,7 @@ where
     D: Digest,
 {
     fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
-        sign::<DummyRng, _>(None, &self.inner, self.hash.as_ref(), &D::digest(msg))
+        sign::<DummyRng, _>(None, &self.inner, &self.prefix, &D::digest(msg))
             .map(|v| v.into())
             .map_err(|e| e.into())
     }
@@ -362,14 +366,9 @@ where
         mut rng: impl CryptoRng + RngCore,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign(
-            Some(&mut rng),
-            &self.inner,
-            self.hash.as_ref(),
-            &D::digest(msg),
-        )
-        .map(|v| v.into())
-        .map_err(|e| e.into())
+        sign(Some(&mut rng), &self.inner, &self.prefix, &D::digest(msg))
+            .map(|v| v.into())
+            .map_err(|e| e.into())
     }
 }
 
@@ -378,7 +377,7 @@ where
     D: Digest,
 {
     fn try_sign_digest(&self, digest: D) -> signature::Result<Signature> {
-        sign::<DummyRng, _>(None, &self.inner, self.hash.as_ref(), &digest.finalize())
+        sign::<DummyRng, _>(None, &self.inner, &self.prefix, &digest.finalize())
             .map(|v| v.into())
             .map_err(|e| e.into())
     }
@@ -396,7 +395,7 @@ where
         sign(
             Some(&mut rng),
             &self.inner,
-            self.hash.as_ref(),
+            &self.prefix,
             &digest.finalize(),
         )
         .map(|v| v.into())
@@ -409,7 +408,7 @@ where
     D: Digest,
 {
     inner: RsaPublicKey,
-    hash: Option<Hash>,
+    prefix: Vec<u8>,
     phantom: PhantomData<D>,
 }
 
@@ -420,7 +419,7 @@ where
     pub fn new(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
-            hash: None,
+            prefix: Vec::new(),
             phantom: Default::default(),
         }
     }
@@ -428,12 +427,12 @@ where
 
 impl<D> VerifyingKey<D>
 where
-    D: Digest + AssociatedHash,
+    D: Digest + AssociatedOid,
 {
     pub fn new_with_prefix(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
-            hash: Some(D::HASH),
+            prefix: generate_prefix::<D>(),
             phantom: Default::default(),
         }
     }
@@ -446,7 +445,7 @@ where
     fn from(key: SigningKey<D>) -> Self {
         Self {
             inner: key.key().into(),
-            hash: key.hash(),
+            prefix: key.prefix(),
             phantom: Default::default(),
         }
     }
@@ -459,7 +458,7 @@ where
     fn from(key: &SigningKey<D>) -> Self {
         Self {
             inner: key.key().into(),
-            hash: key.hash(),
+            prefix: key.prefix(),
             phantom: Default::default(),
         }
     }
@@ -472,7 +471,7 @@ where
     fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
         verify(
             &self.inner,
-            self.hash.as_ref(),
+            &self.prefix,
             &D::digest(msg),
             signature.as_ref(),
         )
@@ -487,7 +486,7 @@ where
     fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
         verify(
             &self.inner,
-            self.hash.as_ref(),
+            &self.prefix,
             &digest.finalize(),
             signature.as_ref(),
         )
@@ -505,11 +504,11 @@ mod tests {
     use num_traits::Num;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
     use sha1::{Digest, Sha1};
-    #[cfg(feature = "sha2")]
     use sha2::Sha256;
+    use sha3::Sha3_256;
     use signature::{RandomizedSigner, Signature, Signer, Verifier};
 
-    use crate::{Hash, PaddingScheme, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+    use crate::{PaddingScheme, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 
     #[test]
     fn test_non_zero_bytes() {
@@ -615,7 +614,7 @@ mod tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
 
             let out = priv_key
-                .sign(PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)), &digest)
+                .sign(PaddingScheme::new_pkcs1v15_sign::<Sha1>(), &digest)
                 .unwrap();
             assert_ne!(out, digest);
             assert_eq!(out, expected);
@@ -624,7 +623,7 @@ mod tests {
             let out2 = priv_key
                 .sign_blinded(
                     &mut rng,
-                    PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)),
+                    PaddingScheme::new_pkcs1v15_sign::<Sha1>(),
                     &digest,
                 )
                 .unwrap();
@@ -632,9 +631,34 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "sha2")]
     #[test]
     fn test_sign_pkcs1v15_signer() {
+        let priv_key = get_private_key();
+
+        let tests = [(
+            "Test.\n",
+            hex!(
+                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+            ),
+        )];
+
+        let signing_key = SigningKey::<Sha1>::new_with_prefix(priv_key);
+
+        for (text, expected) in &tests {
+            let out = signing_key.sign(text.as_bytes());
+            assert_ne!(out.as_ref(), text.as_bytes());
+            assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
+            assert_eq!(out.as_ref(), expected);
+
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
+            let out2 = signing_key.sign_with_rng(&mut rng, text.as_bytes());
+            assert_eq!(out2.as_ref(), expected);
+        }
+    }
+
+    #[test]
+    fn test_sign_pkcs1v15_signer_sha2_256() {
         let priv_key = get_private_key();
 
         let tests = [(
@@ -650,7 +674,6 @@ mod tests {
         for (text, expected) in &tests {
             let out = signing_key.sign(text.as_bytes());
             assert_ne!(out.as_ref(), text.as_bytes());
-            assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
             assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
@@ -659,7 +682,31 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "sha2")]
+    #[test]
+    fn test_sign_pkcs1v15_signer_sha3_256() {
+        let priv_key = get_private_key();
+
+        let tests = [(
+            "Test.\n",
+            hex!(
+                "55e9fba3354dfb51d2c8111794ea552c86afc2cab154652c03324df8c2c51ba7"
+                "2ff7c14de59a6f9ba50d90c13a7537cc3011948369f1f0ec4a49d21eb7e723f9"
+            ),
+        )];
+
+        let signing_key = SigningKey::<Sha3_256>::new_with_prefix(priv_key);
+
+        for (text, expected) in &tests {
+            let out = signing_key.sign(text.as_bytes());
+            assert_ne!(out.as_ref(), text.as_bytes());
+            assert_eq!(out.as_ref(), expected);
+
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
+            let out2 = signing_key.sign_with_rng(&mut rng, text.as_bytes());
+            assert_eq!(out2.as_ref(), expected);
+        }
+    }
+
     #[test]
     fn test_sign_pkcs1v15_digest_signer() {
         let priv_key = get_private_key();
@@ -667,15 +714,15 @@ mod tests {
         let tests = [(
             "Test.\n",
             hex!(
-                "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
-                "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451b"
+                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
             ),
         )];
 
         let signing_key = SigningKey::new_with_prefix(priv_key);
 
         for (text, expected) in &tests {
-            let mut digest = Sha256::new();
+            let mut digest = Sha1::new();
             digest.update(text.as_bytes());
             let out = signing_key.sign_digest(digest);
             assert_ne!(out.as_ref(), text.as_bytes());
@@ -683,7 +730,7 @@ mod tests {
             assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let mut digest = Sha256::new();
+            let mut digest = Sha1::new();
             digest.update(text.as_bytes());
             let out2 = signing_key.sign_digest_with_rng(&mut rng, digest);
             assert_eq!(out2.as_ref(), expected);
@@ -717,11 +764,7 @@ mod tests {
         for (text, sig, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
 
-            let result = pub_key.verify(
-                PaddingScheme::new_pkcs1v15_sign(Some(Hash::SHA1)),
-                &digest,
-                sig,
-            );
+            let result = pub_key.verify(PaddingScheme::new_pkcs1v15_sign::<Sha1>(), &digest, sig);
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -732,7 +775,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "sha2")]
     #[test]
     fn test_verify_pkcs1v15_signer() {
         let priv_key = get_private_key();
@@ -741,22 +783,22 @@ mod tests {
             (
                 "Test.\n",
                 hex!(
-                    "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
-                    "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451b"
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
                 ),
                 true,
             ),
             (
                 "Test.\n",
                 hex!(
-                    "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
-                    "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451c"
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
                 ),
                 false,
             ),
         ];
         let pub_key: RsaPublicKey = priv_key.into();
-        let verifying_key = VerifyingKey::<Sha256>::new_with_prefix(pub_key);
+        let verifying_key = VerifyingKey::<Sha1>::new_with_prefix(pub_key);
 
         for (text, sig, expected) in &tests {
             let result =
@@ -771,7 +813,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "sha2")]
     #[test]
     fn test_verify_pkcs1v15_digest_signer() {
         let priv_key = get_private_key();
@@ -780,16 +821,16 @@ mod tests {
             (
                 "Test.\n",
                 hex!(
-                    "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
-                    "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451b"
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
                 ),
                 true,
             ),
             (
                 "Test.\n",
                 hex!(
-                    "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
-                    "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451c"
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
                 ),
                 false,
             ),
@@ -798,7 +839,7 @@ mod tests {
         let verifying_key = VerifyingKey::new_with_prefix(pub_key);
 
         for (text, sig, expected) in &tests {
-            let mut digest = Sha256::new();
+            let mut digest = Sha1::new();
             digest.update(text.as_bytes());
             let result = verifying_key.verify_digest(digest, &Signature::from_bytes(sig).unwrap());
             match expected {
@@ -817,13 +858,13 @@ mod tests {
         let priv_key = get_private_key();
 
         let sig = priv_key
-            .sign(PaddingScheme::new_pkcs1v15_sign(None), msg)
+            .sign(PaddingScheme::new_pkcs1v15_sign_raw(), msg)
             .unwrap();
         assert_eq!(expected_sig, sig);
 
         let pub_key: RsaPublicKey = priv_key.into();
         pub_key
-            .verify(PaddingScheme::new_pkcs1v15_sign(None), msg, &sig)
+            .verify(PaddingScheme::new_pkcs1v15_sign_raw(), msg, &sig)
             .expect("failed to verify");
     }
 
