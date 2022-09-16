@@ -10,7 +10,8 @@ use rand_core::{CryptoRng, RngCore};
 #[cfg(feature = "hazmat")]
 use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
 use signature::{
-    DigestVerifier, RandomizedDigestSigner, RandomizedSigner, Signature as SignSignature, Verifier,
+    DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, Signature as SignSignature,
+    Verifier,
 };
 use subtle::ConstantTimeEq;
 
@@ -626,6 +627,13 @@ where
     }
 }
 
+impl<D> Keypair<Signature> for SigningKey<D>
+where
+    D: Digest,
+{
+    type VerifyingKey = VerifyingKey<D>;
+}
+
 impl<D> AsRef<VerifyingKey<D>> for SigningKey<D>
 where
     D: Digest,
@@ -797,6 +805,13 @@ where
     fn as_ref(&self) -> &VerifyingKey<D> {
         &self.verifying_key
     }
+}
+
+impl<D> Keypair<Signature> for BlindedSigningKey<D>
+where
+    D: Digest,
+{
+    type VerifyingKey = VerifyingKey<D>;
 }
 
 impl<D> RandomizedSigner<Signature> for BlindedSigningKey<D>
