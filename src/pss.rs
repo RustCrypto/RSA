@@ -518,6 +518,7 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SigningKey<D>
 where
     D: Digest,
@@ -658,6 +659,7 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct VerifyingKey<D>
 where
     D: Digest,
