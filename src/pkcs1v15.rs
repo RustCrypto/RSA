@@ -303,6 +303,7 @@ fn non_zero_random_bytes<R: RngCore + CryptoRng>(rng: &mut R, data: &mut [u8]) {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct SigningKey<D>
 where
     D: Digest,
@@ -403,6 +404,7 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct VerifyingKey<D>
 where
     D: Digest,
