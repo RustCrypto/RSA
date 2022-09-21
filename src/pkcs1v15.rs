@@ -334,6 +334,15 @@ where
     }
 }
 
+impl<D> From<RsaPrivateKey> for SigningKey<D>
+where
+    D: Digest,
+{
+    fn from(key: RsaPrivateKey) -> Self {
+        Self::new(key)
+    }
+}
+
 impl<D> SigningKey<D>
 where
     D: Digest + AssociatedOid,
@@ -433,6 +442,15 @@ where
             prefix: Vec::new(),
             phantom: Default::default(),
         }
+    }
+}
+
+impl<D> From<RsaPublicKey> for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn from(key: RsaPublicKey) -> Self {
+        Self::new(key)
     }
 }
 
