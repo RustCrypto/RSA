@@ -347,6 +347,15 @@ where
     }
 }
 
+impl<D> AsRef<RsaPrivateKey> for SigningKey<D>
+where
+    D: Digest,
+{
+    fn as_ref(&self) -> &RsaPrivateKey {
+        &self.inner
+    }
+}
+
 impl<D> Signer<Signature> for SigningKey<D>
 where
     D: Digest,
@@ -437,6 +446,15 @@ where
             prefix: generate_prefix::<D>(),
             phantom: Default::default(),
         }
+    }
+}
+
+impl<D> AsRef<RsaPublicKey> for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn as_ref(&self) -> &RsaPublicKey {
+        &self.inner
     }
 }
 

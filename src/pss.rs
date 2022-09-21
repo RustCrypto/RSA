@@ -589,6 +589,15 @@ where
     }
 }
 
+impl<D> AsRef<RsaPrivateKey> for SigningKey<D>
+where
+    D: Digest,
+{
+    fn as_ref(&self) -> &RsaPrivateKey {
+        &self.inner
+    }
+}
+
 pub struct BlindedSigningKey<D>
 where
     D: Digest,
@@ -656,6 +665,15 @@ where
         )
         .map(|v| v.into())
         .map_err(|e| e.into())
+    }
+}
+
+impl<D> AsRef<RsaPrivateKey> for BlindedSigningKey<D>
+where
+    D: Digest,
+{
+    fn as_ref(&self) -> &RsaPrivateKey {
+        &self.inner
     }
 }
 
@@ -745,6 +763,15 @@ where
     fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
         verify_digest::<_, D>(&self.inner, &digest.finalize(), signature.as_ref())
             .map_err(|e| e.into())
+    }
+}
+
+impl<D> AsRef<RsaPublicKey> for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn as_ref(&self) -> &RsaPublicKey {
+        &self.inner
     }
 }
 
