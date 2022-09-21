@@ -606,11 +606,11 @@ mod tests {
         let pub_key: RsaPublicKey = private_key.clone().into();
         let m = BigUint::from_u64(42).expect("invalid 42");
         let c = internals::encrypt(&pub_key, &m);
-        let m2 = internals::decrypt::<ChaCha8Rng>(None, &private_key, &c)
+        let m2 = internals::decrypt::<ChaCha8Rng>(None, private_key, &c)
             .expect("unable to decrypt without blinding");
         assert_eq!(m, m2);
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let m3 = internals::decrypt(Some(&mut rng), &private_key, &c)
+        let m3 = internals::decrypt(Some(&mut rng), private_key, &c)
             .expect("unable to decrypt with blinding");
         assert_eq!(m, m3);
     }
@@ -660,16 +660,16 @@ mod tests {
     #[test]
     fn test_negative_decryption_value() {
         let private_key = RsaPrivateKey::from_components(
-            BigUint::from_bytes_le(&vec![
+            BigUint::from_bytes_le(&[
                 99, 192, 208, 179, 0, 220, 7, 29, 49, 151, 75, 107, 75, 73, 200, 180,
             ]),
-            BigUint::from_bytes_le(&vec![1, 0, 1]),
-            BigUint::from_bytes_le(&vec![
+            BigUint::from_bytes_le(&[1, 0, 1]),
+            BigUint::from_bytes_le(&[
                 81, 163, 254, 144, 171, 159, 144, 42, 244, 133, 51, 249, 28, 12, 63, 65,
             ]),
             vec![
-                BigUint::from_bytes_le(&vec![105, 101, 60, 173, 19, 153, 3, 192]),
-                BigUint::from_bytes_le(&vec![235, 65, 160, 134, 32, 136, 6, 241]),
+                BigUint::from_bytes_le(&[105, 101, 60, 173, 19, 153, 3, 192]),
+                BigUint::from_bytes_le(&[235, 65, 160, 134, 32, 136, 6, 241]),
             ],
         )
         .unwrap();

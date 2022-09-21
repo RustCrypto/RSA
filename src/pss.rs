@@ -29,7 +29,7 @@ impl signature::Signature for Signature {
     }
 
     fn as_bytes(&self) -> &[u8] {
-        &self.bytes.as_slice()
+        self.bytes.as_slice()
     }
 }
 
@@ -63,7 +63,7 @@ impl Debug for Signature {
 
 impl AsRef<[u8]> for Signature {
     fn as_ref(&self) -> &[u8] {
-        &self.as_bytes()
+        self.as_bytes()
     }
 }
 
@@ -262,7 +262,7 @@ fn emsa_pss_encode(
     // 9.  Let dbMask = MGF(H, emLen - hLen - 1).
     //
     // 10. Let maskedDB = DB \xor dbMask.
-    mgf1_xor(db, hash, &h);
+    mgf1_xor(db, hash, h);
 
     // 11. Set the leftmost 8 * em_len - em_bits bits of the leftmost octet in
     //     maskedDB to zero.
@@ -335,7 +335,7 @@ where
     // 9.  Let dbMask = MGF(H, emLen - hLen - 1).
     //
     // 10. Let maskedDB = DB \xor dbMask.
-    mgf1_xor_digest(db, &mut hash, &h);
+    mgf1_xor_digest(db, &mut hash, h);
 
     // 11. Set the leftmost 8 * em_len - em_bits bits of the leftmost octet in
     //     maskedDB to zero.
@@ -390,12 +390,12 @@ fn emsa_pss_verify_pre<'a>(
     Ok((db, h))
 }
 
-fn emsa_pss_get_salt<'a>(
-    db: &'a [u8],
+fn emsa_pss_get_salt(
+    db: &[u8],
     em_len: usize,
     s_len: Option<usize>,
     h_len: usize,
-) -> Result<&'a [u8]> {
+) -> Result<&[u8]> {
     let s_len = match s_len {
         None => (0..=em_len - (h_len + 2))
             .rev()
@@ -816,7 +816,6 @@ mod test {
                 true => result.expect("failed to verify"),
                 false => {
                     result.expect_err("expected verifying error");
-                    ()
                 }
             }
         }
@@ -854,7 +853,6 @@ mod test {
                 true => result.expect("failed to verify"),
                 false => {
                     result.expect_err("expected verifying error");
-                    ()
                 }
             }
         }
@@ -893,7 +891,6 @@ mod test {
                 true => result.expect("failed to verify"),
                 false => {
                     result.expect_err("expected verifying error");
-                    ()
                 }
             }
         }
