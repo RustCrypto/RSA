@@ -98,7 +98,7 @@ pub fn decrypt<R: RngCore + CryptoRng>(
     match ir {
         Some(ref ir) => {
             // unblind
-            Ok(unblind(priv_key, &m, &ir))
+            Ok(unblind(priv_key, &m, ir))
         }
         None => Ok(m),
     }

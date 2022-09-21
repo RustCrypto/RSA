@@ -31,7 +31,7 @@ impl signature::Signature for Signature {
     }
 
     fn as_bytes(&self) -> &[u8] {
-        &self.bytes.as_slice()
+        self.bytes.as_slice()
     }
 }
 
@@ -65,7 +65,7 @@ impl Debug for Signature {
 
 impl AsRef<[u8]> for Signature {
     fn as_ref(&self) -> &[u8] {
-        &self.as_bytes()
+        self.as_bytes()
     }
 }
 
@@ -175,7 +175,7 @@ pub(crate) fn sign<R: RngCore + CryptoRng, SK: PrivateKey>(
     em[0] = 0;
     em[1] = 1;
     em[k - t_len - 1] = 0;
-    em[k - t_len..k - hash_len].copy_from_slice(&prefix);
+    em[k - t_len..k - hash_len].copy_from_slice(prefix);
     em[k - hash_len..k].copy_from_slice(hashed);
 
     priv_key.raw_decryption_primitive(rng, &em, priv_key.size())
@@ -202,7 +202,7 @@ pub(crate) fn verify<PK: PublicKey>(
     let mut ok = em[0].ct_eq(&0u8);
     ok &= em[1].ct_eq(&1u8);
     ok &= em[k - hash_len..k].ct_eq(hashed);
-    ok &= em[k - t_len..k - hash_len].ct_eq(&prefix);
+    ok &= em[k - t_len..k - hash_len].ct_eq(prefix);
     ok &= em[k - t_len - 1].ct_eq(&0u8);
 
     for el in em.iter().skip(2).take(k - t_len - 3) {
@@ -771,7 +771,6 @@ mod tests {
                 true => result.expect("failed to verify"),
                 false => {
                     result.expect_err("expected verifying error");
-                    ()
                 }
             }
         }
@@ -809,7 +808,6 @@ mod tests {
                 true => result.expect("failed to verify"),
                 false => {
                     result.expect_err("expected verifying error");
-                    ()
                 }
             }
         }
@@ -848,7 +846,6 @@ mod tests {
                 true => result.expect("failed to verify"),
                 false => {
                     result.expect_err("expected verifying error");
-                    ()
                 }
             }
         }
