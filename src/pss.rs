@@ -6,6 +6,8 @@ use core::marker::PhantomData;
 use core::ops::Deref;
 use digest::{Digest, DynDigest, FixedOutputReset};
 use rand_core::{CryptoRng, RngCore};
+#[cfg(feature = "hazmat")]
+use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
 use signature::{
     DigestVerifier, RandomizedDigestSigner, RandomizedSigner, Signature as SignSignature, Verifier,
 };
@@ -607,6 +609,22 @@ where
     }
 }
 
+#[cfg(feature = "hazmat")]
+impl<D> RandomizedPrehashSigner<Signature> for SigningKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn sign_prehash_with_rng(
+        &self,
+        mut rng: impl CryptoRng + RngCore,
+        prehash: &[u8],
+    ) -> signature::Result<Signature> {
+        sign_digest::<_, _, D>(&mut rng, false, &self.inner, prehash, self.salt_len)
+            .map(|v| v.into())
+            .map_err(|e| e.into())
+    }
+}
+
 impl<D> AsRef<RsaPrivateKey> for SigningKey<D>
 where
     D: Digest,
@@ -702,6 +720,22 @@ where
         )
         .map(|v| v.into())
         .map_err(|e| e.into())
+    }
+}
+
+#[cfg(feature = "hazmat")]
+impl<D> RandomizedPrehashSigner<Signature> for BlindedSigningKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn sign_prehash_with_rng(
+        &self,
+        mut rng: impl CryptoRng + RngCore,
+        prehash: &[u8],
+    ) -> signature::Result<Signature> {
+        sign_digest::<_, _, D>(&mut rng, true, &self.inner, prehash, self.salt_len)
+            .map(|v| v.into())
+            .map_err(|e| e.into())
     }
 }
 
@@ -821,6 +855,16 @@ where
     }
 }
 
+#[cfg(feature = "hazmat")]
+impl<D> PrehashVerifier<Signature> for VerifyingKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
+        verify_digest::<_, D>(&self.inner, prehash, signature.as_ref()).map_err(|e| e.into())
+    }
+}
+
 impl<D> AsRef<RsaPublicKey> for VerifyingKey<D>
 where
     D: Digest,
@@ -840,6 +884,8 @@ mod test {
     use num_traits::{FromPrimitive, Num};
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
     use sha1::{Digest, Sha1};
+    #[cfg(feature = "hazmat")]
+    use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
     use signature::{
         DigestVerifier, RandomizedDigestSigner, RandomizedSigner, Signature, Verifier,
     };
@@ -1090,6 +1136,79 @@ mod test {
             digest.update(test.as_bytes());
             verifying_key
                 .verify_digest(digest, &sig)
+                .expect("failed to verify");
+        }
+    }
+
+    #[cfg(feature = "hazmat")]
+    #[test]
+    fn test_verify_pss_hazmat() {
+        let priv_key = get_private_key();
+
+        let tests = [
+            (
+                Sha1::digest("test\n"),
+                hex!(
+                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
+                ),
+                true,
+            ),
+            (
+                Sha1::digest("test\n"),
+                hex!(
+                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
+                ),
+                false,
+            ),
+        ];
+        let pub_key: RsaPublicKey = priv_key.into();
+        let verifying_key = VerifyingKey::<Sha1>::new(pub_key);
+
+        for (text, sig, expected) in &tests {
+            let result = verifying_key.verify_prehash(text.as_ref(), &Signature::from_bytes(sig).unwrap());
+            match expected {
+                true => result.expect("failed to verify"),
+                false => {
+                    result.expect_err("expected verifying error");
+                }
+            }
+        }
+    }
+
+    #[cfg(feature = "hazmat")]
+    #[test]
+    fn test_sign_and_verify_pss_hazmat() {
+        let priv_key = get_private_key();
+
+        let tests = [Sha1::digest("test\n")];
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let signing_key = SigningKey::<Sha1>::new(priv_key);
+        let verifying_key = VerifyingKey::from(&signing_key);
+
+        for test in &tests {
+            let sig = signing_key.sign_prehash_with_rng(&mut rng, &test).expect("failed to sign");
+            verifying_key
+                .verify_prehash(&test, &sig)
+                .expect("failed to verify");
+        }
+    }
+
+    #[cfg(feature = "hazmat")]
+    #[test]
+    fn test_sign_and_verify_pss_blinded_hazmat() {
+        let priv_key = get_private_key();
+
+        let tests = [Sha1::digest("test\n")];
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
+        let verifying_key = VerifyingKey::from(&signing_key);
+
+        for test in &tests {
+            let sig = signing_key.sign_prehash_with_rng(&mut rng, &test).expect("failed to sign");
+            verifying_key
+                .verify_prehash(&test, &sig)
                 .expect("failed to verify");
         }
     }
