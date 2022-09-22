@@ -6,6 +6,8 @@ use core::ops::Deref;
 use digest::Digest;
 use pkcs8::AssociatedOid;
 use rand_core::{CryptoRng, RngCore};
+#[cfg(feature = "hazmat")]
+use signature::hazmat::{PrehashSigner, PrehashVerifier};
 use signature::{
     DigestSigner, DigestVerifier, RandomizedDigestSigner, RandomizedSigner,
     Signature as SignSignature, Signer, Verifier,
@@ -422,6 +424,18 @@ where
     }
 }
 
+#[cfg(feature = "hazmat")]
+impl<D> PrehashSigner<Signature> for SigningKey<D>
+where
+    D: Digest,
+{
+    fn sign_prehash(&self, prehash: &[u8]) -> signature::Result<Signature> {
+        sign::<DummyRng, _>(None, &self.inner, &self.prefix, prehash)
+            .map(|v| v.into())
+            .map_err(|e| e.into())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct VerifyingKey<D>
 where
@@ -529,6 +543,16 @@ where
             signature.as_ref(),
         )
         .map_err(|e| e.into())
+    }
+}
+
+#[cfg(feature = "hazmat")]
+impl<D> PrehashVerifier<Signature> for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
+        verify(&self.inner, &self.prefix, prehash, signature.as_ref()).map_err(|e| e.into())
     }
 }
 
@@ -903,25 +927,20 @@ mod tests {
             .expect("failed to verify");
     }
 
+    #[cfg(feature = "hazmat")]
     #[test]
-    fn test_unpadded_signature_signer() {
+    fn test_unpadded_signature_hazmat() {
         let msg = b"Thu Dec 19 18:06:16 EST 2013\n";
-        let expected_sig = Base64::decode_vec("F8rxGUnrRLYr9nTWrYMZYk3Y0msVzfl9daWt32AZHJNCVENOWUS17OwcFawgmYhyJZDG3leTT6S5QZLaozun/A==").unwrap();
+        let expected_sig = Base64::decode_vec("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
         let priv_key = get_private_key();
 
         let signing_key = SigningKey::<Sha1>::new(priv_key);
-        let sig = signing_key.sign(msg);
+        let sig = signing_key.sign_prehash(msg).expect("Failure during sign");
         assert_eq!(sig.as_ref(), expected_sig);
 
         let verifying_key: VerifyingKey<_> = (&signing_key).into();
         verifying_key
-            .verify(msg, &Signature::from_bytes(&expected_sig).unwrap())
+            .verify_prehash(msg, &Signature::from_bytes(&expected_sig).unwrap())
             .expect("failed to verify");
-
-        let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let sig = signing_key.sign_with_rng(&mut rng, msg);
-        assert_eq!(sig.as_ref(), expected_sig);
-
-        verifying_key.verify(msg, &sig).expect("failed to verify");
     }
 }

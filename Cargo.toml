@@ -54,6 +54,7 @@ name = "key"
 
 [features]
 default = ["std", "pem"]
+hazmat = ["signature/hazmat-preview"]
 nightly = ["num-bigint/nightly"]
 serde = ["num-bigint/serde", "serde_crate"]
 expose-internals = []
