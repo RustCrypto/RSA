@@ -65,7 +65,7 @@ pub fn generate_multi_prime_key_with_exp<R: RngCore + CryptoRng>(
         let mut pi = prime_limit / (prime_limit.ln() - 1f64);
         // Generated primes start with 0b11, so we can only use a quarter of them.
         pi /= 4f64;
-        // Use a factor of two to ensure taht key generation terminates in a
+        // Use a factor of two to ensure that key generation terminates in a
         // reasonable amount of time.
         pi /= 2f64;
 
