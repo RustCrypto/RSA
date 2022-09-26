@@ -607,6 +607,7 @@ where
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct BlindedSigningKey<D>
 where
     D: Digest,
