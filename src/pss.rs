@@ -562,6 +562,15 @@ where
     }
 }
 
+impl<D> From<SigningKey<D>> for RsaPrivateKey
+where
+    D: Digest,
+{
+    fn from(key: SigningKey<D>) -> Self {
+        key.inner
+    }
+}
+
 impl<D> RandomizedSigner<Signature> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
@@ -651,6 +660,15 @@ where
     }
 }
 
+impl<D> From<BlindedSigningKey<D>> for RsaPrivateKey
+where
+    D: Digest,
+{
+    fn from(key: BlindedSigningKey<D>) -> Self {
+        key.inner
+    }
+}
+
 impl<D> RandomizedSigner<Signature> for BlindedSigningKey<D>
 where
     D: Digest + FixedOutputReset,
@@ -723,6 +741,15 @@ where
 {
     fn from(key: RsaPublicKey) -> Self {
         Self::new(key)
+    }
+}
+
+impl<D> From<VerifyingKey<D>> for RsaPublicKey
+where
+    D: Digest,
+{
+    fn from(key: VerifyingKey<D>) -> Self {
+        key.inner
     }
 }
 

@@ -345,6 +345,15 @@ where
     }
 }
 
+impl<D> From<SigningKey<D>> for RsaPrivateKey
+where
+    D: Digest,
+{
+    fn from(key: SigningKey<D>) -> Self {
+        key.inner
+    }
+}
+
 impl<D> SigningKey<D>
 where
     D: Digest + AssociatedOid,
@@ -465,6 +474,15 @@ where
 {
     fn from(key: RsaPublicKey) -> Self {
         Self::new(key)
+    }
+}
+
+impl<D> From<VerifyingKey<D>> for RsaPublicKey
+where
+    D: Digest,
+{
+    fn from(key: VerifyingKey<D>) -> Self {
+        key.inner
     }
 }
 
