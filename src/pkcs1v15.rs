@@ -289,7 +289,7 @@ fn decrypt_inner<R: RngCore + CryptoRng, SK: PrivateKey>(
     Ok((valid.unwrap_u8(), em, index))
 }
 
-/// Fills the provided slice with random values, which are guranteed
+/// Fills the provided slice with random values, which are guaranteed
 /// to not be zero.
 #[inline]
 fn non_zero_random_bytes<R: RngCore + CryptoRng>(rng: &mut R, data: &mut [u8]) {
