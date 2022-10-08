@@ -4,7 +4,7 @@ use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
 use core::ops::Deref;
 use digest::Digest;
-use pkcs8::{AssociatedOid, Document, EncodePublicKey};
+use pkcs8::{AssociatedOid, Document, EncodePrivateKey, EncodePublicKey, SecretDocument};
 use rand_core::{CryptoRng, RngCore};
 #[cfg(feature = "hazmat")]
 use signature::hazmat::{PrehashSigner, PrehashVerifier};
@@ -373,6 +373,15 @@ where
 {
     fn as_ref(&self) -> &RsaPrivateKey {
         &self.inner
+    }
+}
+
+impl<D> EncodePrivateKey for SigningKey<D>
+where
+    D: Digest,
+{
+    fn to_pkcs8_der(&self) -> pkcs8::Result<SecretDocument> {
+        self.inner.to_pkcs8_der()
     }
 }
 
