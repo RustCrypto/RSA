@@ -250,9 +250,19 @@ impl RsaPublicKey {
 
     /// Create a new public key from its components.
     pub fn new_with_max_size(n: BigUint, e: BigUint, max_size: usize) -> Result<Self> {
-        let k = RsaPublicKey { n, e };
+        let k = Self { n, e };
         check_public_with_max_size(&k, max_size)?;
         Ok(k)
+    }
+
+    /// Create a new public key, bypassing checks around the modulus and public
+    /// exponent size.
+    ///
+    /// This method is not recommended, and only intended for unusual use cases.
+    /// Most applications should use [`RsaPublicKey::new`] or
+    /// [`RsaPublicKey::new_with_max_size`] instead.
+    pub fn new_unchecked(n: BigUint, e: BigUint) -> Self {
+        Self { n, e }
     }
 }
 
