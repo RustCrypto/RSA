@@ -5,6 +5,7 @@ use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
 use core::ops::Deref;
 use digest::{Digest, DynDigest, FixedOutputReset};
+use pkcs8::{Document, EncodePublicKey};
 use rand_core::{CryptoRng, RngCore};
 #[cfg(feature = "hazmat")]
 use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
@@ -871,6 +872,15 @@ where
 {
     fn as_ref(&self) -> &RsaPublicKey {
         &self.inner
+    }
+}
+
+impl<D> EncodePublicKey for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn to_public_key_der(&self) -> pkcs8::spki::Result<Document> {
+        self.inner.to_public_key_der()
     }
 }
 

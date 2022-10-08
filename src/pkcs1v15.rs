@@ -4,7 +4,7 @@ use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
 use core::ops::Deref;
 use digest::Digest;
-use pkcs8::AssociatedOid;
+use pkcs8::{AssociatedOid, Document, EncodePublicKey};
 use rand_core::{CryptoRng, RngCore};
 #[cfg(feature = "hazmat")]
 use signature::hazmat::{PrehashSigner, PrehashVerifier};
@@ -571,6 +571,15 @@ where
 {
     fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
         verify(&self.inner, &self.prefix, prehash, signature.as_ref()).map_err(|e| e.into())
+    }
+}
+
+impl<D> EncodePublicKey for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn to_public_key_der(&self) -> pkcs8::spki::Result<Document> {
+        self.inner.to_public_key_der()
     }
 }
 
