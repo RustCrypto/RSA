@@ -930,7 +930,9 @@ mod tests {
         }
     }
 
-    fn do_test_encrypt_decrypt_oaep<D: 'static + Digest + DynDigest>(prk: &RsaPrivateKey) {
+    fn do_test_encrypt_decrypt_oaep<D: 'static + Digest + DynDigest + Send + Sync>(
+        prk: &RsaPrivateKey,
+    ) {
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
 
         let k = prk.size();
@@ -974,8 +976,8 @@ mod tests {
     }
 
     fn do_test_oaep_with_different_hashes<
-        D: 'static + Digest + DynDigest,
-        U: 'static + Digest + DynDigest,
+        D: 'static + Digest + DynDigest + Send + Sync,
+        U: 'static + Digest + DynDigest + Send + Sync,
     >(
         prk: &RsaPrivateKey,
     ) {

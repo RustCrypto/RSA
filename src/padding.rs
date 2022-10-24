@@ -27,13 +27,13 @@ pub enum PaddingScheme {
     /// A prominent example is the [`AndroidKeyStore`](https://developer.android.com/guide/topics/security/cryptography#oaep-mgf1-digest).
     /// It uses SHA-1 for `mgf_digest` and a user-chosen SHA flavour for `digest`.
     OAEP {
-        digest: Box<dyn DynDigest>,
-        mgf_digest: Box<dyn DynDigest>,
+        digest: Box<dyn DynDigest + Send + Sync>,
+        mgf_digest: Box<dyn DynDigest + Send + Sync>,
         label: Option<String>,
     },
     /// Sign and Verify using PSS padding.
     PSS {
-        digest: Box<dyn DynDigest>,
+        digest: Box<dyn DynDigest + Send + Sync>,
         salt_len: Option<usize>,
     },
 }
@@ -98,8 +98,8 @@ impl PaddingScheme {
     /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();
     /// ```
     pub fn new_oaep_with_mgf_hash<
-        T: 'static + Digest + DynDigest,
-        U: 'static + Digest + DynDigest,
+        T: 'static + Digest + DynDigest + Send + Sync,
+        U: 'static + Digest + DynDigest + Send + Sync,
     >() -> Self {
         PaddingScheme::OAEP {
             digest: Box::new(T::new()),
@@ -125,7 +125,7 @@ impl PaddingScheme {
     /// let padding = PaddingScheme::new_oaep::<Sha256>();
     /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();
     /// ```
-    pub fn new_oaep<T: 'static + Digest + DynDigest>() -> Self {
+    pub fn new_oaep<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
         PaddingScheme::OAEP {
             digest: Box::new(T::new()),
             mgf_digest: Box::new(T::new()),
@@ -135,8 +135,8 @@ impl PaddingScheme {
 
     /// Create a new OAEP `PaddingScheme` with an associated `label`, using `T` as the hash function for the label, and `U` as the hash function for MGF1.
     pub fn new_oaep_with_mgf_hash_with_label<
-        T: 'static + Digest + DynDigest,
-        U: 'static + Digest + DynDigest,
+        T: 'static + Digest + DynDigest + Send + Sync,
+        U: 'static + Digest + DynDigest + Send + Sync,
         S: AsRef<str>,
     >(
         label: S,
@@ -149,7 +149,9 @@ impl PaddingScheme {
     }
 
     /// Create a new OAEP `PaddingScheme` with an associated `label`, using `T` as the hash function for both the label and for MGF1.
-    pub fn new_oaep_with_label<T: 'static + Digest + DynDigest, S: AsRef<str>>(label: S) -> Self {
+    pub fn new_oaep_with_label<T: 'static + Digest + DynDigest + Send + Sync, S: AsRef<str>>(
+        label: S,
+    ) -> Self {
         PaddingScheme::OAEP {
             digest: Box::new(T::new()),
             mgf_digest: Box::new(T::new()),
@@ -157,14 +159,14 @@ impl PaddingScheme {
         }
     }
 
-    pub fn new_pss<T: 'static + Digest + DynDigest>() -> Self {
+    pub fn new_pss<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
         PaddingScheme::PSS {
             digest: Box::new(T::new()),
             salt_len: None,
         }
     }
 
-    pub fn new_pss_with_salt<T: 'static + Digest + DynDigest>(len: usize) -> Self {
+    pub fn new_pss_with_salt<T: 'static + Digest + DynDigest + Send + Sync>(len: usize) -> Self {
         PaddingScheme::PSS {
             digest: Box::new(T::new()),
             salt_len: Some(len),
