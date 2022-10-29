@@ -1,4 +1,5 @@
-use alloc::vec;
+//! Useful algorithms related to RSA.
+
 use digest::{Digest, DynDigest, FixedOutputReset};
 use num_bigint::traits::ModInverse;
 use num_bigint::{BigUint, RandPrime};

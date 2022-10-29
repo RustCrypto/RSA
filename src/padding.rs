@@ -1,3 +1,5 @@
+//! Supported padding schemes.
+
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use core::fmt;
@@ -11,29 +13,44 @@ use crate::pkcs1v15;
 pub enum PaddingScheme {
     /// Encryption and Decryption using PKCS1v15 padding.
     PKCS1v15Encrypt,
+
     /// Sign and Verify using PKCS1v15 padding.
     PKCS1v15Sign {
+        /// Length of hash to use.
         hash_len: Option<usize>,
+
+        /// Prefix.
         prefix: Box<[u8]>,
     },
-    /// Encryption and Decryption using [OAEP padding](https://datatracker.ietf.org/doc/html/rfc3447#section-7.1.1).
+
+    /// Encryption and Decryption using [OAEP padding](https://datatracker.ietf.org/doc/html/rfc8017#section-7.1).
     ///
     /// - `digest` is used to hash the label. The maximum possible plaintext length is `m = k - 2 * h_len - 2`,
-    /// where `k` is the size of the RSA modulus.
-    /// - `mgf_digest` specifies the hash function that is used in the [MGF1](https://datatracker.ietf.org/doc/html/rfc2437#section-10.2.1).
+    ///   where `k` is the size of the RSA modulus.
+    /// - `mgf_digest` specifies the hash function that is used in the [MGF1](https://datatracker.ietf.org/doc/html/rfc8017#appendix-B.2).
     /// - `label` is optional data that can be associated with the message.
     ///
     /// The two hash functions can, but don't need to be the same.
+    ///
     /// A prominent example is the [`AndroidKeyStore`](https://developer.android.com/guide/topics/security/cryptography#oaep-mgf1-digest).
     /// It uses SHA-1 for `mgf_digest` and a user-chosen SHA flavour for `digest`.
     OAEP {
+        /// Digest type to use.
         digest: Box<dyn DynDigest + Send + Sync>,
+
+        /// Digest to use for Mask Generation Function (MGF).
         mgf_digest: Box<dyn DynDigest + Send + Sync>,
+
+        /// Optional label.
         label: Option<String>,
     },
+
     /// Sign and Verify using PSS padding.
     PSS {
+        /// Digest type to use.
         digest: Box<dyn DynDigest + Send + Sync>,
+
+        /// Salt length.
         salt_len: Option<usize>,
     },
 }
@@ -58,10 +75,14 @@ impl fmt::Debug for PaddingScheme {
 }
 
 impl PaddingScheme {
+    /// Create new PKCS#1 v1.5 encryption padding.
     pub fn new_pkcs1v15_encrypt() -> Self {
         PaddingScheme::PKCS1v15Encrypt
     }
 
+    /// Create new PKCS#1 v1.5 padding for computing a raw signature.
+    ///
+    /// This sets `hash_len` to `None` and uses an empty `prefix`.
     pub fn new_pkcs1v15_sign_raw() -> Self {
         PaddingScheme::PKCS1v15Sign {
             hash_len: None,
@@ -69,6 +90,10 @@ impl PaddingScheme {
         }
     }
 
+    /// Create new PKCS#1 v1.5 padding for the given digest.
+    ///
+    /// The digest must have an [`AssociatedOid`]. Make sure to enable the `oid`
+    /// feature of the relevant digest crate.
     pub fn new_pkcs1v15_sign<D>() -> Self
     where
         D: Digest + AssociatedOid,
@@ -159,6 +184,7 @@ impl PaddingScheme {
         }
     }
 
+    /// New PSS padding for the given digest.
     pub fn new_pss<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
         PaddingScheme::PSS {
             digest: Box::new(T::new()),
@@ -166,6 +192,7 @@ impl PaddingScheme {
         }
     }
 
+    /// New PSS padding for the given digest with a salt value of the given length.
     pub fn new_pss_with_salt<T: 'static + Digest + DynDigest + Send + Sync>(len: usize) -> Self {
         PaddingScheme::PSS {
             digest: Box::new(T::new()),

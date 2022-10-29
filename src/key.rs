@@ -17,6 +17,7 @@ use crate::padding::PaddingScheme;
 use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
 use crate::{oaep, pkcs1v15, pss};
 
+/// Components of an RSA public key.
 pub trait PublicKeyParts {
     /// Returns the modulus of the key.
     fn n(&self) -> &BigUint;

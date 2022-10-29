@@ -1,9 +1,17 @@
 //! RSA Implementation in pure Rust.
 //!
+//! It supports several schemes described in [RFC8017]:
+//!
+//! - OAEP encryption scheme
+//! - PKCS#1 v1.5 encryption scheme
+//! - PKCS#1 v1.5 signature scheme
+//! - PSS signature scheme
+//!
+//! These schemes are described below.
 //!
 //! # Usage
 //!
-//! Using PKCS1v15.
+//! Using PKCS#1 v1.5.
 //! ```
 //! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
 //!
@@ -47,7 +55,7 @@
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
 //!
-//! Using PKCS1v15 signatures
+//! Using PKCS#1 v1.5 signatures
 //! ```
 //! use rsa::RsaPrivateKey;
 //! use rsa::pkcs1v15::{SigningKey, VerifyingKey};
@@ -95,8 +103,8 @@
 //!
 //! ## PKCS#1 RSA Key Encoding
 //!
-//! PKCS#1 is a legacy format for encoding RSA keys as binary (DER) or text
-//! (PEM) data.
+//! PKCS#1 supports a legacy format for encoding RSA keys as binary (DER) or
+//! text (PEM) data.
 //!
 //! You can recognize PEM encoded PKCS#1 keys because they have "RSA * KEY" in
 //! the type label, e.g.:
@@ -112,8 +120,8 @@
 //! toplevel of the `rsa` crate:
 //!
 //! - [`pkcs1::DecodeRsaPrivateKey`]: decode RSA private keys from PKCS#1
-//! - [`pkcs1::DecodeRsaPublicKey`]: decode RSA public keys from PKCS#1
 //! - [`pkcs1::EncodeRsaPrivateKey`]: encode RSA private keys to PKCS#1
+//! - [`pkcs1::DecodeRsaPublicKey`]: decode RSA public keys from PKCS#1
 //! - [`pkcs1::EncodeRsaPublicKey`]: encode RSA public keys to PKCS#1
 //!
 //! ### Example
@@ -156,8 +164,8 @@
 //! toplevel of the `rsa` crate:
 //!
 //! - [`pkcs8::DecodePrivateKey`]: decode private keys from PKCS#8
-//! - [`pkcs8::DecodePublicKey`]: decode public keys from PKCS#8
 //! - [`pkcs8::EncodePrivateKey`]: encode private keys to PKCS#8
+//! - [`pkcs8::DecodePublicKey`]: decode public keys from PKCS#8
 //! - [`pkcs8::EncodePublicKey`]: encode public keys to PKCS#8
 //!
 //! ### Example
@@ -183,10 +191,17 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! [RFC8017]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
+//!
+// TODO(tarcieri): figure out why rustdoc isn't rendering these links correctly
+//! [`pkcs8::DecodePublicKey`]: https://docs.rs/pkcs8/latest/pkcs8/trait.DecodePublicKey.html
+//! [`pkcs8::EncodePublicKey`]: https://docs.rs/pkcs8/latest/pkcs8/trait.EncodePublicKey.html
 
 #![cfg_attr(not(test), no_std)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/RustCrypto/meta/master/logo_small.png")]
+#![warn(missing_docs)]
 
 #[macro_use]
 extern crate alloc;
@@ -196,15 +211,10 @@ extern crate std;
 pub use num_bigint::BigUint;
 pub use rand_core;
 
-/// Useful algorithms.
 pub mod algorithms;
-/// Error types.
 pub mod errors;
-/// Supported padding schemes.
 pub mod padding;
-/// RSASSA-PKCS1-v1_5 Signature support
 pub mod pkcs1v15;
-/// RSASSA-PSS Signature support
 pub mod pss;
 
 mod dummy_rng;
