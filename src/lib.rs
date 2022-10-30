@@ -59,7 +59,7 @@
 //! ```
 //! use rsa::RsaPrivateKey;
 //! use rsa::pkcs1v15::{SigningKey, VerifyingKey};
-//! use rsa::signature::{RandomizedSigner, Signature, Verifier};
+//! use rsa::signature::{RandomizedSigner, SignatureEncoding, Verifier};
 //! use sha2::{Digest, Sha256};
 //!
 //! let mut rng = rand::thread_rng();
@@ -72,7 +72,7 @@
 //! // Sign
 //! let data = b"hello world";
 //! let signature = signing_key.sign_with_rng(&mut rng, data);
-//! assert_ne!(signature.as_bytes(), data);
+//! assert_ne!(signature.to_bytes().as_ref(), data.as_slice());
 //!
 //! // Verify
 //! verifying_key.verify(data, &signature).expect("failed to verify");
@@ -82,7 +82,7 @@
 //! ```
 //! use rsa::RsaPrivateKey;
 //! use rsa::pss::{BlindedSigningKey, VerifyingKey};
-//! use rsa::signature::{RandomizedSigner, Signature, Verifier};
+//! use rsa::signature::{RandomizedSigner, SignatureEncoding, Verifier};
 //! use sha2::{Digest, Sha256};
 //!
 //! let mut rng = rand::thread_rng();
@@ -95,7 +95,7 @@
 //! // Sign
 //! let data = b"hello world";
 //! let signature = signing_key.sign_with_rng(&mut rng, data);
-//! assert_ne!(signature.as_bytes(), data);
+//! assert_ne!(signature.to_bytes().as_ref(), data);
 //!
 //! // Verify
 //! verifying_key.verify(data, &signature).expect("failed to verify");

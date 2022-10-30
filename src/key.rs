@@ -4,7 +4,7 @@ use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
 use num_traits::{One, ToPrimitive};
-use rand_core::{CryptoRng, RngCore};
+use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde_crate::{Deserialize, Serialize};
 use zeroize::Zeroize;
@@ -173,7 +173,7 @@ impl From<&RsaPrivateKey> for RsaPublicKey {
 /// Generic trait for operations on a public key.
 pub trait PublicKey: EncryptionPrimitive + PublicKeyParts {
     /// Encrypt the given message.
-    fn encrypt<R: RngCore + CryptoRng>(
+    fn encrypt<R: CryptoRngCore>(
         &self,
         rng: &mut R,
         padding: PaddingScheme,
@@ -198,7 +198,7 @@ impl PublicKeyParts for RsaPublicKey {
 }
 
 impl PublicKey for RsaPublicKey {
-    fn encrypt<R: RngCore + CryptoRng>(
+    fn encrypt<R: CryptoRngCore>(
         &self,
         rng: &mut R,
         padding: PaddingScheme,
@@ -281,7 +281,7 @@ impl PrivateKey for RsaPrivateKey {}
 
 impl RsaPrivateKey {
     /// Generate a new Rsa key pair of the given bit size using the passed in `rng`.
-    pub fn new<R: RngCore + CryptoRng>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
+    pub fn new<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
         generate_multi_prime_key(rng, 2, bit_size)
     }
 
@@ -289,7 +289,7 @@ impl RsaPrivateKey {
     /// using the passed in `rng`.
     ///
     /// Unless you have specific needs, you should use `RsaPrivateKey::new` instead.
-    pub fn new_with_exp<R: RngCore + CryptoRng>(
+    pub fn new_with_exp<R: CryptoRngCore + ?Sized>(
         rng: &mut R,
         bit_size: usize,
         exp: &BigUint,
@@ -473,7 +473,7 @@ impl RsaPrivateKey {
     /// Decrypt the given message.
     ///
     /// Uses `rng` to blind the decryption process.
-    pub fn decrypt_blinded<R: RngCore + CryptoRng>(
+    pub fn decrypt_blinded<R: CryptoRngCore>(
         &self,
         rng: &mut R,
         padding: PaddingScheme,
@@ -516,7 +516,7 @@ impl RsaPrivateKey {
     /// Sign the given digest using the provided rng
     ///
     /// Use `rng` for signature process.
-    pub fn sign_with_rng<R: RngCore + CryptoRng>(
+    pub fn sign_with_rng<R: CryptoRngCore>(
         &self,
         rng: &mut R,
         padding: PaddingScheme,
@@ -534,7 +534,7 @@ impl RsaPrivateKey {
     /// Sign the given digest.
     ///
     /// Use `rng` for blinding.
-    pub fn sign_blinded<R: RngCore + CryptoRng>(
+    pub fn sign_blinded<R: CryptoRngCore>(
         &self,
         rng: &mut R,
         padding: PaddingScheme,

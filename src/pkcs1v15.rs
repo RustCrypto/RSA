@@ -6,18 +6,18 @@
 //!
 //! [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
-use core::ops::Deref;
 use digest::Digest;
 use pkcs8::{AssociatedOid, Document, EncodePrivateKey, EncodePublicKey, SecretDocument};
-use rand_core::{CryptoRng, RngCore};
+use rand_core::CryptoRngCore;
 #[cfg(feature = "hazmat")]
 use signature::hazmat::{PrehashSigner, PrehashVerifier};
 use signature::{
-    DigestSigner, DigestVerifier, RandomizedDigestSigner, RandomizedSigner,
-    Signature as SignSignature, Signer, Verifier,
+    DigestSigner, DigestVerifier, RandomizedDigestSigner, RandomizedSigner, SignatureEncoding,
+    Signer, Verifier,
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;
@@ -30,60 +30,52 @@ use crate::{RsaPrivateKey, RsaPublicKey};
 /// PKCS#1 v1.5 signatures as described in [RFC8017 § 8.2].
 ///
 /// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Signature {
-    bytes: Vec<u8>,
+    bytes: Box<[u8]>,
 }
 
-impl signature::Signature for Signature {
-    fn from_bytes(bytes: &[u8]) -> signature::Result<Self> {
-        Ok(Signature {
-            bytes: bytes.into(),
-        })
-    }
-
-    fn as_bytes(&self) -> &[u8] {
-        self.bytes.as_slice()
-    }
+impl SignatureEncoding for Signature {
+    type Repr = Box<[u8]>;
 }
 
-impl From<Vec<u8>> for Signature {
-    fn from(bytes: Vec<u8>) -> Self {
+impl From<Box<[u8]>> for Signature {
+    fn from(bytes: Box<[u8]>) -> Self {
         Self { bytes }
     }
 }
 
-impl Deref for Signature {
-    type Target = [u8];
+impl<'a> TryFrom<&'a [u8]> for Signature {
+    type Error = signature::Error;
 
-    fn deref(&self) -> &Self::Target {
-        self.as_bytes()
+    fn try_from(bytes: &'a [u8]) -> signature::Result<Self> {
+        Ok(Self {
+            bytes: bytes.into(),
+        })
     }
 }
 
-impl PartialEq for Signature {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_bytes() == other.as_bytes()
-    }
-}
-
-impl Eq for Signature {}
-
-impl Debug for Signature {
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> core::result::Result<(), core::fmt::Error> {
-        fmt.debug_list().entries(self.as_bytes().iter()).finish()
+impl From<Signature> for Box<[u8]> {
+    fn from(signature: Signature) -> Box<[u8]> {
+        signature.bytes
     }
 }
 
 impl AsRef<[u8]> for Signature {
     fn as_ref(&self) -> &[u8] {
-        self.as_bytes()
+        self.bytes.as_ref()
+    }
+}
+
+impl Debug for Signature {
+    fn fmt(&self, fmt: &mut Formatter<'_>) -> core::result::Result<(), core::fmt::Error> {
+        fmt.debug_list().entries(self.bytes.iter()).finish()
     }
 }
 
 impl LowerHex for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for byte in self.as_bytes() {
+        for byte in self.bytes.iter() {
             write!(f, "{:02x}", byte)?;
         }
         Ok(())
@@ -92,7 +84,7 @@ impl LowerHex for Signature {
 
 impl UpperHex for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for byte in self.as_bytes() {
+        for byte in self.bytes.iter() {
             write!(f, "{:02X}", byte)?;
         }
         Ok(())
@@ -109,7 +101,7 @@ impl Display for Signature {
 /// scheme from PKCS#1 v1.5.  The message must be no longer than the
 /// length of the public modulus minus 11 bytes.
 #[inline]
-pub(crate) fn encrypt<R: RngCore + CryptoRng, PK: PublicKey>(
+pub(crate) fn encrypt<R: CryptoRngCore, PK: PublicKey>(
     rng: &mut R,
     pub_key: &PK,
     msg: &[u8],
@@ -141,7 +133,7 @@ pub(crate) fn encrypt<R: RngCore + CryptoRng, PK: PublicKey>(
 /// forge signatures as if they had the private key. See
 /// `decrypt_session_key` for a way of solving this problem.
 #[inline]
-pub(crate) fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
+pub(crate) fn decrypt<R: CryptoRngCore, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
@@ -170,7 +162,7 @@ pub(crate) fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
 /// messages to signatures and identify the signed messages. As ever,
 /// signatures provide authenticity, not confidentiality.
 #[inline]
-pub(crate) fn sign<R: RngCore + CryptoRng, SK: PrivateKey>(
+pub(crate) fn sign<R: CryptoRngCore, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     prefix: &[u8],
@@ -258,7 +250,7 @@ where
 /// in order to maintain constant memory access patterns. If the plaintext was
 /// valid then index contains the index of the original message in em.
 #[inline]
-fn decrypt_inner<R: RngCore + CryptoRng, SK: PrivateKey>(
+fn decrypt_inner<R: CryptoRngCore, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
@@ -303,7 +295,7 @@ fn decrypt_inner<R: RngCore + CryptoRng, SK: PrivateKey>(
 /// Fills the provided slice with random values, which are guaranteed
 /// to not be zero.
 #[inline]
-fn non_zero_random_bytes<R: RngCore + CryptoRng>(rng: &mut R, data: &mut [u8]) {
+fn non_zero_random_bytes<R: CryptoRngCore>(rng: &mut R, data: &mut [u8]) {
     rng.fill_bytes(data);
 
     for el in data {
@@ -407,7 +399,7 @@ where
 {
     fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
         sign::<DummyRng, _>(None, &self.inner, &self.prefix, &D::digest(msg))
-            .map(|v| v.into())
+            .map(|v| v.into_boxed_slice().into())
             .map_err(|e| e.into())
     }
 }
@@ -418,11 +410,11 @@ where
 {
     fn try_sign_with_rng(
         &self,
-        mut rng: impl CryptoRng + RngCore,
+        rng: &mut impl CryptoRngCore,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign(Some(&mut rng), &self.inner, &self.prefix, &D::digest(msg))
-            .map(|v| v.into())
+        sign(Some(rng), &self.inner, &self.prefix, &D::digest(msg))
+            .map(|v| v.into_boxed_slice().into())
             .map_err(|e| e.into())
     }
 }
@@ -433,7 +425,7 @@ where
 {
     fn try_sign_digest(&self, digest: D) -> signature::Result<Signature> {
         sign::<DummyRng, _>(None, &self.inner, &self.prefix, &digest.finalize())
-            .map(|v| v.into())
+            .map(|v| v.into_boxed_slice().into())
             .map_err(|e| e.into())
     }
 }
@@ -444,17 +436,12 @@ where
 {
     fn try_sign_digest_with_rng(
         &self,
-        mut rng: impl CryptoRng + RngCore,
+        rng: &mut impl CryptoRngCore,
         digest: D,
     ) -> signature::Result<Signature> {
-        sign(
-            Some(&mut rng),
-            &self.inner,
-            &self.prefix,
-            &digest.finalize(),
-        )
-        .map(|v| v.into())
-        .map_err(|e| e.into())
+        sign(Some(rng), &self.inner, &self.prefix, &digest.finalize())
+            .map(|v| v.into_boxed_slice().into())
+            .map_err(|e| e.into())
     }
 }
 
@@ -465,7 +452,7 @@ where
 {
     fn sign_prehash(&self, prehash: &[u8]) -> signature::Result<Signature> {
         sign::<DummyRng, _>(None, &self.inner, &self.prefix, prehash)
-            .map(|v| v.into())
+            .map(|v| v.into_boxed_slice().into())
             .map_err(|e| e.into())
     }
 }
@@ -621,11 +608,14 @@ mod tests {
     use num_bigint::BigUint;
     use num_traits::FromPrimitive;
     use num_traits::Num;
-    use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+    use rand_chacha::{
+        rand_core::{RngCore, SeedableRng},
+        ChaCha8Rng,
+    };
     use sha1::{Digest, Sha1};
     use sha2::Sha256;
     use sha3::Sha3_256;
-    use signature::{RandomizedSigner, Signature, Signer, Verifier};
+    use signature::{RandomizedSigner, Signer, Verifier};
 
     use crate::{PaddingScheme, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 
@@ -919,8 +909,10 @@ mod tests {
         let verifying_key = VerifyingKey::<Sha1>::new_with_prefix(pub_key);
 
         for (text, sig, expected) in &tests {
-            let result =
-                verifying_key.verify(text.as_bytes(), &Signature::from_bytes(sig).unwrap());
+            let result = verifying_key.verify(
+                text.as_bytes(),
+                &Signature::try_from(sig.as_slice()).unwrap(),
+            );
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -958,7 +950,8 @@ mod tests {
         for (text, sig, expected) in &tests {
             let mut digest = Sha1::new();
             digest.update(text.as_bytes());
-            let result = verifying_key.verify_digest(digest, &Signature::from_bytes(sig).unwrap());
+            let result =
+                verifying_key.verify_digest(digest, &Signature::try_from(sig.as_slice()).unwrap());
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -997,7 +990,10 @@ mod tests {
 
         let verifying_key: VerifyingKey<_> = (&signing_key).into();
         verifying_key
-            .verify_prehash(msg, &Signature::from_bytes(&expected_sig).unwrap())
+            .verify_prehash(
+                msg,
+                &Signature::try_from(expected_sig.into_boxed_slice()).unwrap(),
+            )
             .expect("failed to verify");
     }
 }

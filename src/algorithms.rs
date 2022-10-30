@@ -6,7 +6,7 @@ use num_bigint::{BigUint, RandPrime};
 #[allow(unused_imports)]
 use num_traits::Float;
 use num_traits::{FromPrimitive, One, Zero};
-use rand_core::{CryptoRng, RngCore};
+use rand_core::CryptoRngCore;
 
 use crate::errors::{Error, Result};
 use crate::key::RsaPrivateKey;
@@ -29,7 +29,7 @@ const EXP: u64 = 65537;
 ///
 /// [1]: https://patents.google.com/patent/US4405829A/en
 /// [2]: https://cacr.uwaterloo.ca/techreports/2006/cacr2006-16.pdf
-pub fn generate_multi_prime_key<R: RngCore + CryptoRng>(
+pub fn generate_multi_prime_key<R: CryptoRngCore + ?Sized>(
     rng: &mut R,
     nprimes: usize,
     bit_size: usize,
@@ -49,7 +49,7 @@ pub fn generate_multi_prime_key<R: RngCore + CryptoRng>(
 ///
 /// [1]: https://patents.google.com/patent/US4405829A/en
 /// [2]: http://www.cacr.math.uwaterloo.ca/techreports/2006/cacr2006-16.pdf
-pub fn generate_multi_prime_key_with_exp<R: RngCore + CryptoRng>(
+pub fn generate_multi_prime_key_with_exp<R: CryptoRngCore + ?Sized>(
     rng: &mut R,
     nprimes: usize,
     bit_size: usize,
