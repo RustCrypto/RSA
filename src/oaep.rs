@@ -15,9 +15,13 @@ use crate::key::{self, PrivateKey, PublicKey};
 // TODO: This is the maximum for SHA-1, unclear from the RFC what the values are for other hashing functions.
 const MAX_LABEL_LEN: u64 = 2_305_843_009_213_693_951;
 
-/// Encrypts the given message with RSA and the padding
-/// scheme from [PKCS#1 OAEP](https://datatracker.ietf.org/doc/html/rfc3447#section-7.1.1).  The message must be no longer than the
-/// length of the public modulus minus (2+ 2*hash.size()).
+/// Encrypts the given message with RSA and the padding scheme from
+/// [PKCS#1 OAEP].
+///
+/// The message must be no longer than the length of the public modulus minus
+/// `2 + (2 * hash.size())`.
+///
+/// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
 pub fn encrypt<R: RngCore + CryptoRng, K: PublicKey>(
     rng: &mut R,
@@ -63,14 +67,18 @@ pub fn encrypt<R: RngCore + CryptoRng, K: PublicKey>(
     pub_key.raw_encryption_primitive(&em, pub_key.size())
 }
 
-/// Decrypts a plaintext using RSA and the padding scheme from [pkcs1# OAEP](https://datatracker.ietf.org/doc/html/rfc3447#section-7.1.2)
+/// Decrypts a plaintext using RSA and the padding scheme from [PKCS#1 OAEP].
+///
 /// If an `rng` is passed, it uses RSA blinding to avoid timing side-channel attacks.
 ///
 /// Note that whether this function returns an error or not discloses secret
 /// information. If an attacker can cause this function to run repeatedly and
 /// learn whether each instance returned an error then they can decrypt and
-/// forge signatures as if they had the private key. See
-/// `decrypt_session_key` for a way of solving this problem.
+/// forge signatures as if they had the private key.
+///
+/// See `decrypt_session_key` for a way of solving this problem.
+///
+/// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
 pub fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
     rng: Option<&mut R>,

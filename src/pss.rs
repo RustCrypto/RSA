@@ -1,4 +1,10 @@
-use alloc::vec;
+//! Support for the [Probabilistic Signature Scheme] (PSS) a.k.a. RSASSA-PSS.
+//!
+//! Designed by Mihir Bellare and Phillip Rogaway. Specified in [RFC8017 § 8.1].
+//!
+//! [Probabilistic Signature Scheme]: https://en.wikipedia.org/wiki/Probabilistic_signature_scheme
+//! [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
+
 use alloc::vec::Vec;
 
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
@@ -19,6 +25,9 @@ use crate::errors::{Error, Result};
 use crate::key::{PrivateKey, PublicKey};
 use crate::{RsaPrivateKey, RsaPublicKey};
 
+/// RSASSA-PSS signatures as described in [RFC8017 § 8.1].
+///
+/// [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 #[derive(Clone)]
 pub struct Signature {
     bytes: Vec<u8>,
@@ -128,6 +137,7 @@ where
 }
 
 /// SignPSS calculates the signature of hashed using RSASSA-PSS.
+///
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. The opts argument may be nil, in which case sensible
 /// defaults are used.
@@ -172,6 +182,7 @@ fn generate_salt<T: RngCore + ?Sized, SK: PrivateKey>(
 }
 
 /// signPSSWithSalt calculates the signature of hashed using PSS with specified salt.
+///
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. salt is a random sequence of bytes whose length will be
 /// later used to verify the signature.
@@ -521,6 +532,10 @@ where
     }
 }
 
+/// Signing key for producing RSASSA-PSS signatures as described in
+/// [RFC8017 § 8.1].
+///
+/// [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 #[derive(Debug, Clone)]
 pub struct SigningKey<D>
 where
@@ -535,10 +550,7 @@ impl<D> SigningKey<D>
 where
     D: Digest,
 {
-    pub(crate) fn key(&self) -> &RsaPrivateKey {
-        &self.inner
-    }
-
+    /// Create a new RSASSA-PSS signing key.
     pub fn new(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
@@ -547,12 +559,17 @@ where
         }
     }
 
+    /// Create a new RSASSA-PSS signing key with a salt of the given length.
     pub fn new_with_salt_len(key: RsaPrivateKey, salt_len: usize) -> Self {
         Self {
             inner: key,
             salt_len: Some(salt_len),
             phantom: Default::default(),
         }
+    }
+
+    pub(crate) fn key(&self) -> &RsaPrivateKey {
+        &self.inner
     }
 }
 
@@ -644,6 +661,8 @@ where
     }
 }
 
+/// Signing key for producing "blinded" RSASSA-PSS signatures as described in
+/// [draft-irtf-cfrg-rsa-blind-signatures](https://datatracker.ietf.org/doc/draft-irtf-cfrg-rsa-blind-signatures/).
 #[derive(Debug, Clone)]
 pub struct BlindedSigningKey<D>
 where
@@ -658,10 +677,8 @@ impl<D> BlindedSigningKey<D>
 where
     D: Digest,
 {
-    pub(crate) fn key(&self) -> &RsaPrivateKey {
-        &self.inner
-    }
-
+    /// Create a new RSASSA-PSS signing key which produces "blinded"
+    /// signatures.
     pub fn new(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
@@ -670,12 +687,18 @@ where
         }
     }
 
+    /// Create a new RSASSA-PSS signing key which produces "blinded"
+    /// signatures with a salt of the given length.
     pub fn new_with_salt_len(key: RsaPrivateKey, salt_len: usize) -> Self {
         Self {
             inner: key,
             salt_len: Some(salt_len),
             phantom: Default::default(),
         }
+    }
+
+    pub(crate) fn key(&self) -> &RsaPrivateKey {
+        &self.inner
     }
 }
 
@@ -767,6 +790,10 @@ where
     }
 }
 
+/// Verifying key for checking the validity of RSASSA-PSS signatures as
+/// described in [RFC8017 § 8.1].
+///
+/// [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 #[derive(Debug, Clone)]
 pub struct VerifyingKey<D>
 where
@@ -780,6 +807,7 @@ impl<D> VerifyingKey<D>
 where
     D: Digest,
 {
+    /// Create a new RSASSA-PSS verifying key.
     pub fn new(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
@@ -1195,7 +1223,8 @@ mod test {
         let verifying_key = VerifyingKey::<Sha1>::new(pub_key);
 
         for (text, sig, expected) in &tests {
-            let result = verifying_key.verify_prehash(text.as_ref(), &Signature::from_bytes(sig).unwrap());
+            let result =
+                verifying_key.verify_prehash(text.as_ref(), &Signature::from_bytes(sig).unwrap());
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -1216,7 +1245,9 @@ mod test {
         let verifying_key = VerifyingKey::from(&signing_key);
 
         for test in &tests {
-            let sig = signing_key.sign_prehash_with_rng(&mut rng, &test).expect("failed to sign");
+            let sig = signing_key
+                .sign_prehash_with_rng(&mut rng, &test)
+                .expect("failed to sign");
             verifying_key
                 .verify_prehash(&test, &sig)
                 .expect("failed to verify");
@@ -1234,7 +1265,9 @@ mod test {
         let verifying_key = VerifyingKey::from(&signing_key);
 
         for test in &tests {
-            let sig = signing_key.sign_prehash_with_rng(&mut rng, &test).expect("failed to sign");
+            let sig = signing_key
+                .sign_prehash_with_rng(&mut rng, &test)
+                .expect("failed to sign");
             verifying_key
                 .verify_prehash(&test, &sig)
                 .expect("failed to verify");

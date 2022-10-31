@@ -1,4 +1,7 @@
-use alloc::vec;
+//! PKCS#1 v1.5 support as described in [RFC8017 § 8.2].
+//!
+//! [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
+
 use alloc::vec::Vec;
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
@@ -20,6 +23,9 @@ use crate::errors::{Error, Result};
 use crate::key::{self, PrivateKey, PublicKey};
 use crate::{RsaPrivateKey, RsaPublicKey};
 
+/// PKCS#1 v1.5 signatures as described in [RFC8017 § 8.2].
+///
+/// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 #[derive(Clone)]
 pub struct Signature {
     bytes: Vec<u8>,
@@ -95,9 +101,9 @@ impl Display for Signature {
     }
 }
 
-// Encrypts the given message with RSA and the padding
-// scheme from PKCS#1 v1.5.  The message must be no longer than the
-// length of the public modulus minus 11 bytes.
+/// Encrypts the given message with RSA and the padding
+/// scheme from PKCS#1 v1.5.  The message must be no longer than the
+/// length of the public modulus minus 11 bytes.
 #[inline]
 pub(crate) fn encrypt<R: RngCore + CryptoRng, PK: PublicKey>(
     rng: &mut R,
@@ -122,13 +128,14 @@ pub(crate) fn encrypt<R: RngCore + CryptoRng, PK: PublicKey>(
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5.
-// If an `rng` is passed, it uses RSA blinding to avoid timing side-channel attacks.
-//
-// Note that whether this function returns an error or not discloses secret
-// information. If an attacker can cause this function to run repeatedly and
-// learn whether each instance returned an error then they can decrypt and
-// forge signatures as if they had the private key. See
-// `decrypt_session_key` for a way of solving this problem.
+///
+/// If an `rng` is passed, it uses RSA blinding to avoid timing side-channel attacks.
+///
+/// Note that whether this function returns an error or not discloses secret
+/// information. If an attacker can cause this function to run repeatedly and
+/// learn whether each instance returned an error then they can decrypt and
+/// forge signatures as if they had the private key. See
+/// `decrypt_session_key` for a way of solving this problem.
 #[inline]
 pub(crate) fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
     rng: Option<&mut R>,
@@ -145,19 +152,19 @@ pub(crate) fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
     Ok(out[index as usize..].to_vec())
 }
 
-// Calculates the signature of hashed using
-// RSASSA-PKCS1-V1_5-SIGN from RSA PKCS#1 v1.5. Note that `hashed` must
-// be the result of hashing the input message using the given hash
-// function. If hash is `None`, hashed is signed directly. This isn't
-// advisable except for interoperability.
-//
-// If `rng` is not `None` then RSA blinding will be used to avoid timing
-// side-channel attacks.
-//
-// This function is deterministic. Thus, if the set of possible
-// messages is small, an attacker may be able to build a map from
-// messages to signatures and identify the signed messages. As ever,
-// signatures provide authenticity, not confidentiality.
+/// Calculates the signature of hashed using
+/// RSASSA-PKCS1-V1_5-SIGN from RSA PKCS#1 v1.5. Note that `hashed` must
+/// be the result of hashing the input message using the given hash
+/// function. If hash is `None`, hashed is signed directly. This isn't
+/// advisable except for interoperability.
+///
+/// If `rng` is not `None` then RSA blinding will be used to avoid timing
+/// side-channel attacks.
+///
+/// This function is deterministic. Thus, if the set of possible
+/// messages is small, an attacker may be able to build a map from
+/// messages to signatures and identify the signed messages. As ever,
+/// signatures provide authenticity, not confidentiality.
 #[inline]
 pub(crate) fn sign<R: RngCore + CryptoRng, SK: PrivateKey>(
     rng: Option<&mut R>,
@@ -218,7 +225,7 @@ pub(crate) fn verify<PK: PublicKey>(
     Ok(())
 }
 
-// prefix = 0x30 <oid_len + 8 + digest_len> 0x30 <oid_len + 4> 0x06 <oid_len> oid 0x05 0x00 0x04 <digest_len>
+/// prefix = 0x30 <oid_len + 8 + digest_len> 0x30 <oid_len + 4> 0x06 <oid_len> oid 0x05 0x00 0x04 <digest_len>
 #[inline]
 pub(crate) fn generate_prefix<D>() -> Vec<u8>
 where
@@ -305,6 +312,9 @@ fn non_zero_random_bytes<R: RngCore + CryptoRng>(rng: &mut R, data: &mut [u8]) {
     }
 }
 
+/// Signing key for PKCS#1 v1.5 signatures as described in [RFC8017 § 8.2].
+///
+/// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 #[derive(Debug, Clone)]
 pub struct SigningKey<D>
 where
@@ -319,20 +329,21 @@ impl<D> SigningKey<D>
 where
     D: Digest,
 {
-    pub(crate) fn key(&self) -> &RsaPrivateKey {
-        &self.inner
-    }
-
-    pub(crate) fn prefix(&self) -> Vec<u8> {
-        self.prefix.clone()
-    }
-
+    /// Create a new signing key from the give RSA private key.
     pub fn new(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
             prefix: Vec::new(),
             phantom: Default::default(),
         }
+    }
+
+    pub(crate) fn key(&self) -> &RsaPrivateKey {
+        &self.inner
+    }
+
+    pub(crate) fn prefix(&self) -> Vec<u8> {
+        self.prefix.clone()
     }
 }
 
@@ -358,6 +369,7 @@ impl<D> SigningKey<D>
 where
     D: Digest + AssociatedOid,
 {
+    /// Create a new verifying key with a prefix for the digest `D`.
     pub fn new_with_prefix(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
@@ -454,6 +466,9 @@ where
     }
 }
 
+/// Verifying key for PKCS#1 v1.5 signatures as described in [RFC8017 § 8.2].
+///
+/// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 #[derive(Debug, Clone)]
 pub struct VerifyingKey<D>
 where
@@ -468,6 +483,7 @@ impl<D> VerifyingKey<D>
 where
     D: Digest,
 {
+    /// Create a new verifying key from an RSA public key.
     pub fn new(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
@@ -499,6 +515,7 @@ impl<D> VerifyingKey<D>
 where
     D: Digest + AssociatedOid,
 {
+    /// Create a new verifying key with a prefix for the digest `D`.
     pub fn new_with_prefix(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
