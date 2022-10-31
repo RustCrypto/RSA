@@ -53,7 +53,6 @@ name = "key"
 
 [features]
 default = ["std", "pem"]
-hazmat = []
 nightly = ["num-bigint/nightly"]
 serde = ["num-bigint/serde", "serde_crate"]
 expose-internals = []

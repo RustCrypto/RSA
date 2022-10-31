@@ -13,9 +13,8 @@ use core::marker::PhantomData;
 use digest::Digest;
 use pkcs8::{AssociatedOid, Document, EncodePrivateKey, EncodePublicKey, SecretDocument};
 use rand_core::CryptoRngCore;
-#[cfg(feature = "hazmat")]
-use signature::hazmat::{PrehashSigner, PrehashVerifier};
 use signature::{
+    hazmat::{PrehashSigner, PrehashVerifier},
     DigestSigner, DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner,
     SignatureEncoding, Signer, Verifier,
 };
@@ -437,7 +436,6 @@ where
     }
 }
 
-#[cfg(feature = "hazmat")]
 impl<D> PrehashSigner<Signature> for SigningKey<D>
 where
     D: Digest,
@@ -575,7 +573,6 @@ where
     }
 }
 
-#[cfg(feature = "hazmat")]
 impl<D> PrehashVerifier<Signature> for VerifyingKey<D>
 where
     D: Digest,
@@ -971,7 +968,6 @@ mod tests {
             .expect("failed to verify");
     }
 
-    #[cfg(feature = "hazmat")]
     #[test]
     fn test_unpadded_signature_hazmat() {
         let msg = b"Thu Dec 19 18:06:16 EST 2013\n";

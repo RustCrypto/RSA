@@ -17,9 +17,8 @@ use core::marker::PhantomData;
 use digest::{Digest, DynDigest, FixedOutputReset};
 use pkcs8::{Document, EncodePrivateKey, EncodePublicKey, SecretDocument};
 use rand_core::CryptoRngCore;
-#[cfg(feature = "hazmat")]
-use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
 use signature::{
+    hazmat::{PrehashVerifier, RandomizedPrehashSigner},
     DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, SignatureEncoding, Verifier,
 };
 use subtle::ConstantTimeEq;
@@ -631,7 +630,6 @@ where
     }
 }
 
-#[cfg(feature = "hazmat")]
 impl<D> RandomizedPrehashSigner<Signature> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
@@ -763,7 +761,6 @@ where
     }
 }
 
-#[cfg(feature = "hazmat")]
 impl<D> RandomizedPrehashSigner<Signature> for BlindedSigningKey<D>
 where
     D: Digest + FixedOutputReset,
@@ -865,7 +862,6 @@ where
     }
 }
 
-#[cfg(feature = "hazmat")]
 impl<D> PrehashVerifier<Signature> for VerifyingKey<D>
 where
     D: Digest + FixedOutputReset,
@@ -903,7 +899,6 @@ mod test {
     use num_traits::{FromPrimitive, Num};
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
     use sha1::{Digest, Sha1};
-    #[cfg(feature = "hazmat")]
     use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
     use signature::{DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, Verifier};
 
@@ -1160,7 +1155,6 @@ mod test {
         }
     }
 
-    #[cfg(feature = "hazmat")]
     #[test]
     fn test_verify_pss_hazmat() {
         let priv_key = get_private_key();
@@ -1198,7 +1192,6 @@ mod test {
         }
     }
 
-    #[cfg(feature = "hazmat")]
     #[test]
     fn test_sign_and_verify_pss_hazmat() {
         let priv_key = get_private_key();
@@ -1218,7 +1211,6 @@ mod test {
         }
     }
 
-    #[cfg(feature = "hazmat")]
     #[test]
     fn test_sign_and_verify_pss_blinded_hazmat() {
         let priv_key = get_private_key();
