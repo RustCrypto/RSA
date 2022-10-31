@@ -4,7 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.7.0 (2022-10-10)
+## 0.7.1 (2022-10-31)
+### Added
+- Documentation improvements ([#216])
+
+### Changed
+- Ensure `PaddingScheme` is `Send` and `Sync` ([#215])
+
+[#215]: https://github.com/RustCrypto/RSA/pull/215
+[#216]: https://github.com/RustCrypto/RSA/pull/216
+
+
+## 0.7.0 (2022-10-10) [YANKED]
 
 NOTE: when computing signatures with this release, make sure to enable the
 `oid` crate feature of the digest crate you are using when computing the
