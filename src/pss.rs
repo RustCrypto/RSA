@@ -20,7 +20,7 @@ use rand_core::CryptoRngCore;
 #[cfg(feature = "hazmat")]
 use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
 use signature::{
-    DigestVerifier, RandomizedDigestSigner, RandomizedSigner, SignatureEncoding, Verifier,
+    DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, SignatureEncoding, Verifier,
 };
 use subtle::ConstantTimeEq;
 
@@ -559,10 +559,6 @@ where
             phantom: Default::default(),
         }
     }
-
-    pub(crate) fn key(&self) -> &RsaPrivateKey {
-        &self.inner
-    }
 }
 
 impl<D> From<RsaPrivateKey> for SigningKey<D>
@@ -589,6 +585,19 @@ where
 {
     fn to_pkcs8_der(&self) -> pkcs8::Result<SecretDocument> {
         self.inner.to_pkcs8_der()
+    }
+}
+
+impl<D> Keypair for SigningKey<D>
+where
+    D: Digest,
+{
+    type VerifyingKey = VerifyingKey<D>;
+    fn verifying_key(&self) -> Self::VerifyingKey {
+        VerifyingKey {
+            inner: self.inner.to_public_key(),
+            phantom: Default::default(),
+        }
     }
 }
 
@@ -682,10 +691,6 @@ where
             phantom: Default::default(),
         }
     }
-
-    pub(crate) fn key(&self) -> &RsaPrivateKey {
-        &self.inner
-    }
 }
 
 impl<D> From<RsaPrivateKey> for BlindedSigningKey<D>
@@ -712,6 +717,19 @@ where
 {
     fn to_pkcs8_der(&self) -> pkcs8::Result<SecretDocument> {
         self.inner.to_pkcs8_der()
+    }
+}
+
+impl<D> Keypair for BlindedSigningKey<D>
+where
+    D: Digest,
+{
+    type VerifyingKey = VerifyingKey<D>;
+    fn verifying_key(&self) -> Self::VerifyingKey {
+        VerifyingKey {
+            inner: self.inner.to_public_key(),
+            phantom: Default::default(),
+        }
     }
 }
 
@@ -774,13 +792,26 @@ where
 /// described in [RFC8017 § 8.1].
 ///
 /// [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct VerifyingKey<D>
 where
     D: Digest,
 {
     inner: RsaPublicKey,
     phantom: PhantomData<D>,
+}
+
+/* Implemented manually so we don't have to bind D with Clone */
+impl<D> Clone for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            phantom: Default::default(),
+        }
+    }
 }
 
 impl<D> VerifyingKey<D>
@@ -811,54 +842,6 @@ where
 {
     fn from(key: VerifyingKey<D>) -> Self {
         key.inner
-    }
-}
-
-impl<D> From<SigningKey<D>> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn from(key: SigningKey<D>) -> Self {
-        Self {
-            inner: key.key().into(),
-            phantom: Default::default(),
-        }
-    }
-}
-
-impl<D> From<&SigningKey<D>> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn from(key: &SigningKey<D>) -> Self {
-        Self {
-            inner: key.key().into(),
-            phantom: Default::default(),
-        }
-    }
-}
-
-impl<D> From<BlindedSigningKey<D>> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn from(key: BlindedSigningKey<D>) -> Self {
-        Self {
-            inner: key.key().into(),
-            phantom: Default::default(),
-        }
-    }
-}
-
-impl<D> From<&BlindedSigningKey<D>> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn from(key: &BlindedSigningKey<D>) -> Self {
-        Self {
-            inner: key.key().into(),
-            phantom: Default::default(),
-        }
     }
 }
 
@@ -922,7 +905,7 @@ mod test {
     use sha1::{Digest, Sha1};
     #[cfg(feature = "hazmat")]
     use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
-    use signature::{DigestVerifier, RandomizedDigestSigner, RandomizedSigner, Verifier};
+    use signature::{DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, Verifier};
 
     fn get_private_key() -> RsaPrivateKey {
         // In order to generate new test vectors you'll need the PEM form of this key:
@@ -1106,7 +1089,7 @@ mod test {
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = SigningKey::<Sha1>::new(priv_key);
-        let verifying_key = VerifyingKey::from(&signing_key);
+        let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
             let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
@@ -1123,7 +1106,7 @@ mod test {
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
-        let verifying_key = VerifyingKey::from(&signing_key);
+        let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
             let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
@@ -1140,7 +1123,7 @@ mod test {
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = SigningKey::new(priv_key);
-        let verifying_key = VerifyingKey::from(&signing_key);
+        let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
             let mut digest = Sha1::new();
@@ -1162,7 +1145,7 @@ mod test {
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
-        let verifying_key = VerifyingKey::from(&signing_key);
+        let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
             let mut digest = Sha1::new();
@@ -1223,7 +1206,7 @@ mod test {
         let tests = [Sha1::digest("test\n")];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = SigningKey::<Sha1>::new(priv_key);
-        let verifying_key = VerifyingKey::from(&signing_key);
+        let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
             let sig = signing_key
@@ -1243,7 +1226,7 @@ mod test {
         let tests = [Sha1::digest("test\n")];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
-        let verifying_key = VerifyingKey::from(&signing_key);
+        let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
             let sig = signing_key

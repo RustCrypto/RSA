@@ -16,8 +16,8 @@ use rand_core::CryptoRngCore;
 #[cfg(feature = "hazmat")]
 use signature::hazmat::{PrehashSigner, PrehashVerifier};
 use signature::{
-    DigestSigner, DigestVerifier, RandomizedDigestSigner, RandomizedSigner, SignatureEncoding,
-    Signer, Verifier,
+    DigestSigner, DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner,
+    SignatureEncoding, Signer, Verifier,
 };
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;
@@ -333,14 +333,6 @@ where
             phantom: Default::default(),
         }
     }
-
-    pub(crate) fn key(&self) -> &RsaPrivateKey {
-        &self.inner
-    }
-
-    pub(crate) fn prefix(&self) -> Vec<u8> {
-        self.prefix.clone()
-    }
 }
 
 impl<D> From<RsaPrivateKey> for SigningKey<D>
@@ -460,7 +452,7 @@ where
 /// Verifying key for PKCS#1 v1.5 signatures as described in [RFC8017 § 8.2].
 ///
 /// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct VerifyingKey<D>
 where
     D: Digest,
@@ -468,6 +460,20 @@ where
     inner: RsaPublicKey,
     prefix: Vec<u8>,
     phantom: PhantomData<D>,
+}
+
+/* Implemented manually so we don't have to bind D with Clone */
+impl<D> Clone for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            prefix: self.prefix.clone(),
+            phantom: Default::default(),
+        }
+    }
 }
 
 impl<D> VerifyingKey<D>
@@ -525,27 +531,15 @@ where
     }
 }
 
-impl<D> From<SigningKey<D>> for VerifyingKey<D>
+impl<D> Keypair for SigningKey<D>
 where
     D: Digest,
 {
-    fn from(key: SigningKey<D>) -> Self {
-        Self {
-            inner: key.key().into(),
-            prefix: key.prefix(),
-            phantom: Default::default(),
-        }
-    }
-}
-
-impl<D> From<&SigningKey<D>> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn from(key: &SigningKey<D>) -> Self {
-        Self {
-            inner: key.key().into(),
-            prefix: key.prefix(),
+    type VerifyingKey = VerifyingKey<D>;
+    fn verifying_key(&self) -> Self::VerifyingKey {
+        VerifyingKey {
+            inner: self.inner.to_public_key(),
+            prefix: self.prefix.clone(),
             phantom: Default::default(),
         }
     }
@@ -558,7 +552,7 @@ where
     fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
         verify(
             &self.inner,
-            &self.prefix,
+            &self.prefix.clone(),
             &D::digest(msg),
             signature.as_ref(),
         )
@@ -988,7 +982,7 @@ mod tests {
         let sig = signing_key.sign_prehash(msg).expect("Failure during sign");
         assert_eq!(sig.as_ref(), expected_sig);
 
-        let verifying_key: VerifyingKey<_> = (&signing_key).into();
+        let verifying_key = signing_key.verifying_key();
         verifying_key
             .verify_prehash(
                 msg,
