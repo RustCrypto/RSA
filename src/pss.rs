@@ -558,6 +558,28 @@ where
             phantom: Default::default(),
         }
     }
+
+    /// Generate a new random RSASSA-PSS signing key.
+    pub fn random<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+        Ok(Self {
+            inner: RsaPrivateKey::new(rng, bit_size)?,
+            salt_len: None,
+            phantom: Default::default(),
+        })
+    }
+
+    /// Generate a new random RSASSA-PSS signing key with a salt of the given length.
+    pub fn random_with_salt_len<R: CryptoRngCore + ?Sized>(
+        rng: &mut R,
+        bit_size: usize,
+        salt_len: usize,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: RsaPrivateKey::new(rng, bit_size)?,
+            salt_len: Some(salt_len),
+            phantom: Default::default(),
+        })
+    }
 }
 
 impl<D> From<RsaPrivateKey> for SigningKey<D>

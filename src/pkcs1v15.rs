@@ -332,6 +332,15 @@ where
             phantom: Default::default(),
         }
     }
+
+    /// Generate a new signing key.
+    pub fn random<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+        Ok(Self {
+            inner: RsaPrivateKey::new(rng, bit_size)?,
+            prefix: Vec::new(),
+            phantom: Default::default(),
+        })
+    }
 }
 
 impl<D> From<RsaPrivateKey> for SigningKey<D>
@@ -356,13 +365,25 @@ impl<D> SigningKey<D>
 where
     D: Digest + AssociatedOid,
 {
-    /// Create a new verifying key with a prefix for the digest `D`.
+    /// Create a new signing key with a prefix for the digest `D`.
     pub fn new_with_prefix(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
             prefix: generate_prefix::<D>(),
             phantom: Default::default(),
         }
+    }
+
+    /// Generate a new signing key with a prefix for the digest `D`.
+    pub fn random_with_prefix<R: CryptoRngCore + ?Sized>(
+        rng: &mut R,
+        bit_size: usize,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: RsaPrivateKey::new(rng, bit_size)?,
+            prefix: generate_prefix::<D>(),
+            phantom: Default::default(),
+        })
     }
 }
 
