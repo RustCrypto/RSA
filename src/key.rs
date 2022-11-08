@@ -332,9 +332,9 @@ impl RsaPrivateKey {
     }
 
     /// Performs some calculations to speed up private key operations.
-    pub fn precompute(&mut self) -> Result<&PrecomputedValues> {
+    pub fn precompute(&mut self) -> Result<()> {
         if  self.precomputed.is_some() {
-            return Ok(self.precomputed.as_ref().unwrap());
+            return Ok(());
         }
 
         let dp = &self.d % (&self.primes[0] - BigUint::one());
@@ -375,12 +375,17 @@ impl RsaPrivateKey {
         };
         self.precomputed = Some(p);
 
-        Ok(self.precomputed.as_ref().unwrap())
+        Ok(())
     }
 
     /// Clears precomputed values by setting to None
     pub fn clear_precomputed(&mut self) {
         self.precomputed = None;
+    }
+
+    /// Returns the precomputed values if they have been computed
+    pub fn precomputed(&self) -> Option<&PrecomputedValues> {
+        self.precomputed.as_ref()
     }
 
     /// Returns the private exponent of the key.
