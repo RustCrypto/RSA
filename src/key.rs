@@ -333,7 +333,7 @@ impl RsaPrivateKey {
 
     /// Performs some calculations to speed up private key operations.
     pub fn precompute(&mut self) -> Result<()> {
-        if  self.precomputed.is_some() {
+        if self.precomputed.is_some() {
             return Ok(());
         }
 
@@ -367,13 +367,12 @@ impl RsaPrivateKey {
             values
         };
 
-        let p = PrecomputedValues {
+        self.precomputed = Some(PrecomputedValues {
             dp,
             dq,
             qinv,
             crt_values,
-        };
-        self.precomputed = Some(p);
+        });
 
         Ok(())
     }
