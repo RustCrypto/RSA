@@ -332,9 +332,9 @@ impl RsaPrivateKey {
     }
 
     /// Performs some calculations to speed up private key operations.
-    pub fn precompute(&mut self) -> Result<PrecomputedValues> {
-        if let Some(p) = self.precomputed.clone() {
-            return Ok(p);
+    pub fn precompute(&mut self) -> Result<&PrecomputedValues> {
+        if  self.precomputed.is_some() {
+            return Ok(self.precomputed.as_ref().unwrap());
         }
 
         let dp = &self.d % (&self.primes[0] - BigUint::one());
@@ -373,9 +373,9 @@ impl RsaPrivateKey {
             qinv,
             crt_values,
         };
-        self.precomputed = Some(p.clone());
+        self.precomputed = Some(p);
 
-        Ok(p)
+        Ok(self.precomputed.as_ref().unwrap())
     }
 
     /// Clears precomputed values by setting to None
