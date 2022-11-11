@@ -103,19 +103,19 @@ impl Deref for RsaPrivateKey {
 }
 
 #[derive(Debug, Clone)]
-pub struct PrecomputedValues {
+pub(crate) struct PrecomputedValues {
     /// D mod (P-1)
-    pub dp: BigUint,
+    pub(crate) dp: BigUint,
     /// D mod (Q-1)
-    pub dq: BigUint,
+    pub(crate) dq: BigUint,
     /// Q^-1 mod P
-    pub qinv: BigInt,
+    pub(crate) qinv: BigInt,
 
     /// CRTValues is used for the 3rd and subsequent primes. Due to a
     /// historical accident, the CRT for the first two primes is handled
     /// differently in PKCS#1 and interoperability is sufficiently
     /// important that we mirror this.
-    pub crt_values: Vec<CRTValue>,
+    pub(crate) crt_values: Vec<CRTValue>,
 }
 
 impl Zeroize for PrecomputedValues {
@@ -138,13 +138,13 @@ impl Drop for PrecomputedValues {
 
 /// Contains the precomputed Chinese remainder theorem values.
 #[derive(Debug, Clone)]
-pub struct CRTValue {
+pub(crate) struct CRTValue {
     /// D mod (prime - 1)
-    pub exp: BigInt,
+    pub(crate) exp: BigInt,
     /// R·Coeff ≡ 1 mod Prime.
-    pub coeff: BigInt,
+    pub(crate) coeff: BigInt,
     /// product of primes prior to this (inc p and q)
-    pub r: BigInt,
+    pub(crate) r: BigInt,
 }
 
 impl Zeroize for CRTValue {
@@ -382,9 +382,19 @@ impl RsaPrivateKey {
         self.precomputed = None;
     }
 
-    /// Returns the precomputed values if they have been computed
-    pub fn precomputed(&self) -> Option<&PrecomputedValues> {
-        self.precomputed.as_ref()
+    /// Returns the precomputed dp value, D mod (P-1)
+    pub fn dp(&self) -> Option<&BigUint> {
+        self.precomputed.as_ref().map(|p| &p.dp)
+    }
+
+    /// Returns the precomputed dq value, D mod (Q-1)
+    pub fn dq(&self) -> Option<&BigUint> {
+        self.precomputed.as_ref().map(|p| &p.dq)
+    }
+
+    /// Returns the precomputed qinv value, Q^-1 mod P
+    pub fn qinv(&self) -> Option<&BigInt> {
+        self.precomputed.as_ref().map(|p| &p.qinv)
     }
 
     /// Returns the private exponent of the key.
