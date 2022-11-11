@@ -382,6 +382,21 @@ impl RsaPrivateKey {
         self.precomputed = None;
     }
 
+    /// Returns the precomputed dp value, D mod (P-1)
+    pub fn dp(&self) -> Option<&BigUint> {
+        self.precomputed.as_ref().map(|p| &p.dp)
+    }
+
+    /// Returns the precomputed dq value, D mod (Q-1)
+    pub fn dq(&self) -> Option<&BigUint> {
+        self.precomputed.as_ref().map(|p| &p.dq)
+    }
+
+    /// Returns the precomputed qinv value, Q^-1 mod P
+    pub fn qinv(&self) -> Option<&BigInt> {
+        self.precomputed.as_ref().map(|p| &p.qinv)
+    }
+
     /// Returns the private exponent of the key.
     pub fn d(&self) -> &BigUint {
         &self.d
