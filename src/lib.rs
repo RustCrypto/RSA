@@ -11,7 +11,7 @@
 //!
 //! # Usage
 //!
-//! Using PKCS#1 v1.5.
+//! ## PKCS#1 v1.5 encryption
 //! ```
 //! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
 //!
@@ -33,7 +33,7 @@
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
 //!
-//! Using OAEP.
+//! ## OAEP encryption
 //! ```
 //! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
 //!
@@ -55,7 +55,7 @@
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
 //!
-//! Using PKCS#1 v1.5 signatures
+//! ## PKCS#1 v1.5 signatures
 //! ```
 //! use rsa::RsaPrivateKey;
 //! use rsa::pkcs1v15::{SigningKey, VerifyingKey};
@@ -78,7 +78,7 @@
 //! verifying_key.verify(data, &signature).expect("failed to verify");
 //! ```
 //!
-//! Using PSS signatures
+//! ## PSS signatures
 //! ```
 //! use rsa::RsaPrivateKey;
 //! use rsa::pss::{BlindedSigningKey, VerifyingKey};

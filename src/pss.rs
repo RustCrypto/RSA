@@ -2,6 +2,10 @@
 //!
 //! Designed by Mihir Bellare and Phillip Rogaway. Specified in [RFC8017 § 8.1].
 //!
+//! # Usage
+//!
+//! See [code example in the toplevel rustdoc](../index.html#pss-signatures).
+//!
 //! [Probabilistic Signature Scheme]: https://en.wikipedia.org/wiki/Probabilistic_signature_scheme
 //! [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 

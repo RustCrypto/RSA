@@ -1,5 +1,9 @@
 //! PKCS#1 v1.5 support as described in [RFC8017 § 8.2].
 //!
+//! # Usage
+//!
+//! See [code example in the toplevel rustdoc](../index.html#pkcs1-v15-signatures).
+//!
 //! [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 
 use alloc::vec::Vec;
