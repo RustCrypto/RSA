@@ -59,8 +59,8 @@
 //! ```
 //! use rsa::RsaPrivateKey;
 //! use rsa::pkcs1v15::{SigningKey, VerifyingKey};
+//! use rsa::signature::{RandomizedSigner, Signature, Verifier};
 //! use sha2::{Digest, Sha256};
-//! use signature::{RandomizedSigner, Signature, Verifier};
 //!
 //! let mut rng = rand::thread_rng();
 //!
@@ -82,8 +82,8 @@
 //! ```
 //! use rsa::RsaPrivateKey;
 //! use rsa::pss::{BlindedSigningKey, VerifyingKey};
+//! use rsa::signature::{RandomizedSigner, Signature, Verifier};
 //! use sha2::{Digest, Sha256};
-//! use signature::{RandomizedSigner, Signature, Verifier};
 //!
 //! let mut rng = rand::thread_rng();
 //!
@@ -210,6 +210,7 @@ extern crate std;
 
 pub use num_bigint::BigUint;
 pub use rand_core;
+pub use signature;
 
 pub mod algorithms;
 pub mod errors;
