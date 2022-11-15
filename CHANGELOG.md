@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.7.2 (2022-11-14)
+### Added
+- Public accessor methods for `PrecomputedValues` ([#221])
+- Re-export `signature` crate ([#223])
+
+[#221]: https://github.com/RustCrypto/RSA/pull/221
+[#223]: https://github.com/RustCrypto/RSA/pull/223
+
+
 ## 0.7.1 (2022-10-31)
 ### Added
 - Documentation improvements ([#216])
