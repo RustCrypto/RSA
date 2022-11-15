@@ -88,3 +88,4 @@ jobs:
           toolchain: nightly
           override: true
       - run: cargo test --release --features nightly
+      - run: cargo build --benches
