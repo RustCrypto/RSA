@@ -13,7 +13,7 @@ readme = "README.md"
 rust-version = "1.57"
 
 [dependencies]
-num-bigint = { version = "0.8.1", features = ["i128", "u64_digit", "prime", "zeroize"], default-features = false, package = "num-bigint-dig" }
+num-bigint = { version = "0.8.2", features = ["i128", "u64_digit", "prime", "zeroize"], default-features = false, package = "num-bigint-dig" }
 num-traits = { version= "0.2.9", default-features = false, features = ["libm"] }
 num-integer = { version = "0.1.39", default-features = false }
 num-iter = { version = "0.1.37", default-features = false }
@@ -25,9 +25,6 @@ pkcs1 = { version = "0.4", default-features = false, features = ["pkcs8", "alloc
 pkcs8 = { version = "0.9", default-features = false, features = ["alloc"] }
 signature = { version = "1.6.4", default-features = false , features = ["digest-preview", "rand-preview"] }
 zeroize = { version = "1", features = ["alloc"] }
-
-# Temporary workaround until https://github.com/dignifiedquire/num-bigint/pull/42 lands
-smallvec = { version = "1.6.1", default-features = false }
 
 [dependencies.serde_crate]
 package = "serde"
