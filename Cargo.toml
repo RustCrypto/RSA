@@ -1,6 +1,6 @@
 [package]
 name = "rsa_ext"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["RustCrypto Developers", "dignifiedquire <dignifiedquire@gmail.com>"]
 edition = "2021"
 description = "Pure Rust RSA implementation"
