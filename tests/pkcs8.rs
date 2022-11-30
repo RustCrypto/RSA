@@ -15,13 +15,13 @@ const RSA_2048_PRIV_PEM: &str = include_str!("examples/pkcs8/rsa2048-priv.pem");
 const RSA_2048_PUB_PEM: &str = include_str!("examples/pkcs8/rsa2048-pub.pem");
 
 use hex_literal::hex;
-use rsa_ext::{
+use rsa::{
     pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
     PublicKeyParts, RsaPrivateKey, RsaPublicKey,
 };
 
 #[cfg(feature = "pem")]
-use rsa_ext::pkcs8::LineEnding;
+use rsa::pkcs8::LineEnding;
 
 #[test]
 fn decode_rsa2048_priv_der() {

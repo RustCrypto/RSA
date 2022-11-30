@@ -217,8 +217,8 @@ pub mod errors;
 pub mod padding;
 pub mod pkcs1v15;
 pub mod pss;
-pub mod rsa_ext;
-
+mod rsa_ext;
+pub use rsa_ext::encrypt as encrypt_ext;
 mod dummy_rng;
 mod encoding;
 mod key;

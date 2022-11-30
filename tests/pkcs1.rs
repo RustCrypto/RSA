@@ -1,13 +1,13 @@
 //! PKCS#1 encoding tests
 
 use hex_literal::hex;
-use rsa_ext::{
+use rsa::{
     pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},
     PublicKeyParts, RsaPrivateKey, RsaPublicKey,
 };
 
 #[cfg(feature = "pem")]
-use rsa_ext::pkcs1::LineEnding;
+use rsa::pkcs1::LineEnding;
 
 /// RSA-2048 PKCS#1 private key encoded as ASN.1 DER.
 ///

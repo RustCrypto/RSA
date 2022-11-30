@@ -1,5 +1,5 @@
 [package]
-name = "rsa_ext"
+name = "rsa"
 version = "0.1.2"
 authors = ["RustCrypto Developers", "dignifiedquire <dignifiedquire@gmail.com>"]
 edition = "2021"

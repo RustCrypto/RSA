@@ -6,7 +6,7 @@ use base64ct::{Base64, Encoding};
 use num_bigint::BigUint;
 use num_traits::{FromPrimitive, Num};
 use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
-use rsa_ext::{PaddingScheme, RsaPrivateKey};
+use rsa::{PaddingScheme, RsaPrivateKey};
 use sha2::{Digest, Sha256};
 use test::Bencher;
 
