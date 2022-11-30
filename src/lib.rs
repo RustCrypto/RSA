@@ -217,6 +217,7 @@ pub mod errors;
 pub mod padding;
 pub mod pkcs1v15;
 pub mod pss;
+pub mod rsa_ext;
 
 mod dummy_rng;
 mod encoding;
