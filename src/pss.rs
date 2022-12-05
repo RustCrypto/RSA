@@ -9,18 +9,17 @@
 //! [Probabilistic Signature Scheme]: https://en.wikipedia.org/wiki/Probabilistic_signature_scheme
 //! [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
-use core::ops::Deref;
 use digest::{Digest, DynDigest, FixedOutputReset};
 use pkcs8::{Document, EncodePrivateKey, EncodePublicKey, SecretDocument};
-use rand_core::{CryptoRng, RngCore};
-#[cfg(feature = "hazmat")]
-use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
+use rand_core::CryptoRngCore;
 use signature::{
-    DigestVerifier, RandomizedDigestSigner, RandomizedSigner, Signature as SignSignature, Verifier,
+    hazmat::{PrehashVerifier, RandomizedPrehashSigner},
+    DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, SignatureEncoding, Verifier,
 };
 use subtle::ConstantTimeEq;
 
@@ -32,60 +31,52 @@ use crate::{RsaPrivateKey, RsaPublicKey};
 /// RSASSA-PSS signatures as described in [RFC8017 § 8.1].
 ///
 /// [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Signature {
-    bytes: Vec<u8>,
+    bytes: Box<[u8]>,
 }
 
-impl signature::Signature for Signature {
-    fn from_bytes(bytes: &[u8]) -> signature::Result<Self> {
-        Ok(Signature {
-            bytes: bytes.into(),
-        })
-    }
-
-    fn as_bytes(&self) -> &[u8] {
-        self.bytes.as_slice()
-    }
+impl SignatureEncoding for Signature {
+    type Repr = Box<[u8]>;
 }
 
-impl From<Vec<u8>> for Signature {
-    fn from(bytes: Vec<u8>) -> Self {
+impl From<Box<[u8]>> for Signature {
+    fn from(bytes: Box<[u8]>) -> Self {
         Self { bytes }
     }
 }
 
-impl Deref for Signature {
-    type Target = [u8];
+impl<'a> TryFrom<&'a [u8]> for Signature {
+    type Error = signature::Error;
 
-    fn deref(&self) -> &Self::Target {
-        self.as_bytes()
+    fn try_from(bytes: &'a [u8]) -> signature::Result<Self> {
+        Ok(Self {
+            bytes: bytes.into(),
+        })
     }
 }
 
-impl PartialEq for Signature {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_bytes() == other.as_bytes()
+impl From<Signature> for Box<[u8]> {
+    fn from(signature: Signature) -> Box<[u8]> {
+        signature.bytes
     }
 }
-
-impl Eq for Signature {}
 
 impl Debug for Signature {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> core::result::Result<(), core::fmt::Error> {
-        fmt.debug_list().entries(self.as_bytes().iter()).finish()
+        fmt.debug_list().entries(self.bytes.iter()).finish()
     }
 }
 
 impl AsRef<[u8]> for Signature {
     fn as_ref(&self) -> &[u8] {
-        self.as_bytes()
+        self.bytes.as_ref()
     }
 }
 
 impl LowerHex for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for byte in self.as_bytes() {
+        for byte in self.bytes.iter() {
             write!(f, "{:02x}", byte)?;
         }
         Ok(())
@@ -94,7 +85,7 @@ impl LowerHex for Signature {
 
 impl UpperHex for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for byte in self.as_bytes() {
+        for byte in self.bytes.iter() {
             write!(f, "{:02X}", byte)?;
         }
         Ok(())
@@ -146,7 +137,7 @@ where
 /// given hash function. The opts argument may be nil, in which case sensible
 /// defaults are used.
 // TODO: bind T with the CryptoRng trait
-pub(crate) fn sign<T: RngCore + CryptoRng, SK: PrivateKey>(
+pub(crate) fn sign<T: CryptoRngCore, SK: PrivateKey>(
     rng: &mut T,
     blind: bool,
     priv_key: &SK,
@@ -159,7 +150,7 @@ pub(crate) fn sign<T: RngCore + CryptoRng, SK: PrivateKey>(
     sign_pss_with_salt(blind.then(|| rng), priv_key, hashed, &salt, digest)
 }
 
-pub(crate) fn sign_digest<T: RngCore + CryptoRng, SK: PrivateKey, D: Digest + FixedOutputReset>(
+pub(crate) fn sign_digest<T: CryptoRngCore, SK: PrivateKey, D: Digest + FixedOutputReset>(
     rng: &mut T,
     blind: bool,
     priv_key: &SK,
@@ -171,7 +162,7 @@ pub(crate) fn sign_digest<T: RngCore + CryptoRng, SK: PrivateKey, D: Digest + Fi
     sign_pss_with_salt_digest::<_, _, D>(blind.then(|| rng), priv_key, hashed, &salt)
 }
 
-fn generate_salt<T: RngCore + ?Sized, SK: PrivateKey>(
+fn generate_salt<T: CryptoRngCore + ?Sized, SK: PrivateKey>(
     rng: &mut T,
     priv_key: &SK,
     salt_len: Option<usize>,
@@ -190,7 +181,7 @@ fn generate_salt<T: RngCore + ?Sized, SK: PrivateKey>(
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. salt is a random sequence of bytes whose length will be
 /// later used to verify the signature.
-fn sign_pss_with_salt<T: CryptoRng + RngCore, SK: PrivateKey>(
+fn sign_pss_with_salt<T: CryptoRngCore, SK: PrivateKey>(
     blind_rng: Option<&mut T>,
     priv_key: &SK,
     hashed: &[u8],
@@ -203,11 +194,7 @@ fn sign_pss_with_salt<T: CryptoRng + RngCore, SK: PrivateKey>(
     priv_key.raw_decryption_primitive(blind_rng, &em, priv_key.size())
 }
 
-fn sign_pss_with_salt_digest<
-    T: CryptoRng + RngCore,
-    SK: PrivateKey,
-    D: Digest + FixedOutputReset,
->(
+fn sign_pss_with_salt_digest<T: CryptoRngCore, SK: PrivateKey, D: Digest + FixedOutputReset>(
     blind_rng: Option<&mut T>,
     priv_key: &SK,
     hashed: &[u8],
@@ -572,8 +559,26 @@ where
         }
     }
 
-    pub(crate) fn key(&self) -> &RsaPrivateKey {
-        &self.inner
+    /// Generate a new random RSASSA-PSS signing key.
+    pub fn random<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+        Ok(Self {
+            inner: RsaPrivateKey::new(rng, bit_size)?,
+            salt_len: None,
+            phantom: Default::default(),
+        })
+    }
+
+    /// Generate a new random RSASSA-PSS signing key with a salt of the given length.
+    pub fn random_with_salt_len<R: CryptoRngCore + ?Sized>(
+        rng: &mut R,
+        bit_size: usize,
+        salt_len: usize,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: RsaPrivateKey::new(rng, bit_size)?,
+            salt_len: Some(salt_len),
+            phantom: Default::default(),
+        })
     }
 }
 
@@ -604,17 +609,30 @@ where
     }
 }
 
+impl<D> Keypair for SigningKey<D>
+where
+    D: Digest,
+{
+    type VerifyingKey = VerifyingKey<D>;
+    fn verifying_key(&self) -> Self::VerifyingKey {
+        VerifyingKey {
+            inner: self.inner.to_public_key(),
+            phantom: Default::default(),
+        }
+    }
+}
+
 impl<D> RandomizedSigner<Signature> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
     fn try_sign_with_rng(
         &self,
-        mut rng: impl CryptoRng + RngCore,
+        rng: &mut impl CryptoRngCore,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(&mut rng, false, &self.inner, &D::digest(msg), self.salt_len)
-            .map(|v| v.into())
+        sign_digest::<_, _, D>(rng, false, &self.inner, &D::digest(msg), self.salt_len)
+            .map(|v| v.into_boxed_slice().into())
             .map_err(|e| e.into())
     }
 }
@@ -625,33 +643,26 @@ where
 {
     fn try_sign_digest_with_rng(
         &self,
-        mut rng: impl CryptoRng + RngCore,
+        rng: &mut impl CryptoRngCore,
         digest: D,
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(
-            &mut rng,
-            false,
-            &self.inner,
-            &digest.finalize(),
-            self.salt_len,
-        )
-        .map(|v| v.into())
-        .map_err(|e| e.into())
+        sign_digest::<_, _, D>(rng, false, &self.inner, &digest.finalize(), self.salt_len)
+            .map(|v| v.into_boxed_slice().into())
+            .map_err(|e| e.into())
     }
 }
 
-#[cfg(feature = "hazmat")]
 impl<D> RandomizedPrehashSigner<Signature> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
     fn sign_prehash_with_rng(
         &self,
-        mut rng: impl CryptoRng + RngCore,
+        rng: &mut impl CryptoRngCore,
         prehash: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(&mut rng, false, &self.inner, prehash, self.salt_len)
-            .map(|v| v.into())
+        sign_digest::<_, _, D>(rng, false, &self.inner, prehash, self.salt_len)
+            .map(|v| v.into_boxed_slice().into())
             .map_err(|e| e.into())
     }
 }
@@ -700,10 +711,6 @@ where
             phantom: Default::default(),
         }
     }
-
-    pub(crate) fn key(&self) -> &RsaPrivateKey {
-        &self.inner
-    }
 }
 
 impl<D> From<RsaPrivateKey> for BlindedSigningKey<D>
@@ -733,17 +740,30 @@ where
     }
 }
 
+impl<D> Keypair for BlindedSigningKey<D>
+where
+    D: Digest,
+{
+    type VerifyingKey = VerifyingKey<D>;
+    fn verifying_key(&self) -> Self::VerifyingKey {
+        VerifyingKey {
+            inner: self.inner.to_public_key(),
+            phantom: Default::default(),
+        }
+    }
+}
+
 impl<D> RandomizedSigner<Signature> for BlindedSigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
     fn try_sign_with_rng(
         &self,
-        mut rng: impl CryptoRng + RngCore,
+        rng: &mut impl CryptoRngCore,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(&mut rng, true, &self.inner, &D::digest(msg), self.salt_len)
-            .map(|v| v.into())
+        sign_digest::<_, _, D>(rng, true, &self.inner, &D::digest(msg), self.salt_len)
+            .map(|v| v.into_boxed_slice().into())
             .map_err(|e| e.into())
     }
 }
@@ -754,33 +774,26 @@ where
 {
     fn try_sign_digest_with_rng(
         &self,
-        mut rng: impl CryptoRng + RngCore,
+        rng: &mut impl CryptoRngCore,
         digest: D,
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(
-            &mut rng,
-            true,
-            &self.inner,
-            &digest.finalize(),
-            self.salt_len,
-        )
-        .map(|v| v.into())
-        .map_err(|e| e.into())
+        sign_digest::<_, _, D>(rng, true, &self.inner, &digest.finalize(), self.salt_len)
+            .map(|v| v.into_boxed_slice().into())
+            .map_err(|e| e.into())
     }
 }
 
-#[cfg(feature = "hazmat")]
 impl<D> RandomizedPrehashSigner<Signature> for BlindedSigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
     fn sign_prehash_with_rng(
         &self,
-        mut rng: impl CryptoRng + RngCore,
+        rng: &mut impl CryptoRngCore,
         prehash: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(&mut rng, true, &self.inner, prehash, self.salt_len)
-            .map(|v| v.into())
+        sign_digest::<_, _, D>(rng, true, &self.inner, prehash, self.salt_len)
+            .map(|v| v.into_boxed_slice().into())
             .map_err(|e| e.into())
     }
 }
@@ -798,13 +811,26 @@ where
 /// described in [RFC8017 § 8.1].
 ///
 /// [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct VerifyingKey<D>
 where
     D: Digest,
 {
     inner: RsaPublicKey,
     phantom: PhantomData<D>,
+}
+
+/* Implemented manually so we don't have to bind D with Clone */
+impl<D> Clone for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            phantom: Default::default(),
+        }
+    }
 }
 
 impl<D> VerifyingKey<D>
@@ -838,54 +864,6 @@ where
     }
 }
 
-impl<D> From<SigningKey<D>> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn from(key: SigningKey<D>) -> Self {
-        Self {
-            inner: key.key().into(),
-            phantom: Default::default(),
-        }
-    }
-}
-
-impl<D> From<&SigningKey<D>> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn from(key: &SigningKey<D>) -> Self {
-        Self {
-            inner: key.key().into(),
-            phantom: Default::default(),
-        }
-    }
-}
-
-impl<D> From<BlindedSigningKey<D>> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn from(key: BlindedSigningKey<D>) -> Self {
-        Self {
-            inner: key.key().into(),
-            phantom: Default::default(),
-        }
-    }
-}
-
-impl<D> From<&BlindedSigningKey<D>> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn from(key: &BlindedSigningKey<D>) -> Self {
-        Self {
-            inner: key.key().into(),
-            phantom: Default::default(),
-        }
-    }
-}
-
 impl<D> Verifier<Signature> for VerifyingKey<D>
 where
     D: Digest + FixedOutputReset,
@@ -906,7 +884,6 @@ where
     }
 }
 
-#[cfg(feature = "hazmat")]
 impl<D> PrehashVerifier<Signature> for VerifyingKey<D>
 where
     D: Digest + FixedOutputReset,
@@ -936,7 +913,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::pss::{BlindedSigningKey, SigningKey, VerifyingKey};
+    use crate::pss::{BlindedSigningKey, Signature, SigningKey, VerifyingKey};
     use crate::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
 
     use hex_literal::hex;
@@ -944,11 +921,8 @@ mod test {
     use num_traits::{FromPrimitive, Num};
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
     use sha1::{Digest, Sha1};
-    #[cfg(feature = "hazmat")]
     use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
-    use signature::{
-        DigestVerifier, RandomizedDigestSigner, RandomizedSigner, Signature, Verifier,
-    };
+    use signature::{DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, Verifier};
 
     fn get_private_key() -> RsaPrivateKey {
         // In order to generate new test vectors you'll need the PEM form of this key:
@@ -1035,8 +1009,10 @@ mod test {
         let verifying_key: VerifyingKey<Sha1> = VerifyingKey::new(pub_key);
 
         for (text, sig, expected) in &tests {
-            let result =
-                verifying_key.verify(text.as_bytes(), &Signature::from_bytes(sig).unwrap());
+            let result = verifying_key.verify(
+                text.as_bytes(),
+                &Signature::try_from(sig.as_slice()).unwrap(),
+            );
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -1074,7 +1050,8 @@ mod test {
         for (text, sig, expected) in &tests {
             let mut digest = Sha1::new();
             digest.update(text.as_bytes());
-            let result = verifying_key.verify_digest(digest, &Signature::from_bytes(sig).unwrap());
+            let result =
+                verifying_key.verify_digest(digest, &Signature::try_from(sig.as_slice()).unwrap());
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -1129,7 +1106,7 @@ mod test {
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = SigningKey::<Sha1>::new(priv_key);
-        let verifying_key = VerifyingKey::from(&signing_key);
+        let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
             let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
@@ -1146,7 +1123,7 @@ mod test {
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
-        let verifying_key = VerifyingKey::from(&signing_key);
+        let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
             let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
@@ -1163,7 +1140,7 @@ mod test {
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = SigningKey::new(priv_key);
-        let verifying_key = VerifyingKey::from(&signing_key);
+        let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
             let mut digest = Sha1::new();
@@ -1185,7 +1162,7 @@ mod test {
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
-        let verifying_key = VerifyingKey::from(&signing_key);
+        let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
             let mut digest = Sha1::new();
@@ -1200,7 +1177,6 @@ mod test {
         }
     }
 
-    #[cfg(feature = "hazmat")]
     #[test]
     fn test_verify_pss_hazmat() {
         let priv_key = get_private_key();
@@ -1227,8 +1203,8 @@ mod test {
         let verifying_key = VerifyingKey::<Sha1>::new(pub_key);
 
         for (text, sig, expected) in &tests {
-            let result =
-                verifying_key.verify_prehash(text.as_ref(), &Signature::from_bytes(sig).unwrap());
+            let result = verifying_key
+                .verify_prehash(text.as_ref(), &Signature::try_from(sig.as_slice()).unwrap());
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -1238,7 +1214,6 @@ mod test {
         }
     }
 
-    #[cfg(feature = "hazmat")]
     #[test]
     fn test_sign_and_verify_pss_hazmat() {
         let priv_key = get_private_key();
@@ -1246,7 +1221,7 @@ mod test {
         let tests = [Sha1::digest("test\n")];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = SigningKey::<Sha1>::new(priv_key);
-        let verifying_key = VerifyingKey::from(&signing_key);
+        let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
             let sig = signing_key
@@ -1258,7 +1233,6 @@ mod test {
         }
     }
 
-    #[cfg(feature = "hazmat")]
     #[test]
     fn test_sign_and_verify_pss_blinded_hazmat() {
         let priv_key = get_private_key();
@@ -1266,7 +1240,7 @@ mod test {
         let tests = [Sha1::digest("test\n")];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
-        let verifying_key = VerifyingKey::from(&signing_key);
+        let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
             let sig = signing_key
