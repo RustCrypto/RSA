@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.0-pre.0 (2022-12-??)
+### Added
+- Fix benches (#225)
+
+### Changed
+- Switched to signature trait v2.0.0-pre development versions (#217)
+
+[#225]: https://github.com/RustCrypto/RSA/pull/225
+[#217]: https://github.com/RustCrypto/RSA/pull/217
+
 ## 0.7.2 (2022-11-14)
 ### Added
 - Public accessor methods for `PrecomputedValues` ([#221])
