@@ -136,7 +136,6 @@ where
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. The opts argument may be nil, in which case sensible
 /// defaults are used.
-// TODO: bind T with the CryptoRng trait
 pub(crate) fn sign<T: CryptoRngCore, SK: PrivateKey>(
     rng: &mut T,
     blind: bool,
