@@ -18,7 +18,7 @@ pub fn encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> BigUint {
 /// Performs raw RSA decryption with no padding, resulting in a plaintext `BigUint`.
 /// Peforms RSA blinding if an `Rng` is passed.
 #[inline]
-pub fn decrypt<R: CryptoRngCore>(
+pub fn decrypt<R: CryptoRngCore + ?Sized>(
     mut rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     c: &BigUint,
@@ -108,7 +108,7 @@ pub fn decrypt<R: CryptoRngCore>(
 /// Peforms RSA blinding if an `Rng` is passed.
 /// This will also check for errors in the CRT computation.
 #[inline]
-pub fn decrypt_and_check<R: CryptoRngCore>(
+pub fn decrypt_and_check<R: CryptoRngCore + ?Sized>(
     rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     c: &BigUint,

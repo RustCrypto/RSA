@@ -161,7 +161,7 @@ pub(crate) fn decrypt<R: CryptoRngCore, SK: PrivateKey>(
 /// messages to signatures and identify the signed messages. As ever,
 /// signatures provide authenticity, not confidentiality.
 #[inline]
-pub(crate) fn sign<R: CryptoRngCore, SK: PrivateKey>(
+pub(crate) fn sign<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     prefix: &[u8],
@@ -420,9 +420,9 @@ impl<D> RandomizedSigner<Signature> for SigningKey<D>
 where
     D: Digest,
 {
-    fn try_sign_with_rng(
+    fn try_sign_with_rng<R: CryptoRngCore + ?Sized>(
         &self,
-        rng: &mut impl CryptoRngCore,
+        rng: &mut R,
         msg: &[u8],
     ) -> signature::Result<Signature> {
         sign(Some(rng), &self.inner, &self.prefix, &D::digest(msg))
@@ -446,9 +446,9 @@ impl<D> RandomizedDigestSigner<D, Signature> for SigningKey<D>
 where
     D: Digest,
 {
-    fn try_sign_digest_with_rng(
+    fn try_sign_digest_with_rng<R: CryptoRngCore + ?Sized>(
         &self,
-        rng: &mut impl CryptoRngCore,
+        rng: &mut R,
         digest: D,
     ) -> signature::Result<Signature> {
         sign(Some(rng), &self.inner, &self.prefix, &digest.finalize())
