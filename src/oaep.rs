@@ -1,7 +1,7 @@
 use alloc::string::String;
 use alloc::vec;
 use alloc::vec::Vec;
-use rand_core::{CryptoRng, RngCore};
+use rand_core::CryptoRngCore;
 
 use digest::DynDigest;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
@@ -23,7 +23,7 @@ const MAX_LABEL_LEN: u64 = 2_305_843_009_213_693_951;
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-pub fn encrypt<R: RngCore + CryptoRng, K: PublicKey>(
+pub fn encrypt<R: CryptoRngCore, K: PublicKey>(
     rng: &mut R,
     pub_key: &K,
     msg: &[u8],
@@ -80,7 +80,7 @@ pub fn encrypt<R: RngCore + CryptoRng, K: PublicKey>(
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-pub fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
+pub fn decrypt<R: CryptoRngCore, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
@@ -104,7 +104,7 @@ pub fn decrypt<R: RngCore + CryptoRng, SK: PrivateKey>(
 /// `rng` is given. It returns one or zero in valid that indicates whether the
 /// plaintext was correctly structured.
 #[inline]
-fn decrypt_inner<R: RngCore + CryptoRng, SK: PrivateKey>(
+fn decrypt_inner<R: CryptoRngCore, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],

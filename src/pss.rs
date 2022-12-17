@@ -136,7 +136,6 @@ where
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. The opts argument may be nil, in which case sensible
 /// defaults are used.
-// TODO: bind T with the CryptoRng trait
 pub(crate) fn sign<T: CryptoRngCore, SK: PrivateKey>(
     rng: &mut T,
     blind: bool,
@@ -150,7 +149,11 @@ pub(crate) fn sign<T: CryptoRngCore, SK: PrivateKey>(
     sign_pss_with_salt(blind.then(|| rng), priv_key, hashed, &salt, digest)
 }
 
-pub(crate) fn sign_digest<T: CryptoRngCore, SK: PrivateKey, D: Digest + FixedOutputReset>(
+pub(crate) fn sign_digest<
+    T: CryptoRngCore + ?Sized,
+    SK: PrivateKey,
+    D: Digest + FixedOutputReset,
+>(
     rng: &mut T,
     blind: bool,
     priv_key: &SK,
@@ -194,7 +197,11 @@ fn sign_pss_with_salt<T: CryptoRngCore, SK: PrivateKey>(
     priv_key.raw_decryption_primitive(blind_rng, &em, priv_key.size())
 }
 
-fn sign_pss_with_salt_digest<T: CryptoRngCore, SK: PrivateKey, D: Digest + FixedOutputReset>(
+fn sign_pss_with_salt_digest<
+    T: CryptoRngCore + ?Sized,
+    SK: PrivateKey,
+    D: Digest + FixedOutputReset,
+>(
     blind_rng: Option<&mut T>,
     priv_key: &SK,
     hashed: &[u8],
@@ -626,9 +633,9 @@ impl<D> RandomizedSigner<Signature> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
-    fn try_sign_with_rng(
+    fn try_sign_with_rng<R: CryptoRngCore + ?Sized>(
         &self,
-        rng: &mut impl CryptoRngCore,
+        rng: &mut R,
         msg: &[u8],
     ) -> signature::Result<Signature> {
         sign_digest::<_, _, D>(rng, false, &self.inner, &D::digest(msg), self.salt_len)
@@ -641,9 +648,9 @@ impl<D> RandomizedDigestSigner<D, Signature> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
-    fn try_sign_digest_with_rng(
+    fn try_sign_digest_with_rng<R: CryptoRngCore + ?Sized>(
         &self,
-        rng: &mut impl CryptoRngCore,
+        rng: &mut R,
         digest: D,
     ) -> signature::Result<Signature> {
         sign_digest::<_, _, D>(rng, false, &self.inner, &digest.finalize(), self.salt_len)
@@ -656,9 +663,9 @@ impl<D> RandomizedPrehashSigner<Signature> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
-    fn sign_prehash_with_rng(
+    fn sign_prehash_with_rng<R: CryptoRngCore + ?Sized>(
         &self,
-        rng: &mut impl CryptoRngCore,
+        rng: &mut R,
         prehash: &[u8],
     ) -> signature::Result<Signature> {
         sign_digest::<_, _, D>(rng, false, &self.inner, prehash, self.salt_len)
@@ -757,9 +764,9 @@ impl<D> RandomizedSigner<Signature> for BlindedSigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
-    fn try_sign_with_rng(
+    fn try_sign_with_rng<R: CryptoRngCore + ?Sized>(
         &self,
-        rng: &mut impl CryptoRngCore,
+        rng: &mut R,
         msg: &[u8],
     ) -> signature::Result<Signature> {
         sign_digest::<_, _, D>(rng, true, &self.inner, &D::digest(msg), self.salt_len)
@@ -772,9 +779,9 @@ impl<D> RandomizedDigestSigner<D, Signature> for BlindedSigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
-    fn try_sign_digest_with_rng(
+    fn try_sign_digest_with_rng<R: CryptoRngCore + ?Sized>(
         &self,
-        rng: &mut impl CryptoRngCore,
+        rng: &mut R,
         digest: D,
     ) -> signature::Result<Signature> {
         sign_digest::<_, _, D>(rng, true, &self.inner, &digest.finalize(), self.salt_len)
@@ -787,9 +794,9 @@ impl<D> RandomizedPrehashSigner<Signature> for BlindedSigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
-    fn sign_prehash_with_rng(
+    fn sign_prehash_with_rng<R: CryptoRngCore + ?Sized>(
         &self,
-        rng: &mut impl CryptoRngCore,
+        rng: &mut R,
         prehash: &[u8],
     ) -> signature::Result<Signature> {
         sign_digest::<_, _, D>(rng, true, &self.inner, prehash, self.salt_len)

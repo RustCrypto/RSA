@@ -1,6 +1,6 @@
 use alloc::vec::Vec;
 use num_bigint::BigUint;
-use rand_core::{CryptoRng, RngCore};
+use rand_core::CryptoRngCore;
 use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
@@ -14,7 +14,7 @@ pub trait EncryptionPrimitive {
 
 pub trait DecryptionPrimitive {
     /// Do NOT use directly! Only for implementors.
-    fn raw_decryption_primitive<R: RngCore + CryptoRng>(
+    fn raw_decryption_primitive<R: CryptoRngCore + ?Sized>(
         &self,
         rng: Option<&mut R>,
         ciphertext: &[u8],
@@ -43,7 +43,7 @@ impl EncryptionPrimitive for RsaPublicKey {
 }
 
 impl DecryptionPrimitive for RsaPrivateKey {
-    fn raw_decryption_primitive<R: RngCore + CryptoRng>(
+    fn raw_decryption_primitive<R: CryptoRngCore + ?Sized>(
         &self,
         rng: Option<&mut R>,
         ciphertext: &[u8],

@@ -3,7 +3,7 @@ use alloc::vec;
 use alloc::vec::Vec;
 use num_bigint::{BigInt, BigUint, IntoBigInt, IntoBigUint, ModInverse, RandBigInt, ToBigInt};
 use num_traits::{One, Signed, Zero};
-use rand_core::{CryptoRng, RngCore};
+use rand_core::CryptoRngCore;
 use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
@@ -18,7 +18,7 @@ pub fn encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> BigUint {
 /// Performs raw RSA decryption with no padding, resulting in a plaintext `BigUint`.
 /// Peforms RSA blinding if an `Rng` is passed.
 #[inline]
-pub fn decrypt<R: RngCore + CryptoRng>(
+pub fn decrypt<R: CryptoRngCore + ?Sized>(
     mut rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     c: &BigUint,
@@ -108,7 +108,7 @@ pub fn decrypt<R: RngCore + CryptoRng>(
 /// Peforms RSA blinding if an `Rng` is passed.
 /// This will also check for errors in the CRT computation.
 #[inline]
-pub fn decrypt_and_check<R: RngCore + CryptoRng>(
+pub fn decrypt_and_check<R: CryptoRngCore + ?Sized>(
     rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     c: &BigUint,
@@ -127,7 +127,7 @@ pub fn decrypt_and_check<R: RngCore + CryptoRng>(
 }
 
 /// Returns the blinded c, along with the unblinding factor.
-pub fn blind<R: RngCore + CryptoRng, K: PublicKeyParts>(
+pub fn blind<R: CryptoRngCore, K: PublicKeyParts>(
     rng: &mut R,
     key: &K,
     c: &BigUint,
