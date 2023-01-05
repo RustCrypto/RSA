@@ -214,7 +214,6 @@ pub use signature;
 
 pub mod algorithms;
 pub mod errors;
-pub mod padding;
 pub mod pkcs1v15;
 pub mod pss;
 
@@ -222,6 +221,7 @@ mod dummy_rng;
 mod encoding;
 mod key;
 mod oaep;
+mod padding;
 mod raw;
 
 pub use pkcs1;
