@@ -13,18 +13,18 @@ pub trait PaddingScheme {
     ///
     /// If an `rng` is passed, it uses RSA blinding to help mitigate timing
     /// side-channel attacks.
-    fn decrypt(
+    fn decrypt<Rng: CryptoRngCore, Priv: PrivateKey>(
         self,
-        rng: Option<&mut impl CryptoRngCore>,
-        priv_key: &impl PrivateKey,
+        rng: Option<&mut Rng>,
+        priv_key: &Priv,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>>;
 
     /// Encrypt the given message using the given public key.
-    fn encrypt(
+    fn encrypt<Rng: CryptoRngCore, Pub: PublicKey>(
         self,
-        rng: &mut impl CryptoRngCore,
-        pub_key: &impl PublicKey,
+        rng: &mut Rng,
+        pub_key: &Pub,
         msg: &[u8],
     ) -> Result<Vec<u8>>;
 }
@@ -32,10 +32,10 @@ pub trait PaddingScheme {
 /// Digital signature scheme.
 pub trait SignatureScheme {
     /// Sign the given digest.
-    fn sign(
+    fn sign<Rng: CryptoRngCore, Priv: PrivateKey>(
         self,
-        rng: Option<&mut impl CryptoRngCore>,
-        priv_key: &impl PrivateKey,
+        rng: Option<&mut Rng>,
+        priv_key: &Priv,
         hashed: &[u8],
     ) -> Result<Vec<u8>>;
 
@@ -45,5 +45,5 @@ pub trait SignatureScheme {
     /// passed in through `hash`.
     ///
     /// If the message is valid `Ok(())` is returned, otherwise an `Err` indicating failure.
-    fn verify(self, pub_key: &impl PublicKey, hashed: &[u8], sig: &[u8]) -> Result<()>;
+    fn verify<Pub: PublicKey>(self, pub_key: &Pub, hashed: &[u8], sig: &[u8]) -> Result<()>;
 }

@@ -123,10 +123,10 @@ impl Oaep {
 }
 
 impl PaddingScheme for Oaep {
-    fn decrypt(
+    fn decrypt<Rng: CryptoRngCore, Priv: PrivateKey>(
         mut self,
-        rng: Option<&mut impl CryptoRngCore>,
-        priv_key: &impl PrivateKey,
+        rng: Option<&mut Rng>,
+        priv_key: &Priv,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
         decrypt(
@@ -139,10 +139,10 @@ impl PaddingScheme for Oaep {
         )
     }
 
-    fn encrypt(
+    fn encrypt<Rng: CryptoRngCore, Pub: PublicKey>(
         mut self,
-        rng: &mut impl CryptoRngCore,
-        pub_key: &impl PublicKey,
+        rng: &mut Rng,
+        pub_key: &Pub,
         msg: &[u8],
     ) -> Result<Vec<u8>> {
         encrypt(

@@ -32,19 +32,19 @@ use crate::{RsaPrivateKey, RsaPublicKey};
 pub struct Pkcs1v15Encrypt;
 
 impl PaddingScheme for Pkcs1v15Encrypt {
-    fn decrypt(
+    fn decrypt<Rng: CryptoRngCore, Priv: PrivateKey>(
         self,
-        rng: Option<&mut impl CryptoRngCore>,
-        priv_key: &impl PrivateKey,
+        rng: Option<&mut Rng>,
+        priv_key: &Priv,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
         decrypt(rng, priv_key, ciphertext)
     }
 
-    fn encrypt(
+    fn encrypt<Rng: CryptoRngCore, Pub: PublicKey>(
         self,
-        rng: &mut impl CryptoRngCore,
-        pub_key: &impl PublicKey,
+        rng: &mut Rng,
+        pub_key: &Pub,
         msg: &[u8],
     ) -> Result<Vec<u8>> {
         encrypt(rng, pub_key, msg)
@@ -88,10 +88,10 @@ impl Pkcs1v15Sign {
 }
 
 impl SignatureScheme for Pkcs1v15Sign {
-    fn sign(
+    fn sign<Rng: CryptoRngCore, Priv: PrivateKey>(
         self,
-        rng: Option<&mut impl CryptoRngCore>,
-        priv_key: &impl PrivateKey,
+        rng: Option<&mut Rng>,
+        priv_key: &Priv,
         hashed: &[u8],
     ) -> Result<Vec<u8>> {
         if let Some(hash_len) = self.hash_len {
@@ -103,7 +103,7 @@ impl SignatureScheme for Pkcs1v15Sign {
         sign(rng, priv_key, &self.prefix, hashed)
     }
 
-    fn verify(self, pub_key: &impl PublicKey, hashed: &[u8], sig: &[u8]) -> Result<()> {
+    fn verify<Pub: PublicKey>(self, pub_key: &Pub, hashed: &[u8], sig: &[u8]) -> Result<()> {
         if let Some(hash_len) = self.hash_len {
             if hashed.len() != hash_len {
                 return Err(Error::InputNotHashed);

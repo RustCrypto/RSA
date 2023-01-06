@@ -83,15 +83,14 @@ impl Pss {
 }
 
 impl SignatureScheme for Pss {
-    fn sign(
+    fn sign<Rng: CryptoRngCore, Priv: PrivateKey>(
         mut self,
-        rng: Option<&mut impl CryptoRngCore>,
-        priv_key: &impl PrivateKey,
+        rng: Option<&mut Rng>,
+        priv_key: &Priv,
         hashed: &[u8],
     ) -> Result<Vec<u8>> {
-        let rng = rng.ok_or(Error::InvalidPaddingScheme)?;
         sign(
-            rng,
+            rng.ok_or(Error::InvalidPaddingScheme)?,
             self.blinded,
             priv_key,
             hashed,
@@ -100,7 +99,7 @@ impl SignatureScheme for Pss {
         )
     }
 
-    fn verify(mut self, pub_key: &impl PublicKey, hashed: &[u8], sig: &[u8]) -> Result<()> {
+    fn verify<Pub: PublicKey>(mut self, pub_key: &Pub, hashed: &[u8], sig: &[u8]) -> Result<()> {
         verify(pub_key, hashed, sig, &mut *self.digest)
     }
 }
