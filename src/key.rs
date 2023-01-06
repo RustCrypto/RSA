@@ -15,7 +15,7 @@ use crate::errors::{Error, Result};
 
 use crate::padding::PaddingScheme;
 use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
-use crate::{oaep, pkcs1v15, pss};
+use crate::{oaep, pkcs1v15};
 
 /// Components of an RSA public key.
 pub trait PublicKeyParts {
@@ -179,12 +179,6 @@ pub trait PublicKey: EncryptionPrimitive + PublicKeyParts {
         padding: PaddingScheme,
         msg: &[u8],
     ) -> Result<Vec<u8>>;
-
-    /// Verify a signed message.
-    /// `hashed`must be the result of hashing the input using the hashing function
-    /// passed in through `hash`.
-    /// If the message is valid `Ok(())` is returned, otherwiese an `Err` indicating failure.
-    fn verify(&self, padding: PaddingScheme, hashed: &[u8], sig: &[u8]) -> Result<()>;
 }
 
 impl PublicKeyParts for RsaPublicKey {
@@ -211,22 +205,6 @@ impl PublicKey for RsaPublicKey {
                 mut mgf_digest,
                 label,
             } => oaep::encrypt(rng, self, msg, &mut *digest, &mut *mgf_digest, label),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
-    }
-
-    fn verify(&self, padding: PaddingScheme, hashed: &[u8], sig: &[u8]) -> Result<()> {
-        match padding {
-            PaddingScheme::PKCS1v15Sign { hash_len, prefix } => {
-                if let Some(hash_len) = hash_len {
-                    if hashed.len() != hash_len {
-                        return Err(Error::InputNotHashed);
-                    }
-                }
-                pkcs1v15::verify(self, prefix.as_ref(), hashed, sig)
-            }
-            PaddingScheme::PSS { mut digest, .. } => pss::verify(self, hashed, sig, &mut *digest),
-            _ => Err(Error::InvalidPaddingScheme),
         }
     }
 }
@@ -466,7 +444,6 @@ impl RsaPrivateKey {
                 &mut *mgf_digest,
                 label,
             ),
-            _ => Err(Error::InvalidPaddingScheme),
         }
     }
 
@@ -493,67 +470,6 @@ impl RsaPrivateKey {
                 &mut *mgf_digest,
                 label,
             ),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
-    }
-
-    /// Sign the given digest.
-    pub fn sign(&self, padding: PaddingScheme, digest_in: &[u8]) -> Result<Vec<u8>> {
-        match padding {
-            // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
-            PaddingScheme::PKCS1v15Sign { hash_len, prefix } => {
-                if let Some(hash_len) = hash_len {
-                    if digest_in.len() != hash_len {
-                        return Err(Error::InputNotHashed);
-                    }
-                }
-                pkcs1v15::sign::<DummyRng, _>(None, self, prefix.as_ref(), digest_in)
-            }
-            _ => Err(Error::InvalidPaddingScheme),
-        }
-    }
-
-    /// Sign the given digest using the provided rng
-    ///
-    /// Use `rng` for signature process.
-    pub fn sign_with_rng<R: CryptoRngCore>(
-        &self,
-        rng: &mut R,
-        padding: PaddingScheme,
-        digest_in: &[u8],
-    ) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PSS {
-                mut digest,
-                salt_len,
-            } => pss::sign::<R, _>(rng, false, self, digest_in, salt_len, &mut *digest),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
-    }
-
-    /// Sign the given digest.
-    ///
-    /// Use `rng` for blinding.
-    pub fn sign_blinded<R: CryptoRngCore>(
-        &self,
-        rng: &mut R,
-        padding: PaddingScheme,
-        digest_in: &[u8],
-    ) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PKCS1v15Sign { hash_len, prefix } => {
-                if let Some(hash_len) = hash_len {
-                    if digest_in.len() != hash_len {
-                        return Err(Error::InputNotHashed);
-                    }
-                }
-                pkcs1v15::sign(Some(rng), self, prefix.as_ref(), digest_in)
-            }
-            PaddingScheme::PSS {
-                mut digest,
-                salt_len,
-            } => pss::sign::<R, _>(rng, true, self, digest_in, salt_len, &mut *digest),
-            _ => Err(Error::InvalidPaddingScheme),
         }
     }
 }

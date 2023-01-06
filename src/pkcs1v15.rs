@@ -629,7 +629,7 @@ mod tests {
     use sha3::Sha3_256;
     use signature::{RandomizedSigner, Signer, Verifier};
 
-    use crate::{PaddingScheme, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+    use crate::{PaddingScheme, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 
     #[test]
     fn test_non_zero_bytes() {
@@ -716,39 +716,6 @@ mod tests {
             let blinder = if blind { Some(&mut rng) } else { None };
             let plaintext = decrypt(blinder, &priv_key, &ciphertext).unwrap();
             assert_eq!(input, plaintext);
-        }
-    }
-
-    #[test]
-    fn test_sign_pkcs1v15() {
-        let priv_key = get_private_key();
-
-        let tests = [(
-            "Test.\n",
-            hex!(
-                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
-            ),
-        )];
-
-        for (text, expected) in &tests {
-            let digest = Sha1::digest(text.as_bytes()).to_vec();
-
-            let out = priv_key
-                .sign(PaddingScheme::new_pkcs1v15_sign::<Sha1>(), &digest)
-                .unwrap();
-            assert_ne!(out, digest);
-            assert_eq!(out, expected);
-
-            let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = priv_key
-                .sign_blinded(
-                    &mut rng,
-                    PaddingScheme::new_pkcs1v15_sign::<Sha1>(),
-                    &digest,
-                )
-                .unwrap();
-            assert_eq!(out2, expected);
         }
     }
 
@@ -859,43 +826,6 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_pkcs1v15() {
-        let priv_key = get_private_key();
-
-        let tests = [
-            (
-                "Test.\n",
-                hex!(
-                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
-                ),
-                true,
-            ),
-            (
-                "Test.\n",
-                hex!(
-                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
-                ),
-                false,
-            ),
-        ];
-        let pub_key: RsaPublicKey = priv_key.into();
-
-        for (text, sig, expected) in &tests {
-            let digest = Sha1::digest(text.as_bytes()).to_vec();
-
-            let result = pub_key.verify(PaddingScheme::new_pkcs1v15_sign::<Sha1>(), &digest, sig);
-            match expected {
-                true => result.expect("failed to verify"),
-                false => {
-                    result.expect_err("expected verifying error");
-                }
-            }
-        }
-    }
-
-    #[test]
     fn test_verify_pkcs1v15_signer() {
         let priv_key = get_private_key();
 
@@ -971,22 +901,6 @@ mod tests {
                 }
             }
         }
-    }
-    #[test]
-    fn test_unpadded_signature() {
-        let msg = b"Thu Dec 19 18:06:16 EST 2013\n";
-        let expected_sig = Base64::decode_vec("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
-        let priv_key = get_private_key();
-
-        let sig = priv_key
-            .sign(PaddingScheme::new_pkcs1v15_sign_raw(), msg)
-            .unwrap();
-        assert_eq!(expected_sig, sig);
-
-        let pub_key: RsaPublicKey = priv_key.into();
-        pub_key
-            .verify(PaddingScheme::new_pkcs1v15_sign_raw(), msg, &sig)
-            .expect("failed to verify");
     }
 
     #[test]

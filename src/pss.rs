@@ -14,7 +14,7 @@ use alloc::vec::Vec;
 
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
-use digest::{Digest, DynDigest, FixedOutputReset};
+use digest::{Digest, FixedOutputReset};
 use pkcs8::{Document, EncodePrivateKey, EncodePublicKey, SecretDocument};
 use rand_core::CryptoRngCore;
 use signature::{
@@ -23,7 +23,7 @@ use signature::{
 };
 use subtle::ConstantTimeEq;
 
-use crate::algorithms::{mgf1_xor, mgf1_xor_digest};
+use crate::algorithms::mgf1_xor_digest;
 use crate::errors::{Error, Result};
 use crate::key::{PrivateKey, PublicKey};
 use crate::{RsaPrivateKey, RsaPublicKey};
@@ -98,23 +98,6 @@ impl Display for Signature {
     }
 }
 
-pub(crate) fn verify<PK: PublicKey>(
-    pub_key: &PK,
-    hashed: &[u8],
-    sig: &[u8],
-    digest: &mut dyn DynDigest,
-) -> Result<()> {
-    if sig.len() != pub_key.size() {
-        return Err(Error::Verification);
-    }
-
-    let em_bits = pub_key.n().bits() - 1;
-    let em_len = (em_bits + 7) / 8;
-    let mut em = pub_key.raw_encryption_primitive(sig, em_len)?;
-
-    emsa_pss_verify(hashed, &mut em, em_bits, None, digest)
-}
-
 pub(crate) fn verify_digest<PK, D>(pub_key: &PK, hashed: &[u8], sig: &[u8]) -> Result<()>
 where
     PK: PublicKey,
@@ -129,24 +112,6 @@ where
     let mut em = pub_key.raw_encryption_primitive(sig, em_len)?;
 
     emsa_pss_verify_digest::<D>(hashed, &mut em, em_bits, None)
-}
-
-/// SignPSS calculates the signature of hashed using RSASSA-PSS.
-///
-/// Note that hashed must be the result of hashing the input message using the
-/// given hash function. The opts argument may be nil, in which case sensible
-/// defaults are used.
-pub(crate) fn sign<T: CryptoRngCore, SK: PrivateKey>(
-    rng: &mut T,
-    blind: bool,
-    priv_key: &SK,
-    hashed: &[u8],
-    salt_len: Option<usize>,
-    digest: &mut dyn DynDigest,
-) -> Result<Vec<u8>> {
-    let salt = generate_salt(rng, priv_key, salt_len, digest.output_size());
-
-    sign_pss_with_salt(blind.then(|| rng), priv_key, hashed, &salt, digest)
 }
 
 pub(crate) fn sign_digest<
@@ -184,19 +149,6 @@ fn generate_salt<T: CryptoRngCore + ?Sized, SK: PrivateKey>(
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. salt is a random sequence of bytes whose length will be
 /// later used to verify the signature.
-fn sign_pss_with_salt<T: CryptoRngCore, SK: PrivateKey>(
-    blind_rng: Option<&mut T>,
-    priv_key: &SK,
-    hashed: &[u8],
-    salt: &[u8],
-    digest: &mut dyn DynDigest,
-) -> Result<Vec<u8>> {
-    let em_bits = priv_key.n().bits() - 1;
-    let em = emsa_pss_encode(hashed, em_bits, salt, digest)?;
-
-    priv_key.raw_decryption_primitive(blind_rng, &em, priv_key.size())
-}
-
 fn sign_pss_with_salt_digest<
     T: CryptoRngCore + ?Sized,
     SK: PrivateKey,
@@ -211,79 +163,6 @@ fn sign_pss_with_salt_digest<
     let em = emsa_pss_encode_digest::<D>(hashed, em_bits, salt)?;
 
     priv_key.raw_decryption_primitive(blind_rng, &em, priv_key.size())
-}
-
-fn emsa_pss_encode(
-    m_hash: &[u8],
-    em_bits: usize,
-    salt: &[u8],
-    hash: &mut dyn DynDigest,
-) -> Result<Vec<u8>> {
-    // See [1], section 9.1.1
-    let h_len = hash.output_size();
-    let s_len = salt.len();
-    let em_len = (em_bits + 7) / 8;
-
-    // 1. If the length of M is greater than the input limitation for the
-    //     hash function (2^61 - 1 octets for SHA-1), output "message too
-    //     long" and stop.
-    //
-    // 2.  Let mHash = Hash(M), an octet string of length hLen.
-    if m_hash.len() != h_len {
-        return Err(Error::InputNotHashed);
-    }
-
-    // 3. If em_len < h_len + s_len + 2, output "encoding error" and stop.
-    if em_len < h_len + s_len + 2 {
-        // TODO: Key size too small
-        return Err(Error::Internal);
-    }
-
-    let mut em = vec![0; em_len];
-
-    let (db, h) = em.split_at_mut(em_len - h_len - 1);
-    let h = &mut h[..(em_len - 1) - db.len()];
-
-    // 4. Generate a random octet string salt of length s_len; if s_len = 0,
-    //     then salt is the empty string.
-    //
-    // 5.  Let
-    //       M' = (0x)00 00 00 00 00 00 00 00 || m_hash || salt;
-    //
-    //     M' is an octet string of length 8 + h_len + s_len with eight
-    //     initial zero octets.
-    //
-    // 6.  Let H = Hash(M'), an octet string of length h_len.
-    let prefix = [0u8; 8];
-
-    hash.update(&prefix);
-    hash.update(m_hash);
-    hash.update(salt);
-
-    let hashed = hash.finalize_reset();
-    h.copy_from_slice(&hashed);
-
-    // 7.  Generate an octet string PS consisting of em_len - s_len - h_len - 2
-    //     zero octets. The length of PS may be 0.
-    //
-    // 8.  Let DB = PS || 0x01 || salt; DB is an octet string of length
-    //     emLen - hLen - 1.
-    db[em_len - s_len - h_len - 2] = 0x01;
-    db[em_len - s_len - h_len - 1..].copy_from_slice(salt);
-
-    // 9.  Let dbMask = MGF(H, emLen - hLen - 1).
-    //
-    // 10. Let maskedDB = DB \xor dbMask.
-    mgf1_xor(db, hash, h);
-
-    // 11. Set the leftmost 8 * em_len - em_bits bits of the leftmost octet in
-    //     maskedDB to zero.
-    db[0] &= 0xFF >> (8 * em_len - em_bits);
-
-    // 12. Let EM = maskedDB || H || 0xbc.
-    em[em_len - 1] = 0xBC;
-
-    Ok(em)
 }
 
 fn emsa_pss_encode_digest<D>(m_hash: &[u8], em_bits: usize, salt: &[u8]) -> Result<Vec<u8>>
@@ -436,50 +315,6 @@ fn emsa_pss_get_salt(
     let salt = &db[db.len() - s_len..];
 
     Ok(salt)
-}
-
-fn emsa_pss_verify(
-    m_hash: &[u8],
-    em: &mut [u8],
-    em_bits: usize,
-    s_len: Option<usize>,
-    hash: &mut dyn DynDigest,
-) -> Result<()> {
-    let em_len = em.len(); //(em_bits + 7) / 8;
-    let h_len = hash.output_size();
-
-    let (db, h) = emsa_pss_verify_pre(m_hash, em, em_bits, s_len, h_len)?;
-
-    // 7. Let dbMask = MGF(H, em_len - h_len - 1)
-    //
-    // 8. Let DB = maskedDB \xor dbMask
-    mgf1_xor(db, hash, &*h);
-
-    // 9.  Set the leftmost 8 * emLen - emBits bits of the leftmost octet in DB
-    //     to zero.
-    db[0] &= 0xFF >> /*uint*/(8 * em_len - em_bits);
-
-    let salt = emsa_pss_get_salt(db, em_len, s_len, h_len)?;
-
-    // 12. Let
-    //          M' = (0x)00 00 00 00 00 00 00 00 || mHash || salt ;
-    //     M' is an octet string of length 8 + hLen + sLen with eight
-    //     initial zero octets.
-    //
-    // 13. Let H' = Hash(M'), an octet string of length hLen.
-    let prefix = [0u8; 8];
-
-    hash.update(&prefix[..]);
-    hash.update(m_hash);
-    hash.update(salt);
-    let h0 = hash.finalize_reset();
-
-    // 14. If H = H', output "consistent." Otherwise, output "inconsistent."
-    if h0.ct_eq(h).into() {
-        Ok(())
-    } else {
-        Err(Error::Verification)
-    }
 }
 
 fn emsa_pss_verify_digest<D>(
@@ -921,7 +756,7 @@ where
 #[cfg(test)]
 mod test {
     use crate::pss::{BlindedSigningKey, Signature, SigningKey, VerifyingKey};
-    use crate::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
+    use crate::{RsaPrivateKey, RsaPublicKey};
 
     use hex_literal::hex;
     use num_bigint::BigUint;
@@ -952,42 +787,6 @@ mod test {
                 BigUint::from_str_radix("94560208308847015747498523884063394671606671904944666360068158221458669711639", 10).unwrap()
             ],
         ).unwrap()
-    }
-
-    #[test]
-    fn test_verify_pss() {
-        let priv_key = get_private_key();
-
-        let tests = [
-            (
-                "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
-                ),
-                true,
-            ),
-            (
-                "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
-                ),
-                false,
-            ),
-        ];
-        let pub_key: RsaPublicKey = priv_key.into();
-
-        for (text, sig, expected) in &tests {
-            let digest = Sha1::digest(text.as_bytes()).to_vec();
-            let result = pub_key.verify(PaddingScheme::new_pss::<Sha1>(), &digest, sig);
-            match expected {
-                true => result.expect("failed to verify"),
-                false => {
-                    result.expect_err("expected verifying error");
-                }
-            }
-        }
     }
 
     #[test]
@@ -1065,44 +864,6 @@ mod test {
                     result.expect_err("expected verifying error");
                 }
             }
-        }
-    }
-
-    #[test]
-    fn test_sign_and_verify_roundtrip() {
-        let priv_key = get_private_key();
-
-        let tests = ["test\n"];
-        let rng = ChaCha8Rng::from_seed([42; 32]);
-
-        for test in &tests {
-            let digest = Sha1::digest(test.as_bytes()).to_vec();
-            let sig = priv_key
-                .sign_with_rng(&mut rng.clone(), PaddingScheme::new_pss::<Sha1>(), &digest)
-                .expect("failed to sign");
-
-            priv_key
-                .verify(PaddingScheme::new_pss::<Sha1>(), &digest, &sig)
-                .expect("failed to verify");
-        }
-    }
-
-    #[test]
-    fn test_sign_blinded_and_verify_roundtrip() {
-        let priv_key = get_private_key();
-
-        let tests = ["test\n"];
-        let rng = ChaCha8Rng::from_seed([42; 32]);
-
-        for test in &tests {
-            let digest = Sha1::digest(test.as_bytes()).to_vec();
-            let sig = priv_key
-                .sign_blinded(&mut rng.clone(), PaddingScheme::new_pss::<Sha1>(), &digest)
-                .expect("failed to sign");
-
-            priv_key
-                .verify(PaddingScheme::new_pss::<Sha1>(), &digest, &sig)
-                .expect("failed to verify");
         }
     }
 
