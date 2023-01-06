@@ -226,14 +226,12 @@ pub mod traits;
 mod dummy_rng;
 mod encoding;
 mod key;
-mod padding;
 mod raw;
 
 pub use pkcs1;
 pub use pkcs8;
 
 pub use self::key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
-pub use self::padding::PaddingScheme;
 
 /// Internal raw RSA functions.
 #[cfg(not(feature = "expose-internals"))]
