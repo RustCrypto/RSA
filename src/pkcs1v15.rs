@@ -24,6 +24,7 @@ use zeroize::Zeroizing;
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::key::{self, PrivateKey, PublicKey};
+use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 use crate::{RsaPrivateKey, RsaPublicKey};
 
 /// PKCS#1 v1.5 signatures as described in [RFC8017 § 8.2].
@@ -612,6 +613,62 @@ where
     }
 }
 
+/// Encryption key for PKCS#1 v1.5 encryption as described in [RFC8017 § 7.2].
+///
+/// [RFC8017 § 7.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.2
+#[derive(Debug, Clone)]
+pub struct EncryptingKey {
+    inner: RsaPublicKey,
+}
+
+impl EncryptingKey {
+    /// Create a new verifying key from an RSA public key.
+    pub fn new(key: RsaPublicKey) -> Self {
+        Self { inner: key }
+    }
+}
+
+impl RandomizedEncryptor for EncryptingKey {
+    fn encrypt_with_rng<R: CryptoRngCore + ?Sized>(
+        &self,
+        rng: &mut R,
+        msg: &[u8],
+    ) -> Result<Vec<u8>> {
+        encrypt(rng, &self.inner, msg)
+    }
+}
+
+/// Decryption key for PKCS#1 v1.5 decryption as described in [RFC8017 § 7.2].
+///
+/// [RFC8017 § 7.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.2
+#[derive(Debug, Clone)]
+pub struct DecryptingKey {
+    inner: RsaPrivateKey,
+}
+
+impl DecryptingKey {
+    /// Create a new verifying key from an RSA public key.
+    pub fn new(key: RsaPrivateKey) -> Self {
+        Self { inner: key }
+    }
+}
+
+impl Decryptor for DecryptingKey {
+    fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
+        decrypt::<DummyRng, _>(None, &self.inner, ciphertext)
+    }
+}
+
+impl RandomizedDecryptor for DecryptingKey {
+    fn decrypt_with_rng<R: CryptoRngCore + ?Sized>(
+        &self,
+        rng: &mut R,
+        ciphertext: &[u8],
+    ) -> Result<Vec<u8>> {
+        decrypt(Some(rng), &self.inner, ciphertext)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -629,7 +686,7 @@ mod tests {
     use sha3::Sha3_256;
     use signature::{RandomizedSigner, Signer, Verifier};
 
-    use crate::{PaddingScheme, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+    use crate::{PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 
     #[test]
     fn test_non_zero_bytes() {
@@ -669,6 +726,7 @@ mod tests {
     #[test]
     fn test_decrypt_pkcs1v15() {
         let priv_key = get_private_key();
+        let decrypting_key = DecryptingKey::new(priv_key);
 
         let tests = [[
 	    "gIcUIoVkD6ATMBk/u/nlCZCCWRKdkfjCgFdo35VpRXLduiKXhNz1XupLLzTXAybEq15juc+EgY5o0DHv/nt3yg==",
@@ -685,11 +743,8 @@ mod tests {
 	]];
 
         for test in &tests {
-            let out = priv_key
-                .decrypt(
-                    PaddingScheme::new_pkcs1v15_encrypt(),
-                    &Base64::decode_vec(test[0]).unwrap(),
-                )
+            let out = decrypting_key
+                .decrypt(&Base64::decode_vec(test[0]).unwrap())
                 .unwrap();
             assert_eq!(out, test[1].as_bytes());
         }

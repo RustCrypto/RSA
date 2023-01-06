@@ -13,7 +13,9 @@
 //!
 //! ## PKCS#1 v1.5 encryption
 //! ```
-//! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
+//! use rsa::{RsaPrivateKey, RsaPublicKey};
+//! use rsa::pkcs1v15::{DecryptingKey, EncryptingKey};
+//! use rsa::traits::{RandomizedEncryptor, Decryptor};
 //!
 //! let mut rng = rand::thread_rng();
 //!
@@ -23,35 +25,37 @@
 //!
 //! // Encrypt
 //! let data = b"hello world";
-//! let padding = PaddingScheme::new_pkcs1v15_encrypt();
-//! let enc_data = public_key.encrypt(&mut rng, padding, &data[..]).expect("failed to encrypt");
+//! let encrypting_key = EncryptingKey::new(public_key);
+//! let enc_data = encrypting_key.encrypt_with_rng(&mut rng, &data[..]).expect("failed to encrypt");
 //! assert_ne!(&data[..], &enc_data[..]);
 //!
 //! // Decrypt
-//! let padding = PaddingScheme::new_pkcs1v15_encrypt();
-//! let dec_data = private_key.decrypt(padding, &enc_data).expect("failed to decrypt");
+//! let decrypting_key = DecryptingKey::new(private_key);
+//! let dec_data = decrypting_key.decrypt(&enc_data).expect("failed to decrypt");
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
 //!
 //! ## OAEP encryption
 //! ```
-//! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
+//! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey};
+//! use rsa::oaep::{DecryptingKey, EncryptingKey};
+//! use rsa::traits::{RandomizedEncryptor, Decryptor};
 //!
 //! let mut rng = rand::thread_rng();
 //!
 //! let bits = 2048;
 //! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
 //! let public_key = RsaPublicKey::from(&private_key);
+//! let encrypting_key = EncryptingKey::<sha2::Sha256>::new(public_key);
+//! let decrypting_key = DecryptingKey::<sha2::Sha256>::new(private_key);
 //!
 //! // Encrypt
 //! let data = b"hello world";
-//! let padding = PaddingScheme::new_oaep::<sha2::Sha256>();
-//! let enc_data = public_key.encrypt(&mut rng, padding, &data[..]).expect("failed to encrypt");
+//! let enc_data = encrypting_key.encrypt_with_rng(&mut rng, &data[..]).expect("failed to encrypt");
 //! assert_ne!(&data[..], &enc_data[..]);
 //!
 //! // Decrypt
-//! let padding = PaddingScheme::new_oaep::<sha2::Sha256>();
-//! let dec_data = private_key.decrypt(padding, &enc_data).expect("failed to decrypt");
+//! let dec_data = decrypting_key.decrypt(&enc_data).expect("failed to decrypt");
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
 //!
@@ -214,6 +218,7 @@ pub use signature;
 
 pub mod algorithms;
 pub mod errors;
+pub mod oaep;
 pub mod pkcs1v15;
 pub mod pss;
 pub mod traits;
@@ -221,7 +226,6 @@ pub mod traits;
 mod dummy_rng;
 mod encoding;
 mod key;
-mod oaep;
 mod padding;
 mod raw;
 

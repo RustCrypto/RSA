@@ -7,7 +7,8 @@ use num_bigint::BigUint;
 use num_traits::{FromPrimitive, Num};
 use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 use rsa::signature::RandomizedSigner;
-use rsa::{PaddingScheme, RsaPrivateKey};
+use rsa::traits::Decryptor;
+use rsa::RsaPrivateKey;
 use sha2::{Digest, Sha256};
 use test::Bencher;
 
@@ -29,12 +30,11 @@ fn get_key() -> RsaPrivateKey {
 #[bench]
 fn bench_rsa_2048_pkcsv1_decrypt(b: &mut Bencher) {
     let priv_key = get_key();
+    let decryption_key = rsa::pkcs1v15::DecryptingKey::new(priv_key);
     let x = Base64::decode_vec(DECRYPT_VAL).unwrap();
 
     b.iter(|| {
-        let res = priv_key
-            .decrypt(PaddingScheme::new_pkcs1v15_encrypt(), &x)
-            .unwrap();
+        let res = decryption_key.decrypt(&x).unwrap();
         test::black_box(res);
     });
 }

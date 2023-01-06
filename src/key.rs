@@ -10,12 +10,9 @@ use serde_crate::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
 use crate::algorithms::{generate_multi_prime_key, generate_multi_prime_key_with_exp};
-use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 
-use crate::padding::PaddingScheme;
 use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
-use crate::{oaep, pkcs1v15};
 
 /// Components of an RSA public key.
 pub trait PublicKeyParts {
@@ -171,15 +168,7 @@ impl From<&RsaPrivateKey> for RsaPublicKey {
 }
 
 /// Generic trait for operations on a public key.
-pub trait PublicKey: EncryptionPrimitive + PublicKeyParts {
-    /// Encrypt the given message.
-    fn encrypt<R: CryptoRngCore>(
-        &self,
-        rng: &mut R,
-        padding: PaddingScheme,
-        msg: &[u8],
-    ) -> Result<Vec<u8>>;
-}
+pub trait PublicKey: EncryptionPrimitive + PublicKeyParts {}
 
 impl PublicKeyParts for RsaPublicKey {
     fn n(&self) -> &BigUint {
@@ -191,23 +180,7 @@ impl PublicKeyParts for RsaPublicKey {
     }
 }
 
-impl PublicKey for RsaPublicKey {
-    fn encrypt<R: CryptoRngCore>(
-        &self,
-        rng: &mut R,
-        padding: PaddingScheme,
-        msg: &[u8],
-    ) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PKCS1v15Encrypt => pkcs1v15::encrypt(rng, self, msg),
-            PaddingScheme::OAEP {
-                mut digest,
-                mut mgf_digest,
-                label,
-            } => oaep::encrypt(rng, self, msg, &mut *digest, &mut *mgf_digest, label),
-        }
-    }
-}
+impl PublicKey for RsaPublicKey {}
 
 impl RsaPublicKey {
     /// Minimum value of the public exponent `e`.
@@ -424,54 +397,6 @@ impl RsaPrivateKey {
 
         Ok(())
     }
-
-    /// Decrypt the given message.
-    pub fn decrypt(&self, padding: PaddingScheme, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        match padding {
-            // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
-            PaddingScheme::PKCS1v15Encrypt => {
-                pkcs1v15::decrypt::<DummyRng, _>(None, self, ciphertext)
-            }
-            PaddingScheme::OAEP {
-                mut digest,
-                mut mgf_digest,
-                label,
-            } => oaep::decrypt::<DummyRng, _>(
-                None,
-                self,
-                ciphertext,
-                &mut *digest,
-                &mut *mgf_digest,
-                label,
-            ),
-        }
-    }
-
-    /// Decrypt the given message.
-    ///
-    /// Uses `rng` to blind the decryption process.
-    pub fn decrypt_blinded<R: CryptoRngCore>(
-        &self,
-        rng: &mut R,
-        padding: PaddingScheme,
-        ciphertext: &[u8],
-    ) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PKCS1v15Encrypt => pkcs1v15::decrypt(Some(rng), self, ciphertext),
-            PaddingScheme::OAEP {
-                mut digest,
-                mut mgf_digest,
-                label,
-            } => oaep::decrypt(
-                Some(rng),
-                self,
-                ciphertext,
-                &mut *digest,
-                &mut *mgf_digest,
-                label,
-            ),
-        }
-    }
 }
 
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
@@ -507,9 +432,11 @@ fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize)
 mod tests {
     use super::*;
     use crate::internals;
+    use crate::oaep::{DecryptingKey, EncryptingKey};
+    use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 
     use alloc::string::String;
-    use digest::{Digest, DynDigest};
+    use digest::{Digest, FixedOutputReset};
     use hex_literal::hex;
     use num_traits::{FromPrimitive, ToPrimitive};
     use rand_chacha::{
@@ -862,7 +789,11 @@ mod tests {
         }
     }
 
-    fn do_test_encrypt_decrypt_oaep<D: 'static + Digest + DynDigest + Send + Sync>(
+    fn do_test_encrypt_decrypt_oaep<D: Digest + FixedOutputReset>(prk: &RsaPrivateKey) {
+        do_test_oaep_with_different_hashes::<D, D>(prk);
+    }
+
+    fn do_test_oaep_with_different_hashes<D: Digest, MGD: Digest + FixedOutputReset>(
         prk: &RsaPrivateKey,
     ) {
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
@@ -881,98 +812,48 @@ mod tests {
             let pub_key: RsaPublicKey = prk.into();
 
             let ciphertext = if let Some(ref label) = label {
-                let padding = PaddingScheme::new_oaep_with_label::<D, _>(label);
-                pub_key.encrypt(&mut rng, padding, &input).unwrap()
+                let encrypting_key =
+                    EncryptingKey::<D, MGD>::new_with_label(pub_key, label.clone());
+                encrypting_key.encrypt_with_rng(&mut rng, &input).unwrap()
             } else {
-                let padding = PaddingScheme::new_oaep::<D>();
-                pub_key.encrypt(&mut rng, padding, &input).unwrap()
+                let encrypting_key = EncryptingKey::<D, MGD>::new(pub_key);
+                encrypting_key.encrypt_with_rng(&mut rng, &input).unwrap()
             };
 
             assert_ne!(input, ciphertext);
             let blind: bool = rng.next_u32() < (1 << 31);
 
-            let padding = if let Some(ref label) = label {
-                PaddingScheme::new_oaep_with_label::<D, _>(label)
+            let decrypting_key = if let Some(ref label) = label {
+                DecryptingKey::<D, MGD>::new_with_label(prk.clone(), label.clone())
             } else {
-                PaddingScheme::new_oaep::<D>()
+                DecryptingKey::<D, MGD>::new(prk.clone())
             };
 
             let plaintext = if blind {
-                prk.decrypt(padding, &ciphertext).unwrap()
+                decrypting_key.decrypt(&ciphertext).unwrap()
             } else {
-                prk.decrypt_blinded(&mut rng, padding, &ciphertext).unwrap()
+                decrypting_key
+                    .decrypt_with_rng(&mut rng, &ciphertext)
+                    .unwrap()
             };
 
             assert_eq!(input, plaintext);
         }
     }
 
-    fn do_test_oaep_with_different_hashes<
-        D: 'static + Digest + DynDigest + Send + Sync,
-        U: 'static + Digest + DynDigest + Send + Sync,
-    >(
-        prk: &RsaPrivateKey,
-    ) {
-        let mut rng = ChaCha8Rng::from_seed([42; 32]);
-
-        let k = prk.size();
-
-        for i in 1..8 {
-            let mut input = vec![0u8; i * 8];
-            rng.fill_bytes(&mut input);
-
-            if input.len() > k - 11 {
-                input = input[0..k - 11].to_vec();
-            }
-            let label = get_label(&mut rng);
-
-            let pub_key: RsaPublicKey = prk.into();
-
-            let ciphertext = if let Some(ref label) = label {
-                let padding = PaddingScheme::new_oaep_with_mgf_hash_with_label::<D, U, _>(label);
-                pub_key.encrypt(&mut rng, padding, &input).unwrap()
-            } else {
-                let padding = PaddingScheme::new_oaep_with_mgf_hash::<D, U>();
-                pub_key.encrypt(&mut rng, padding, &input).unwrap()
-            };
-
-            assert_ne!(input, ciphertext);
-            let blind: bool = rng.next_u32() < (1 << 31);
-
-            let padding = if let Some(ref label) = label {
-                PaddingScheme::new_oaep_with_mgf_hash_with_label::<D, U, _>(label)
-            } else {
-                PaddingScheme::new_oaep_with_mgf_hash::<D, U>()
-            };
-
-            let plaintext = if blind {
-                prk.decrypt(padding, &ciphertext).unwrap()
-            } else {
-                prk.decrypt_blinded(&mut rng, padding, &ciphertext).unwrap()
-            };
-
-            assert_eq!(input, plaintext);
-        }
-    }
     #[test]
     fn test_decrypt_oaep_invalid_hash() {
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = get_private_key();
         let pub_key: RsaPublicKey = (&priv_key).into();
-        let ciphertext = pub_key
-            .encrypt(
-                &mut rng,
-                PaddingScheme::new_oaep::<Sha1>(),
-                "a_plain_text".as_bytes(),
-            )
+        let encrypting_key = EncryptingKey::<Sha1>::new(pub_key);
+        let decrypting_key = DecryptingKey::<Sha1>::new_with_label(priv_key, "label");
+        let ciphertext = encrypting_key
+            .encrypt_with_rng(&mut rng, "a_plain_text".as_bytes())
             .unwrap();
         assert!(
-            priv_key
-                .decrypt_blinded(
-                    &mut rng,
-                    PaddingScheme::new_oaep_with_label::<Sha1, _>("label"),
-                    &ciphertext,
-                )
+            decrypting_key
+                .decrypt_with_rng(&mut rng, &ciphertext,)
                 .is_err(),
             "decrypt should have failed on hash verification"
         );
