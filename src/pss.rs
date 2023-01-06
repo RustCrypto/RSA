@@ -107,9 +107,10 @@ impl SignatureScheme for Pss {
 impl Debug for Pss {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PSS")
-            .field("blind", &self.blinded)
+            .field("blinded", &self.blinded)
+            .field("digest", &"...")
             .field("salt_len", &self.salt_len)
-            .finish_non_exhaustive()
+            .finish()
     }
 }
 

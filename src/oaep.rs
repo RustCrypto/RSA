@@ -159,8 +159,10 @@ impl PaddingScheme for Oaep {
 impl fmt::Debug for Oaep {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("OAEP")
+            .field("digest", &"...")
+            .field("mgf_digest", &"...")
             .field("label", &self.label)
-            .finish_non_exhaustive()
+            .finish()
     }
 }
 
