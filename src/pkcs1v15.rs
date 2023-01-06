@@ -24,7 +24,95 @@ use zeroize::Zeroizing;
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::key::{self, PrivateKey, PublicKey};
+use crate::padding::{PaddingScheme, SignatureScheme};
 use crate::{RsaPrivateKey, RsaPublicKey};
+
+/// Encryption using PKCS#1 v1.5 padding.
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct Pkcs1v15Encrypt;
+
+impl PaddingScheme for Pkcs1v15Encrypt {
+    fn decrypt(
+        self,
+        rng: Option<&mut impl CryptoRngCore>,
+        priv_key: &impl PrivateKey,
+        ciphertext: &[u8],
+    ) -> Result<Vec<u8>> {
+        decrypt(rng, priv_key, ciphertext)
+    }
+
+    fn encrypt(
+        self,
+        rng: &mut impl CryptoRngCore,
+        pub_key: &impl PublicKey,
+        msg: &[u8],
+    ) -> Result<Vec<u8>> {
+        encrypt(rng, pub_key, msg)
+    }
+}
+
+/// Digital signatures using PKCS#1 v1.5 padding.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Pkcs1v15Sign {
+    /// Length of hash to use.
+    pub hash_len: Option<usize>,
+
+    /// Prefix.
+    pub prefix: Box<[u8]>,
+}
+
+impl Pkcs1v15Sign {
+    /// Create new PKCS#1 v1.5 padding for the given digest.
+    ///
+    /// The digest must have an [`AssociatedOid`]. Make sure to enable the `oid`
+    /// feature of the relevant digest crate.
+    pub fn new<D>() -> Self
+    where
+        D: Digest + AssociatedOid,
+    {
+        Self {
+            hash_len: Some(<D as Digest>::output_size()),
+            prefix: generate_prefix::<D>().into_boxed_slice(),
+        }
+    }
+
+    /// Create new PKCS#1 v1.5 padding for computing a raw signature.
+    ///
+    /// This sets `hash_len` to `None` and uses an empty `prefix`.
+    pub fn new_raw() -> Self {
+        Self {
+            hash_len: None,
+            prefix: Box::new([]),
+        }
+    }
+}
+
+impl SignatureScheme for Pkcs1v15Sign {
+    fn sign(
+        self,
+        rng: Option<&mut impl CryptoRngCore>,
+        priv_key: &impl PrivateKey,
+        hashed: &[u8],
+    ) -> Result<Vec<u8>> {
+        if let Some(hash_len) = self.hash_len {
+            if hashed.len() != hash_len {
+                return Err(Error::InputNotHashed);
+            }
+        }
+
+        sign(rng, priv_key, &self.prefix, hashed)
+    }
+
+    fn verify(self, pub_key: &impl PublicKey, hashed: &[u8], sig: &[u8]) -> Result<()> {
+        if let Some(hash_len) = self.hash_len {
+            if hashed.len() != hash_len {
+                return Err(Error::InputNotHashed);
+            }
+        }
+
+        verify(pub_key, self.prefix.as_ref(), hashed, sig)
+    }
+}
 
 /// PKCS#1 v1.5 signatures as described in [RFC8017 § 8.2].
 ///
@@ -44,10 +132,10 @@ impl From<Box<[u8]>> for Signature {
     }
 }
 
-impl<'a> TryFrom<&'a [u8]> for Signature {
+impl TryFrom<&[u8]> for Signature {
     type Error = signature::Error;
 
-    fn try_from(bytes: &'a [u8]) -> signature::Result<Self> {
+    fn try_from(bytes: &[u8]) -> signature::Result<Self> {
         Ok(Self {
             bytes: bytes.into(),
         })
@@ -629,7 +717,7 @@ mod tests {
     use sha3::Sha3_256;
     use signature::{RandomizedSigner, Signer, Verifier};
 
-    use crate::{PaddingScheme, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+    use crate::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 
     #[test]
     fn test_non_zero_bytes() {
@@ -686,10 +774,7 @@ mod tests {
 
         for test in &tests {
             let out = priv_key
-                .decrypt(
-                    PaddingScheme::new_pkcs1v15_encrypt(),
-                    &Base64::decode_vec(test[0]).unwrap(),
-                )
+                .decrypt(Pkcs1v15Encrypt, &Base64::decode_vec(test[0]).unwrap())
                 .unwrap();
             assert_eq!(out, test[1].as_bytes());
         }
@@ -734,19 +819,13 @@ mod tests {
         for (text, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
 
-            let out = priv_key
-                .sign(PaddingScheme::new_pkcs1v15_sign::<Sha1>(), &digest)
-                .unwrap();
+            let out = priv_key.sign(Pkcs1v15Sign::new::<Sha1>(), &digest).unwrap();
             assert_ne!(out, digest);
             assert_eq!(out, expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
             let out2 = priv_key
-                .sign_blinded(
-                    &mut rng,
-                    PaddingScheme::new_pkcs1v15_sign::<Sha1>(),
-                    &digest,
-                )
+                .sign_with_rng(&mut rng, Pkcs1v15Sign::new::<Sha1>(), &digest)
                 .unwrap();
             assert_eq!(out2, expected);
         }
@@ -885,7 +964,7 @@ mod tests {
         for (text, sig, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
 
-            let result = pub_key.verify(PaddingScheme::new_pkcs1v15_sign::<Sha1>(), &digest, sig);
+            let result = pub_key.verify(Pkcs1v15Sign::new::<Sha1>(), &digest, sig);
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -978,14 +1057,12 @@ mod tests {
         let expected_sig = Base64::decode_vec("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
         let priv_key = get_private_key();
 
-        let sig = priv_key
-            .sign(PaddingScheme::new_pkcs1v15_sign_raw(), msg)
-            .unwrap();
+        let sig = priv_key.sign(Pkcs1v15Sign::new_raw(), msg).unwrap();
         assert_eq!(expected_sig, sig);
 
         let pub_key: RsaPublicKey = priv_key.into();
         pub_key
-            .verify(PaddingScheme::new_pkcs1v15_sign_raw(), msg, &sig)
+            .verify(Pkcs1v15Sign::new_raw(), msg, &sig)
             .expect("failed to verify");
     }
 

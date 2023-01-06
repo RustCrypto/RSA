@@ -6,7 +6,7 @@ use base64ct::{Base64, Encoding};
 use num_bigint::BigUint;
 use num_traits::{FromPrimitive, Num};
 use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
-use rsa::{PaddingScheme, RsaPrivateKey};
+use rsa::{Pkcs1v15Encrypt, Pkcs1v15Sign, RsaPrivateKey};
 use sha2::{Digest, Sha256};
 use test::Bencher;
 
@@ -31,9 +31,7 @@ fn bench_rsa_2048_pkcsv1_decrypt(b: &mut Bencher) {
     let x = Base64::decode_vec(DECRYPT_VAL).unwrap();
 
     b.iter(|| {
-        let res = priv_key
-            .decrypt(PaddingScheme::new_pkcs1v15_encrypt(), &x)
-            .unwrap();
+        let res = priv_key.decrypt(Pkcs1v15Encrypt, &x).unwrap();
         test::black_box(res);
     });
 }
@@ -46,11 +44,7 @@ fn bench_rsa_2048_pkcsv1_sign_blinded(b: &mut Bencher) {
 
     b.iter(|| {
         let res = priv_key
-            .sign_blinded(
-                &mut rng,
-                PaddingScheme::new_pkcs1v15_sign::<Sha256>(),
-                &digest,
-            )
+            .sign_with_rng(&mut rng, Pkcs1v15Sign::new::<Sha256>(), &digest)
             .unwrap();
         test::black_box(res);
     });

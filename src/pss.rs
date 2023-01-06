@@ -11,8 +11,8 @@
 
 use alloc::boxed::Box;
 use alloc::vec::Vec;
+use core::fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex};
 
-use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
 use digest::{Digest, DynDigest, FixedOutputReset};
 use pkcs8::{Document, EncodePrivateKey, EncodePublicKey, SecretDocument};
@@ -26,7 +26,93 @@ use subtle::ConstantTimeEq;
 use crate::algorithms::{mgf1_xor, mgf1_xor_digest};
 use crate::errors::{Error, Result};
 use crate::key::{PrivateKey, PublicKey};
+use crate::padding::SignatureScheme;
 use crate::{RsaPrivateKey, RsaPublicKey};
+
+/// Digital signatures using PSS padding.
+pub struct Pss {
+    /// Create blinded signatures.
+    pub blinded: bool,
+
+    /// Digest type to use.
+    pub digest: Box<dyn DynDigest + Send + Sync>,
+
+    /// Salt length.
+    pub salt_len: Option<usize>,
+}
+
+impl Pss {
+    /// New PSS padding for the given digest.
+    pub fn new<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
+        Self {
+            blinded: false,
+            digest: Box::new(T::new()),
+            salt_len: None,
+        }
+    }
+
+    /// New PSS padding for the given digest with a salt value of the given length.
+    pub fn new_with_salt<T: 'static + Digest + DynDigest + Send + Sync>(len: usize) -> Self {
+        Self {
+            blinded: false,
+            digest: Box::new(T::new()),
+            salt_len: Some(len),
+        }
+    }
+
+    /// New PSS padding for blinded signatures the given digest.
+    pub fn new_blinded<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
+        Self {
+            blinded: true,
+            digest: Box::new(T::new()),
+            salt_len: None,
+        }
+    }
+
+    /// New PSS padding for blinded signatures the given digest with a salt value of the given
+    /// length.
+    pub fn new_blinded_with_salt<T: 'static + Digest + DynDigest + Send + Sync>(
+        len: usize,
+    ) -> Self {
+        Self {
+            blinded: true,
+            digest: Box::new(T::new()),
+            salt_len: Some(len),
+        }
+    }
+}
+
+impl SignatureScheme for Pss {
+    fn sign(
+        mut self,
+        rng: Option<&mut impl CryptoRngCore>,
+        priv_key: &impl PrivateKey,
+        hashed: &[u8],
+    ) -> Result<Vec<u8>> {
+        let rng = rng.ok_or(Error::InvalidPaddingScheme)?;
+        sign(
+            rng,
+            self.blinded,
+            priv_key,
+            hashed,
+            self.salt_len,
+            &mut *self.digest,
+        )
+    }
+
+    fn verify(mut self, pub_key: &impl PublicKey, hashed: &[u8], sig: &[u8]) -> Result<()> {
+        verify(pub_key, hashed, sig, &mut *self.digest)
+    }
+}
+
+impl Debug for Pss {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PSS")
+            .field("blind", &self.blinded)
+            .field("salt_len", &self.salt_len)
+            .finish_non_exhaustive()
+    }
+}
 
 /// RSASSA-PSS signatures as described in [RFC8017 § 8.1].
 ///
@@ -46,10 +132,10 @@ impl From<Box<[u8]>> for Signature {
     }
 }
 
-impl<'a> TryFrom<&'a [u8]> for Signature {
+impl TryFrom<&[u8]> for Signature {
     type Error = signature::Error;
 
-    fn try_from(bytes: &'a [u8]) -> signature::Result<Self> {
+    fn try_from(bytes: &[u8]) -> signature::Result<Self> {
         Ok(Self {
             bytes: bytes.into(),
         })
@@ -329,7 +415,7 @@ where
 
     let mut hash = D::new();
 
-    Digest::update(&mut hash, &prefix);
+    Digest::update(&mut hash, prefix);
     Digest::update(&mut hash, m_hash);
     Digest::update(&mut hash, salt);
 
@@ -920,8 +1006,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use crate::pss::{BlindedSigningKey, Signature, SigningKey, VerifyingKey};
-    use crate::{PaddingScheme, PublicKey, RsaPrivateKey, RsaPublicKey};
+    use crate::pss::{BlindedSigningKey, Pss, Signature, SigningKey, VerifyingKey};
+    use crate::{PublicKey, RsaPrivateKey, RsaPublicKey};
 
     use hex_literal::hex;
     use num_bigint::BigUint;
@@ -980,7 +1066,7 @@ mod test {
 
         for (text, sig, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
-            let result = pub_key.verify(PaddingScheme::new_pss::<Sha1>(), &digest, sig);
+            let result = pub_key.verify(Pss::new::<Sha1>(), &digest, sig);
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -1078,11 +1164,11 @@ mod test {
         for test in &tests {
             let digest = Sha1::digest(test.as_bytes()).to_vec();
             let sig = priv_key
-                .sign_with_rng(&mut rng.clone(), PaddingScheme::new_pss::<Sha1>(), &digest)
+                .sign_with_rng(&mut rng.clone(), Pss::new::<Sha1>(), &digest)
                 .expect("failed to sign");
 
             priv_key
-                .verify(PaddingScheme::new_pss::<Sha1>(), &digest, &sig)
+                .verify(Pss::new::<Sha1>(), &digest, &sig)
                 .expect("failed to verify");
         }
     }
@@ -1097,11 +1183,11 @@ mod test {
         for test in &tests {
             let digest = Sha1::digest(test.as_bytes()).to_vec();
             let sig = priv_key
-                .sign_blinded(&mut rng.clone(), PaddingScheme::new_pss::<Sha1>(), &digest)
+                .sign_with_rng(&mut rng.clone(), Pss::new_blinded::<Sha1>(), &digest)
                 .expect("failed to sign");
 
             priv_key
-                .verify(PaddingScheme::new_pss::<Sha1>(), &digest, &sig)
+                .verify(Pss::new::<Sha1>(), &digest, &sig)
                 .expect("failed to verify");
         }
     }

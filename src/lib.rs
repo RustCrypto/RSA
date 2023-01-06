@@ -13,7 +13,7 @@
 //!
 //! ## PKCS#1 v1.5 encryption
 //! ```
-//! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
+//! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
 //!
 //! let mut rng = rand::thread_rng();
 //!
@@ -23,19 +23,17 @@
 //!
 //! // Encrypt
 //! let data = b"hello world";
-//! let padding = PaddingScheme::new_pkcs1v15_encrypt();
-//! let enc_data = public_key.encrypt(&mut rng, padding, &data[..]).expect("failed to encrypt");
+//! let enc_data = public_key.encrypt(&mut rng, Pkcs1v15Encrypt, &data[..]).expect("failed to encrypt");
 //! assert_ne!(&data[..], &enc_data[..]);
 //!
 //! // Decrypt
-//! let padding = PaddingScheme::new_pkcs1v15_encrypt();
-//! let dec_data = private_key.decrypt(padding, &enc_data).expect("failed to decrypt");
+//! let dec_data = private_key.decrypt(Pkcs1v15Encrypt, &enc_data).expect("failed to decrypt");
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
 //!
 //! ## OAEP encryption
 //! ```
-//! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
+//! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, Oaep};
 //!
 //! let mut rng = rand::thread_rng();
 //!
@@ -45,12 +43,12 @@
 //!
 //! // Encrypt
 //! let data = b"hello world";
-//! let padding = PaddingScheme::new_oaep::<sha2::Sha256>();
+//! let padding = Oaep::new::<sha2::Sha256>();
 //! let enc_data = public_key.encrypt(&mut rng, padding, &data[..]).expect("failed to encrypt");
 //! assert_ne!(&data[..], &enc_data[..]);
 //!
 //! // Decrypt
-//! let padding = PaddingScheme::new_oaep::<sha2::Sha256>();
+//! let padding = Oaep::new::<sha2::Sha256>();
 //! let dec_data = private_key.decrypt(padding, &enc_data).expect("failed to decrypt");
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
@@ -227,8 +225,13 @@ mod raw;
 pub use pkcs1;
 pub use pkcs8;
 
-pub use self::key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
-pub use self::padding::PaddingScheme;
+pub use crate::{
+    key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey},
+    oaep::Oaep,
+    padding::{PaddingScheme, SignatureScheme},
+    pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign},
+    pss::Pss,
+};
 
 /// Internal raw RSA functions.
 #[cfg(not(feature = "expose-internals"))]
