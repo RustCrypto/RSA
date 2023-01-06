@@ -188,7 +188,7 @@ impl Display for Signature {
 /// scheme from PKCS#1 v1.5.  The message must be no longer than the
 /// length of the public modulus minus 11 bytes.
 #[inline]
-pub(crate) fn encrypt<R: CryptoRngCore, PK: PublicKey>(
+pub(crate) fn encrypt<R: CryptoRngCore + ?Sized, PK: PublicKey>(
     rng: &mut R,
     pub_key: &PK,
     msg: &[u8],
@@ -220,7 +220,7 @@ pub(crate) fn encrypt<R: CryptoRngCore, PK: PublicKey>(
 /// forge signatures as if they had the private key. See
 /// `decrypt_session_key` for a way of solving this problem.
 #[inline]
-pub(crate) fn decrypt<R: CryptoRngCore, SK: PrivateKey>(
+pub(crate) fn decrypt<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
@@ -337,7 +337,7 @@ where
 /// in order to maintain constant memory access patterns. If the plaintext was
 /// valid then index contains the index of the original message in em.
 #[inline]
-fn decrypt_inner<R: CryptoRngCore, SK: PrivateKey>(
+fn decrypt_inner<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
@@ -382,7 +382,7 @@ fn decrypt_inner<R: CryptoRngCore, SK: PrivateKey>(
 /// Fills the provided slice with random values, which are guaranteed
 /// to not be zero.
 #[inline]
-fn non_zero_random_bytes<R: CryptoRngCore>(rng: &mut R, data: &mut [u8]) {
+fn non_zero_random_bytes<R: CryptoRngCore + ?Sized>(rng: &mut R, data: &mut [u8]) {
     rng.fill_bytes(data);
 
     for el in data {

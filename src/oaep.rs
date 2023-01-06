@@ -174,7 +174,7 @@ impl fmt::Debug for Oaep {
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-pub fn encrypt<R: CryptoRngCore, K: PublicKey>(
+pub fn encrypt<R: CryptoRngCore + ?Sized, K: PublicKey>(
     rng: &mut R,
     pub_key: &K,
     msg: &[u8],
@@ -231,7 +231,7 @@ pub fn encrypt<R: CryptoRngCore, K: PublicKey>(
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-pub fn decrypt<R: CryptoRngCore, SK: PrivateKey>(
+pub fn decrypt<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
@@ -255,7 +255,7 @@ pub fn decrypt<R: CryptoRngCore, SK: PrivateKey>(
 /// `rng` is given. It returns one or zero in valid that indicates whether the
 /// plaintext was correctly structured.
 #[inline]
-fn decrypt_inner<R: CryptoRngCore, SK: PrivateKey>(
+fn decrypt_inner<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
