@@ -420,9 +420,9 @@ impl<D> RandomizedSigner<Signature> for SigningKey<D>
 where
     D: Digest,
 {
-    fn try_sign_with_rng<R: CryptoRngCore + ?Sized>(
+    fn try_sign_with_rng(
         &self,
-        rng: &mut R,
+        rng: &mut impl CryptoRngCore,
         msg: &[u8],
     ) -> signature::Result<Signature> {
         sign(Some(rng), &self.inner, &self.prefix, &D::digest(msg))
@@ -446,9 +446,9 @@ impl<D> RandomizedDigestSigner<D, Signature> for SigningKey<D>
 where
     D: Digest,
 {
-    fn try_sign_digest_with_rng<R: CryptoRngCore + ?Sized>(
+    fn try_sign_digest_with_rng(
         &self,
-        rng: &mut R,
+        rng: &mut impl CryptoRngCore,
         digest: D,
     ) -> signature::Result<Signature> {
         sign(Some(rng), &self.inner, &self.prefix, &digest.finalize())
