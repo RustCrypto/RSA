@@ -13,9 +13,8 @@ use crate::algorithms::{generate_multi_prime_key, generate_multi_prime_key_with_
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 
-use crate::padding::PaddingScheme;
+use crate::padding::{PaddingScheme, SignatureScheme};
 use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
-use crate::{oaep, pkcs1v15, pss};
 
 /// Components of an RSA public key.
 pub trait PublicKeyParts {
@@ -173,18 +172,20 @@ impl From<&RsaPrivateKey> for RsaPublicKey {
 /// Generic trait for operations on a public key.
 pub trait PublicKey: EncryptionPrimitive + PublicKeyParts {
     /// Encrypt the given message.
-    fn encrypt<R: CryptoRngCore>(
+    fn encrypt<R: CryptoRngCore, P: PaddingScheme>(
         &self,
         rng: &mut R,
-        padding: PaddingScheme,
+        padding: P,
         msg: &[u8],
     ) -> Result<Vec<u8>>;
 
     /// Verify a signed message.
-    /// `hashed`must be the result of hashing the input using the hashing function
+    ///
+    /// `hashed` must be the result of hashing the input using the hashing function
     /// passed in through `hash`.
-    /// If the message is valid `Ok(())` is returned, otherwiese an `Err` indicating failure.
-    fn verify(&self, padding: PaddingScheme, hashed: &[u8], sig: &[u8]) -> Result<()>;
+    ///
+    /// If the message is valid `Ok(())` is returned, otherwise an `Err` indicating failure.
+    fn verify<S: SignatureScheme>(&self, scheme: S, hashed: &[u8], sig: &[u8]) -> Result<()>;
 }
 
 impl PublicKeyParts for RsaPublicKey {
@@ -198,36 +199,17 @@ impl PublicKeyParts for RsaPublicKey {
 }
 
 impl PublicKey for RsaPublicKey {
-    fn encrypt<R: CryptoRngCore>(
+    fn encrypt<R: CryptoRngCore, P: PaddingScheme>(
         &self,
         rng: &mut R,
-        padding: PaddingScheme,
+        padding: P,
         msg: &[u8],
     ) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PKCS1v15Encrypt => pkcs1v15::encrypt(rng, self, msg),
-            PaddingScheme::OAEP {
-                mut digest,
-                mut mgf_digest,
-                label,
-            } => oaep::encrypt(rng, self, msg, &mut *digest, &mut *mgf_digest, label),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
+        padding.encrypt(rng, self, msg)
     }
 
-    fn verify(&self, padding: PaddingScheme, hashed: &[u8], sig: &[u8]) -> Result<()> {
-        match padding {
-            PaddingScheme::PKCS1v15Sign { hash_len, prefix } => {
-                if let Some(hash_len) = hash_len {
-                    if hashed.len() != hash_len {
-                        return Err(Error::InputNotHashed);
-                    }
-                }
-                pkcs1v15::verify(self, prefix.as_ref(), hashed, sig)
-            }
-            PaddingScheme::PSS { mut digest, .. } => pss::verify(self, hashed, sig, &mut *digest),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
+    fn verify<S: SignatureScheme>(&self, scheme: S, hashed: &[u8], sig: &[u8]) -> Result<()> {
+        scheme.verify(self, hashed, sig)
     }
 }
 
@@ -448,113 +430,44 @@ impl RsaPrivateKey {
     }
 
     /// Decrypt the given message.
-    pub fn decrypt(&self, padding: PaddingScheme, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        match padding {
-            // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
-            PaddingScheme::PKCS1v15Encrypt => {
-                pkcs1v15::decrypt::<DummyRng, _>(None, self, ciphertext)
-            }
-            PaddingScheme::OAEP {
-                mut digest,
-                mut mgf_digest,
-                label,
-            } => oaep::decrypt::<DummyRng, _>(
-                None,
-                self,
-                ciphertext,
-                &mut *digest,
-                &mut *mgf_digest,
-                label,
-            ),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
+    pub fn decrypt<P: PaddingScheme>(&self, padding: P, ciphertext: &[u8]) -> Result<Vec<u8>> {
+        padding.decrypt(Option::<&mut DummyRng>::None, self, ciphertext)
     }
 
     /// Decrypt the given message.
     ///
     /// Uses `rng` to blind the decryption process.
-    pub fn decrypt_blinded<R: CryptoRngCore>(
+    pub fn decrypt_blinded<R: CryptoRngCore, P: PaddingScheme>(
         &self,
         rng: &mut R,
-        padding: PaddingScheme,
+        padding: P,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PKCS1v15Encrypt => pkcs1v15::decrypt(Some(rng), self, ciphertext),
-            PaddingScheme::OAEP {
-                mut digest,
-                mut mgf_digest,
-                label,
-            } => oaep::decrypt(
-                Some(rng),
-                self,
-                ciphertext,
-                &mut *digest,
-                &mut *mgf_digest,
-                label,
-            ),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
+        padding.decrypt(Some(rng), self, ciphertext)
     }
 
     /// Sign the given digest.
-    pub fn sign(&self, padding: PaddingScheme, digest_in: &[u8]) -> Result<Vec<u8>> {
-        match padding {
-            // need to pass any Rng as the type arg, so the type checker is happy, it is not actually used for anything
-            PaddingScheme::PKCS1v15Sign { hash_len, prefix } => {
-                if let Some(hash_len) = hash_len {
-                    if digest_in.len() != hash_len {
-                        return Err(Error::InputNotHashed);
-                    }
-                }
-                pkcs1v15::sign::<DummyRng, _>(None, self, prefix.as_ref(), digest_in)
-            }
-            _ => Err(Error::InvalidPaddingScheme),
-        }
+    pub fn sign<S: SignatureScheme>(&self, padding: S, digest_in: &[u8]) -> Result<Vec<u8>> {
+        padding.sign(Option::<&mut DummyRng>::None, self, digest_in)
     }
 
-    /// Sign the given digest using the provided rng
+    /// Sign the given digest using the provided `rng`, which is used in the
+    /// following ways depending on the [`SignatureScheme`]:
     ///
-    /// Use `rng` for signature process.
-    pub fn sign_with_rng<R: CryptoRngCore>(
+    /// - [`Pkcs1v15Sign`][`crate::Pkcs1v15Sign`] padding: uses the RNG
+    ///   to mask the private key operation with random blinding, which helps
+    ///   mitigate sidechannel attacks.
+    /// - [`Pss`][`crate::Pss`] always requires randomness. Use
+    ///   [`Pss::new`][`crate::Pss::new`] for a standard RSASSA-PSS signature, or
+    ///   [`Pss::new_blinded`][`crate::Pss::new_blinded`] for RSA-BSSA blind
+    ///   signatures.
+    pub fn sign_with_rng<R: CryptoRngCore, S: SignatureScheme>(
         &self,
         rng: &mut R,
-        padding: PaddingScheme,
+        padding: S,
         digest_in: &[u8],
     ) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PSS {
-                mut digest,
-                salt_len,
-            } => pss::sign::<R, _>(rng, false, self, digest_in, salt_len, &mut *digest),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
-    }
-
-    /// Sign the given digest.
-    ///
-    /// Use `rng` for blinding.
-    pub fn sign_blinded<R: CryptoRngCore>(
-        &self,
-        rng: &mut R,
-        padding: PaddingScheme,
-        digest_in: &[u8],
-    ) -> Result<Vec<u8>> {
-        match padding {
-            PaddingScheme::PKCS1v15Sign { hash_len, prefix } => {
-                if let Some(hash_len) = hash_len {
-                    if digest_in.len() != hash_len {
-                        return Err(Error::InputNotHashed);
-                    }
-                }
-                pkcs1v15::sign(Some(rng), self, prefix.as_ref(), digest_in)
-            }
-            PaddingScheme::PSS {
-                mut digest,
-                salt_len,
-            } => pss::sign::<R, _>(rng, true, self, digest_in, salt_len, &mut *digest),
-            _ => Err(Error::InvalidPaddingScheme),
-        }
+        padding.sign(Some(rng), self, digest_in)
     }
 }
 
@@ -591,6 +504,7 @@ fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize)
 mod tests {
     use super::*;
     use crate::internals;
+    use crate::oaep::Oaep;
 
     use alloc::string::String;
     use digest::{Digest, DynDigest};
@@ -965,10 +879,10 @@ mod tests {
             let pub_key: RsaPublicKey = prk.into();
 
             let ciphertext = if let Some(ref label) = label {
-                let padding = PaddingScheme::new_oaep_with_label::<D, _>(label);
+                let padding = Oaep::new_with_label::<D, _>(label);
                 pub_key.encrypt(&mut rng, padding, &input).unwrap()
             } else {
-                let padding = PaddingScheme::new_oaep::<D>();
+                let padding = Oaep::new::<D>();
                 pub_key.encrypt(&mut rng, padding, &input).unwrap()
             };
 
@@ -976,9 +890,9 @@ mod tests {
             let blind: bool = rng.next_u32() < (1 << 31);
 
             let padding = if let Some(ref label) = label {
-                PaddingScheme::new_oaep_with_label::<D, _>(label)
+                Oaep::new_with_label::<D, _>(label)
             } else {
-                PaddingScheme::new_oaep::<D>()
+                Oaep::new::<D>()
             };
 
             let plaintext = if blind {
@@ -1013,10 +927,10 @@ mod tests {
             let pub_key: RsaPublicKey = prk.into();
 
             let ciphertext = if let Some(ref label) = label {
-                let padding = PaddingScheme::new_oaep_with_mgf_hash_with_label::<D, U, _>(label);
+                let padding = Oaep::new_with_mgf_hash_and_label::<D, U, _>(label);
                 pub_key.encrypt(&mut rng, padding, &input).unwrap()
             } else {
-                let padding = PaddingScheme::new_oaep_with_mgf_hash::<D, U>();
+                let padding = Oaep::new_with_mgf_hash::<D, U>();
                 pub_key.encrypt(&mut rng, padding, &input).unwrap()
             };
 
@@ -1024,9 +938,9 @@ mod tests {
             let blind: bool = rng.next_u32() < (1 << 31);
 
             let padding = if let Some(ref label) = label {
-                PaddingScheme::new_oaep_with_mgf_hash_with_label::<D, U, _>(label)
+                Oaep::new_with_mgf_hash_and_label::<D, U, _>(label)
             } else {
-                PaddingScheme::new_oaep_with_mgf_hash::<D, U>()
+                Oaep::new_with_mgf_hash::<D, U>()
             };
 
             let plaintext = if blind {
@@ -1044,17 +958,13 @@ mod tests {
         let priv_key = get_private_key();
         let pub_key: RsaPublicKey = (&priv_key).into();
         let ciphertext = pub_key
-            .encrypt(
-                &mut rng,
-                PaddingScheme::new_oaep::<Sha1>(),
-                "a_plain_text".as_bytes(),
-            )
+            .encrypt(&mut rng, Oaep::new::<Sha1>(), "a_plain_text".as_bytes())
             .unwrap();
         assert!(
             priv_key
                 .decrypt_blinded(
                     &mut rng,
-                    PaddingScheme::new_oaep_with_label::<Sha1, _>("label"),
+                    Oaep::new_with_label::<Sha1, _>("label"),
                     &ciphertext,
                 )
                 .is_err(),
