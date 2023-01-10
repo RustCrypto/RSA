@@ -172,10 +172,10 @@ impl From<&RsaPrivateKey> for RsaPublicKey {
 /// Generic trait for operations on a public key.
 pub trait PublicKey: EncryptionPrimitive + PublicKeyParts {
     /// Encrypt the given message.
-    fn encrypt(
+    fn encrypt<R: CryptoRngCore, P: PaddingScheme>(
         &self,
-        rng: &mut impl CryptoRngCore,
-        padding: impl PaddingScheme,
+        rng: &mut R,
+        padding: P,
         msg: &[u8],
     ) -> Result<Vec<u8>>;
 
@@ -185,7 +185,7 @@ pub trait PublicKey: EncryptionPrimitive + PublicKeyParts {
     /// passed in through `hash`.
     ///
     /// If the message is valid `Ok(())` is returned, otherwise an `Err` indicating failure.
-    fn verify(&self, padding: impl SignatureScheme, hashed: &[u8], sig: &[u8]) -> Result<()>;
+    fn verify<S: SignatureScheme>(&self, scheme: S, hashed: &[u8], sig: &[u8]) -> Result<()>;
 }
 
 impl PublicKeyParts for RsaPublicKey {
@@ -199,17 +199,17 @@ impl PublicKeyParts for RsaPublicKey {
 }
 
 impl PublicKey for RsaPublicKey {
-    fn encrypt(
+    fn encrypt<R: CryptoRngCore, P: PaddingScheme>(
         &self,
-        rng: &mut impl CryptoRngCore,
-        padding: impl PaddingScheme,
+        rng: &mut R,
+        padding: P,
         msg: &[u8],
     ) -> Result<Vec<u8>> {
         padding.encrypt(rng, self, msg)
     }
 
-    fn verify(&self, padding: impl SignatureScheme, hashed: &[u8], sig: &[u8]) -> Result<()> {
-        padding.verify(self, hashed, sig)
+    fn verify<S: SignatureScheme>(&self, scheme: S, hashed: &[u8], sig: &[u8]) -> Result<()> {
+        scheme.verify(self, hashed, sig)
     }
 }
 
@@ -430,34 +430,34 @@ impl RsaPrivateKey {
     }
 
     /// Decrypt the given message.
-    pub fn decrypt(&self, padding: impl PaddingScheme, ciphertext: &[u8]) -> Result<Vec<u8>> {
+    pub fn decrypt<P: PaddingScheme>(&self, padding: P, ciphertext: &[u8]) -> Result<Vec<u8>> {
         padding.decrypt(Option::<&mut DummyRng>::None, self, ciphertext)
     }
 
     /// Decrypt the given message.
     ///
     /// Uses `rng` to blind the decryption process.
-    pub fn decrypt_blinded(
+    pub fn decrypt_blinded<R: CryptoRngCore, P: PaddingScheme>(
         &self,
-        rng: &mut impl CryptoRngCore,
-        padding: impl PaddingScheme,
+        rng: &mut R,
+        padding: P,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
         padding.decrypt(Some(rng), self, ciphertext)
     }
 
     /// Sign the given digest.
-    pub fn sign(&self, padding: impl SignatureScheme, digest_in: &[u8]) -> Result<Vec<u8>> {
+    pub fn sign<S: SignatureScheme>(&self, padding: S, digest_in: &[u8]) -> Result<Vec<u8>> {
         padding.sign(Option::<&mut DummyRng>::None, self, digest_in)
     }
 
     /// Sign the given digest using the provided rng
     ///
     /// Use `rng` for signature process.
-    pub fn sign_with_rng(
+    pub fn sign_with_rng<R: CryptoRngCore, S: SignatureScheme>(
         &self,
-        rng: &mut impl CryptoRngCore,
-        padding: impl SignatureScheme,
+        rng: &mut R,
+        padding: S,
         digest_in: &[u8],
     ) -> Result<Vec<u8>> {
         padding.sign(Some(rng), self, digest_in)
