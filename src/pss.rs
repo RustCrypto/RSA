@@ -60,7 +60,7 @@ impl Pss {
         }
     }
 
-    /// New PSS padding for blinded signatures the given digest.
+    /// New PSS padding for blinded signatures (RSA-BSSA) for the given digest.
     pub fn new_blinded<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
         Self {
             blinded: true,
@@ -69,8 +69,8 @@ impl Pss {
         }
     }
 
-    /// New PSS padding for blinded signatures the given digest with a salt value of the given
-    /// length.
+    /// New PSS padding for blinded signatures (RSA-BSSA) for the given digest
+    /// with a salt value of the given length.
     pub fn new_blinded_with_salt<T: 'static + Digest + DynDigest + Send + Sync>(
         len: usize,
     ) -> Self {

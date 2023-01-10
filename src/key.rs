@@ -451,9 +451,16 @@ impl RsaPrivateKey {
         padding.sign(Option::<&mut DummyRng>::None, self, digest_in)
     }
 
-    /// Sign the given digest using the provided rng
+    /// Sign the given digest using the provided `rng`, which is used in the
+    /// following ways depending on the [`SignatureScheme`]:
     ///
-    /// Use `rng` for signature process.
+    /// - [`Pkcs1v15Sign`][`crate::Pkcs1v15Sign`] padding: uses the RNG
+    ///   to mask the private key operation with random blinding, which helps
+    ///   mitigate sidechannel attacks.
+    /// - [`Pss`][`crate::Pss`] always requires randomness. Use
+    ///   [`Pss::new`][`crate::Pss::new`] for a standard RSASSA-PSS signature, or
+    ///   [`Pss::new_blinded`][`crate::Pss::new_blinded`] for RSA-BSSA blind
+    ///   signatures.
     pub fn sign_with_rng<R: CryptoRngCore, S: SignatureScheme>(
         &self,
         rng: &mut R,
