@@ -23,7 +23,7 @@ subtle = { version = "2.1.1", default-features = false }
 digest = { version = "0.10.5", default-features = false, features = ["alloc", "oid"] }
 pkcs1 = { version = "0.4", default-features = false, features = ["pkcs8", "alloc"] }
 pkcs8 = { version = "0.9", default-features = false, features = ["alloc"] }
-signature = { version = "2.0.0-rc.1", default-features = false , features = ["digest-preview", "rand-preview"] }
+signature = { version = "2", default-features = false , features = ["digest", "rand_core"] }
 zeroize = { version = "1", features = ["alloc"] }
 
 [dependencies.serde_crate]
