@@ -10,7 +10,7 @@ repository = "https://github.com/RustCrypto/RSA"
 keywords = ["rsa", "encryption", "security", "crypto"]
 categories = ["cryptography"]
 readme = "README.md"
-rust-version = "1.57"
+rust-version = "1.60"
 
 [dependencies]
 num-bigint = { version = "0.8.2", features = ["i128", "u64_digit", "prime", "zeroize"], default-features = false, package = "num-bigint-dig" }
@@ -25,13 +25,7 @@ pkcs1 = { version = "0.4", default-features = false, features = ["pkcs8", "alloc
 pkcs8 = { version = "0.9", default-features = false, features = ["alloc"] }
 signature = { version = "2", default-features = false , features = ["digest", "rand_core"] }
 zeroize = { version = "1", features = ["alloc"] }
-
-[dependencies.serde_crate]
-package = "serde"
-optional = true
-version = "1.0.103"
-default-features = false
-features = ["derive"]
+serde = { version = "1.0.103", optional = true, default-features = false, features = ["derive"] }
 
 [dev-dependencies]
 base64ct = { version = "1", features = ["alloc"] }
@@ -51,7 +45,7 @@ name = "key"
 [features]
 default = ["std", "pem"]
 nightly = ["num-bigint/nightly"]
-serde = ["num-bigint/serde", "serde_crate"]
+serde = ["dep:serde", "num-bigint/serde"]
 expose-internals = []
 std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std", "signature/std"]
 pem = ["pkcs1/pem", "pkcs8/pem"]
