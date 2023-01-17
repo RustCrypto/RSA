@@ -4,15 +4,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.8.0-pre.0 (2022-12-17)
-### Added
-- Fix benches (#225)
-
+## 0.8.0 (2022-12-17)
 ### Changed
-- Switched to signature trait v2.0.0-pre development versions (#217)
+- Bump `signature` crate dependency to v2 ([#217], [#249])
+- Switch to `CryptoRngCore` marker trait ([#237])
+- Make `padding` module private ([#243])
+- Refactor `PaddingScheme` into a trait ([#244])
 
-[#225]: https://github.com/RustCrypto/RSA/pull/225
+### Fixed
+- Benchmark build ([#225])
+
 [#217]: https://github.com/RustCrypto/RSA/pull/217
+[#225]: https://github.com/RustCrypto/RSA/pull/225
+[#237]: https://github.com/RustCrypto/RSA/pull/237
+[#243]: https://github.com/RustCrypto/RSA/pull/243
+[#244]: https://github.com/RustCrypto/RSA/pull/244
+[#249]: https://github.com/RustCrypto/RSA/pull/249
 
 ## 0.7.2 (2022-11-14)
 ### Added
