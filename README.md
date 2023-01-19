@@ -3,7 +3,7 @@
 [![crates.io][crate-image]][crate-link]
 [![Documentation][doc-image]][doc-link]
 [![Build Status][build-image]][build-link]
-![MSRV][msrv-image]
+![minimum rustc 1.57][msrv-image]
 [![Project Chat][chat-image]][chat-link]
 [![dependency status][deps-image]][deps-link]
 
@@ -70,7 +70,7 @@ There will be three phases before `1.0` 🚢 can be released.
 
 ## Minimum Supported Rust Version (MSRV)
 
-All crates in this repository support Rust 1.60 or higher. In future
+All crates in this repository support Rust 1.57 or higher. In future
 minimally supported version of Rust can be changed, but it will be done with
 a minor version bump.
 
@@ -97,7 +97,7 @@ dual licensed as above, without any additional terms or conditions.
 [doc-link]: https://docs.rs/rsa
 [build-image]: https://github.com/rustcrypto/RSA/workflows/CI/badge.svg
 [build-link]: https://github.com/RustCrypto/RSA/actions?query=workflow%3ACI+branch%3Amaster
-[msrv-image]: https://img.shields.io/badge/rustc-1.60+-blue.svg
+[msrv-image]: https://img.shields.io/badge/rustc-1.57+-blue.svg
 [chat-image]: https://img.shields.io/badge/zulip-join_chat-blue.svg
 [chat-link]: https://rustcrypto.zulipchat.com/#narrow/stream/260047-RSA
 [deps-image]: https://deps.rs/repo/github/RustCrypto/RSA/status.svg
