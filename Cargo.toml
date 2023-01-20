@@ -26,6 +26,12 @@ pkcs8 = { version = "0.9", default-features = false, features = ["alloc"] }
 signature = { version = "2", default-features = false , features = ["digest", "rand_core"] }
 zeroize = { version = "1", features = ["alloc"] }
 
+[dependencies.sha2]
+version = "0.10.6"
+optional = true
+default-features = false
+features = ["oid"]
+
 [dependencies.serde_crate]
 package = "serde"
 optional = true
@@ -59,7 +65,7 @@ pkcs5 = ["pkcs8/encryption"]
 getrandom = ["rand_core/getrandom"]
 
 [package.metadata.docs.rs]
-features = ["std", "pem", "serde", "expose-internals"]
+features = ["std", "pem", "serde", "expose-internals", "sha2"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.dev]
