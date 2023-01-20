@@ -412,7 +412,11 @@ impl<D> SigningKey<D>
 where
     D: Digest,
 {
-    /// Create a new signing key from the give RSA private key.
+    /// Create a new signing key from the give RSA private key with an empty prefix.
+    ///
+    /// ## Note: unprefixed signatures are uncommon
+    ///
+    /// In most cases you'll want to use [`SigningKey::new_with_prefix`].
     pub fn new(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
@@ -587,7 +591,11 @@ impl<D> VerifyingKey<D>
 where
     D: Digest,
 {
-    /// Create a new verifying key from an RSA public key.
+    /// Create a new verifying key from an RSA public key with an empty prefix.
+    ///
+    /// ## Note: unprefixed signatures are uncommon
+    ///
+    /// In most cases you'll want to use [`SigningKey::new_with_prefix`].
     pub fn new(key: RsaPublicKey) -> Self {
         Self {
             inner: key,

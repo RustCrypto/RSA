@@ -54,11 +54,15 @@
 //! ```
 //!
 //! ## PKCS#1 v1.5 signatures
-//! ```
+//!
+//! Note: requires `sha2` feature of `rsa` crate is enabled.
+//!
+#![cfg_attr(feature = "sha2", doc = "```")]
+#![cfg_attr(not(feature = "sha2"), doc = "```ignore")]
 //! use rsa::RsaPrivateKey;
 //! use rsa::pkcs1v15::{SigningKey, VerifyingKey};
 //! use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier};
-//! use sha2::{Digest, Sha256};
+//! use rsa::sha2::{Digest, Sha256};
 //!
 //! let mut rng = rand::thread_rng();
 //!
@@ -224,6 +228,8 @@ mod raw;
 
 pub use pkcs1;
 pub use pkcs8;
+#[cfg(feature = "sha2")]
+pub use sha2;
 
 pub use crate::{
     key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey},
