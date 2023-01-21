@@ -81,11 +81,15 @@
 //! ```
 //!
 //! ## PSS signatures
-//! ```
+//!
+//! Note: requires `sha2` feature of `rsa` crate is enabled.
+//!
+#![cfg_attr(feature = "sha2", doc = "```")]
+#![cfg_attr(not(feature = "sha2"), doc = "```ignore")]
 //! use rsa::RsaPrivateKey;
 //! use rsa::pss::{BlindedSigningKey, VerifyingKey};
 //! use rsa::signature::{Keypair,RandomizedSigner, SignatureEncoding, Verifier};
-//! use sha2::{Digest, Sha256};
+//! use rsa::sha2::{Digest, Sha256};
 //!
 //! let mut rng = rand::thread_rng();
 //!
