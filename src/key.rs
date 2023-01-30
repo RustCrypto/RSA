@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::algorithms::generate::generate_multi_prime_key_with_exp;
+use crate::algorithms::rsa::recover_primes;
+
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::traits::{PaddingScheme, PrivateKeyParts, PublicKeyParts, SignatureScheme};
@@ -232,12 +234,17 @@ impl RsaPrivateKey {
         n: BigUint,
         e: BigUint,
         d: BigUint,
-        primes: Vec<BigUint>,
+        mut primes: Vec<BigUint>,
     ) -> Result<RsaPrivateKey> {
-        // TODO(tarcieri): support recovering `p` and `q` from `d` if `primes` is empty
-        // See method in Appendix C: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br1.pdf
         if primes.len() < 2 {
-            return Err(Error::NprimesTooSmall);
+            if !primes.is_empty() {
+                return Err(Error::NprimesTooSmall);
+            }
+            // Recover `p` and `q` from `d`.
+            // See method in Appendix C: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br1.pdf
+            let (p, q) = recover_primes(&n, &e, &d)?;
+            primes.push(p);
+            primes.push(q);
         }
 
         let mut k = RsaPrivateKey {
