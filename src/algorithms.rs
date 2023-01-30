@@ -250,7 +250,6 @@ pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint,
                 let g = (g - &one) % n;
                 let p = n.gcd(&g);
                 let q = n / &p;
-                std::println!("count: {}", count);
                 return Ok((p, q));
             } else if g_next == n_min1 {
                 continue;
