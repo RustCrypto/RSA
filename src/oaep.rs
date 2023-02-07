@@ -1,18 +1,26 @@
+//! Encryption and Decryption using [OAEP padding](https://datatracker.ietf.org/doc/html/rfc8017#section-7.1).
+//!
+//! # Usage
+//!
+//! See [code example in the toplevel rustdoc](../index.html#oaep-encryption).
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
+use core::marker::PhantomData;
 use rand_core::CryptoRngCore;
 
-use digest::{Digest, DynDigest};
+use digest::{Digest, DynDigest, FixedOutputReset};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use zeroize::Zeroizing;
 
-use crate::algorithms::mgf1_xor;
+use crate::algorithms::{mgf1_xor, mgf1_xor_digest};
+use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
-use crate::key::{self, PrivateKey, PublicKey};
+use crate::key::{self, PrivateKey, PublicKey, RsaPrivateKey, RsaPublicKey};
 use crate::padding::PaddingScheme;
+use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 
 // 2**61 -1 (pow is not const yet)
 // TODO: This is the maximum for SHA-1, unclear from the RFC what the values are for other hashing functions.
@@ -166,6 +174,46 @@ impl fmt::Debug for Oaep {
     }
 }
 
+#[inline]
+fn encrypt_internal<
+    'a,
+    R: CryptoRngCore + ?Sized,
+    K: PublicKey,
+    MGF: FnMut(&mut [u8], &mut [u8]) -> (),
+>(
+    rng: &mut R,
+    pub_key: &K,
+    msg: &[u8],
+    p_hash: &[u8],
+    h_size: usize,
+    mut mgf: MGF,
+) -> Result<Vec<u8>> {
+    key::check_public(pub_key)?;
+
+    let k = pub_key.size();
+
+    if msg.len() + 2 * h_size + 2 > k {
+        return Err(Error::MessageTooLong);
+    }
+
+    let mut em = Zeroizing::new(vec![0u8; k]);
+
+    let (_, payload) = em.split_at_mut(1);
+    let (seed, db) = payload.split_at_mut(h_size);
+    rng.fill_bytes(seed);
+
+    // Data block DB =  pHash || PS || 01 || M
+    let db_len = k - h_size - 1;
+
+    db[0..h_size].copy_from_slice(p_hash);
+    db[db_len - msg.len() - 1] = 1;
+    db[db_len - msg.len()..].copy_from_slice(msg);
+
+    mgf(seed, db);
+
+    pub_key.raw_encryption_primitive(&em, pub_key.size())
+}
+
 /// Encrypts the given message with RSA and the padding scheme from
 /// [PKCS#1 OAEP].
 ///
@@ -182,40 +230,55 @@ fn encrypt<R: CryptoRngCore + ?Sized, K: PublicKey>(
     mgf_digest: &mut dyn DynDigest,
     label: Option<String>,
 ) -> Result<Vec<u8>> {
-    key::check_public(pub_key)?;
-
-    let k = pub_key.size();
-
     let h_size = digest.output_size();
-
-    if msg.len() + 2 * h_size + 2 > k {
-        return Err(Error::MessageTooLong);
-    }
 
     let label = label.unwrap_or_default();
     if label.len() as u64 > MAX_LABEL_LEN {
         return Err(Error::LabelTooLong);
     }
 
-    let mut em = Zeroizing::new(vec![0u8; k]);
-
-    let (_, payload) = em.split_at_mut(1);
-    let (seed, db) = payload.split_at_mut(h_size);
-    rng.fill_bytes(seed);
-
-    // Data block DB =  pHash || PS || 01 || M
-    let db_len = k - h_size - 1;
-
     digest.update(label.as_bytes());
     let p_hash = digest.finalize_reset();
-    db[0..h_size].copy_from_slice(&p_hash);
-    db[db_len - msg.len() - 1] = 1;
-    db[db_len - msg.len()..].copy_from_slice(msg);
 
-    mgf1_xor(db, mgf_digest, seed);
-    mgf1_xor(seed, mgf_digest, db);
+    encrypt_internal(rng, pub_key, msg, &p_hash, h_size, |seed, db| {
+        mgf1_xor(db, mgf_digest, seed);
+        mgf1_xor(seed, mgf_digest, db);
+    })
+}
 
-    pub_key.raw_encryption_primitive(&em, pub_key.size())
+/// Encrypts the given message with RSA and the padding scheme from
+/// [PKCS#1 OAEP].
+///
+/// The message must be no longer than the length of the public modulus minus
+/// `2 + (2 * hash.size())`.
+///
+/// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
+#[inline]
+fn encrypt_digest<
+    R: CryptoRngCore + ?Sized,
+    K: PublicKey,
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+>(
+    rng: &mut R,
+    pub_key: &K,
+    msg: &[u8],
+    label: Option<String>,
+) -> Result<Vec<u8>> {
+    let h_size = <D as Digest>::output_size();
+
+    let label = label.unwrap_or_default();
+    if label.len() as u64 > MAX_LABEL_LEN {
+        return Err(Error::LabelTooLong);
+    }
+
+    let p_hash = D::digest(label.as_bytes());
+
+    encrypt_internal(rng, pub_key, msg, &p_hash, h_size, |seed, db| {
+        let mut mgf_digest = MGD::new();
+        mgf1_xor_digest(db, &mut mgf_digest, seed);
+        mgf1_xor_digest(seed, &mut mgf_digest, db);
+    })
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from [PKCS#1 OAEP].
@@ -241,7 +304,84 @@ fn decrypt<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
-    let res = decrypt_inner(rng, priv_key, ciphertext, digest, mgf_digest, label)?;
+    let h_size = digest.output_size();
+
+    let label = label.unwrap_or_default();
+    if label.len() as u64 > MAX_LABEL_LEN {
+        return Err(Error::Decryption);
+    }
+
+    digest.update(label.as_bytes());
+
+    let expected_p_hash = digest.finalize_reset();
+
+    let res = decrypt_inner(
+        rng,
+        priv_key,
+        ciphertext,
+        h_size,
+        &expected_p_hash,
+        |seed, db| {
+            mgf1_xor(seed, mgf_digest, db);
+            mgf1_xor(db, mgf_digest, seed);
+        },
+    )?;
+    if res.is_none().into() {
+        return Err(Error::Decryption);
+    }
+
+    let (out, index) = res.unwrap();
+
+    Ok(out[index as usize..].to_vec())
+}
+
+/// Decrypts a plaintext using RSA and the padding scheme from [PKCS#1 OAEP].
+///
+/// If an `rng` is passed, it uses RSA blinding to avoid timing side-channel attacks.
+///
+/// Note that whether this function returns an error or not discloses secret
+/// information. If an attacker can cause this function to run repeatedly and
+/// learn whether each instance returned an error then they can decrypt and
+/// forge signatures as if they had the private key.
+///
+/// See `decrypt_session_key` for a way of solving this problem.
+///
+/// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
+#[inline]
+fn decrypt_digest<
+    R: CryptoRngCore + ?Sized,
+    SK: PrivateKey,
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+>(
+    rng: Option<&mut R>,
+    priv_key: &SK,
+    ciphertext: &[u8],
+    label: Option<String>,
+) -> Result<Vec<u8>> {
+    key::check_public(priv_key)?;
+
+    let h_size = <D as Digest>::output_size();
+
+    let label = label.unwrap_or_default();
+    if label.len() as u64 > MAX_LABEL_LEN {
+        return Err(Error::LabelTooLong);
+    }
+
+    let expected_p_hash = D::digest(label.as_bytes());
+
+    let res = decrypt_inner(
+        rng,
+        priv_key,
+        ciphertext,
+        h_size,
+        &expected_p_hash,
+        |seed, db| {
+            let mut mgf_digest = MGD::new();
+            mgf1_xor_digest(seed, &mut mgf_digest, db);
+            mgf1_xor_digest(db, &mut mgf_digest, seed);
+        },
+    )?;
     if res.is_none().into() {
         return Err(Error::Decryption);
     }
@@ -255,20 +395,22 @@ fn decrypt<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
 /// `rng` is given. It returns one or zero in valid that indicates whether the
 /// plaintext was correctly structured.
 #[inline]
-fn decrypt_inner<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
+fn decrypt_inner<
+    R: CryptoRngCore + ?Sized,
+    SK: PrivateKey,
+    MGF: FnMut(&mut [u8], &mut [u8]) -> (),
+>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
-    digest: &mut dyn DynDigest,
-    mgf_digest: &mut dyn DynDigest,
-    label: Option<String>,
+    h_size: usize,
+    expected_p_hash: &[u8],
+    mut mgf: MGF,
 ) -> Result<CtOption<(Vec<u8>, u32)>> {
     let k = priv_key.size();
     if k < 11 {
         return Err(Error::Decryption);
     }
-
-    let h_size = digest.output_size();
 
     if ciphertext.len() != k || k < h_size * 2 + 2 {
         return Err(Error::Decryption);
@@ -276,22 +418,12 @@ fn decrypt_inner<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
 
     let mut em = priv_key.raw_decryption_primitive(rng, ciphertext, priv_key.size())?;
 
-    let label = label.unwrap_or_default();
-    if label.len() as u64 > MAX_LABEL_LEN {
-        return Err(Error::LabelTooLong);
-    }
-
-    digest.update(label.as_bytes());
-
-    let expected_p_hash = &*digest.finalize_reset();
-
     let first_byte_is_zero = em[0].ct_eq(&0u8);
 
     let (_, payload) = em.split_at_mut(1);
     let (seed, db) = payload.split_at_mut(h_size);
 
-    mgf1_xor(seed, mgf_digest, db);
-    mgf1_xor(db, mgf_digest, seed);
+    mgf(seed, db);
 
     let hash_are_equal = db[0..h_size].ct_eq(expected_p_hash);
 
@@ -317,13 +449,144 @@ fn decrypt_inner<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
     Ok(CtOption::new((em, index + 2 + (h_size * 2) as u32), valid))
 }
 
+/// Encryption key for PKCS#1 v1.5 encryption as described in [RFC8017 § 7.1].
+///
+/// [RFC8017 § 7.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
+#[derive(Debug, Clone)]
+pub struct EncryptingKey<D, MGD = D>
+where
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+{
+    inner: RsaPublicKey,
+    label: Option<String>,
+    phantom: PhantomData<D>,
+    mg_phantom: PhantomData<MGD>,
+}
+
+impl<D, MGD> EncryptingKey<D, MGD>
+where
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+{
+    /// Create a new verifying key from an RSA public key.
+    pub fn new(key: RsaPublicKey) -> Self {
+        Self {
+            inner: key,
+            label: None,
+            phantom: Default::default(),
+            mg_phantom: Default::default(),
+        }
+    }
+
+    /// Create a new verifying key from an RSA public key using provided label
+    pub fn new_with_label<S: AsRef<str>>(key: RsaPublicKey, label: S) -> Self {
+        Self {
+            inner: key,
+            label: Some(label.as_ref().to_string()),
+            phantom: Default::default(),
+            mg_phantom: Default::default(),
+        }
+    }
+}
+
+impl<D, MGD> RandomizedEncryptor for EncryptingKey<D, MGD>
+where
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+{
+    fn encrypt_with_rng<R: CryptoRngCore + ?Sized>(
+        &self,
+        rng: &mut R,
+        msg: &[u8],
+    ) -> Result<Vec<u8>> {
+        encrypt_digest::<_, _, D, MGD>(rng, &self.inner, msg, self.label.as_ref().cloned())
+    }
+}
+
+/// Decryption key for PKCS#1 v1.5 decryption as described in [RFC8017 § 7.1].
+///
+/// [RFC8017 § 7.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
+#[derive(Debug, Clone)]
+pub struct DecryptingKey<D, MGD = D>
+where
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+{
+    inner: RsaPrivateKey,
+    label: Option<String>,
+    phantom: PhantomData<D>,
+    mg_phantom: PhantomData<MGD>,
+}
+
+impl<D, MGD> DecryptingKey<D, MGD>
+where
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+{
+    /// Create a new verifying key from an RSA public key.
+    pub fn new(key: RsaPrivateKey) -> Self {
+        Self {
+            inner: key,
+            label: None,
+            phantom: Default::default(),
+            mg_phantom: Default::default(),
+        }
+    }
+
+    /// Create a new verifying key from an RSA public key using provided label
+    pub fn new_with_label<S: AsRef<str>>(key: RsaPrivateKey, label: S) -> Self {
+        Self {
+            inner: key,
+            label: Some(label.as_ref().to_string()),
+            phantom: Default::default(),
+            mg_phantom: Default::default(),
+        }
+    }
+}
+
+impl<D, MGD> Decryptor for DecryptingKey<D, MGD>
+where
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+{
+    fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
+        decrypt_digest::<DummyRng, _, D, MGD>(
+            None,
+            &self.inner,
+            ciphertext,
+            self.label.as_ref().cloned(),
+        )
+    }
+}
+
+impl<D, MGD> RandomizedDecryptor for DecryptingKey<D, MGD>
+where
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+{
+    fn decrypt_with_rng<R: CryptoRngCore + ?Sized>(
+        &self,
+        rng: &mut R,
+        ciphertext: &[u8],
+    ) -> Result<Vec<u8>> {
+        decrypt_digest::<_, _, D, MGD>(
+            Some(rng),
+            &self.inner,
+            ciphertext,
+            self.label.as_ref().cloned(),
+        )
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
-    use crate::oaep::Oaep;
+    use crate::oaep::{DecryptingKey, EncryptingKey, Oaep};
+    use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 
     use alloc::string::String;
-    use digest::{Digest, DynDigest};
+    use digest::{Digest, DynDigest, FixedOutputReset};
     use num_bigint::BigUint;
     use num_traits::FromPrimitive;
     use rand_chacha::{
@@ -521,6 +784,98 @@ mod tests {
                     Oaep::new_with_label::<Sha1, _>("label"),
                     &ciphertext,
                 )
+                .is_err(),
+            "decrypt should have failed on hash verification"
+        );
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_oaep_traits() {
+        let priv_key = get_private_key();
+        do_test_encrypt_decrypt_oaep_traits::<Sha1>(&priv_key);
+        do_test_encrypt_decrypt_oaep_traits::<Sha224>(&priv_key);
+        do_test_encrypt_decrypt_oaep_traits::<Sha256>(&priv_key);
+        do_test_encrypt_decrypt_oaep_traits::<Sha384>(&priv_key);
+        do_test_encrypt_decrypt_oaep_traits::<Sha512>(&priv_key);
+        do_test_encrypt_decrypt_oaep_traits::<Sha3_256>(&priv_key);
+        do_test_encrypt_decrypt_oaep_traits::<Sha3_384>(&priv_key);
+        do_test_encrypt_decrypt_oaep_traits::<Sha3_512>(&priv_key);
+
+        do_test_oaep_with_different_hashes_traits::<Sha1, Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes_traits::<Sha224, Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes_traits::<Sha256, Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes_traits::<Sha384, Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes_traits::<Sha512, Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes_traits::<Sha3_256, Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes_traits::<Sha3_384, Sha1>(&priv_key);
+        do_test_oaep_with_different_hashes_traits::<Sha3_512, Sha1>(&priv_key);
+    }
+
+    fn do_test_encrypt_decrypt_oaep_traits<D: Digest + FixedOutputReset>(prk: &RsaPrivateKey) {
+        do_test_oaep_with_different_hashes_traits::<D, D>(prk);
+    }
+
+    fn do_test_oaep_with_different_hashes_traits<D: Digest, MGD: Digest + FixedOutputReset>(
+        prk: &RsaPrivateKey,
+    ) {
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+
+        let k = prk.size();
+
+        for i in 1..8 {
+            let mut input = vec![0u8; i * 8];
+            rng.fill_bytes(&mut input);
+
+            if input.len() > k - 11 {
+                input = input[0..k - 11].to_vec();
+            }
+            let label = get_label(&mut rng);
+
+            let pub_key: RsaPublicKey = prk.into();
+
+            let ciphertext = if let Some(ref label) = label {
+                let encrypting_key =
+                    EncryptingKey::<D, MGD>::new_with_label(pub_key, label.clone());
+                encrypting_key.encrypt_with_rng(&mut rng, &input).unwrap()
+            } else {
+                let encrypting_key = EncryptingKey::<D, MGD>::new(pub_key);
+                encrypting_key.encrypt_with_rng(&mut rng, &input).unwrap()
+            };
+
+            assert_ne!(input, ciphertext);
+            let blind: bool = rng.next_u32() < (1 << 31);
+
+            let decrypting_key = if let Some(ref label) = label {
+                DecryptingKey::<D, MGD>::new_with_label(prk.clone(), label.clone())
+            } else {
+                DecryptingKey::<D, MGD>::new(prk.clone())
+            };
+
+            let plaintext = if blind {
+                decrypting_key.decrypt(&ciphertext).unwrap()
+            } else {
+                decrypting_key
+                    .decrypt_with_rng(&mut rng, &ciphertext)
+                    .unwrap()
+            };
+
+            assert_eq!(input, plaintext);
+        }
+    }
+
+    #[test]
+    fn test_decrypt_oaep_invalid_hash_traits() {
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let priv_key = get_private_key();
+        let pub_key: RsaPublicKey = (&priv_key).into();
+        let encrypting_key = EncryptingKey::<Sha1>::new(pub_key);
+        let decrypting_key = DecryptingKey::<Sha1>::new_with_label(priv_key, "label");
+        let ciphertext = encrypting_key
+            .encrypt_with_rng(&mut rng, "a_plain_text".as_bytes())
+            .unwrap();
+        assert!(
+            decrypting_key
+                .decrypt_with_rng(&mut rng, &ciphertext)
                 .is_err(),
             "decrypt should have failed on hash verification"
         );
