@@ -3,7 +3,7 @@ use num_bigint::BigUint;
 use rand_core::CryptoRngCore;
 use zeroize::Zeroize;
 
-use crate::errors::{Error, Result};
+use crate::errors::Result;
 use crate::internals;
 use crate::key::{RsaPrivateKey, RsaPublicKey};
 
@@ -29,16 +29,12 @@ impl EncryptionPrimitive for RsaPublicKey {
         let mut c_bytes = c.to_bytes_be();
         let ciphertext = internals::left_pad(&c_bytes, pad_size);
 
-        if pad_size < ciphertext.len() {
-            return Err(Error::Verification);
-        }
-
         // clear out tmp values
         m.zeroize();
         c.zeroize();
         c_bytes.zeroize();
 
-        Ok(ciphertext)
+        ciphertext
     }
 }
 
@@ -59,6 +55,6 @@ impl DecryptionPrimitive for RsaPrivateKey {
         m.zeroize();
         m_bytes.zeroize();
 
-        Ok(plaintext)
+        plaintext
     }
 }

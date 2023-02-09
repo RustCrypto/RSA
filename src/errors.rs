@@ -60,6 +60,9 @@ pub enum Error {
 
     /// Label too long.
     LabelTooLong,
+
+    /// Invalid padding length.
+    InvalidPadLen,
 }
 
 #[cfg(feature = "std")]
@@ -87,6 +90,7 @@ impl core::fmt::Display for Error {
             Error::Pkcs8(err) => write!(f, "{}", err),
             Error::Internal => write!(f, "internal error"),
             Error::LabelTooLong => write!(f, "label too long"),
+            Error::InvalidPadLen => write!(f, "invalid padding length"),
         }
     }
 }
