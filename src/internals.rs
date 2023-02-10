@@ -174,14 +174,34 @@ pub fn unblind(key: &impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> B
 
 /// Returns a new vector of the given length, with 0s left padded.
 #[inline]
-pub fn left_pad(input: &[u8], size: usize) -> Vec<u8> {
-    let n = if input.len() > size {
-        size
-    } else {
-        input.len()
-    };
+pub fn left_pad(input: &[u8], padded_len: usize) -> Result<Vec<u8>> {
+    if input.len() > padded_len {
+        return Err(Error::InvalidPadLen);
+    }
 
-    let mut out = vec![0u8; size];
-    out[size - n..].copy_from_slice(input);
-    out
+    let mut out = vec![0u8; padded_len];
+    out[padded_len - input.len()..].copy_from_slice(input);
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_left_pad() {
+        const INPUT_LEN: usize = 3;
+        let input = vec![0u8; INPUT_LEN];
+
+        // input len < padded len
+        let padded = left_pad(&input, INPUT_LEN + 1).unwrap();
+        assert_eq!(padded.len(), INPUT_LEN + 1);
+
+        // input len == padded len
+        let padded = left_pad(&input, INPUT_LEN).unwrap();
+        assert_eq!(padded.len(), INPUT_LEN);
+
+        // input len > padded len
+        let padded = left_pad(&input, INPUT_LEN - 1);
+        assert!(padded.is_err());
+    }
 }
