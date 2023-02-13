@@ -25,6 +25,7 @@ use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::key::{self, PrivateKey, PublicKey};
 use crate::padding::{PaddingScheme, SignatureScheme};
+use crate::traits::{Decryptor, EncryptingKeypair, RandomizedDecryptor, RandomizedEncryptor};
 use crate::{RsaPrivateKey, RsaPublicKey};
 
 /// Encryption using PKCS#1 v1.5 padding.
@@ -188,7 +189,7 @@ impl Display for Signature {
 /// scheme from PKCS#1 v1.5.  The message must be no longer than the
 /// length of the public modulus minus 11 bytes.
 #[inline]
-pub(crate) fn encrypt<R: CryptoRngCore, PK: PublicKey>(
+pub(crate) fn encrypt<R: CryptoRngCore + ?Sized, PK: PublicKey>(
     rng: &mut R,
     pub_key: &PK,
     msg: &[u8],
@@ -220,7 +221,7 @@ pub(crate) fn encrypt<R: CryptoRngCore, PK: PublicKey>(
 /// forge signatures as if they had the private key. See
 /// `decrypt_session_key` for a way of solving this problem.
 #[inline]
-pub(crate) fn decrypt<R: CryptoRngCore, SK: PrivateKey>(
+pub(crate) fn decrypt<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
@@ -337,7 +338,7 @@ where
 /// in order to maintain constant memory access patterns. If the plaintext was
 /// valid then index contains the index of the original message in em.
 #[inline]
-fn decrypt_inner<R: CryptoRngCore, SK: PrivateKey>(
+fn decrypt_inner<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
@@ -382,7 +383,7 @@ fn decrypt_inner<R: CryptoRngCore, SK: PrivateKey>(
 /// Fills the provided slice with random values, which are guaranteed
 /// to not be zero.
 #[inline]
-fn non_zero_random_bytes<R: CryptoRngCore>(rng: &mut R, data: &mut [u8]) {
+fn non_zero_random_bytes<R: CryptoRngCore + ?Sized>(rng: &mut R, data: &mut [u8]) {
     rng.fill_bytes(data);
 
     for el in data {
@@ -708,6 +709,71 @@ where
     }
 }
 
+/// Encryption key for PKCS#1 v1.5 encryption as described in [RFC8017 § 7.2].
+///
+/// [RFC8017 § 7.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.2
+#[derive(Debug, Clone)]
+pub struct EncryptingKey {
+    inner: RsaPublicKey,
+}
+
+impl EncryptingKey {
+    /// Create a new verifying key from an RSA public key.
+    pub fn new(key: RsaPublicKey) -> Self {
+        Self { inner: key }
+    }
+}
+
+impl RandomizedEncryptor for EncryptingKey {
+    fn encrypt_with_rng<R: CryptoRngCore + ?Sized>(
+        &self,
+        rng: &mut R,
+        msg: &[u8],
+    ) -> Result<Vec<u8>> {
+        encrypt(rng, &self.inner, msg)
+    }
+}
+
+/// Decryption key for PKCS#1 v1.5 decryption as described in [RFC8017 § 7.2].
+///
+/// [RFC8017 § 7.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.2
+#[derive(Debug, Clone)]
+pub struct DecryptingKey {
+    inner: RsaPrivateKey,
+}
+
+impl DecryptingKey {
+    /// Create a new verifying key from an RSA public key.
+    pub fn new(key: RsaPrivateKey) -> Self {
+        Self { inner: key }
+    }
+}
+
+impl Decryptor for DecryptingKey {
+    fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
+        decrypt::<DummyRng, _>(None, &self.inner, ciphertext)
+    }
+}
+
+impl RandomizedDecryptor for DecryptingKey {
+    fn decrypt_with_rng<R: CryptoRngCore + ?Sized>(
+        &self,
+        rng: &mut R,
+        ciphertext: &[u8],
+    ) -> Result<Vec<u8>> {
+        decrypt(Some(rng), &self.inner, ciphertext)
+    }
+}
+
+impl EncryptingKeypair for DecryptingKey {
+    type EncryptingKey = EncryptingKey;
+    fn encrypting_key(&self) -> EncryptingKey {
+        EncryptingKey {
+            inner: self.inner.clone().into(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -808,6 +874,63 @@ mod tests {
             let blind: bool = rng.next_u32() < (1u32 << 31);
             let blinder = if blind { Some(&mut rng) } else { None };
             let plaintext = decrypt(blinder, &priv_key, &ciphertext).unwrap();
+            assert_eq!(input, plaintext);
+        }
+    }
+
+    #[test]
+    fn test_decrypt_pkcs1v15_traits() {
+        let priv_key = get_private_key();
+        let decrypting_key = DecryptingKey::new(priv_key);
+
+        let tests = [[
+	    "gIcUIoVkD6ATMBk/u/nlCZCCWRKdkfjCgFdo35VpRXLduiKXhNz1XupLLzTXAybEq15juc+EgY5o0DHv/nt3yg==",
+	    "x",
+	], [
+	    "Y7TOCSqofGhkRb+jaVRLzK8xw2cSo1IVES19utzv6hwvx+M8kFsoWQm5DzBeJCZTCVDPkTpavUuEbgp8hnUGDw==",
+	    "testing.",
+	], [
+	    "arReP9DJtEVyV2Dg3dDp4c/PSk1O6lxkoJ8HcFupoRorBZG+7+1fDAwT1olNddFnQMjmkb8vxwmNMoTAT/BFjQ==",
+	    "testing.\n",
+	], [
+	"WtaBXIoGC54+vH0NH0CHHE+dRDOsMc/6BrfFu2lEqcKL9+uDuWaf+Xj9mrbQCjjZcpQuX733zyok/jsnqe/Ftw==",
+		"01234567890123456789012345678901234567890123456789012",
+	]];
+
+        for test in &tests {
+            let out = decrypting_key
+                .decrypt(&Base64::decode_vec(test[0]).unwrap())
+                .unwrap();
+            assert_eq!(out, test[1].as_bytes());
+        }
+    }
+
+    #[test]
+    fn test_encrypt_decrypt_pkcs1v15_traits() {
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let priv_key = get_private_key();
+        let k = priv_key.size();
+        let decrypting_key = DecryptingKey::new(priv_key);
+
+        for i in 1..100 {
+            let mut input = vec![0u8; i * 8];
+            rng.fill_bytes(&mut input);
+            if input.len() > k - 11 {
+                input = input[0..k - 11].to_vec();
+            }
+
+            let encrypting_key = decrypting_key.encrypting_key();
+            let ciphertext = encrypting_key.encrypt_with_rng(&mut rng, &input).unwrap();
+            assert_ne!(input, ciphertext);
+
+            let blind: bool = rng.next_u32() < (1u32 << 31);
+            let plaintext = if blind {
+                decrypting_key
+                    .decrypt_with_rng(&mut rng, &ciphertext)
+                    .unwrap()
+            } else {
+                decrypting_key.decrypt(&ciphertext).unwrap()
+            };
             assert_eq!(input, plaintext);
         }
     }

@@ -220,13 +220,14 @@ pub use signature;
 
 pub mod algorithms;
 pub mod errors;
+pub mod oaep;
 pub mod pkcs1v15;
 pub mod pss;
+pub mod traits;
 
 mod dummy_rng;
 mod encoding;
 mod key;
-mod oaep;
 mod padding;
 mod raw;
 
