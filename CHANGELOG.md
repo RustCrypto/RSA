@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.8.2 (2023-03-01)
+### Added
+- Encryption-related traits ([#259])
+
+### Fixed
+- Possible panic in `internals::left_pad` ([#262])
+- Correct PSS sign/verify when key length is multiple of 8+1 bits ([#263])
+
+[#259]: https://github.com/RustCrypto/RSA/pull/259
+[#262]: https://github.com/RustCrypto/RSA/pull/262
+[#263]: https://github.com/RustCrypto/RSA/pull/263
+
 ## 0.8.1 (2023-01-20)
 ### Added
 - `sha2` feature with `oid` subfeature enabled ([#255])
