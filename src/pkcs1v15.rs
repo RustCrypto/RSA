@@ -596,7 +596,7 @@ where
     ///
     /// ## Note: unprefixed signatures are uncommon
     ///
-    /// In most cases you'll want to use [`SigningKey::new_with_prefix`].
+    /// In most cases you'll want to use [`VerifyingKey::new_with_prefix`].
     pub fn new(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
