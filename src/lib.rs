@@ -209,6 +209,10 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/RustCrypto/meta/master/logo_small.png")]
 #![warn(missing_docs)]
 
+#[doc = include_str!("../README.md")]
+#[cfg(doctest)]
+pub struct ReadmeDoctests;
+
 #[macro_use]
 extern crate alloc;
 #[cfg(feature = "std")]
