@@ -14,7 +14,7 @@ A portable RSA implementation in pure Rust.
 ## Example
 
 ```rust
-use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, PaddingScheme};
+use rsa::{Pkcs1v15Encrypt, PublicKey, RsaPrivateKey, RsaPublicKey};
 
 let mut rng = rand::thread_rng();
 let bits = 2048;
@@ -23,11 +23,11 @@ let pub_key = RsaPublicKey::from(&priv_key);
 
 // Encrypt
 let data = b"hello world";
-let enc_data = pub_key.encrypt(&mut rng, PaddingScheme::new_pkcs1v15_encrypt(), &data[..]).expect("failed to encrypt");
+let enc_data = pub_key.encrypt(&mut rng, Pkcs1v15Encrypt, &data[..]).expect("failed to encrypt");
 assert_ne!(&data[..], &enc_data[..]);
 
 // Decrypt
-let dec_data = priv_key.decrypt(PaddingScheme::new_pkcs1v15_encrypt(), &enc_data).expect("failed to decrypt");
+let dec_data = priv_key.decrypt(Pkcs1v15Encrypt, &enc_data).expect("failed to decrypt");
 assert_eq!(&data[..], &dec_data[..]);
 ```
 

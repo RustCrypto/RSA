@@ -1,3 +1,4 @@
+#![doc = include_str!("../README.md")]
 //! RSA Implementation in pure Rust.
 //!
 //! It supports several schemes described in [RFC8017]:
@@ -208,6 +209,9 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/RustCrypto/meta/master/logo_small.png")]
 #![warn(missing_docs)]
+
+#[cfg(doctest)]
+pub struct ReadmeDoctests;
 
 #[macro_use]
 extern crate alloc;
