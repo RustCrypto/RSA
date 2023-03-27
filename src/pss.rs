@@ -677,6 +677,11 @@ where
             phantom: Default::default(),
         })
     }
+
+    /// Return specified salt length for this key
+    pub fn salt_len(&self) -> Option<usize> {
+        self.salt_len
+    }
 }
 
 impl<D> From<RsaPrivateKey> for SigningKey<D>
@@ -807,6 +812,11 @@ where
             salt_len: Some(salt_len),
             phantom: Default::default(),
         }
+    }
+
+    /// Return specified salt length for this key
+    pub fn salt_len(&self) -> Option<usize> {
+        self.salt_len
     }
 }
 
