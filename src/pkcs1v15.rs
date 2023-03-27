@@ -11,7 +11,10 @@ use alloc::vec::Vec;
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
 use digest::Digest;
-use pkcs8::{AssociatedOid, Document, EncodePrivateKey, EncodePublicKey, SecretDocument};
+use pkcs8::{
+    spki::{der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier},
+    AssociatedOid, Document, EncodePrivateKey, EncodePublicKey, SecretDocument,
+};
 use rand_core::CryptoRngCore;
 use signature::{
     hazmat::{PrehashSigner, PrehashVerifier},
@@ -436,6 +439,15 @@ where
     }
 }
 
+impl<D> AssociatedAlgorithmIdentifier for SigningKey<D>
+where
+    D: Digest,
+{
+    type Params = AnyRef<'static>;
+
+    const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
+}
+
 impl<D> From<RsaPrivateKey> for SigningKey<D>
 where
     D: Digest,
@@ -604,6 +616,15 @@ where
             phantom: Default::default(),
         }
     }
+}
+
+impl<D> AssociatedAlgorithmIdentifier for VerifyingKey<D>
+where
+    D: Digest,
+{
+    type Params = AnyRef<'static>;
+
+    const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
 }
 
 impl<D> From<RsaPublicKey> for VerifyingKey<D>
