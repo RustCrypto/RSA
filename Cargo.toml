@@ -19,6 +19,7 @@ num-integer = { version = "0.1.39", default-features = false }
 num-iter = { version = "0.1.37", default-features = false }
 rand_core = { version = "0.6.4", default-features = false }
 byteorder = { version = "1.3.1", default-features = false }
+const-oid = { version = "0.9", default-features = false }
 subtle = { version = "2.1.1", default-features = false }
 digest = { version = "0.10.5", default-features = false, features = ["alloc", "oid"] }
 pkcs1 = { version = "0.7.1", default-features = false, features = ["alloc", "pkcs8"] }
@@ -59,3 +60,8 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.dev]
 opt-level = 2
+
+[patch.crates-io]
+pkcs1 = { git = "https://github.com/RustCrypto/formats" }
+pkcs8 = { git = "https://github.com/RustCrypto/formats" }
+spki = { git = "https://github.com/RustCrypto/formats" }
