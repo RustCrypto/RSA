@@ -199,7 +199,7 @@ pub(crate) fn verify<PK: PublicKey>(
     let key_len = pub_key.size();
     let mut em = pub_key.raw_encryption_primitive(sig, key_len)?;
 
-    emsa_pss_verify(hashed, &mut em[key_len - em_len ..], em_bits, None, digest)
+    emsa_pss_verify(hashed, &mut em[key_len - em_len..], em_bits, None, digest)
 }
 
 pub(crate) fn verify_digest<PK, D>(pub_key: &PK, hashed: &[u8], sig: &[u8]) -> Result<()>
@@ -216,7 +216,7 @@ where
     let key_len = pub_key.size();
     let mut em = pub_key.raw_encryption_primitive(sig, key_len)?;
 
-    emsa_pss_verify_digest::<D>(hashed, &mut em[key_len - em_len ..], em_bits, None)
+    emsa_pss_verify_digest::<D>(hashed, &mut em[key_len - em_len..], em_bits, None)
 }
 
 /// SignPSS calculates the signature of hashed using RSASSA-PSS.
@@ -485,7 +485,12 @@ fn emsa_pss_verify_pre<'a>(
     // 6. If the leftmost 8 * em_len - em_bits bits of the leftmost octet in
     //    maskedDB are not all equal to zero, output "inconsistent" and
     //    stop.
-    if db[0] & (0xFF_u8.checked_shl(8 - (8 * em_len - em_bits) as u32).unwrap_or(0)) != 0 {
+    if db[0]
+        & (0xFF_u8
+            .checked_shl(8 - (8 * em_len - em_bits) as u32)
+            .unwrap_or(0))
+        != 0
+    {
         return Err(Error::Verification);
     }
 
