@@ -199,7 +199,7 @@ pub(crate) fn verify<PK: PublicKey>(
     let key_len = pub_key.size();
     let mut em = pub_key.raw_encryption_primitive(sig, key_len)?;
 
-    emsa_pss_verify(hashed, &mut em[key_len - em_len ..], em_bits, None, digest)
+    emsa_pss_verify(hashed, &mut em[key_len - em_len..], em_bits, None, digest)
 }
 
 pub(crate) fn verify_digest<PK, D>(pub_key: &PK, hashed: &[u8], sig: &[u8]) -> Result<()>
@@ -216,7 +216,7 @@ where
     let key_len = pub_key.size();
     let mut em = pub_key.raw_encryption_primitive(sig, key_len)?;
 
-    emsa_pss_verify_digest::<D>(hashed, &mut em[key_len - em_len ..], em_bits, None)
+    emsa_pss_verify_digest::<D>(hashed, &mut em[key_len - em_len..], em_bits, None)
 }
 
 /// SignPSS calculates the signature of hashed using RSASSA-PSS.
@@ -234,7 +234,7 @@ pub(crate) fn sign<T: CryptoRngCore, SK: PrivateKey>(
 ) -> Result<Vec<u8>> {
     let salt = generate_salt(rng, priv_key, salt_len, digest.output_size());
 
-    sign_pss_with_salt(blind.then(|| rng), priv_key, hashed, &salt, digest)
+    sign_pss_with_salt(blind.then_some(rng), priv_key, hashed, &salt, digest)
 }
 
 pub(crate) fn sign_digest<
@@ -250,7 +250,7 @@ pub(crate) fn sign_digest<
 ) -> Result<Vec<u8>> {
     let salt = generate_salt(rng, priv_key, salt_len, <D as Digest>::output_size());
 
-    sign_pss_with_salt_digest::<_, _, D>(blind.then(|| rng), priv_key, hashed, &salt)
+    sign_pss_with_salt_digest::<_, _, D>(blind.then_some(rng), priv_key, hashed, &salt)
 }
 
 fn generate_salt<T: CryptoRngCore + ?Sized, SK: PrivateKey>(
@@ -261,7 +261,7 @@ fn generate_salt<T: CryptoRngCore + ?Sized, SK: PrivateKey>(
 ) -> Vec<u8> {
     let em_bits = priv_key.n().bits() - 1;
     let em_len = (em_bits + 7) / 8;
-    let salt_len = salt_len.unwrap_or_else(|| em_len - 2 - digest_size);
+    let salt_len = salt_len.unwrap_or(em_len - 2 - digest_size);
 
     let mut salt = vec![0; salt_len];
     rng.fill_bytes(&mut salt[..]);
@@ -485,7 +485,12 @@ fn emsa_pss_verify_pre<'a>(
     // 6. If the leftmost 8 * em_len - em_bits bits of the leftmost octet in
     //    maskedDB are not all equal to zero, output "inconsistent" and
     //    stop.
-    if db[0] & (0xFF_u8.checked_shl(8 - (8 * em_len - em_bits) as u32).unwrap_or(0)) != 0 {
+    if db[0]
+        & (0xFF_u8
+            .checked_shl(8 - (8 * em_len - em_bits) as u32)
+            .unwrap_or(0))
+        != 0
+    {
         return Err(Error::Verification);
     }
 
