@@ -234,7 +234,7 @@ pub(crate) fn sign<T: CryptoRngCore, SK: PrivateKey>(
 ) -> Result<Vec<u8>> {
     let salt = generate_salt(rng, priv_key, salt_len, digest.output_size());
 
-    sign_pss_with_salt(blind.then(|| rng), priv_key, hashed, &salt, digest)
+    sign_pss_with_salt(blind.then_some(rng), priv_key, hashed, &salt, digest)
 }
 
 pub(crate) fn sign_digest<
@@ -250,7 +250,7 @@ pub(crate) fn sign_digest<
 ) -> Result<Vec<u8>> {
     let salt = generate_salt(rng, priv_key, salt_len, <D as Digest>::output_size());
 
-    sign_pss_with_salt_digest::<_, _, D>(blind.then(|| rng), priv_key, hashed, &salt)
+    sign_pss_with_salt_digest::<_, _, D>(blind.then_some(rng), priv_key, hashed, &salt)
 }
 
 fn generate_salt<T: CryptoRngCore + ?Sized, SK: PrivateKey>(
@@ -261,7 +261,7 @@ fn generate_salt<T: CryptoRngCore + ?Sized, SK: PrivateKey>(
 ) -> Vec<u8> {
     let em_bits = priv_key.n().bits() - 1;
     let em_len = (em_bits + 7) / 8;
-    let salt_len = salt_len.unwrap_or_else(|| em_len - 2 - digest_size);
+    let salt_len = salt_len.unwrap_or(em_len - 2 - digest_size);
 
     let mut salt = vec![0; salt_len];
     rng.fill_bytes(&mut salt[..]);

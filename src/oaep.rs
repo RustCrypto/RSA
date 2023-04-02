@@ -175,12 +175,7 @@ impl fmt::Debug for Oaep {
 }
 
 #[inline]
-fn encrypt_internal<
-    'a,
-    R: CryptoRngCore + ?Sized,
-    K: PublicKey,
-    MGF: FnMut(&mut [u8], &mut [u8]) -> (),
->(
+fn encrypt_internal<R: CryptoRngCore + ?Sized, K: PublicKey, MGF: FnMut(&mut [u8], &mut [u8])>(
     rng: &mut R,
     pub_key: &K,
     msg: &[u8],
@@ -395,11 +390,7 @@ fn decrypt_digest<
 /// `rng` is given. It returns one or zero in valid that indicates whether the
 /// plaintext was correctly structured.
 #[inline]
-fn decrypt_inner<
-    R: CryptoRngCore + ?Sized,
-    SK: PrivateKey,
-    MGF: FnMut(&mut [u8], &mut [u8]) -> (),
->(
+fn decrypt_inner<R: CryptoRngCore + ?Sized, SK: PrivateKey, MGF: FnMut(&mut [u8], &mut [u8])>(
     rng: Option<&mut R>,
     priv_key: &SK,
     ciphertext: &[u8],
