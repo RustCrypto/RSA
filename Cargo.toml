@@ -24,10 +24,13 @@ subtle = { version = "2.1.1", default-features = false }
 digest = { version = "0.10.5", default-features = false, features = ["alloc", "oid"] }
 pkcs1 = { version = "0.7.2", default-features = false, features = ["alloc", "pkcs8"] }
 pkcs8 = { version = "0.10.2", default-features = false, features = ["alloc"] }
-serde = { version = "1.0.103", optional = true, default-features = false, features = ["derive"] }
-sha2 = { version = "0.10.6", optional = true, default-features = false, features = ["oid"] }
 signature = { version = "2", default-features = false , features = ["digest", "rand_core"] }
 zeroize = { version = "1", features = ["alloc"] }
+
+# optional dependencies
+serde = { version = "1.0.103", optional = true, default-features = false, features = ["derive"] }
+sha1 = { version = "0.10.5", optional = true, default-features = false, features = ["oid"] }
+sha2 = { version = "0.10.6", optional = true, default-features = false, features = ["oid"] }
 
 [dev-dependencies]
 base64ct = { version = "1", features = ["alloc"] }
