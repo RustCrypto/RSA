@@ -11,7 +11,13 @@ use alloc::vec::Vec;
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
 use digest::Digest;
-use pkcs8::{AssociatedOid, Document, EncodePrivateKey, EncodePublicKey, SecretDocument};
+use pkcs8::{
+    spki::{
+        der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
+        SignatureAlgorithmIdentifier,
+    },
+    AssociatedOid, Document, EncodePrivateKey, EncodePublicKey, SecretDocument,
+};
 use rand_core::CryptoRngCore;
 use signature::{
     hazmat::{PrehashSigner, PrehashVerifier},
@@ -436,6 +442,28 @@ where
     }
 }
 
+impl<D> AssociatedAlgorithmIdentifier for SigningKey<D>
+where
+    D: Digest,
+{
+    type Params = AnyRef<'static>;
+
+    const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
+}
+
+impl<D> SignatureAlgorithmIdentifier for SigningKey<D>
+where
+    D: Digest + oid::RsaSignatureAssociatedOid,
+{
+    type Params = AnyRef<'static>;
+
+    const SIGNATURE_ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> =
+        AlgorithmIdentifierRef {
+            oid: D::OID,
+            parameters: Some(AnyRef::NULL),
+        };
+}
+
 impl<D> From<RsaPrivateKey> for SigningKey<D>
 where
     D: Digest,
@@ -606,6 +634,28 @@ where
     }
 }
 
+impl<D> AssociatedAlgorithmIdentifier for VerifyingKey<D>
+where
+    D: Digest,
+{
+    type Params = AnyRef<'static>;
+
+    const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
+}
+
+impl<D> SignatureAlgorithmIdentifier for VerifyingKey<D>
+where
+    D: Digest + oid::RsaSignatureAssociatedOid,
+{
+    type Params = AnyRef<'static>;
+
+    const SIGNATURE_ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> =
+        AlgorithmIdentifierRef {
+            oid: D::OID,
+            parameters: Some(AnyRef::NULL),
+        };
+}
+
 impl<D> From<RsaPublicKey> for VerifyingKey<D>
 where
     D: Digest,
@@ -771,6 +821,46 @@ impl EncryptingKeypair for DecryptingKey {
         EncryptingKey {
             inner: self.inner.clone().into(),
         }
+    }
+}
+
+mod oid {
+    use const_oid::ObjectIdentifier;
+
+    /// A trait which associates an RSA-specific OID with a type.
+    pub(crate) trait RsaSignatureAssociatedOid {
+        /// The OID associated with this type.
+        const OID: ObjectIdentifier;
+    }
+
+    #[cfg(feature = "sha1")]
+    impl RsaSignatureAssociatedOid for sha1::Sha1 {
+        const OID: ObjectIdentifier =
+            const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.5");
+    }
+
+    #[cfg(feature = "sha2")]
+    impl RsaSignatureAssociatedOid for sha2::Sha224 {
+        const OID: ObjectIdentifier =
+            const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.14");
+    }
+
+    #[cfg(feature = "sha2")]
+    impl RsaSignatureAssociatedOid for sha2::Sha256 {
+        const OID: ObjectIdentifier =
+            const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
+    }
+
+    #[cfg(feature = "sha2")]
+    impl RsaSignatureAssociatedOid for sha2::Sha384 {
+        const OID: ObjectIdentifier =
+            const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.12");
+    }
+
+    #[cfg(feature = "sha2")]
+    impl RsaSignatureAssociatedOid for sha2::Sha512 {
+        const OID: ObjectIdentifier =
+            const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.13");
     }
 }
 

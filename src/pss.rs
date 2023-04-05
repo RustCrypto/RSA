@@ -12,10 +12,19 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 use core::fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex};
-
 use core::marker::PhantomData;
+
+use const_oid::{AssociatedOid, ObjectIdentifier};
 use digest::{Digest, DynDigest, FixedOutputReset};
-use pkcs8::{Document, EncodePrivateKey, EncodePublicKey, SecretDocument};
+use pkcs1::RsaPssParams;
+use pkcs8::{
+    spki::{
+        der::{Any, AnyRef},
+        AlgorithmIdentifier, AlgorithmIdentifierOwned, AlgorithmIdentifierRef,
+        AssociatedAlgorithmIdentifier, DynSignatureAlgorithmIdentifier,
+    },
+    Document, EncodePrivateKey, EncodePublicKey, SecretDocument,
+};
 use rand_core::CryptoRngCore;
 use signature::{
     hazmat::{PrehashVerifier, RandomizedPrehashSigner},
@@ -689,6 +698,57 @@ where
     }
 }
 
+fn get_pss_signature_algo_id<D>(
+    salt_len: Option<usize>,
+) -> pkcs8::spki::Result<AlgorithmIdentifierOwned>
+where
+    D: Digest + AssociatedOid,
+{
+    const ID_MGF_1: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.8");
+    const ID_RSASSA_PSS: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.10");
+
+    let salt_len = salt_len.map_or(RsaPssParams::SALT_LEN_DEFAULT, |l| l as u8);
+
+    let pss_params = RsaPssParams {
+        hash: AlgorithmIdentifierRef {
+            oid: D::OID,
+            parameters: None,
+        },
+        mask_gen: AlgorithmIdentifier {
+            oid: ID_MGF_1,
+            parameters: Some(AlgorithmIdentifierRef {
+                oid: D::OID,
+                parameters: None,
+            }),
+        },
+        salt_len,
+        trailer_field: Default::default(),
+    };
+
+    Ok(AlgorithmIdentifierOwned {
+        oid: ID_RSASSA_PSS,
+        parameters: Some(Any::encode_from(&pss_params)?),
+    })
+}
+
+impl<D> AssociatedAlgorithmIdentifier for SigningKey<D>
+where
+    D: Digest,
+{
+    type Params = AnyRef<'static>;
+
+    const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
+}
+
+impl<D> DynSignatureAlgorithmIdentifier for SigningKey<D>
+where
+    D: Digest + AssociatedOid,
+{
+    fn signature_algorithm_identifier(&self) -> pkcs8::spki::Result<AlgorithmIdentifierOwned> {
+        get_pss_signature_algo_id::<D>(self.salt_len)
+    }
+}
+
 impl<D> From<RsaPrivateKey> for SigningKey<D>
 where
     D: Digest,
@@ -825,6 +885,24 @@ where
     }
 }
 
+impl<D> AssociatedAlgorithmIdentifier for BlindedSigningKey<D>
+where
+    D: Digest,
+{
+    type Params = AnyRef<'static>;
+
+    const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
+}
+
+impl<D> DynSignatureAlgorithmIdentifier for BlindedSigningKey<D>
+where
+    D: Digest + AssociatedOid,
+{
+    fn signature_algorithm_identifier(&self) -> pkcs8::spki::Result<AlgorithmIdentifierOwned> {
+        get_pss_signature_algo_id::<D>(self.salt_len)
+    }
+}
+
 impl<D> From<RsaPrivateKey> for BlindedSigningKey<D>
 where
     D: Digest,
@@ -956,6 +1034,15 @@ where
             phantom: Default::default(),
         }
     }
+}
+
+impl<D> AssociatedAlgorithmIdentifier for VerifyingKey<D>
+where
+    D: Digest,
+{
+    type Params = AnyRef<'static>;
+
+    const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
 }
 
 impl<D> From<RsaPublicKey> for VerifyingKey<D>
