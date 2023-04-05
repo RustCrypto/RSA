@@ -9,8 +9,6 @@
 
 A portable RSA implementation in pure Rust.
 
-⚠️ **WARNING:** This crate has been audited by a 3rd party, but a full blog post with the results and the updates made since the audit has not been officially released yet. See [#60](https://github.com/RustCrypto/RSA/issues/60) for more information.
-
 ## Example
 
 ```rust
@@ -67,6 +65,10 @@ There will be three phases before `1.0` 🚢 can be released.
     - [ ] Fuzz testing
     - [ ] Security Audits
 
+## Security Notes
+
+This crate has received one [security audit by Include Security][audit], with
+only one minor finding which has since been addressed.
 
 ## Minimum Supported Rust Version (MSRV)
 
@@ -102,3 +104,7 @@ dual licensed as above, without any additional terms or conditions.
 [chat-link]: https://rustcrypto.zulipchat.com/#narrow/stream/260047-RSA
 [deps-image]: https://deps.rs/repo/github/RustCrypto/RSA/status.svg
 [deps-link]: https://deps.rs/repo/github/RustCrypto/RSA
+
+[//]: # (links)
+
+[audit]: https://www.opentech.fund/results/security-safety-audits/deltachat/
