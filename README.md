@@ -1,11 +1,11 @@
-# RSA
+# [RustCrypto]: RSA
 
 [![crates.io][crate-image]][crate-link]
 [![Documentation][doc-image]][doc-link]
 [![Build Status][build-image]][build-link]
+[![dependency status][deps-image]][deps-link]
 ![MSRV][msrv-image]
 [![Project Chat][chat-image]][chat-link]
-[![dependency status][deps-image]][deps-link]
 
 A portable RSA implementation in pure Rust.
 
@@ -93,7 +93,7 @@ dual licensed as above, without any additional terms or conditions.
 
 [//]: # (badges)
 
-[crate-image]: https://img.shields.io/crates/v/rsa.svg
+[crate-image]: https://buildstats.info/crate/rsa
 [crate-link]: https://crates.io/crates/rsa
 [doc-image]: https://docs.rs/rsa/badge.svg
 [doc-link]: https://docs.rs/rsa
@@ -107,4 +107,5 @@ dual licensed as above, without any additional terms or conditions.
 
 [//]: # (links)
 
+[RustCrypto]: https://github.com/RustCrypto/
 [audit]: https://www.opentech.fund/results/security-safety-audits/deltachat/
