@@ -423,8 +423,8 @@ where
     ///
     /// ## Note: unprefixed signatures are uncommon
     ///
-    /// In most cases you'll want to use [`SigningKey::new_with_prefix`].
-    pub fn new(key: RsaPrivateKey) -> Self {
+    /// In most cases you'll want to use [`SigningKey::new`].
+    pub fn new_unprefixed(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
             prefix: Vec::new(),
@@ -432,8 +432,11 @@ where
         }
     }
 
-    /// Generate a new signing key.
-    pub fn random<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    /// Generate a new signing key with an empty prefix.
+    pub fn random_unprefixed<R: CryptoRngCore + ?Sized>(
+        rng: &mut R,
+        bit_size: usize,
+    ) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
             prefix: Vec::new(),
@@ -469,7 +472,7 @@ where
     D: Digest,
 {
     fn from(key: RsaPrivateKey) -> Self {
-        Self::new(key)
+        Self::new_unprefixed(key)
     }
 }
 
@@ -487,7 +490,7 @@ where
     D: Digest + AssociatedOid,
 {
     /// Create a new signing key with a prefix for the digest `D`.
-    pub fn new_with_prefix(key: RsaPrivateKey) -> Self {
+    pub fn new(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
             prefix: generate_prefix::<D>(),
@@ -496,15 +499,27 @@ where
     }
 
     /// Generate a new signing key with a prefix for the digest `D`.
-    pub fn random_with_prefix<R: CryptoRngCore + ?Sized>(
-        rng: &mut R,
-        bit_size: usize,
-    ) -> Result<Self> {
+    pub fn random<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
             prefix: generate_prefix::<D>(),
             phantom: Default::default(),
         })
+    }
+
+    /// Create a new signing key with a prefix for the digest `D`.
+    #[deprecated(since = "0.9.0", note = "use SigningKey::new instead")]
+    pub fn new_with_prefix(key: RsaPrivateKey) -> Self {
+        Self::new(key)
+    }
+
+    /// Generate a new signing key with a prefix for the digest `D`.
+    #[deprecated(since = "0.9.0", note = "use SigningKey::random instead")]
+    pub fn random_with_prefix<R: CryptoRngCore + ?Sized>(
+        rng: &mut R,
+        bit_size: usize,
+    ) -> Result<Self> {
+        Self::random(rng, bit_size)
     }
 }
 
@@ -624,8 +639,8 @@ where
     ///
     /// ## Note: unprefixed signatures are uncommon
     ///
-    /// In most cases you'll want to use [`VerifyingKey::new_with_prefix`].
-    pub fn new(key: RsaPublicKey) -> Self {
+    /// In most cases you'll want to use [`VerifyingKey::new`] instead.
+    pub fn new_unprefixed(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
             prefix: Vec::new(),
@@ -661,7 +676,7 @@ where
     D: Digest,
 {
     fn from(key: RsaPublicKey) -> Self {
-        Self::new(key)
+        Self::new_unprefixed(key)
     }
 }
 
@@ -679,12 +694,18 @@ where
     D: Digest + AssociatedOid,
 {
     /// Create a new verifying key with a prefix for the digest `D`.
-    pub fn new_with_prefix(key: RsaPublicKey) -> Self {
+    pub fn new(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
             prefix: generate_prefix::<D>(),
             phantom: Default::default(),
         }
+    }
+
+    /// Create a new verifying key with a prefix for the digest `D`.
+    #[deprecated(since = "0.9.0", note = "use VerifyingKey::new instead")]
+    pub fn new_with_prefix(key: RsaPublicKey) -> Self {
+        Self::new(key)
     }
 }
 
@@ -1064,7 +1085,7 @@ mod tests {
             ),
         )];
 
-        let signing_key = SigningKey::<Sha1>::new_with_prefix(priv_key);
+        let signing_key = SigningKey::<Sha1>::new(priv_key);
 
         for (text, expected) in &tests {
             let out = signing_key.sign(text.as_bytes());
@@ -1090,7 +1111,7 @@ mod tests {
             ),
         )];
 
-        let signing_key = SigningKey::<Sha256>::new_with_prefix(priv_key);
+        let signing_key = SigningKey::<Sha256>::new(priv_key);
 
         for (text, expected) in &tests {
             let out = signing_key.sign(text.as_bytes());
@@ -1115,7 +1136,7 @@ mod tests {
             ),
         )];
 
-        let signing_key = SigningKey::<Sha3_256>::new_with_prefix(priv_key);
+        let signing_key = SigningKey::<Sha3_256>::new(priv_key);
 
         for (text, expected) in &tests {
             let out = signing_key.sign(text.as_bytes());
@@ -1140,7 +1161,7 @@ mod tests {
             ),
         )];
 
-        let signing_key = SigningKey::new_with_prefix(priv_key);
+        let signing_key = SigningKey::new(priv_key);
 
         for (text, expected) in &tests {
             let mut digest = Sha1::new();
@@ -1218,7 +1239,7 @@ mod tests {
             ),
         ];
         let pub_key: RsaPublicKey = priv_key.into();
-        let verifying_key = VerifyingKey::<Sha1>::new_with_prefix(pub_key);
+        let verifying_key = VerifyingKey::<Sha1>::new(pub_key);
 
         for (text, sig, expected) in &tests {
             let result = verifying_key.verify(
@@ -1257,7 +1278,7 @@ mod tests {
             ),
         ];
         let pub_key: RsaPublicKey = priv_key.into();
-        let verifying_key = VerifyingKey::new_with_prefix(pub_key);
+        let verifying_key = VerifyingKey::new(pub_key);
 
         for (text, sig, expected) in &tests {
             let mut digest = Sha1::new();
@@ -1272,6 +1293,7 @@ mod tests {
             }
         }
     }
+
     #[test]
     fn test_unpadded_signature() {
         let msg = b"Thu Dec 19 18:06:16 EST 2013\n";
@@ -1293,7 +1315,7 @@ mod tests {
         let expected_sig = Base64::decode_vec("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
         let priv_key = get_private_key();
 
-        let signing_key = SigningKey::<Sha1>::new(priv_key);
+        let signing_key = SigningKey::<Sha1>::new_unprefixed(priv_key);
         let sig = signing_key.sign_prehash(msg).expect("Failure during sign");
         assert_eq!(sig.as_ref(), expected_sig);
 
