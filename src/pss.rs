@@ -51,8 +51,17 @@ pub struct Pss {
 }
 
 impl Pss {
+    /// New PSS padding for the given digest with a salt value of the given length.
+    pub fn new<T: 'static + Digest + DynDigest + Send + Sync>(salt_len: usize) -> Self {
+        Self {
+            blinded: false,
+            digest: Box::new(T::new()),
+            salt_len: Some(salt_len),
+        }
+    }
+
     /// New PSS padding for the given digest.
-    pub fn new<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
+    pub fn new_unsalted<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
         Self {
             blinded: false,
             digest: Box::new(T::new()),
@@ -60,17 +69,24 @@ impl Pss {
         }
     }
 
-    /// New PSS padding for the given digest with a salt value of the given length.
-    pub fn new_with_salt<T: 'static + Digest + DynDigest + Send + Sync>(len: usize) -> Self {
+    /// Create a new signing key with a prefix for the digest `D`.
+    #[deprecated(since = "0.9.0", note = "use Pss::new instead")]
+    pub fn new_with_salt<T: 'static + Digest + DynDigest + Send + Sync>(salt_len: usize) -> Self {
+        Self::new::<T>(salt_len)
+    }
+
+    /// New PSS padding for blinded signatures (RSA-BSSA) for the given digest
+    /// with a salt value of the given length.
+    pub fn new_blinded<T: 'static + Digest + DynDigest + Send + Sync>(salt_len: usize) -> Self {
         Self {
-            blinded: false,
+            blinded: true,
             digest: Box::new(T::new()),
-            salt_len: Some(len),
+            salt_len: Some(salt_len),
         }
     }
 
     /// New PSS padding for blinded signatures (RSA-BSSA) for the given digest.
-    pub fn new_blinded<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
+    pub fn new_blinded_unsalted<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
         Self {
             blinded: true,
             digest: Box::new(T::new()),
@@ -80,14 +96,11 @@ impl Pss {
 
     /// New PSS padding for blinded signatures (RSA-BSSA) for the given digest
     /// with a salt value of the given length.
+    #[deprecated(since = "0.9.0", note = "use Pss::new_blinded instead")]
     pub fn new_blinded_with_salt<T: 'static + Digest + DynDigest + Send + Sync>(
-        len: usize,
+        salt_len: usize,
     ) -> Self {
-        Self {
-            blinded: true,
-            digest: Box::new(T::new()),
-            salt_len: Some(len),
-        }
+        Self::new_blinded::<T>(salt_len)
     }
 }
 
@@ -652,8 +665,17 @@ impl<D> SigningKey<D>
 where
     D: Digest,
 {
+    /// Create a new RSASSA-PSS signing key with a salt of the given length.
+    pub fn new(key: RsaPrivateKey, salt_len: usize) -> Self {
+        Self {
+            inner: key,
+            salt_len: Some(salt_len),
+            phantom: Default::default(),
+        }
+    }
+
     /// Create a new RSASSA-PSS signing key.
-    pub fn new(key: RsaPrivateKey) -> Self {
+    pub fn new_unsalted(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
             salt_len: None,
@@ -662,25 +684,13 @@ where
     }
 
     /// Create a new RSASSA-PSS signing key with a salt of the given length.
+    #[deprecated(since = "0.9.0", note = "use SigningKey::new instead")]
     pub fn new_with_salt_len(key: RsaPrivateKey, salt_len: usize) -> Self {
-        Self {
-            inner: key,
-            salt_len: Some(salt_len),
-            phantom: Default::default(),
-        }
-    }
-
-    /// Generate a new random RSASSA-PSS signing key.
-    pub fn random<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
-        Ok(Self {
-            inner: RsaPrivateKey::new(rng, bit_size)?,
-            salt_len: None,
-            phantom: Default::default(),
-        })
+        Self::new(key, salt_len)
     }
 
     /// Generate a new random RSASSA-PSS signing key with a salt of the given length.
-    pub fn random_with_salt_len<R: CryptoRngCore + ?Sized>(
+    pub fn random<R: CryptoRngCore + ?Sized>(
         rng: &mut R,
         bit_size: usize,
         salt_len: usize,
@@ -690,6 +700,28 @@ where
             salt_len: Some(salt_len),
             phantom: Default::default(),
         })
+    }
+
+    /// Generate a new random RSASSA-PSS signing key.
+    pub fn random_unsalted<R: CryptoRngCore + ?Sized>(
+        rng: &mut R,
+        bit_size: usize,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: RsaPrivateKey::new(rng, bit_size)?,
+            salt_len: None,
+            phantom: Default::default(),
+        })
+    }
+
+    /// Generate a new random RSASSA-PSS signing key with a salt of the given length.
+    #[deprecated(since = "0.9.0", note = "use SigningKey::random instead")]
+    pub fn random_with_salt_len<R: CryptoRngCore + ?Sized>(
+        rng: &mut R,
+        bit_size: usize,
+        salt_len: usize,
+    ) -> Result<Self> {
+        Self::random(rng, bit_size, salt_len)
     }
 
     /// Return specified salt length for this key
@@ -754,7 +786,7 @@ where
     D: Digest,
 {
     fn from(key: RsaPrivateKey) -> Self {
-        Self::new(key)
+        Self::new_unsalted(key)
     }
 }
 
@@ -1172,7 +1204,7 @@ mod test {
 
         for (text, sig, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
-            let result = pub_key.verify(Pss::new::<Sha1>(), &digest, sig);
+            let result = pub_key.verify(Pss::new_unsalted::<Sha1>(), &digest, sig);
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -1270,11 +1302,11 @@ mod test {
         for test in &tests {
             let digest = Sha1::digest(test.as_bytes()).to_vec();
             let sig = priv_key
-                .sign_with_rng(&mut rng.clone(), Pss::new::<Sha1>(), &digest)
+                .sign_with_rng(&mut rng.clone(), Pss::new_unsalted::<Sha1>(), &digest)
                 .expect("failed to sign");
 
             priv_key
-                .verify(Pss::new::<Sha1>(), &digest, &sig)
+                .verify(Pss::new_unsalted::<Sha1>(), &digest, &sig)
                 .expect("failed to verify");
         }
     }
@@ -1289,11 +1321,15 @@ mod test {
         for test in &tests {
             let digest = Sha1::digest(test.as_bytes()).to_vec();
             let sig = priv_key
-                .sign_with_rng(&mut rng.clone(), Pss::new_blinded::<Sha1>(), &digest)
+                .sign_with_rng(
+                    &mut rng.clone(),
+                    Pss::new_blinded_unsalted::<Sha1>(),
+                    &digest,
+                )
                 .expect("failed to sign");
 
             priv_key
-                .verify(Pss::new::<Sha1>(), &digest, &sig)
+                .verify(Pss::new_unsalted::<Sha1>(), &digest, &sig)
                 .expect("failed to verify");
         }
     }
@@ -1304,7 +1340,7 @@ mod test {
 
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let signing_key = SigningKey::<Sha1>::new(priv_key);
+        let signing_key = SigningKey::<Sha1>::new_unsalted(priv_key);
         let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
@@ -1338,7 +1374,7 @@ mod test {
 
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let signing_key = SigningKey::new(priv_key);
+        let signing_key = SigningKey::new_unsalted(priv_key);
         let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
@@ -1419,7 +1455,7 @@ mod test {
 
         let tests = [Sha1::digest("test\n")];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let signing_key = SigningKey::<Sha1>::new(priv_key);
+        let signing_key = SigningKey::<Sha1>::new_unsalted(priv_key);
         let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
@@ -1460,11 +1496,11 @@ mod test {
 
         let digest = Sha1::digest(plaintext.as_bytes()).to_vec();
         let sig = priv_key
-            .sign_with_rng(&mut rng.clone(), Pss::new::<Sha1>(), &digest)
+            .sign_with_rng(&mut rng.clone(), Pss::new_unsalted::<Sha1>(), &digest)
             .expect("failed to sign");
 
         priv_key
-            .verify(Pss::new::<Sha1>(), &digest, &sig)
+            .verify(Pss::new_unsalted::<Sha1>(), &digest, &sig)
             .expect("failed to verify");
     }
 }
