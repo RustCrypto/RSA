@@ -69,7 +69,7 @@
 //!
 //! let bits = 2048;
 //! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
-//! let signing_key = SigningKey::<Sha256>::new_with_prefix(private_key);
+//! let signing_key = SigningKey::<Sha256>::new(private_key);
 //! let verifying_key = signing_key.verifying_key();
 //!
 //! // Sign
