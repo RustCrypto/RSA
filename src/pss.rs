@@ -47,17 +47,14 @@ pub struct Pss {
     pub digest: Box<dyn DynDigest + Send + Sync>,
 
     /// Salt length.
-    pub salt_len: Option<usize>,
+    pub salt_len: usize,
 }
 
 impl Pss {
     /// New PSS padding for the given digest.
+    /// Digest output size is used as a salt length.
     pub fn new<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
-        Self {
-            blinded: false,
-            digest: Box::new(T::new()),
-            salt_len: None,
-        }
+        Self::new_with_salt::<T>(<T as Digest>::output_size())
     }
 
     /// New PSS padding for the given digest with a salt value of the given length.
@@ -65,17 +62,14 @@ impl Pss {
         Self {
             blinded: false,
             digest: Box::new(T::new()),
-            salt_len: Some(len),
+            salt_len: len,
         }
     }
 
     /// New PSS padding for blinded signatures (RSA-BSSA) for the given digest.
+    /// Digest output size is used as a salt length.
     pub fn new_blinded<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
-        Self {
-            blinded: true,
-            digest: Box::new(T::new()),
-            salt_len: None,
-        }
+        Self::new_blinded_with_salt::<T>(<T as Digest>::output_size())
     }
 
     /// New PSS padding for blinded signatures (RSA-BSSA) for the given digest
@@ -86,7 +80,7 @@ impl Pss {
         Self {
             blinded: true,
             digest: Box::new(T::new()),
-            salt_len: Some(len),
+            salt_len: len,
         }
     }
 }
@@ -238,10 +232,11 @@ pub(crate) fn sign<T: CryptoRngCore, SK: PrivateKey>(
     blind: bool,
     priv_key: &SK,
     hashed: &[u8],
-    salt_len: Option<usize>,
+    salt_len: usize,
     digest: &mut dyn DynDigest,
 ) -> Result<Vec<u8>> {
-    let salt = generate_salt(rng, priv_key, salt_len, digest.output_size());
+    let mut salt = vec![0; salt_len];
+    rng.fill_bytes(&mut salt[..]);
 
     sign_pss_with_salt(blind.then_some(rng), priv_key, hashed, &salt, digest)
 }
@@ -255,27 +250,12 @@ pub(crate) fn sign_digest<
     blind: bool,
     priv_key: &SK,
     hashed: &[u8],
-    salt_len: Option<usize>,
+    salt_len: usize,
 ) -> Result<Vec<u8>> {
-    let salt = generate_salt(rng, priv_key, salt_len, <D as Digest>::output_size());
-
-    sign_pss_with_salt_digest::<_, _, D>(blind.then_some(rng), priv_key, hashed, &salt)
-}
-
-fn generate_salt<T: CryptoRngCore + ?Sized, SK: PrivateKey>(
-    rng: &mut T,
-    priv_key: &SK,
-    salt_len: Option<usize>,
-    digest_size: usize,
-) -> Vec<u8> {
-    let em_bits = priv_key.n().bits() - 1;
-    let em_len = (em_bits + 7) / 8;
-    let salt_len = salt_len.unwrap_or(em_len - 2 - digest_size);
-
     let mut salt = vec![0; salt_len];
     rng.fill_bytes(&mut salt[..]);
 
-    salt
+    sign_pss_with_salt_digest::<_, _, D>(blind.then_some(rng), priv_key, hashed, &salt)
 }
 
 /// signPSSWithSalt calculates the signature of hashed using PSS with specified salt.
@@ -644,7 +624,7 @@ where
     D: Digest,
 {
     inner: RsaPrivateKey,
-    salt_len: Option<usize>,
+    salt_len: usize,
     phantom: PhantomData<D>,
 }
 
@@ -653,30 +633,24 @@ where
     D: Digest,
 {
     /// Create a new RSASSA-PSS signing key.
+    /// Digest output size is used as a salt length.
     pub fn new(key: RsaPrivateKey) -> Self {
-        Self {
-            inner: key,
-            salt_len: None,
-            phantom: Default::default(),
-        }
+        Self::new_with_salt_len(key, <D as Digest>::output_size())
     }
 
     /// Create a new RSASSA-PSS signing key with a salt of the given length.
     pub fn new_with_salt_len(key: RsaPrivateKey, salt_len: usize) -> Self {
         Self {
             inner: key,
-            salt_len: Some(salt_len),
+            salt_len,
             phantom: Default::default(),
         }
     }
 
     /// Generate a new random RSASSA-PSS signing key.
+    /// Digest output size is used as a salt length.
     pub fn random<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
-        Ok(Self {
-            inner: RsaPrivateKey::new(rng, bit_size)?,
-            salt_len: None,
-            phantom: Default::default(),
-        })
+        Self::random_with_salt_len(rng, bit_size, <D as Digest>::output_size())
     }
 
     /// Generate a new random RSASSA-PSS signing key with a salt of the given length.
@@ -687,27 +661,23 @@ where
     ) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
-            salt_len: Some(salt_len),
+            salt_len,
             phantom: Default::default(),
         })
     }
 
     /// Return specified salt length for this key
-    pub fn salt_len(&self) -> Option<usize> {
+    pub fn salt_len(&self) -> usize {
         self.salt_len
     }
 }
 
-fn get_pss_signature_algo_id<D>(
-    salt_len: Option<usize>,
-) -> pkcs8::spki::Result<AlgorithmIdentifierOwned>
+fn get_pss_signature_algo_id<D>(salt_len: u8) -> pkcs8::spki::Result<AlgorithmIdentifierOwned>
 where
     D: Digest + AssociatedOid,
 {
     const ID_MGF_1: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.8");
     const ID_RSASSA_PSS: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.10");
-
-    let salt_len = salt_len.map_or(RsaPssParams::SALT_LEN_DEFAULT, |l| l as u8);
 
     let pss_params = RsaPssParams {
         hash: AlgorithmIdentifierRef {
@@ -745,7 +715,7 @@ where
     D: Digest + AssociatedOid,
 {
     fn signature_algorithm_identifier(&self) -> pkcs8::spki::Result<AlgorithmIdentifierOwned> {
-        get_pss_signature_algo_id::<D>(self.salt_len)
+        get_pss_signature_algo_id::<D>(self.salt_len as u8)
     }
 }
 
@@ -851,7 +821,7 @@ where
     D: Digest,
 {
     inner: RsaPrivateKey,
-    salt_len: Option<usize>,
+    salt_len: usize,
     phantom: PhantomData<D>,
 }
 
@@ -861,12 +831,9 @@ where
 {
     /// Create a new RSASSA-PSS signing key which produces "blinded"
     /// signatures.
+    /// Digest output size is used as a salt length.
     pub fn new(key: RsaPrivateKey) -> Self {
-        Self {
-            inner: key,
-            salt_len: None,
-            phantom: Default::default(),
-        }
+        Self::new_with_salt_len(key, <D as Digest>::output_size())
     }
 
     /// Create a new RSASSA-PSS signing key which produces "blinded"
@@ -874,13 +841,13 @@ where
     pub fn new_with_salt_len(key: RsaPrivateKey, salt_len: usize) -> Self {
         Self {
             inner: key,
-            salt_len: Some(salt_len),
+            salt_len,
             phantom: Default::default(),
         }
     }
 
     /// Return specified salt length for this key
-    pub fn salt_len(&self) -> Option<usize> {
+    pub fn salt_len(&self) -> usize {
         self.salt_len
     }
 }
@@ -899,7 +866,7 @@ where
     D: Digest + AssociatedOid,
 {
     fn signature_algorithm_identifier(&self) -> pkcs8::spki::Result<AlgorithmIdentifierOwned> {
-        get_pss_signature_algo_id::<D>(self.salt_len)
+        get_pss_signature_algo_id::<D>(self.salt_len as u8)
     }
 }
 
