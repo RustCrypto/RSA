@@ -103,7 +103,7 @@ impl SignatureScheme for Pss {
     }
 
     fn verify<Pub: PublicKey>(mut self, pub_key: &Pub, hashed: &[u8], sig: &[u8]) -> Result<()> {
-        verify(pub_key, hashed, sig, &mut *self.digest)
+        verify(pub_key, hashed, sig, &mut *self.digest, self.salt_len)
     }
 }
 
@@ -192,6 +192,7 @@ pub(crate) fn verify<PK: PublicKey>(
     hashed: &[u8],
     sig: &[u8],
     digest: &mut dyn DynDigest,
+    salt_len: usize,
 ) -> Result<()> {
     if sig.len() != pub_key.size() {
         return Err(Error::Verification);
@@ -202,10 +203,21 @@ pub(crate) fn verify<PK: PublicKey>(
     let key_len = pub_key.size();
     let mut em = pub_key.raw_encryption_primitive(sig, key_len)?;
 
-    emsa_pss_verify(hashed, &mut em[key_len - em_len..], em_bits, None, digest)
+    emsa_pss_verify(
+        hashed,
+        &mut em[key_len - em_len..],
+        em_bits,
+        salt_len,
+        digest,
+    )
 }
 
-pub(crate) fn verify_digest<PK, D>(pub_key: &PK, hashed: &[u8], sig: &[u8]) -> Result<()>
+pub(crate) fn verify_digest<PK, D>(
+    pub_key: &PK,
+    hashed: &[u8],
+    sig: &[u8],
+    salt_len: usize,
+) -> Result<()>
 where
     PK: PublicKey,
     D: Digest + FixedOutputReset,
@@ -219,7 +231,7 @@ where
     let key_len = pub_key.size();
     let mut em = pub_key.raw_encryption_primitive(sig, key_len)?;
 
-    emsa_pss_verify_digest::<D>(hashed, &mut em[key_len - em_len..], em_bits, None)
+    emsa_pss_verify_digest::<D>(hashed, &mut em[key_len - em_len..], em_bits, salt_len)
 }
 
 /// SignPSS calculates the signature of hashed using RSASSA-PSS.
@@ -442,7 +454,7 @@ fn emsa_pss_verify_pre<'a>(
     m_hash: &[u8],
     em: &'a mut [u8],
     em_bits: usize,
-    s_len: Option<usize>,
+    s_len: usize,
     h_len: usize,
 ) -> Result<(&'a mut [u8], &'a mut [u8])> {
     // 1. If the length of M is greater than the input limitation for the
@@ -456,7 +468,7 @@ fn emsa_pss_verify_pre<'a>(
 
     // 3. If emLen < hLen + sLen + 2, output "inconsistent" and stop.
     let em_len = em.len(); //(em_bits + 7) / 8;
-    if em_len < h_len + s_len.unwrap_or_default() + 2 {
+    if em_len < h_len + s_len + 2 {
         return Err(Error::Verification);
     }
 
@@ -486,34 +498,14 @@ fn emsa_pss_verify_pre<'a>(
     Ok((db, h))
 }
 
-fn emsa_pss_get_salt(
-    db: &[u8],
-    em_len: usize,
-    s_len: Option<usize>,
-    h_len: usize,
-) -> Result<&[u8]> {
-    let s_len = match s_len {
-        None => (0..=em_len - (h_len + 2))
-            .rev()
-            .try_fold(None, |state, i| match (state, db[em_len - h_len - i - 2]) {
-                (Some(i), _) => Ok(Some(i)),
-                (_, 1) => Ok(Some(i)),
-                (_, 0) => Ok(None),
-                _ => Err(Error::Verification),
-            })?
-            .ok_or(Error::Verification)?,
-        Some(s_len) => {
-            // 10. If the emLen - hLen - sLen - 2 leftmost octets of DB are not zero
-            //     or if the octet at position emLen - hLen - sLen - 1 (the leftmost
-            //     position is "position 1") does not have hexadecimal value 0x01,
-            //     output "inconsistent" and stop.
-            let (zeroes, rest) = db.split_at(em_len - h_len - s_len - 2);
-            if zeroes.iter().any(|e| *e != 0x00) || rest[0] != 0x01 {
-                return Err(Error::Verification);
-            }
-
-            s_len
-        }
+fn emsa_pss_get_salt(db: &[u8], em_len: usize, s_len: usize, h_len: usize) -> Result<&[u8]> {
+    // 10. If the emLen - hLen - sLen - 2 leftmost octets of DB are not zero
+    //     or if the octet at position emLen - hLen - sLen - 1 (the leftmost
+    //     position is "position 1") does not have hexadecimal value 0x01,
+    //     output "inconsistent" and stop.
+    let (zeroes, rest) = db.split_at(em_len - h_len - s_len - 2);
+    if zeroes.iter().any(|e| *e != 0x00) || rest[0] != 0x01 {
+        return Err(Error::Verification);
     };
 
     // 11. Let salt be the last s_len octets of DB.
@@ -526,7 +518,7 @@ fn emsa_pss_verify(
     m_hash: &[u8],
     em: &mut [u8],
     em_bits: usize,
-    s_len: Option<usize>,
+    s_len: usize,
     hash: &mut dyn DynDigest,
 ) -> Result<()> {
     let em_len = em.len(); //(em_bits + 7) / 8;
@@ -570,7 +562,7 @@ fn emsa_pss_verify_digest<D>(
     m_hash: &[u8],
     em: &mut [u8],
     em_bits: usize,
-    s_len: Option<usize>,
+    s_len: usize,
 ) -> Result<()>
 where
     D: Digest + FixedOutputReset,
@@ -754,6 +746,7 @@ where
     fn verifying_key(&self) -> Self::VerifyingKey {
         VerifyingKey {
             inner: self.inner.to_public_key(),
+            salt_len: self.salt_len,
             phantom: Default::default(),
         }
     }
@@ -905,6 +898,7 @@ where
     fn verifying_key(&self) -> Self::VerifyingKey {
         VerifyingKey {
             inner: self.inner.to_public_key(),
+            salt_len: self.salt_len,
             phantom: Default::default(),
         }
     }
@@ -974,6 +968,7 @@ where
     D: Digest,
 {
     inner: RsaPublicKey,
+    salt_len: usize,
     phantom: PhantomData<D>,
 }
 
@@ -985,6 +980,7 @@ where
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
+            salt_len: self.salt_len,
             phantom: Default::default(),
         }
     }
@@ -995,9 +991,16 @@ where
     D: Digest,
 {
     /// Create a new RSASSA-PSS verifying key.
+    /// Digest output size is used as a salt length.
     pub fn new(key: RsaPublicKey) -> Self {
+        Self::new_with_salt_len(key, <D as Digest>::output_size())
+    }
+
+    /// Create a new RSASSA-PSS verifying key.
+    pub fn new_with_salt_len(key: RsaPublicKey, salt_len: usize) -> Self {
         Self {
             inner: key,
+            salt_len,
             phantom: Default::default(),
         }
     }
@@ -1035,8 +1038,13 @@ where
     D: Digest + FixedOutputReset,
 {
     fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify_digest::<_, D>(&self.inner, &D::digest(msg), signature.as_ref())
-            .map_err(|e| e.into())
+        verify_digest::<_, D>(
+            &self.inner,
+            &D::digest(msg),
+            signature.as_ref(),
+            self.salt_len,
+        )
+        .map_err(|e| e.into())
     }
 }
 
@@ -1045,8 +1053,13 @@ where
     D: Digest + FixedOutputReset,
 {
     fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
-        verify_digest::<_, D>(&self.inner, &digest.finalize(), signature.as_ref())
-            .map_err(|e| e.into())
+        verify_digest::<_, D>(
+            &self.inner,
+            &digest.finalize(),
+            signature.as_ref(),
+            self.salt_len,
+        )
+        .map_err(|e| e.into())
     }
 }
 
@@ -1055,7 +1068,8 @@ where
     D: Digest + FixedOutputReset,
 {
     fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify_digest::<_, D>(&self.inner, prehash, signature.as_ref()).map_err(|e| e.into())
+        verify_digest::<_, D>(&self.inner, prehash, signature.as_ref(), self.salt_len)
+            .map_err(|e| e.into())
     }
 }
 
