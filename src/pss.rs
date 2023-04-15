@@ -30,7 +30,7 @@ use signature::{
     hazmat::{PrehashVerifier, RandomizedPrehashSigner},
     DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, SignatureEncoding, Verifier,
 };
-use subtle::ConstantTimeEq;
+use subtle::{Choice, ConstantTimeEq};
 
 use crate::algorithms::{mgf1_xor, mgf1_xor_digest};
 use crate::errors::{Error, Result};
@@ -498,20 +498,17 @@ fn emsa_pss_verify_pre<'a>(
     Ok((db, h))
 }
 
-fn emsa_pss_get_salt(db: &[u8], em_len: usize, s_len: usize, h_len: usize) -> Result<&[u8]> {
+fn emsa_pss_verify_salt(db: &[u8], em_len: usize, s_len: usize, h_len: usize) -> Choice {
     // 10. If the emLen - hLen - sLen - 2 leftmost octets of DB are not zero
     //     or if the octet at position emLen - hLen - sLen - 1 (the leftmost
     //     position is "position 1") does not have hexadecimal value 0x01,
     //     output "inconsistent" and stop.
     let (zeroes, rest) = db.split_at(em_len - h_len - s_len - 2);
-    if zeroes.iter().any(|e| *e != 0x00) || rest[0] != 0x01 {
-        return Err(Error::Verification);
-    };
+    let valid: Choice = zeroes
+        .iter()
+        .fold(Choice::from(1u8), |a, e| a & e.ct_eq(&0x00));
 
-    // 11. Let salt be the last s_len octets of DB.
-    let salt = &db[db.len() - s_len..];
-
-    Ok(salt)
+    valid & rest[0].ct_eq(&0x01)
 }
 
 fn emsa_pss_verify(
@@ -535,7 +532,10 @@ fn emsa_pss_verify(
     //     to zero.
     db[0] &= 0xFF >> /*uint*/(8 * em_len - em_bits);
 
-    let salt = emsa_pss_get_salt(db, em_len, s_len, h_len)?;
+    let salt_valid = emsa_pss_verify_salt(db, em_len, s_len, h_len);
+
+    // 11. Let salt be the last s_len octets of DB.
+    let salt = &db[db.len() - s_len..];
 
     // 12. Let
     //          M' = (0x)00 00 00 00 00 00 00 00 || mHash || salt ;
@@ -551,7 +551,7 @@ fn emsa_pss_verify(
     let h0 = hash.finalize_reset();
 
     // 14. If H = H', output "consistent." Otherwise, output "inconsistent."
-    if h0.ct_eq(h).into() {
+    if (salt_valid & h0.ct_eq(h)).into() {
         Ok(())
     } else {
         Err(Error::Verification)
@@ -583,7 +583,10 @@ where
     //     to zero.
     db[0] &= 0xFF >> /*uint*/(8 * em_len - em_bits);
 
-    let salt = emsa_pss_get_salt(db, em_len, s_len, h_len)?;
+    let salt_valid = emsa_pss_verify_salt(db, em_len, s_len, h_len);
+
+    // 11. Let salt be the last s_len octets of DB.
+    let salt = &db[db.len() - s_len..];
 
     // 12. Let
     //          M' = (0x)00 00 00 00 00 00 00 00 || mHash || salt ;
@@ -599,7 +602,7 @@ where
     let h0 = hash.finalize_reset();
 
     // 14. If H = H', output "consistent." Otherwise, output "inconsistent."
-    if h0.ct_eq(h).into() {
+    if (salt_valid & h0.ct_eq(h)).into() {
         Ok(())
     } else {
         Err(Error::Verification)
