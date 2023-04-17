@@ -842,6 +842,27 @@ where
         }
     }
 
+    /// Create a new random RSASSA-PSS signing key which produces "blinded"
+    /// signatures.
+    /// Digest output size is used as a salt length.
+    pub fn random<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+        Self::random_with_salt_len(rng, bit_size, <D as Digest>::output_size())
+    }
+
+    /// Create a new random RSASSA-PSS signing key which produces "blinded"
+    /// signatures with a salt of the given length.
+    pub fn random_with_salt_len<R: CryptoRngCore + ?Sized>(
+        rng: &mut R,
+        bit_size: usize,
+        salt_len: usize,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: RsaPrivateKey::new(rng, bit_size)?,
+            salt_len,
+            phantom: Default::default(),
+        })
+    }
+
     /// Return specified salt length for this key
     pub fn salt_len(&self) -> usize {
         self.salt_len
