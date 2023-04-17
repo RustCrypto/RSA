@@ -83,14 +83,22 @@ impl Pkcs1v15Sign {
         }
     }
 
-    /// Create new PKCS#1 v1.5 padding for computing a raw signature.
+    /// Create new PKCS#1 v1.5 padding for computing an unprefixed signature.
     ///
     /// This sets `hash_len` to `None` and uses an empty `prefix`.
-    pub fn new_raw() -> Self {
+    pub fn new_unprefixed() -> Self {
         Self {
             hash_len: None,
             prefix: Box::new([]),
         }
+    }
+
+    /// Create new PKCS#1 v1.5 padding for computing an unprefixed signature.
+    ///
+    /// This sets `hash_len` to `None` and uses an empty `prefix`.
+    #[deprecated(since = "0.9.0", note = "use Pkcs1v15Sign::new_unprefixed instead")]
+    pub fn new_raw() -> Self {
+        Self::new_unprefixed()
     }
 }
 
@@ -1300,12 +1308,12 @@ mod tests {
         let expected_sig = Base64::decode_vec("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
         let priv_key = get_private_key();
 
-        let sig = priv_key.sign(Pkcs1v15Sign::new_raw(), msg).unwrap();
+        let sig = priv_key.sign(Pkcs1v15Sign::new_unprefixed(), msg).unwrap();
         assert_eq!(expected_sig, sig);
 
         let pub_key: RsaPublicKey = priv_key.into();
         pub_key
-            .verify(Pkcs1v15Sign::new_raw(), msg, &sig)
+            .verify(Pkcs1v15Sign::new_unprefixed(), msg, &sig)
             .expect("failed to verify");
     }
 
