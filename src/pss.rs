@@ -38,6 +38,9 @@ use crate::key::{PrivateKey, PublicKey};
 use crate::padding::SignatureScheme;
 use crate::{RsaPrivateKey, RsaPublicKey};
 
+#[cfg(feature = "getrandom")]
+use {rand_core::OsRng, signature::Signer};
+
 /// Digital signatures using PSS padding.
 pub struct Pss {
     /// Create blinded signatures.
@@ -752,6 +755,16 @@ where
             salt_len: self.salt_len,
             phantom: Default::default(),
         }
+    }
+}
+
+#[cfg(feature = "getrandom")]
+impl<D> Signer<Signature> for SigningKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
+        self.try_sign_with_rng(&mut OsRng, msg)
     }
 }
 
