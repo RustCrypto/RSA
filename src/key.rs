@@ -31,7 +31,17 @@ pub trait PublicKeyParts {
     }
 }
 
-pub trait PrivateKey: DecryptionPrimitive + PublicKeyParts {}
+/// Generic trait for operations on a private key.
+pub trait PrivateKey: DecryptionPrimitive + PublicKeyParts + Sized {
+    /// Corresponding public key type
+    type PublicKey: PublicKey;
+
+    /// generate new random private key of the specified bit size
+    fn new<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self>;
+
+    /// convert this private key to the corresponding public key
+    fn to_public_key(&self) -> Self::PublicKey;
+}
 
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -251,14 +261,24 @@ impl PublicKeyParts for RsaPrivateKey {
     }
 }
 
-impl PrivateKey for RsaPrivateKey {}
+impl PrivateKey for RsaPrivateKey {
+    type PublicKey = RsaPublicKey;
 
-impl RsaPrivateKey {
     /// Generate a new Rsa key pair of the given bit size using the passed in `rng`.
-    pub fn new<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
+    fn new<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
         generate_multi_prime_key(rng, 2, bit_size)
     }
 
+    /// Get the public key from the private key, cloning `n` and `e`.
+    ///
+    /// Generally this is not needed since `RsaPrivateKey` implements the `PublicKey` trait,
+    /// but it can occasionally be useful to discard the private information entirely.
+    fn to_public_key(&self) -> Self::PublicKey {
+        self.pubkey_components.clone()
+    }
+}
+
+impl RsaPrivateKey {
     /// Generate a new RSA key pair of the given bit size and the public exponent
     /// using the passed in `rng`.
     ///
@@ -295,14 +315,6 @@ impl RsaPrivateKey {
         let _ = k.precompute();
 
         Ok(k)
-    }
-
-    /// Get the public key from the private key, cloning `n` and `e`.
-    ///
-    /// Generally this is not needed since `RsaPrivateKey` implements the `PublicKey` trait,
-    /// but it can occasionally be useful to discard the private information entirely.
-    pub fn to_public_key(&self) -> RsaPublicKey {
-        self.pubkey_components.clone()
     }
 
     /// Performs some calculations to speed up private key operations.

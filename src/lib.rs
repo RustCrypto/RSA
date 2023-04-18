@@ -14,7 +14,7 @@
 //!
 //! ## PKCS#1 v1.5 encryption
 //! ```
-//! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
+//! use rsa::{PrivateKey, PublicKey, RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
 //!
 //! let mut rng = rand::thread_rng();
 //!
@@ -34,7 +34,7 @@
 //!
 //! ## OAEP encryption
 //! ```
-//! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, Oaep};
+//! use rsa::{PrivateKey, PublicKey, RsaPrivateKey, RsaPublicKey, Oaep};
 //!
 //! let mut rng = rand::thread_rng();
 //!
@@ -60,7 +60,7 @@
 //!
 #![cfg_attr(feature = "sha2", doc = "```")]
 #![cfg_attr(not(feature = "sha2"), doc = "```ignore")]
-//! use rsa::RsaPrivateKey;
+//! use rsa::{PrivateKey, RsaPrivateKey};
 //! use rsa::pkcs1v15::{SigningKey, VerifyingKey};
 //! use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier};
 //! use rsa::sha2::{Digest, Sha256};
@@ -87,7 +87,7 @@
 //!
 #![cfg_attr(feature = "sha2", doc = "```")]
 #![cfg_attr(not(feature = "sha2"), doc = "```ignore")]
-//! use rsa::RsaPrivateKey;
+//! use rsa::{PrivateKey, RsaPrivateKey};
 //! use rsa::pss::{BlindedSigningKey, VerifyingKey};
 //! use rsa::signature::{Keypair,RandomizedSigner, SignatureEncoding, Verifier};
 //! use rsa::sha2::{Digest, Sha256};
@@ -96,7 +96,7 @@
 //!
 //! let bits = 2048;
 //! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
-//! let signing_key = BlindedSigningKey::<Sha256>::new(private_key);
+//! let signing_key = BlindedSigningKey::<Sha256, _>::new(private_key);
 //! let verifying_key = signing_key.verifying_key();
 //!
 //! // Sign
@@ -241,7 +241,7 @@ pub use pkcs8;
 pub use sha2;
 
 pub use crate::{
-    key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey},
+    key::{PrivateKey, PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey},
     oaep::Oaep,
     padding::{PaddingScheme, SignatureScheme},
     pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign},

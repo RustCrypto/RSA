@@ -36,7 +36,6 @@ use crate::algorithms::{mgf1_xor, mgf1_xor_digest};
 use crate::errors::{Error, Result};
 use crate::key::{PrivateKey, PublicKey};
 use crate::padding::SignatureScheme;
-use crate::{RsaPrivateKey, RsaPublicKey};
 
 #[cfg(feature = "getrandom")]
 use {rand_core::OsRng, signature::Signer};
@@ -617,27 +616,29 @@ where
 ///
 /// [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 #[derive(Debug, Clone)]
-pub struct SigningKey<D>
+pub struct SigningKey<D, Priv>
 where
     D: Digest,
+    Priv: PrivateKey,
 {
-    inner: RsaPrivateKey,
+    inner: Priv,
     salt_len: usize,
     phantom: PhantomData<D>,
 }
 
-impl<D> SigningKey<D>
+impl<D, Priv> SigningKey<D, Priv>
 where
     D: Digest,
+    Priv: PrivateKey,
 {
     /// Create a new RSASSA-PSS signing key.
     /// Digest output size is used as a salt length.
-    pub fn new(key: RsaPrivateKey) -> Self {
+    pub fn new(key: Priv) -> Self {
         Self::new_with_salt_len(key, <D as Digest>::output_size())
     }
 
     /// Create a new RSASSA-PSS signing key with a salt of the given length.
-    pub fn new_with_salt_len(key: RsaPrivateKey, salt_len: usize) -> Self {
+    pub fn new_with_salt_len(key: Priv, salt_len: usize) -> Self {
         Self {
             inner: key,
             salt_len,
@@ -658,7 +659,7 @@ where
         salt_len: usize,
     ) -> Result<Self> {
         Ok(Self {
-            inner: RsaPrivateKey::new(rng, bit_size)?,
+            inner: Priv::new(rng, bit_size)?,
             salt_len,
             phantom: Default::default(),
         })
@@ -684,56 +685,53 @@ where
     })
 }
 
-impl<D> AssociatedAlgorithmIdentifier for SigningKey<D>
+impl<D, Priv> AssociatedAlgorithmIdentifier for SigningKey<D, Priv>
 where
     D: Digest,
+    Priv: PrivateKey,
 {
     type Params = AnyRef<'static>;
 
     const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
 }
 
-impl<D> DynSignatureAlgorithmIdentifier for SigningKey<D>
+impl<D, Priv> DynSignatureAlgorithmIdentifier for SigningKey<D, Priv>
 where
     D: Digest + AssociatedOid,
+    Priv: PrivateKey,
 {
     fn signature_algorithm_identifier(&self) -> pkcs8::spki::Result<AlgorithmIdentifierOwned> {
         get_pss_signature_algo_id::<D>(self.salt_len as u8)
     }
 }
 
-impl<D> From<RsaPrivateKey> for SigningKey<D>
+impl<D, Priv> From<Priv> for SigningKey<D, Priv>
 where
     D: Digest,
+    Priv: PrivateKey,
 {
-    fn from(key: RsaPrivateKey) -> Self {
+    fn from(key: Priv) -> Self {
         Self::new(key)
     }
 }
 
-impl<D> From<SigningKey<D>> for RsaPrivateKey
+impl<D, Priv> EncodePrivateKey for SigningKey<D, Priv>
 where
     D: Digest,
-{
-    fn from(key: SigningKey<D>) -> Self {
-        key.inner
-    }
-}
-
-impl<D> EncodePrivateKey for SigningKey<D>
-where
-    D: Digest,
+    Priv: PrivateKey + EncodePrivateKey,
 {
     fn to_pkcs8_der(&self) -> pkcs8::Result<SecretDocument> {
         self.inner.to_pkcs8_der()
     }
 }
 
-impl<D> Keypair for SigningKey<D>
+impl<D, Priv> Keypair for SigningKey<D, Priv>
 where
     D: Digest,
+    Priv: PrivateKey,
+    Priv::PublicKey: Clone,
 {
-    type VerifyingKey = VerifyingKey<D>;
+    type VerifyingKey = VerifyingKey<D, Priv::PublicKey>;
     fn verifying_key(&self) -> Self::VerifyingKey {
         VerifyingKey {
             inner: self.inner.to_public_key(),
@@ -744,18 +742,20 @@ where
 }
 
 #[cfg(feature = "getrandom")]
-impl<D> Signer<Signature> for SigningKey<D>
+impl<D, Priv> Signer<Signature> for SigningKey<D, Priv>
 where
     D: Digest + FixedOutputReset,
+    Priv: PrivateKey,
 {
     fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
         self.try_sign_with_rng(&mut OsRng, msg)
     }
 }
 
-impl<D> RandomizedSigner<Signature> for SigningKey<D>
+impl<D, Priv> RandomizedSigner<Signature> for SigningKey<D, Priv>
 where
     D: Digest + FixedOutputReset,
+    Priv: PrivateKey,
 {
     fn try_sign_with_rng(
         &self,
@@ -768,9 +768,10 @@ where
     }
 }
 
-impl<D> RandomizedDigestSigner<D, Signature> for SigningKey<D>
+impl<D, Priv> RandomizedDigestSigner<D, Signature> for SigningKey<D, Priv>
 where
     D: Digest + FixedOutputReset,
+    Priv: PrivateKey,
 {
     fn try_sign_digest_with_rng(
         &self,
@@ -783,9 +784,10 @@ where
     }
 }
 
-impl<D> RandomizedPrehashSigner<Signature> for SigningKey<D>
+impl<D, Priv> RandomizedPrehashSigner<Signature> for SigningKey<D, Priv>
 where
     D: Digest + FixedOutputReset,
+    Priv: PrivateKey,
 {
     fn sign_prehash_with_rng(
         &self,
@@ -798,11 +800,12 @@ where
     }
 }
 
-impl<D> AsRef<RsaPrivateKey> for SigningKey<D>
+impl<D, Priv> AsRef<Priv> for SigningKey<D, Priv>
 where
     D: Digest,
+    Priv: PrivateKey,
 {
-    fn as_ref(&self) -> &RsaPrivateKey {
+    fn as_ref(&self) -> &Priv {
         &self.inner
     }
 }
@@ -810,29 +813,31 @@ where
 /// Signing key for producing "blinded" RSASSA-PSS signatures as described in
 /// [draft-irtf-cfrg-rsa-blind-signatures](https://datatracker.ietf.org/doc/draft-irtf-cfrg-rsa-blind-signatures/).
 #[derive(Debug, Clone)]
-pub struct BlindedSigningKey<D>
+pub struct BlindedSigningKey<D, Priv>
 where
     D: Digest,
+    Priv: PrivateKey,
 {
-    inner: RsaPrivateKey,
+    inner: Priv,
     salt_len: usize,
     phantom: PhantomData<D>,
 }
 
-impl<D> BlindedSigningKey<D>
+impl<D, Priv> BlindedSigningKey<D, Priv>
 where
     D: Digest,
+    Priv: PrivateKey,
 {
     /// Create a new RSASSA-PSS signing key which produces "blinded"
     /// signatures.
     /// Digest output size is used as a salt length.
-    pub fn new(key: RsaPrivateKey) -> Self {
+    pub fn new(key: Priv) -> Self {
         Self::new_with_salt_len(key, <D as Digest>::output_size())
     }
 
     /// Create a new RSASSA-PSS signing key which produces "blinded"
     /// signatures with a salt of the given length.
-    pub fn new_with_salt_len(key: RsaPrivateKey, salt_len: usize) -> Self {
+    pub fn new_with_salt_len(key: Priv, salt_len: usize) -> Self {
         Self {
             inner: key,
             salt_len,
@@ -855,7 +860,7 @@ where
         salt_len: usize,
     ) -> Result<Self> {
         Ok(Self {
-            inner: RsaPrivateKey::new(rng, bit_size)?,
+            inner: Priv::new(rng, bit_size)?,
             salt_len,
             phantom: Default::default(),
         })
@@ -867,56 +872,53 @@ where
     }
 }
 
-impl<D> AssociatedAlgorithmIdentifier for BlindedSigningKey<D>
+impl<D, Priv> AssociatedAlgorithmIdentifier for BlindedSigningKey<D, Priv>
 where
     D: Digest,
+    Priv: PrivateKey,
 {
     type Params = AnyRef<'static>;
 
     const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
 }
 
-impl<D> DynSignatureAlgorithmIdentifier for BlindedSigningKey<D>
+impl<D, Priv> DynSignatureAlgorithmIdentifier for BlindedSigningKey<D, Priv>
 where
     D: Digest + AssociatedOid,
+    Priv: PrivateKey,
 {
     fn signature_algorithm_identifier(&self) -> pkcs8::spki::Result<AlgorithmIdentifierOwned> {
         get_pss_signature_algo_id::<D>(self.salt_len as u8)
     }
 }
 
-impl<D> From<RsaPrivateKey> for BlindedSigningKey<D>
+impl<D, Priv> From<Priv> for BlindedSigningKey<D, Priv>
 where
     D: Digest,
+    Priv: PrivateKey,
 {
-    fn from(key: RsaPrivateKey) -> Self {
+    fn from(key: Priv) -> Self {
         Self::new(key)
     }
 }
 
-impl<D> From<BlindedSigningKey<D>> for RsaPrivateKey
+impl<D, Priv> EncodePrivateKey for BlindedSigningKey<D, Priv>
 where
     D: Digest,
-{
-    fn from(key: BlindedSigningKey<D>) -> Self {
-        key.inner
-    }
-}
-
-impl<D> EncodePrivateKey for BlindedSigningKey<D>
-where
-    D: Digest,
+    Priv: PrivateKey + EncodePrivateKey,
 {
     fn to_pkcs8_der(&self) -> pkcs8::Result<SecretDocument> {
         self.inner.to_pkcs8_der()
     }
 }
 
-impl<D> Keypair for BlindedSigningKey<D>
+impl<D, Priv> Keypair for BlindedSigningKey<D, Priv>
 where
     D: Digest,
+    Priv: PrivateKey,
+    Priv::PublicKey: Clone,
 {
-    type VerifyingKey = VerifyingKey<D>;
+    type VerifyingKey = VerifyingKey<D, Priv::PublicKey>;
     fn verifying_key(&self) -> Self::VerifyingKey {
         VerifyingKey {
             inner: self.inner.to_public_key(),
@@ -926,9 +928,10 @@ where
     }
 }
 
-impl<D> RandomizedSigner<Signature> for BlindedSigningKey<D>
+impl<D, Priv> RandomizedSigner<Signature> for BlindedSigningKey<D, Priv>
 where
     D: Digest + FixedOutputReset,
+    Priv: PrivateKey,
 {
     fn try_sign_with_rng(
         &self,
@@ -941,9 +944,10 @@ where
     }
 }
 
-impl<D> RandomizedDigestSigner<D, Signature> for BlindedSigningKey<D>
+impl<D, Priv> RandomizedDigestSigner<D, Signature> for BlindedSigningKey<D, Priv>
 where
     D: Digest + FixedOutputReset,
+    Priv: PrivateKey,
 {
     fn try_sign_digest_with_rng(
         &self,
@@ -956,9 +960,10 @@ where
     }
 }
 
-impl<D> RandomizedPrehashSigner<Signature> for BlindedSigningKey<D>
+impl<D, Priv> RandomizedPrehashSigner<Signature> for BlindedSigningKey<D, Priv>
 where
     D: Digest + FixedOutputReset,
+    Priv: PrivateKey,
 {
     fn sign_prehash_with_rng(
         &self,
@@ -971,11 +976,12 @@ where
     }
 }
 
-impl<D> AsRef<RsaPrivateKey> for BlindedSigningKey<D>
+impl<D, Priv> AsRef<Priv> for BlindedSigningKey<D, Priv>
 where
     D: Digest,
+    Priv: PrivateKey,
 {
-    fn as_ref(&self) -> &RsaPrivateKey {
+    fn as_ref(&self) -> &Priv {
         &self.inner
     }
 }
@@ -985,19 +991,21 @@ where
 ///
 /// [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 #[derive(Debug)]
-pub struct VerifyingKey<D>
+pub struct VerifyingKey<D, Pub>
 where
     D: Digest,
+    Pub: PublicKey,
 {
-    inner: RsaPublicKey,
+    inner: Pub,
     salt_len: usize,
     phantom: PhantomData<D>,
 }
 
 /* Implemented manually so we don't have to bind D with Clone */
-impl<D> Clone for VerifyingKey<D>
+impl<D, Pub> Clone for VerifyingKey<D, Pub>
 where
     D: Digest,
+    Pub: PublicKey + Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -1008,18 +1016,19 @@ where
     }
 }
 
-impl<D> VerifyingKey<D>
+impl<D, Pub> VerifyingKey<D, Pub>
 where
     D: Digest,
+    Pub: PublicKey,
 {
     /// Create a new RSASSA-PSS verifying key.
     /// Digest output size is used as a salt length.
-    pub fn new(key: RsaPublicKey) -> Self {
+    pub fn new(key: Pub) -> Self {
         Self::new_with_salt_len(key, <D as Digest>::output_size())
     }
 
     /// Create a new RSASSA-PSS verifying key.
-    pub fn new_with_salt_len(key: RsaPublicKey, salt_len: usize) -> Self {
+    pub fn new_with_salt_len(key: Pub, salt_len: usize) -> Self {
         Self {
             inner: key,
             salt_len,
@@ -1028,36 +1037,30 @@ where
     }
 }
 
-impl<D> AssociatedAlgorithmIdentifier for VerifyingKey<D>
+impl<D, Pub> AssociatedAlgorithmIdentifier for VerifyingKey<D, Pub>
 where
     D: Digest,
+    Pub: PublicKey,
 {
     type Params = AnyRef<'static>;
 
     const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
 }
 
-impl<D> From<RsaPublicKey> for VerifyingKey<D>
+impl<D, Pub> From<Pub> for VerifyingKey<D, Pub>
 where
     D: Digest,
+    Pub: PublicKey,
 {
-    fn from(key: RsaPublicKey) -> Self {
+    fn from(key: Pub) -> Self {
         Self::new(key)
     }
 }
 
-impl<D> From<VerifyingKey<D>> for RsaPublicKey
-where
-    D: Digest,
-{
-    fn from(key: VerifyingKey<D>) -> Self {
-        key.inner
-    }
-}
-
-impl<D> Verifier<Signature> for VerifyingKey<D>
+impl<D, Pub> Verifier<Signature> for VerifyingKey<D, Pub>
 where
     D: Digest + FixedOutputReset,
+    Pub: PublicKey,
 {
     fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
         verify_digest::<_, D>(
@@ -1070,9 +1073,10 @@ where
     }
 }
 
-impl<D> DigestVerifier<D, Signature> for VerifyingKey<D>
+impl<D, Pub> DigestVerifier<D, Signature> for VerifyingKey<D, Pub>
 where
     D: Digest + FixedOutputReset,
+    Pub: PublicKey,
 {
     fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
         verify_digest::<_, D>(
@@ -1085,9 +1089,10 @@ where
     }
 }
 
-impl<D> PrehashVerifier<Signature> for VerifyingKey<D>
+impl<D, Pub> PrehashVerifier<Signature> for VerifyingKey<D, Pub>
 where
     D: Digest + FixedOutputReset,
+    Pub: PublicKey,
 {
     fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
         verify_digest::<_, D>(&self.inner, prehash, signature.as_ref(), self.salt_len)
@@ -1095,18 +1100,20 @@ where
     }
 }
 
-impl<D> AsRef<RsaPublicKey> for VerifyingKey<D>
+impl<D, Pub> AsRef<Pub> for VerifyingKey<D, Pub>
 where
     D: Digest,
+    Pub: PublicKey,
 {
-    fn as_ref(&self) -> &RsaPublicKey {
+    fn as_ref(&self) -> &Pub {
         &self.inner
     }
 }
 
-impl<D> EncodePublicKey for VerifyingKey<D>
+impl<D, Pub> EncodePublicKey for VerifyingKey<D, Pub>
 where
     D: Digest,
+    Pub: PublicKey + EncodePublicKey,
 {
     fn to_public_key_der(&self) -> pkcs8::spki::Result<Document> {
         self.inner.to_public_key_der()
@@ -1116,7 +1123,7 @@ where
 #[cfg(test)]
 mod test {
     use crate::pss::{BlindedSigningKey, Pss, Signature, SigningKey, VerifyingKey};
-    use crate::{PublicKey, RsaPrivateKey, RsaPublicKey};
+    use crate::{PrivateKey, PublicKey, RsaPrivateKey, RsaPublicKey};
 
     use hex_literal::hex;
     use num_bigint::BigUint;
@@ -1208,7 +1215,7 @@ mod test {
             ),
         ];
         let pub_key: RsaPublicKey = priv_key.into();
-        let verifying_key: VerifyingKey<Sha1> = VerifyingKey::new(pub_key);
+        let verifying_key: VerifyingKey<Sha1, _> = VerifyingKey::new(pub_key);
 
         for (text, sig, expected) in &tests {
             let result = verifying_key.verify(
@@ -1307,7 +1314,7 @@ mod test {
 
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let signing_key = SigningKey::<Sha1>::new(priv_key);
+        let signing_key = SigningKey::<Sha1, _>::new(priv_key);
         let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
@@ -1324,7 +1331,7 @@ mod test {
 
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
+        let signing_key = BlindedSigningKey::<Sha1, _>::new(priv_key);
         let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
@@ -1363,7 +1370,7 @@ mod test {
 
         let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
+        let signing_key = BlindedSigningKey::<Sha1, _>::new(priv_key);
         let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
@@ -1402,7 +1409,7 @@ mod test {
             ),
         ];
         let pub_key: RsaPublicKey = priv_key.into();
-        let verifying_key = VerifyingKey::<Sha1>::new(pub_key);
+        let verifying_key = VerifyingKey::<Sha1, _>::new(pub_key);
 
         for (text, sig, expected) in &tests {
             let result = verifying_key
@@ -1422,7 +1429,7 @@ mod test {
 
         let tests = [Sha1::digest("test\n")];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let signing_key = SigningKey::<Sha1>::new(priv_key);
+        let signing_key = SigningKey::<Sha1, _>::new(priv_key);
         let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
@@ -1441,7 +1448,7 @@ mod test {
 
         let tests = [Sha1::digest("test\n")];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
+        let signing_key = BlindedSigningKey::<Sha1, _>::new(priv_key);
         let verifying_key = signing_key.verifying_key();
 
         for test in &tests {

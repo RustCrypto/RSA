@@ -12,7 +12,7 @@ A portable RSA implementation in pure Rust.
 ## Example
 
 ```rust
-use rsa::{Pkcs1v15Encrypt, PublicKey, RsaPrivateKey, RsaPublicKey};
+use rsa::{Pkcs1v15Encrypt, PublicKey, PrivateKey, RsaPrivateKey, RsaPublicKey};
 
 let mut rng = rand::thread_rng();
 let bits = 2048;
