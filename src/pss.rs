@@ -20,8 +20,8 @@ use pkcs1::RsaPssParams;
 use pkcs8::{
     spki::{
         der::{Any, AnyRef},
-        AlgorithmIdentifier, AlgorithmIdentifierOwned, AlgorithmIdentifierRef,
-        AssociatedAlgorithmIdentifier, DynSignatureAlgorithmIdentifier,
+        AlgorithmIdentifierOwned, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
+        DynSignatureAlgorithmIdentifier,
     },
     Document, EncodePrivateKey, EncodePublicKey, SecretDocument,
 };
@@ -671,24 +671,9 @@ fn get_pss_signature_algo_id<D>(salt_len: u8) -> pkcs8::spki::Result<AlgorithmId
 where
     D: Digest + AssociatedOid,
 {
-    const ID_MGF_1: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.8");
     const ID_RSASSA_PSS: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.10");
 
-    let pss_params = RsaPssParams {
-        hash: AlgorithmIdentifierRef {
-            oid: D::OID,
-            parameters: None,
-        },
-        mask_gen: AlgorithmIdentifier {
-            oid: ID_MGF_1,
-            parameters: Some(AlgorithmIdentifierRef {
-                oid: D::OID,
-                parameters: None,
-            }),
-        },
-        salt_len,
-        trailer_field: Default::default(),
-    };
+    let pss_params = RsaPssParams::new::<D>(salt_len);
 
     Ok(AlgorithmIdentifierOwned {
         oid: ID_RSASSA_PSS,
