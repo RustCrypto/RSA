@@ -278,7 +278,7 @@ fn sign_pss_with_salt<T: CryptoRngCore>(
     let em_bits = priv_key.n().bits() - 1;
     let em = emsa_pss_encode(hashed, em_bits, salt, digest)?;
 
-    priv_key.raw_decryption_primitive(blind_rng, &em, priv_key.size())
+    priv_key.raw_int_decryption_primitive(blind_rng, &BigUint::from_bytes_be(&em), priv_key.size())
 }
 
 fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputReset>(
@@ -290,7 +290,7 @@ fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputR
     let em_bits = priv_key.n().bits() - 1;
     let em = emsa_pss_encode_digest::<D>(hashed, em_bits, salt)?;
 
-    priv_key.raw_decryption_primitive(blind_rng, &em, priv_key.size())
+    priv_key.raw_int_decryption_primitive(blind_rng, &BigUint::from_bytes_be(&em), priv_key.size())
 }
 
 fn emsa_pss_encode(

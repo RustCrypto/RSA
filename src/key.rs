@@ -457,16 +457,6 @@ impl RsaPrivateKey {
     }
 
     /// Do NOT use directly! Only for implementors.
-    pub(crate) fn raw_decryption_primitive<R: CryptoRngCore + ?Sized>(
-        &self,
-        rng: Option<&mut R>,
-        ciphertext: &[u8],
-        pad_size: usize,
-    ) -> Result<Vec<u8>> {
-        let int = Zeroizing::new(BigUint::from_bytes_be(ciphertext));
-        self.raw_int_decryption_primitive(rng, &int, pad_size)
-    }
-
     pub(crate) fn raw_int_decryption_primitive<R: CryptoRngCore + ?Sized>(
         &self,
         rng: Option<&mut R>,

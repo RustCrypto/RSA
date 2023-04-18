@@ -275,7 +275,7 @@ pub(crate) fn sign<R: CryptoRngCore + ?Sized>(
     em[k - t_len..k - hash_len].copy_from_slice(prefix);
     em[k - hash_len..k].copy_from_slice(hashed);
 
-    priv_key.raw_decryption_primitive(rng, &em, priv_key.size())
+    priv_key.raw_int_decryption_primitive(rng, &BigUint::from_bytes_be(&em), priv_key.size())
 }
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
@@ -352,7 +352,11 @@ fn decrypt_inner<R: CryptoRngCore + ?Sized>(
         return Err(Error::Decryption);
     }
 
-    let em = priv_key.raw_decryption_primitive(rng, ciphertext, priv_key.size())?;
+    let em = priv_key.raw_int_decryption_primitive(
+        rng,
+        &BigUint::from_bytes_be(ciphertext),
+        priv_key.size(),
+    )?;
 
     let first_byte_is_zero = em[0].ct_eq(&0u8);
     let second_byte_is_two = em[1].ct_eq(&2u8);

@@ -399,7 +399,11 @@ fn decrypt_inner<R: CryptoRngCore + ?Sized, MGF: FnMut(&mut [u8], &mut [u8])>(
         return Err(Error::Decryption);
     }
 
-    let mut em = priv_key.raw_decryption_primitive(rng, ciphertext, priv_key.size())?;
+    let mut em = priv_key.raw_int_decryption_primitive(
+        rng,
+        &BigUint::from_bytes_be(ciphertext),
+        priv_key.size(),
+    )?;
 
     let first_byte_is_zero = em[0].ct_eq(&0u8);
 
