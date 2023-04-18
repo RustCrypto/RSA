@@ -34,6 +34,7 @@ use subtle::{Choice, ConstantTimeEq};
 
 use crate::algorithms::{mgf1_xor, mgf1_xor_digest};
 use crate::errors::{Error, Result};
+use crate::internals::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::key::PublicKeyParts;
 use crate::padding::SignatureScheme;
 use crate::{RsaPrivateKey, RsaPublicKey};
@@ -198,7 +199,7 @@ pub(crate) fn verify(
     let em_bits = pub_key.n().bits() - 1;
     let em_len = (em_bits + 7) / 8;
     let key_len = pub_key.size();
-    let mut em = pub_key.raw_int_encryption_primitive(sig, key_len)?;
+    let mut em = uint_to_be_pad(pub_key.raw_int_encryption_primitive(sig)?, key_len)?;
 
     emsa_pss_verify(
         hashed,
@@ -226,7 +227,7 @@ where
     let em_bits = pub_key.n().bits() - 1;
     let em_len = (em_bits + 7) / 8;
     let key_len = pub_key.size();
-    let mut em = pub_key.raw_int_encryption_primitive(sig, key_len)?;
+    let mut em = uint_to_be_pad(pub_key.raw_int_encryption_primitive(sig)?, key_len)?;
 
     emsa_pss_verify_digest::<D>(hashed, &mut em[key_len - em_len..], em_bits, salt_len)
 }
@@ -278,7 +279,10 @@ fn sign_pss_with_salt<T: CryptoRngCore>(
     let em_bits = priv_key.n().bits() - 1;
     let em = emsa_pss_encode(hashed, em_bits, salt, digest)?;
 
-    priv_key.raw_int_decryption_primitive(blind_rng, &BigUint::from_bytes_be(&em), priv_key.size())
+    uint_to_zeroizing_be_pad(
+        priv_key.raw_int_decryption_primitive(blind_rng, &BigUint::from_bytes_be(&em))?,
+        priv_key.size(),
+    )
 }
 
 fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputReset>(
@@ -290,7 +294,10 @@ fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputR
     let em_bits = priv_key.n().bits() - 1;
     let em = emsa_pss_encode_digest::<D>(hashed, em_bits, salt)?;
 
-    priv_key.raw_int_decryption_primitive(blind_rng, &BigUint::from_bytes_be(&em), priv_key.size())
+    uint_to_zeroizing_be_pad(
+        priv_key.raw_int_decryption_primitive(blind_rng, &BigUint::from_bytes_be(&em))?,
+        priv_key.size(),
+    )
 }
 
 fn emsa_pss_encode(

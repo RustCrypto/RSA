@@ -29,6 +29,7 @@ use zeroize::Zeroizing;
 
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
+use crate::internals::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::key::{self, PublicKeyParts};
 use crate::padding::{PaddingScheme, SignatureScheme};
 use crate::traits::{Decryptor, EncryptingKeypair, RandomizedDecryptor, RandomizedEncryptor};
@@ -212,7 +213,7 @@ pub(crate) fn encrypt<R: CryptoRngCore + ?Sized>(
     em[k - msg.len()..].copy_from_slice(msg);
 
     let int = Zeroizing::new(BigUint::from_bytes_be(&em));
-    pub_key.raw_int_encryption_primitive(&int, pub_key.size())
+    uint_to_be_pad(pub_key.raw_int_encryption_primitive(&int)?, pub_key.size())
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5.
@@ -275,7 +276,10 @@ pub(crate) fn sign<R: CryptoRngCore + ?Sized>(
     em[k - t_len..k - hash_len].copy_from_slice(prefix);
     em[k - hash_len..k].copy_from_slice(hashed);
 
-    priv_key.raw_int_decryption_primitive(rng, &BigUint::from_bytes_be(&em), priv_key.size())
+    uint_to_zeroizing_be_pad(
+        priv_key.raw_int_decryption_primitive(rng, &BigUint::from_bytes_be(&em))?,
+        priv_key.size(),
+    )
 }
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
@@ -293,7 +297,7 @@ pub(crate) fn verify(
         return Err(Error::Verification);
     }
 
-    let em = pub_key.raw_int_encryption_primitive(sig, pub_key.size())?;
+    let em = uint_to_be_pad(pub_key.raw_int_encryption_primitive(sig)?, pub_key.size())?;
 
     // EM = 0x00 || 0x01 || PS || 0x00 || T
     let mut ok = em[0].ct_eq(&0u8);
@@ -352,11 +356,8 @@ fn decrypt_inner<R: CryptoRngCore + ?Sized>(
         return Err(Error::Decryption);
     }
 
-    let em = priv_key.raw_int_decryption_primitive(
-        rng,
-        &BigUint::from_bytes_be(ciphertext),
-        priv_key.size(),
-    )?;
+    let em = priv_key.raw_int_decryption_primitive(rng, &BigUint::from_bytes_be(ciphertext))?;
+    let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
     let first_byte_is_zero = em[0].ct_eq(&0u8);
     let second_byte_is_two = em[1].ct_eq(&2u8);

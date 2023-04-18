@@ -7,7 +7,7 @@ use num_traits::{One, ToPrimitive};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use zeroize::{Zeroize, Zeroizing};
+use zeroize::Zeroize;
 
 use crate::algorithms::{generate_multi_prime_key, generate_multi_prime_key_with_exp};
 use crate::dummy_rng::DummyRng;
@@ -226,14 +226,8 @@ impl RsaPublicKey {
         Self { n, e }
     }
 
-    pub(crate) fn raw_int_encryption_primitive(
-        &self,
-        plaintext: &BigUint,
-        pad_size: usize,
-    ) -> Result<Vec<u8>> {
-        let c = Zeroizing::new(internals::encrypt(self, plaintext));
-        let c_bytes = Zeroizing::new(c.to_bytes_be());
-        internals::left_pad(&c_bytes, pad_size)
+    pub(crate) fn raw_int_encryption_primitive(&self, plaintext: &BigUint) -> Result<BigUint> {
+        Ok(internals::encrypt(self, plaintext))
     }
 }
 
@@ -461,11 +455,8 @@ impl RsaPrivateKey {
         &self,
         rng: Option<&mut R>,
         ciphertext: &BigUint,
-        pad_size: usize,
-    ) -> Result<Vec<u8>> {
-        let m = Zeroizing::new(internals::decrypt_and_check(rng, self, ciphertext)?);
-        let m_bytes = Zeroizing::new(m.to_bytes_be());
-        internals::left_pad(&m_bytes, pad_size)
+    ) -> Result<BigUint> {
+        internals::decrypt_and_check(rng, self, ciphertext)
     }
 }
 

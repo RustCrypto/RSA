@@ -19,6 +19,7 @@ use zeroize::Zeroizing;
 use crate::algorithms::{mgf1_xor, mgf1_xor_digest};
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
+use crate::internals::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::key::{self, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 use crate::padding::PaddingScheme;
 use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
@@ -208,7 +209,7 @@ fn encrypt_internal<R: CryptoRngCore + ?Sized, MGF: FnMut(&mut [u8], &mut [u8])>
     mgf(seed, db);
 
     let int = Zeroizing::new(BigUint::from_bytes_be(&em));
-    pub_key.raw_int_encryption_primitive(&int, pub_key.size())
+    uint_to_be_pad(pub_key.raw_int_encryption_primitive(&int)?, pub_key.size())
 }
 
 /// Encrypts the given message with RSA and the padding scheme from
@@ -399,11 +400,8 @@ fn decrypt_inner<R: CryptoRngCore + ?Sized, MGF: FnMut(&mut [u8], &mut [u8])>(
         return Err(Error::Decryption);
     }
 
-    let mut em = priv_key.raw_int_decryption_primitive(
-        rng,
-        &BigUint::from_bytes_be(ciphertext),
-        priv_key.size(),
-    )?;
+    let em = priv_key.raw_int_decryption_primitive(rng, &BigUint::from_bytes_be(ciphertext))?;
+    let mut em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
     let first_byte_is_zero = em[0].ct_eq(&0u8);
 
