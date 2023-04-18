@@ -29,7 +29,7 @@ use zeroize::Zeroizing;
 
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
-use crate::key::{self, PrivateKey, PublicKey};
+use crate::key::{self, PublicKeyParts};
 use crate::padding::{PaddingScheme, SignatureScheme};
 use crate::traits::{Decryptor, EncryptingKeypair, RandomizedDecryptor, RandomizedEncryptor};
 use crate::{RsaPrivateKey, RsaPublicKey};
@@ -39,19 +39,19 @@ use crate::{RsaPrivateKey, RsaPublicKey};
 pub struct Pkcs1v15Encrypt;
 
 impl PaddingScheme for Pkcs1v15Encrypt {
-    fn decrypt<Rng: CryptoRngCore, Priv: PrivateKey>(
+    fn decrypt<Rng: CryptoRngCore>(
         self,
         rng: Option<&mut Rng>,
-        priv_key: &Priv,
+        priv_key: &RsaPrivateKey,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
         decrypt(rng, priv_key, ciphertext)
     }
 
-    fn encrypt<Rng: CryptoRngCore, Pub: PublicKey>(
+    fn encrypt<Rng: CryptoRngCore>(
         self,
         rng: &mut Rng,
-        pub_key: &Pub,
+        pub_key: &RsaPublicKey,
         msg: &[u8],
     ) -> Result<Vec<u8>> {
         encrypt(rng, pub_key, msg)
@@ -103,10 +103,10 @@ impl Pkcs1v15Sign {
 }
 
 impl SignatureScheme for Pkcs1v15Sign {
-    fn sign<Rng: CryptoRngCore, Priv: PrivateKey>(
+    fn sign<Rng: CryptoRngCore>(
         self,
         rng: Option<&mut Rng>,
-        priv_key: &Priv,
+        priv_key: &RsaPrivateKey,
         hashed: &[u8],
     ) -> Result<Vec<u8>> {
         if let Some(hash_len) = self.hash_len {
@@ -118,7 +118,7 @@ impl SignatureScheme for Pkcs1v15Sign {
         sign(rng, priv_key, &self.prefix, hashed)
     }
 
-    fn verify<Pub: PublicKey>(self, pub_key: &Pub, hashed: &[u8], sig: &[u8]) -> Result<()> {
+    fn verify(self, pub_key: &RsaPublicKey, hashed: &[u8], sig: &[u8]) -> Result<()> {
         if let Some(hash_len) = self.hash_len {
             if hashed.len() != hash_len {
                 return Err(Error::InputNotHashed);
@@ -192,9 +192,9 @@ impl Display for Signature {
 /// scheme from PKCS#1 v1.5.  The message must be no longer than the
 /// length of the public modulus minus 11 bytes.
 #[inline]
-pub(crate) fn encrypt<R: CryptoRngCore + ?Sized, PK: PublicKey>(
+pub(crate) fn encrypt<R: CryptoRngCore + ?Sized>(
     rng: &mut R,
-    pub_key: &PK,
+    pub_key: &RsaPublicKey,
     msg: &[u8],
 ) -> Result<Vec<u8>> {
     key::check_public(pub_key)?;
@@ -211,7 +211,8 @@ pub(crate) fn encrypt<R: CryptoRngCore + ?Sized, PK: PublicKey>(
     em[k - msg.len() - 1] = 0;
     em[k - msg.len()..].copy_from_slice(msg);
 
-    pub_key.raw_encryption_primitive(&em, pub_key.size())
+    let int = Zeroizing::new(BigUint::from_bytes_be(&em));
+    pub_key.raw_int_encryption_primitive(&int, pub_key.size())
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5.
@@ -224,9 +225,9 @@ pub(crate) fn encrypt<R: CryptoRngCore + ?Sized, PK: PublicKey>(
 /// forge signatures as if they had the private key. See
 /// `decrypt_session_key` for a way of solving this problem.
 #[inline]
-pub(crate) fn decrypt<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
+pub(crate) fn decrypt<R: CryptoRngCore + ?Sized>(
     rng: Option<&mut R>,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
@@ -253,9 +254,9 @@ pub(crate) fn decrypt<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
 /// messages to signatures and identify the signed messages. As ever,
 /// signatures provide authenticity, not confidentiality.
 #[inline]
-pub(crate) fn sign<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
+pub(crate) fn sign<R: CryptoRngCore + ?Sized>(
     rng: Option<&mut R>,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     prefix: &[u8],
     hashed: &[u8],
 ) -> Result<Vec<u8>> {
@@ -279,8 +280,8 @@ pub(crate) fn sign<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
 #[inline]
-pub(crate) fn verify<PK: PublicKey>(
-    pub_key: &PK,
+pub(crate) fn verify(
+    pub_key: &RsaPublicKey,
     prefix: &[u8],
     hashed: &[u8],
     sig: &BigUint,
@@ -341,9 +342,9 @@ where
 /// in order to maintain constant memory access patterns. If the plaintext was
 /// valid then index contains the index of the original message in em.
 #[inline]
-fn decrypt_inner<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
+fn decrypt_inner<R: CryptoRngCore + ?Sized>(
     rng: Option<&mut R>,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
 ) -> Result<(u8, Vec<u8>, u32)> {
     let k = priv_key.size();
@@ -543,7 +544,7 @@ where
     D: Digest,
 {
     fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
-        sign::<DummyRng, _>(None, &self.inner, &self.prefix, &D::digest(msg))?
+        sign::<DummyRng>(None, &self.inner, &self.prefix, &D::digest(msg))?
             .as_slice()
             .try_into()
     }
@@ -569,7 +570,7 @@ where
     D: Digest,
 {
     fn try_sign_digest(&self, digest: D) -> signature::Result<Signature> {
-        sign::<DummyRng, _>(None, &self.inner, &self.prefix, &digest.finalize())?
+        sign::<DummyRng>(None, &self.inner, &self.prefix, &digest.finalize())?
             .as_slice()
             .try_into()
     }
@@ -595,7 +596,7 @@ where
     D: Digest,
 {
     fn sign_prehash(&self, prehash: &[u8]) -> signature::Result<Signature> {
-        sign::<DummyRng, _>(None, &self.inner, &self.prefix, prehash)?
+        sign::<DummyRng>(None, &self.inner, &self.prefix, prehash)?
             .as_slice()
             .try_into()
     }
@@ -819,7 +820,7 @@ impl DecryptingKey {
 
 impl Decryptor for DecryptingKey {
     fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        decrypt::<DummyRng, _>(None, &self.inner, ciphertext)
+        decrypt::<DummyRng>(None, &self.inner, ciphertext)
     }
 }
 
@@ -899,7 +900,7 @@ mod tests {
     use sha3::Sha3_256;
     use signature::{RandomizedSigner, Signer, Verifier};
 
-    use crate::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+    use crate::{PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 
     #[test]
     fn test_non_zero_bytes() {

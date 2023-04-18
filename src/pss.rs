@@ -34,7 +34,7 @@ use subtle::{Choice, ConstantTimeEq};
 
 use crate::algorithms::{mgf1_xor, mgf1_xor_digest};
 use crate::errors::{Error, Result};
-use crate::key::{PrivateKey, PublicKey};
+use crate::key::PublicKeyParts;
 use crate::padding::SignatureScheme;
 use crate::{RsaPrivateKey, RsaPublicKey};
 
@@ -89,10 +89,10 @@ impl Pss {
 }
 
 impl SignatureScheme for Pss {
-    fn sign<Rng: CryptoRngCore, Priv: PrivateKey>(
+    fn sign<Rng: CryptoRngCore>(
         mut self,
         rng: Option<&mut Rng>,
-        priv_key: &Priv,
+        priv_key: &RsaPrivateKey,
         hashed: &[u8],
     ) -> Result<Vec<u8>> {
         sign(
@@ -105,7 +105,7 @@ impl SignatureScheme for Pss {
         )
     }
 
-    fn verify<Pub: PublicKey>(mut self, pub_key: &Pub, hashed: &[u8], sig: &[u8]) -> Result<()> {
+    fn verify(mut self, pub_key: &RsaPublicKey, hashed: &[u8], sig: &[u8]) -> Result<()> {
         verify(
             pub_key,
             hashed,
@@ -183,8 +183,8 @@ impl Display for Signature {
     }
 }
 
-pub(crate) fn verify<PK: PublicKey>(
-    pub_key: &PK,
+pub(crate) fn verify(
+    pub_key: &RsaPublicKey,
     hashed: &[u8],
     sig: &BigUint,
     sig_len: usize,
@@ -209,15 +209,14 @@ pub(crate) fn verify<PK: PublicKey>(
     )
 }
 
-pub(crate) fn verify_digest<PK, D>(
-    pub_key: &PK,
+pub(crate) fn verify_digest<D>(
+    pub_key: &RsaPublicKey,
     hashed: &[u8],
     sig: &BigUint,
     sig_len: usize,
     salt_len: usize,
 ) -> Result<()>
 where
-    PK: PublicKey,
     D: Digest + FixedOutputReset,
 {
     if sig_len != pub_key.size() {
@@ -237,10 +236,10 @@ where
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. The opts argument may be nil, in which case sensible
 /// defaults are used.
-pub(crate) fn sign<T: CryptoRngCore, SK: PrivateKey>(
+pub(crate) fn sign<T: CryptoRngCore>(
     rng: &mut T,
     blind: bool,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     hashed: &[u8],
     salt_len: usize,
     digest: &mut dyn DynDigest,
@@ -251,21 +250,17 @@ pub(crate) fn sign<T: CryptoRngCore, SK: PrivateKey>(
     sign_pss_with_salt(blind.then_some(rng), priv_key, hashed, &salt, digest)
 }
 
-pub(crate) fn sign_digest<
-    T: CryptoRngCore + ?Sized,
-    SK: PrivateKey,
-    D: Digest + FixedOutputReset,
->(
+pub(crate) fn sign_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputReset>(
     rng: &mut T,
     blind: bool,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     hashed: &[u8],
     salt_len: usize,
 ) -> Result<Vec<u8>> {
     let mut salt = vec![0; salt_len];
     rng.fill_bytes(&mut salt[..]);
 
-    sign_pss_with_salt_digest::<_, _, D>(blind.then_some(rng), priv_key, hashed, &salt)
+    sign_pss_with_salt_digest::<_, D>(blind.then_some(rng), priv_key, hashed, &salt)
 }
 
 /// signPSSWithSalt calculates the signature of hashed using PSS with specified salt.
@@ -273,9 +268,9 @@ pub(crate) fn sign_digest<
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. salt is a random sequence of bytes whose length will be
 /// later used to verify the signature.
-fn sign_pss_with_salt<T: CryptoRngCore, SK: PrivateKey>(
+fn sign_pss_with_salt<T: CryptoRngCore>(
     blind_rng: Option<&mut T>,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     hashed: &[u8],
     salt: &[u8],
     digest: &mut dyn DynDigest,
@@ -286,13 +281,9 @@ fn sign_pss_with_salt<T: CryptoRngCore, SK: PrivateKey>(
     priv_key.raw_decryption_primitive(blind_rng, &em, priv_key.size())
 }
 
-fn sign_pss_with_salt_digest<
-    T: CryptoRngCore + ?Sized,
-    SK: PrivateKey,
-    D: Digest + FixedOutputReset,
->(
+fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputReset>(
     blind_rng: Option<&mut T>,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     hashed: &[u8],
     salt: &[u8],
 ) -> Result<Vec<u8>> {
@@ -757,7 +748,7 @@ where
         rng: &mut impl CryptoRngCore,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, false, &self.inner, &D::digest(msg), self.salt_len)?
+        sign_digest::<_, D>(rng, false, &self.inner, &D::digest(msg), self.salt_len)?
             .as_slice()
             .try_into()
     }
@@ -772,7 +763,7 @@ where
         rng: &mut impl CryptoRngCore,
         digest: D,
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, false, &self.inner, &digest.finalize(), self.salt_len)?
+        sign_digest::<_, D>(rng, false, &self.inner, &digest.finalize(), self.salt_len)?
             .as_slice()
             .try_into()
     }
@@ -787,7 +778,7 @@ where
         rng: &mut impl CryptoRngCore,
         prehash: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, false, &self.inner, prehash, self.salt_len)?
+        sign_digest::<_, D>(rng, false, &self.inner, prehash, self.salt_len)?
             .as_slice()
             .try_into()
     }
@@ -930,7 +921,7 @@ where
         rng: &mut impl CryptoRngCore,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, true, &self.inner, &D::digest(msg), self.salt_len)?
+        sign_digest::<_, D>(rng, true, &self.inner, &D::digest(msg), self.salt_len)?
             .as_slice()
             .try_into()
     }
@@ -945,7 +936,7 @@ where
         rng: &mut impl CryptoRngCore,
         digest: D,
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, true, &self.inner, &digest.finalize(), self.salt_len)?
+        sign_digest::<_, D>(rng, true, &self.inner, &digest.finalize(), self.salt_len)?
             .as_slice()
             .try_into()
     }
@@ -960,7 +951,7 @@ where
         rng: &mut impl CryptoRngCore,
         prehash: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, true, &self.inner, prehash, self.salt_len)?
+        sign_digest::<_, D>(rng, true, &self.inner, prehash, self.salt_len)?
             .as_slice()
             .try_into()
     }
@@ -1055,7 +1046,7 @@ where
     D: Digest + FixedOutputReset,
 {
     fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify_digest::<_, D>(
+        verify_digest::<D>(
             &self.inner,
             &D::digest(msg),
             &signature.inner,
@@ -1071,7 +1062,7 @@ where
     D: Digest + FixedOutputReset,
 {
     fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
-        verify_digest::<_, D>(
+        verify_digest::<D>(
             &self.inner,
             &digest.finalize(),
             &signature.inner,
@@ -1087,7 +1078,7 @@ where
     D: Digest + FixedOutputReset,
 {
     fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify_digest::<_, D>(
+        verify_digest::<D>(
             &self.inner,
             prehash,
             &signature.inner,
@@ -1119,7 +1110,7 @@ where
 #[cfg(test)]
 mod test {
     use crate::pss::{BlindedSigningKey, Pss, Signature, SigningKey, VerifyingKey};
-    use crate::{PublicKey, RsaPrivateKey, RsaPublicKey};
+    use crate::{RsaPrivateKey, RsaPublicKey};
 
     use hex_literal::hex;
     use num_bigint::BigUint;

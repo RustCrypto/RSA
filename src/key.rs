@@ -7,14 +7,14 @@ use num_traits::{One, ToPrimitive};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::algorithms::{generate_multi_prime_key, generate_multi_prime_key_with_exp};
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
+use crate::internals;
 
 use crate::padding::{PaddingScheme, SignatureScheme};
-use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
 
 /// Components of an RSA public key.
 pub trait PublicKeyParts {
@@ -30,8 +30,6 @@ pub trait PublicKeyParts {
         (self.n().bits() + 7) / 8
     }
 }
-
-pub trait PrivateKey: DecryptionPrimitive + PublicKeyParts {}
 
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -161,25 +159,6 @@ impl From<&RsaPrivateKey> for RsaPublicKey {
     }
 }
 
-/// Generic trait for operations on a public key.
-pub trait PublicKey: EncryptionPrimitive + PublicKeyParts {
-    /// Encrypt the given message.
-    fn encrypt<R: CryptoRngCore, P: PaddingScheme>(
-        &self,
-        rng: &mut R,
-        padding: P,
-        msg: &[u8],
-    ) -> Result<Vec<u8>>;
-
-    /// Verify a signed message.
-    ///
-    /// `hashed` must be the result of hashing the input using the hashing function
-    /// passed in through `hash`.
-    ///
-    /// If the message is valid `Ok(())` is returned, otherwise an `Err` indicating failure.
-    fn verify<S: SignatureScheme>(&self, scheme: S, hashed: &[u8], sig: &[u8]) -> Result<()>;
-}
-
 impl PublicKeyParts for RsaPublicKey {
     fn n(&self) -> &BigUint {
         &self.n
@@ -190,8 +169,9 @@ impl PublicKeyParts for RsaPublicKey {
     }
 }
 
-impl PublicKey for RsaPublicKey {
-    fn encrypt<R: CryptoRngCore, P: PaddingScheme>(
+impl RsaPublicKey {
+    /// Encrypt the given message.
+    pub fn encrypt<R: CryptoRngCore, P: PaddingScheme>(
         &self,
         rng: &mut R,
         padding: P,
@@ -200,7 +180,13 @@ impl PublicKey for RsaPublicKey {
         padding.encrypt(rng, self, msg)
     }
 
-    fn verify<S: SignatureScheme>(&self, scheme: S, hashed: &[u8], sig: &[u8]) -> Result<()> {
+    /// Verify a signed message.
+    ///
+    /// `hashed` must be the result of hashing the input using the hashing function
+    /// passed in through `hash`.
+    ///
+    /// If the message is valid `Ok(())` is returned, otherwise an `Err` indicating failure.
+    pub fn verify<S: SignatureScheme>(&self, scheme: S, hashed: &[u8], sig: &[u8]) -> Result<()> {
         scheme.verify(self, hashed, sig)
     }
 }
@@ -239,6 +225,16 @@ impl RsaPublicKey {
     pub fn new_unchecked(n: BigUint, e: BigUint) -> Self {
         Self { n, e }
     }
+
+    pub(crate) fn raw_int_encryption_primitive(
+        &self,
+        plaintext: &BigUint,
+        pad_size: usize,
+    ) -> Result<Vec<u8>> {
+        let c = Zeroizing::new(internals::encrypt(self, plaintext));
+        let c_bytes = Zeroizing::new(c.to_bytes_be());
+        internals::left_pad(&c_bytes, pad_size)
+    }
 }
 
 impl PublicKeyParts for RsaPrivateKey {
@@ -250,8 +246,6 @@ impl PublicKeyParts for RsaPrivateKey {
         &self.e
     }
 }
-
-impl PrivateKey for RsaPrivateKey {}
 
 impl RsaPrivateKey {
     /// Generate a new Rsa key pair of the given bit size using the passed in `rng`.
@@ -460,6 +454,28 @@ impl RsaPrivateKey {
         digest_in: &[u8],
     ) -> Result<Vec<u8>> {
         padding.sign(Some(rng), self, digest_in)
+    }
+
+    /// Do NOT use directly! Only for implementors.
+    pub(crate) fn raw_decryption_primitive<R: CryptoRngCore + ?Sized>(
+        &self,
+        rng: Option<&mut R>,
+        ciphertext: &[u8],
+        pad_size: usize,
+    ) -> Result<Vec<u8>> {
+        let int = Zeroizing::new(BigUint::from_bytes_be(ciphertext));
+        self.raw_int_decryption_primitive(rng, &int, pad_size)
+    }
+
+    pub(crate) fn raw_int_decryption_primitive<R: CryptoRngCore + ?Sized>(
+        &self,
+        rng: Option<&mut R>,
+        ciphertext: &BigUint,
+        pad_size: usize,
+    ) -> Result<Vec<u8>> {
+        let m = Zeroizing::new(internals::decrypt_and_check(rng, self, ciphertext)?);
+        let m_bytes = Zeroizing::new(m.to_bytes_be());
+        internals::left_pad(&m_bytes, pad_size)
     }
 }
 

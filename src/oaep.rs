@@ -12,13 +12,14 @@ use core::marker::PhantomData;
 use rand_core::CryptoRngCore;
 
 use digest::{Digest, DynDigest, FixedOutputReset};
+use num_bigint::BigUint;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use zeroize::Zeroizing;
 
 use crate::algorithms::{mgf1_xor, mgf1_xor_digest};
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
-use crate::key::{self, PrivateKey, PublicKey, RsaPrivateKey, RsaPublicKey};
+use crate::key::{self, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 use crate::padding::PaddingScheme;
 use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 
@@ -55,7 +56,7 @@ impl Oaep {
     /// ```
     /// use sha1::Sha1;
     /// use sha2::Sha256;
-    /// use rsa::{BigUint, RsaPublicKey, Oaep, PublicKey};
+    /// use rsa::{BigUint, RsaPublicKey, Oaep, };
     /// use base64ct::{Base64, Encoding};
     ///
     /// let n = Base64::decode_vec("ALHgDoZmBQIx+jTmgeeHW6KsPOrj11f6CvWsiRleJlQpW77AwSZhd21ZDmlTKfaIHBSUxRUsuYNh7E2SHx8rkFVCQA2/gXkZ5GK2IUbzSTio9qXA25MWHvVxjMfKSL8ZAxZyKbrG94FLLszFAFOaiLLY8ECs7g+dXOriYtBwLUJK+lppbd+El+8ZA/zH0bk7vbqph5pIoiWggxwdq3mEz4LnrUln7r6dagSQzYErKewY8GADVpXcq5mfHC1xF2DFBub7bFjMVM5fHq7RK+pG5xjNDiYITbhLYrbVv3X0z75OvN0dY49ITWjM7xyvMWJXVJS7sJlgmCCL6RwWgP8PhcE=").unwrap();
@@ -92,7 +93,7 @@ impl Oaep {
     /// ```
     /// use sha1::Sha1;
     /// use sha2::Sha256;
-    /// use rsa::{BigUint, RsaPublicKey, Oaep, PublicKey};
+    /// use rsa::{BigUint, RsaPublicKey, Oaep, };
     /// use base64ct::{Base64, Encoding};
     ///
     /// let n = Base64::decode_vec("ALHgDoZmBQIx+jTmgeeHW6KsPOrj11f6CvWsiRleJlQpW77AwSZhd21ZDmlTKfaIHBSUxRUsuYNh7E2SHx8rkFVCQA2/gXkZ5GK2IUbzSTio9qXA25MWHvVxjMfKSL8ZAxZyKbrG94FLLszFAFOaiLLY8ECs7g+dXOriYtBwLUJK+lppbd+El+8ZA/zH0bk7vbqph5pIoiWggxwdq3mEz4LnrUln7r6dagSQzYErKewY8GADVpXcq5mfHC1xF2DFBub7bFjMVM5fHq7RK+pG5xjNDiYITbhLYrbVv3X0z75OvN0dY49ITWjM7xyvMWJXVJS7sJlgmCCL6RwWgP8PhcE=").unwrap();
@@ -131,10 +132,10 @@ impl Oaep {
 }
 
 impl PaddingScheme for Oaep {
-    fn decrypt<Rng: CryptoRngCore, Priv: PrivateKey>(
+    fn decrypt<Rng: CryptoRngCore>(
         mut self,
         rng: Option<&mut Rng>,
-        priv_key: &Priv,
+        priv_key: &RsaPrivateKey,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
         decrypt(
@@ -147,10 +148,10 @@ impl PaddingScheme for Oaep {
         )
     }
 
-    fn encrypt<Rng: CryptoRngCore, Pub: PublicKey>(
+    fn encrypt<Rng: CryptoRngCore>(
         mut self,
         rng: &mut Rng,
-        pub_key: &Pub,
+        pub_key: &RsaPublicKey,
         msg: &[u8],
     ) -> Result<Vec<u8>> {
         encrypt(
@@ -175,9 +176,9 @@ impl fmt::Debug for Oaep {
 }
 
 #[inline]
-fn encrypt_internal<R: CryptoRngCore + ?Sized, K: PublicKey, MGF: FnMut(&mut [u8], &mut [u8])>(
+fn encrypt_internal<R: CryptoRngCore + ?Sized, MGF: FnMut(&mut [u8], &mut [u8])>(
     rng: &mut R,
-    pub_key: &K,
+    pub_key: &RsaPublicKey,
     msg: &[u8],
     p_hash: &[u8],
     h_size: usize,
@@ -206,7 +207,8 @@ fn encrypt_internal<R: CryptoRngCore + ?Sized, K: PublicKey, MGF: FnMut(&mut [u8
 
     mgf(seed, db);
 
-    pub_key.raw_encryption_primitive(&em, pub_key.size())
+    let int = Zeroizing::new(BigUint::from_bytes_be(&em));
+    pub_key.raw_int_encryption_primitive(&int, pub_key.size())
 }
 
 /// Encrypts the given message with RSA and the padding scheme from
@@ -217,9 +219,9 @@ fn encrypt_internal<R: CryptoRngCore + ?Sized, K: PublicKey, MGF: FnMut(&mut [u8
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-fn encrypt<R: CryptoRngCore + ?Sized, K: PublicKey>(
+fn encrypt<R: CryptoRngCore + ?Sized>(
     rng: &mut R,
-    pub_key: &K,
+    pub_key: &RsaPublicKey,
     msg: &[u8],
     digest: &mut dyn DynDigest,
     mgf_digest: &mut dyn DynDigest,
@@ -249,14 +251,9 @@ fn encrypt<R: CryptoRngCore + ?Sized, K: PublicKey>(
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-fn encrypt_digest<
-    R: CryptoRngCore + ?Sized,
-    K: PublicKey,
-    D: Digest,
-    MGD: Digest + FixedOutputReset,
->(
+fn encrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutputReset>(
     rng: &mut R,
-    pub_key: &K,
+    pub_key: &RsaPublicKey,
     msg: &[u8],
     label: Option<String>,
 ) -> Result<Vec<u8>> {
@@ -289,9 +286,9 @@ fn encrypt_digest<
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-fn decrypt<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
+fn decrypt<R: CryptoRngCore + ?Sized>(
     rng: Option<&mut R>,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
     digest: &mut dyn DynDigest,
     mgf_digest: &mut dyn DynDigest,
@@ -343,14 +340,9 @@ fn decrypt<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-fn decrypt_digest<
-    R: CryptoRngCore + ?Sized,
-    SK: PrivateKey,
-    D: Digest,
-    MGD: Digest + FixedOutputReset,
->(
+fn decrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutputReset>(
     rng: Option<&mut R>,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
     label: Option<String>,
 ) -> Result<Vec<u8>> {
@@ -390,9 +382,9 @@ fn decrypt_digest<
 /// `rng` is given. It returns one or zero in valid that indicates whether the
 /// plaintext was correctly structured.
 #[inline]
-fn decrypt_inner<R: CryptoRngCore + ?Sized, SK: PrivateKey, MGF: FnMut(&mut [u8], &mut [u8])>(
+fn decrypt_inner<R: CryptoRngCore + ?Sized, MGF: FnMut(&mut [u8], &mut [u8])>(
     rng: Option<&mut R>,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
     h_size: usize,
     expected_p_hash: &[u8],
@@ -491,7 +483,7 @@ where
         rng: &mut R,
         msg: &[u8],
     ) -> Result<Vec<u8>> {
-        encrypt_digest::<_, _, D, MGD>(rng, &self.inner, msg, self.label.as_ref().cloned())
+        encrypt_digest::<_, D, MGD>(rng, &self.inner, msg, self.label.as_ref().cloned())
     }
 }
 
@@ -542,7 +534,7 @@ where
     MGD: Digest + FixedOutputReset,
 {
     fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        decrypt_digest::<DummyRng, _, D, MGD>(
+        decrypt_digest::<DummyRng, D, MGD>(
             None,
             &self.inner,
             ciphertext,
@@ -561,7 +553,7 @@ where
         rng: &mut R,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
-        decrypt_digest::<_, _, D, MGD>(
+        decrypt_digest::<_, D, MGD>(
             Some(rng),
             &self.inner,
             ciphertext,
@@ -572,7 +564,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+    use crate::key::{PublicKeyParts, RsaPrivateKey, RsaPublicKey};
     use crate::oaep::{DecryptingKey, EncryptingKey, Oaep};
     use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 
