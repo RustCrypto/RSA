@@ -9,13 +9,13 @@
 //! [Probabilistic Signature Scheme]: https://en.wikipedia.org/wiki/Probabilistic_signature_scheme
 //! [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 
-use alloc::boxed::Box;
-use alloc::vec::Vec;
+use alloc::{boxed::Box, string::ToString, vec::Vec};
 use core::fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
 
 use const_oid::{AssociatedOid, ObjectIdentifier};
 use digest::{Digest, DynDigest, FixedOutputReset};
+use num_bigint::BigUint;
 use pkcs1::RsaPssParams;
 use pkcs8::{
     spki::{
@@ -106,7 +106,14 @@ impl SignatureScheme for Pss {
     }
 
     fn verify<Pub: PublicKey>(mut self, pub_key: &Pub, hashed: &[u8], sig: &[u8]) -> Result<()> {
-        verify(pub_key, hashed, sig, &mut *self.digest, self.salt_len)
+        verify(
+            pub_key,
+            hashed,
+            &BigUint::from_bytes_be(sig),
+            sig.len(),
+            &mut *self.digest,
+            self.salt_len,
+        )
     }
 }
 
@@ -125,17 +132,12 @@ impl Debug for Pss {
 /// [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 #[derive(Clone, PartialEq, Eq)]
 pub struct Signature {
-    bytes: Box<[u8]>,
+    inner: BigUint,
+    len: usize,
 }
 
 impl SignatureEncoding for Signature {
     type Repr = Box<[u8]>;
-}
-
-impl From<Box<[u8]>> for Signature {
-    fn from(bytes: Box<[u8]>) -> Self {
-        Self { bytes }
-    }
 }
 
 impl TryFrom<&[u8]> for Signature {
@@ -143,44 +145,35 @@ impl TryFrom<&[u8]> for Signature {
 
     fn try_from(bytes: &[u8]) -> signature::Result<Self> {
         Ok(Self {
-            bytes: bytes.into(),
+            len: bytes.len(),
+            inner: BigUint::from_bytes_be(bytes),
         })
     }
 }
 
 impl From<Signature> for Box<[u8]> {
     fn from(signature: Signature) -> Box<[u8]> {
-        signature.bytes
+        signature.inner.to_bytes_be().into_boxed_slice()
     }
 }
 
 impl Debug for Signature {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> core::result::Result<(), core::fmt::Error> {
-        fmt.debug_list().entries(self.bytes.iter()).finish()
-    }
-}
-
-impl AsRef<[u8]> for Signature {
-    fn as_ref(&self) -> &[u8] {
-        self.bytes.as_ref()
+        fmt.debug_tuple("Signature")
+            .field(&self.to_string())
+            .finish()
     }
 }
 
 impl LowerHex for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for byte in self.bytes.iter() {
-            write!(f, "{:02x}", byte)?;
-        }
-        Ok(())
+        write!(f, "{:x}", &self.inner)
     }
 }
 
 impl UpperHex for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for byte in self.bytes.iter() {
-            write!(f, "{:02X}", byte)?;
-        }
-        Ok(())
+        write!(f, "{:X}", &self.inner)
     }
 }
 
@@ -193,18 +186,19 @@ impl Display for Signature {
 pub(crate) fn verify<PK: PublicKey>(
     pub_key: &PK,
     hashed: &[u8],
-    sig: &[u8],
+    sig: &BigUint,
+    sig_len: usize,
     digest: &mut dyn DynDigest,
     salt_len: usize,
 ) -> Result<()> {
-    if sig.len() != pub_key.size() {
+    if sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
 
     let em_bits = pub_key.n().bits() - 1;
     let em_len = (em_bits + 7) / 8;
     let key_len = pub_key.size();
-    let mut em = pub_key.raw_encryption_primitive(sig, key_len)?;
+    let mut em = pub_key.raw_int_encryption_primitive(sig, key_len)?;
 
     emsa_pss_verify(
         hashed,
@@ -218,21 +212,22 @@ pub(crate) fn verify<PK: PublicKey>(
 pub(crate) fn verify_digest<PK, D>(
     pub_key: &PK,
     hashed: &[u8],
-    sig: &[u8],
+    sig: &BigUint,
+    sig_len: usize,
     salt_len: usize,
 ) -> Result<()>
 where
     PK: PublicKey,
     D: Digest + FixedOutputReset,
 {
-    if sig.len() != pub_key.size() {
+    if sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
 
     let em_bits = pub_key.n().bits() - 1;
     let em_len = (em_bits + 7) / 8;
     let key_len = pub_key.size();
-    let mut em = pub_key.raw_encryption_primitive(sig, key_len)?;
+    let mut em = pub_key.raw_int_encryption_primitive(sig, key_len)?;
 
     emsa_pss_verify_digest::<D>(hashed, &mut em[key_len - em_len..], em_bits, salt_len)
 }
@@ -762,9 +757,9 @@ where
         rng: &mut impl CryptoRngCore,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, false, &self.inner, &D::digest(msg), self.salt_len)
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign_digest::<_, _, D>(rng, false, &self.inner, &D::digest(msg), self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -777,9 +772,9 @@ where
         rng: &mut impl CryptoRngCore,
         digest: D,
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, false, &self.inner, &digest.finalize(), self.salt_len)
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign_digest::<_, _, D>(rng, false, &self.inner, &digest.finalize(), self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -792,9 +787,9 @@ where
         rng: &mut impl CryptoRngCore,
         prehash: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, false, &self.inner, prehash, self.salt_len)
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign_digest::<_, _, D>(rng, false, &self.inner, prehash, self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -935,9 +930,9 @@ where
         rng: &mut impl CryptoRngCore,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, true, &self.inner, &D::digest(msg), self.salt_len)
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign_digest::<_, _, D>(rng, true, &self.inner, &D::digest(msg), self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -950,9 +945,9 @@ where
         rng: &mut impl CryptoRngCore,
         digest: D,
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, true, &self.inner, &digest.finalize(), self.salt_len)
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign_digest::<_, _, D>(rng, true, &self.inner, &digest.finalize(), self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -965,9 +960,9 @@ where
         rng: &mut impl CryptoRngCore,
         prehash: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, true, &self.inner, prehash, self.salt_len)
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign_digest::<_, _, D>(rng, true, &self.inner, prehash, self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -1063,7 +1058,8 @@ where
         verify_digest::<_, D>(
             &self.inner,
             &D::digest(msg),
-            signature.as_ref(),
+            &signature.inner,
+            signature.len,
             self.salt_len,
         )
         .map_err(|e| e.into())
@@ -1078,7 +1074,8 @@ where
         verify_digest::<_, D>(
             &self.inner,
             &digest.finalize(),
-            signature.as_ref(),
+            &signature.inner,
+            signature.len,
             self.salt_len,
         )
         .map_err(|e| e.into())
@@ -1090,8 +1087,14 @@ where
     D: Digest + FixedOutputReset,
 {
     fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify_digest::<_, D>(&self.inner, prehash, signature.as_ref(), self.salt_len)
-            .map_err(|e| e.into())
+        verify_digest::<_, D>(
+            &self.inner,
+            prehash,
+            &signature.inner,
+            signature.len,
+            self.salt_len,
+        )
+        .map_err(|e| e.into())
     }
 }
 
