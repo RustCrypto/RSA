@@ -6,11 +6,11 @@
 //!
 //! [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 
-use alloc::boxed::Box;
-use alloc::vec::Vec;
+use alloc::{boxed::Box, string::ToString, vec::Vec};
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
 use digest::Digest;
+use num_bigint::BigUint;
 use pkcs8::{
     spki::{
         der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
@@ -125,7 +125,12 @@ impl SignatureScheme for Pkcs1v15Sign {
             }
         }
 
-        verify(pub_key, self.prefix.as_ref(), hashed, sig)
+        verify(
+            pub_key,
+            self.prefix.as_ref(),
+            hashed,
+            &BigUint::from_bytes_be(sig),
+        )
     }
 }
 
@@ -134,17 +139,11 @@ impl SignatureScheme for Pkcs1v15Sign {
 /// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 #[derive(Clone, PartialEq, Eq)]
 pub struct Signature {
-    bytes: Box<[u8]>,
+    inner: BigUint,
 }
 
 impl SignatureEncoding for Signature {
     type Repr = Box<[u8]>;
-}
-
-impl From<Box<[u8]>> for Signature {
-    fn from(bytes: Box<[u8]>) -> Self {
-        Self { bytes }
-    }
 }
 
 impl TryFrom<&[u8]> for Signature {
@@ -152,44 +151,34 @@ impl TryFrom<&[u8]> for Signature {
 
     fn try_from(bytes: &[u8]) -> signature::Result<Self> {
         Ok(Self {
-            bytes: bytes.into(),
+            inner: BigUint::from_bytes_be(bytes),
         })
     }
 }
 
 impl From<Signature> for Box<[u8]> {
     fn from(signature: Signature) -> Box<[u8]> {
-        signature.bytes
-    }
-}
-
-impl AsRef<[u8]> for Signature {
-    fn as_ref(&self) -> &[u8] {
-        self.bytes.as_ref()
+        signature.inner.to_bytes_be().into_boxed_slice()
     }
 }
 
 impl Debug for Signature {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> core::result::Result<(), core::fmt::Error> {
-        fmt.debug_list().entries(self.bytes.iter()).finish()
+        fmt.debug_tuple("Signature")
+            .field(&self.to_string())
+            .finish()
     }
 }
 
 impl LowerHex for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for byte in self.bytes.iter() {
-            write!(f, "{:02x}", byte)?;
-        }
-        Ok(())
+        write!(f, "{:x}", &self.inner)
     }
 }
 
 impl UpperHex for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for byte in self.bytes.iter() {
-            write!(f, "{:02X}", byte)?;
-        }
-        Ok(())
+        write!(f, "{:X}", &self.inner)
     }
 }
 
@@ -294,7 +283,7 @@ pub(crate) fn verify<PK: PublicKey>(
     pub_key: &PK,
     prefix: &[u8],
     hashed: &[u8],
-    sig: &[u8],
+    sig: &BigUint,
 ) -> Result<()> {
     let hash_len = hashed.len();
     let t_len = prefix.len() + hashed.len();
@@ -303,7 +292,7 @@ pub(crate) fn verify<PK: PublicKey>(
         return Err(Error::Verification);
     }
 
-    let em = pub_key.raw_encryption_primitive(sig, pub_key.size())?;
+    let em = pub_key.raw_int_encryption_primitive(sig, pub_key.size())?;
 
     // EM = 0x00 || 0x01 || PS || 0x00 || T
     let mut ok = em[0].ct_eq(&0u8);
@@ -554,9 +543,9 @@ where
     D: Digest,
 {
     fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
-        sign::<DummyRng, _>(None, &self.inner, &self.prefix, &D::digest(msg))
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign::<DummyRng, _>(None, &self.inner, &self.prefix, &D::digest(msg))?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -569,9 +558,9 @@ where
         rng: &mut impl CryptoRngCore,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign(Some(rng), &self.inner, &self.prefix, &D::digest(msg))
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign(Some(rng), &self.inner, &self.prefix, &D::digest(msg))?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -580,9 +569,9 @@ where
     D: Digest,
 {
     fn try_sign_digest(&self, digest: D) -> signature::Result<Signature> {
-        sign::<DummyRng, _>(None, &self.inner, &self.prefix, &digest.finalize())
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign::<DummyRng, _>(None, &self.inner, &self.prefix, &digest.finalize())?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -595,9 +584,9 @@ where
         rng: &mut impl CryptoRngCore,
         digest: D,
     ) -> signature::Result<Signature> {
-        sign(Some(rng), &self.inner, &self.prefix, &digest.finalize())
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign(Some(rng), &self.inner, &self.prefix, &digest.finalize())?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -606,9 +595,9 @@ where
     D: Digest,
 {
     fn sign_prehash(&self, prehash: &[u8]) -> signature::Result<Signature> {
-        sign::<DummyRng, _>(None, &self.inner, &self.prefix, prehash)
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign::<DummyRng, _>(None, &self.inner, &self.prefix, prehash)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -749,7 +738,7 @@ where
             &self.inner,
             &self.prefix.clone(),
             &D::digest(msg),
-            signature.as_ref(),
+            &signature.inner,
         )
         .map_err(|e| e.into())
     }
@@ -764,7 +753,7 @@ where
             &self.inner,
             &self.prefix,
             &digest.finalize(),
-            signature.as_ref(),
+            &signature.inner,
         )
         .map_err(|e| e.into())
     }
@@ -775,7 +764,7 @@ where
     D: Digest,
 {
     fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify(&self.inner, &self.prefix, prehash, signature.as_ref()).map_err(|e| e.into())
+        verify(&self.inner, &self.prefix, prehash, &signature.inner).map_err(|e| e.into())
     }
 }
 
@@ -1096,13 +1085,15 @@ mod tests {
         let signing_key = SigningKey::<Sha1>::new(priv_key);
 
         for (text, expected) in &tests {
-            let out = signing_key.sign(text.as_bytes());
+            let out = signing_key.sign(text.as_bytes()).to_bytes();
             assert_ne!(out.as_ref(), text.as_bytes());
             assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
             assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = signing_key.sign_with_rng(&mut rng, text.as_bytes());
+            let out2 = signing_key
+                .sign_with_rng(&mut rng, text.as_bytes())
+                .to_bytes();
             assert_eq!(out2.as_ref(), expected);
         }
     }
@@ -1122,12 +1113,14 @@ mod tests {
         let signing_key = SigningKey::<Sha256>::new(priv_key);
 
         for (text, expected) in &tests {
-            let out = signing_key.sign(text.as_bytes());
+            let out = signing_key.sign(text.as_bytes()).to_bytes();
             assert_ne!(out.as_ref(), text.as_bytes());
             assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = signing_key.sign_with_rng(&mut rng, text.as_bytes());
+            let out2 = signing_key
+                .sign_with_rng(&mut rng, text.as_bytes())
+                .to_bytes();
             assert_eq!(out2.as_ref(), expected);
         }
     }
@@ -1147,12 +1140,14 @@ mod tests {
         let signing_key = SigningKey::<Sha3_256>::new(priv_key);
 
         for (text, expected) in &tests {
-            let out = signing_key.sign(text.as_bytes());
+            let out = signing_key.sign(text.as_bytes()).to_bytes();
             assert_ne!(out.as_ref(), text.as_bytes());
             assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = signing_key.sign_with_rng(&mut rng, text.as_bytes());
+            let out2 = signing_key
+                .sign_with_rng(&mut rng, text.as_bytes())
+                .to_bytes();
             assert_eq!(out2.as_ref(), expected);
         }
     }
@@ -1174,7 +1169,7 @@ mod tests {
         for (text, expected) in &tests {
             let mut digest = Sha1::new();
             digest.update(text.as_bytes());
-            let out = signing_key.sign_digest(digest);
+            let out = signing_key.sign_digest(digest).to_bytes();
             assert_ne!(out.as_ref(), text.as_bytes());
             assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
             assert_eq!(out.as_ref(), expected);
@@ -1182,7 +1177,9 @@ mod tests {
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
             let mut digest = Sha1::new();
             digest.update(text.as_bytes());
-            let out2 = signing_key.sign_digest_with_rng(&mut rng, digest);
+            let out2 = signing_key
+                .sign_digest_with_rng(&mut rng, digest)
+                .to_bytes();
             assert_eq!(out2.as_ref(), expected);
         }
     }
@@ -1324,15 +1321,15 @@ mod tests {
         let priv_key = get_private_key();
 
         let signing_key = SigningKey::<Sha1>::new_unprefixed(priv_key);
-        let sig = signing_key.sign_prehash(msg).expect("Failure during sign");
+        let sig = signing_key
+            .sign_prehash(msg)
+            .expect("Failure during sign")
+            .to_bytes();
         assert_eq!(sig.as_ref(), expected_sig);
 
         let verifying_key = signing_key.verifying_key();
         verifying_key
-            .verify_prehash(
-                msg,
-                &Signature::try_from(expected_sig.into_boxed_slice()).unwrap(),
-            )
+            .verify_prehash(msg, &Signature::try_from(expected_sig.as_slice()).unwrap())
             .expect("failed to verify");
     }
 }
