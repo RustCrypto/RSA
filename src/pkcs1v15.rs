@@ -27,6 +27,7 @@ use signature::{
 use zeroize::Zeroizing;
 
 use crate::algorithms::pkcs1v15::*;
+use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::internals::{uint_to_be_pad, uint_to_zeroizing_be_pad};
@@ -203,7 +204,7 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
 
     let em = pkcs1v15_encrypt_pad(rng, msg, pub_key.size())?;
     let int = Zeroizing::new(BigUint::from_bytes_be(&em));
-    uint_to_be_pad(pub_key.raw_int_encryption_primitive(&int)?, pub_key.size())
+    uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5.
@@ -223,7 +224,7 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
-    let em = priv_key.raw_int_decryption_primitive(rng, &BigUint::from_bytes_be(ciphertext))?;
+    let em = rsa_decrypt_and_check(priv_key, rng, &BigUint::from_bytes_be(ciphertext))?;
     let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
     pkcs1v15_encrypt_unpad(em, priv_key.size())
@@ -252,7 +253,7 @@ fn sign<R: CryptoRngCore + ?Sized>(
     let em = pkcs1v15_sign_pad(prefix, hashed, priv_key.size())?;
 
     uint_to_zeroizing_be_pad(
-        priv_key.raw_int_decryption_primitive(rng, &BigUint::from_bytes_be(&em))?,
+        rsa_decrypt_and_check(priv_key, rng, &BigUint::from_bytes_be(&em))?,
         priv_key.size(),
     )
 }
@@ -260,7 +261,7 @@ fn sign<R: CryptoRngCore + ?Sized>(
 /// Verifies an RSA PKCS#1 v1.5 signature.
 #[inline]
 fn verify(pub_key: &RsaPublicKey, prefix: &[u8], hashed: &[u8], sig: &BigUint) -> Result<()> {
-    let em = uint_to_be_pad(pub_key.raw_int_encryption_primitive(sig)?, pub_key.size())?;
+    let em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
 
     pkcs1v15_sign_unpad(prefix, hashed, &em, pub_key.size())
 }

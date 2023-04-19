@@ -10,7 +10,6 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
 use crate::algorithms::generate::generate_multi_prime_key_with_exp;
-use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::keytraits::{CRTValue, PrivateKeyParts, PublicKeyParts};
@@ -191,10 +190,6 @@ impl RsaPublicKey {
     /// [`RsaPublicKey::new_with_max_size`] instead.
     pub fn new_unchecked(n: BigUint, e: BigUint) -> Self {
         Self { n, e }
-    }
-
-    pub(crate) fn raw_int_encryption_primitive(&self, plaintext: &BigUint) -> Result<BigUint> {
-        Ok(rsa_encrypt(self, plaintext))
     }
 }
 
@@ -396,15 +391,6 @@ impl RsaPrivateKey {
     ) -> Result<Vec<u8>> {
         padding.sign(Some(rng), self, digest_in)
     }
-
-    /// Do NOT use directly! Only for implementors.
-    pub(crate) fn raw_int_decryption_primitive<R: CryptoRngCore + ?Sized>(
-        &self,
-        rng: Option<&mut R>,
-        ciphertext: &BigUint,
-    ) -> Result<BigUint> {
-        rsa_decrypt_and_check(rng, self, ciphertext)
-    }
 }
 
 impl PrivateKeyParts for RsaPrivateKey {
@@ -470,6 +456,7 @@ fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 
     use hex_literal::hex;
     use num_traits::{FromPrimitive, ToPrimitive};
@@ -502,16 +489,12 @@ mod tests {
 
         let pub_key: RsaPublicKey = private_key.clone().into();
         let m = BigUint::from_u64(42).expect("invalid 42");
-        let c = pub_key
-            .raw_int_encryption_primitive(&m)
-            .expect("encryption successfull");
-        let m2 = private_key
-            .raw_int_decryption_primitive::<ChaCha8Rng>(None, &c)
+        let c = rsa_encrypt(&pub_key, &m).expect("encryption successfull");
+        let m2 = rsa_decrypt_and_check::<ChaCha8Rng>(private_key, None, &c)
             .expect("unable to decrypt without blinding");
         assert_eq!(m, m2);
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let m3 = private_key
-            .raw_int_decryption_primitive(Some(&mut rng), &c)
+        let m3 = rsa_decrypt_and_check(private_key, Some(&mut rng), &c)
             .expect("unable to decrypt with blinding");
         assert_eq!(m, m3);
     }
