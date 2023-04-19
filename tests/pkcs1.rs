@@ -3,7 +3,7 @@
 use hex_literal::hex;
 use rsa::{
     pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},
-    PublicKeyParts, RsaPrivateKey, RsaPublicKey,
+    PrivateKeyParts, PublicKeyParts, RsaPrivateKey, RsaPublicKey,
 };
 
 #[cfg(feature = "pem")]

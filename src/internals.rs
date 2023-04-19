@@ -7,8 +7,7 @@ use rand_core::CryptoRngCore;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::{Error, Result};
-use crate::key::RsaPrivateKey;
-use crate::keytraits::PublicKeyParts;
+use crate::keytraits::{PrivateKeyParts, PublicKeyParts};
 
 /// Raw RSA encryption of m with the public key. No padding is performed.
 #[inline]
@@ -21,7 +20,7 @@ pub fn encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> BigUint {
 #[inline]
 fn decrypt<R: CryptoRngCore + ?Sized>(
     mut rng: Option<&mut R>,
-    priv_key: &RsaPrivateKey,
+    priv_key: &impl PrivateKeyParts,
     c: &BigUint,
 ) -> Result<BigUint> {
     if c >= priv_key.n() {
@@ -42,16 +41,20 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
         Cow::Borrowed(c)
     };
 
-    let m = match priv_key.precomputed {
-        None => c.modpow(priv_key.d(), priv_key.n()),
-        Some(ref precomputed) => {
+    let dp = priv_key.dp();
+    let dq = priv_key.dq();
+    let qinv = priv_key.qinv();
+    let crt_values = priv_key.crt_values();
+
+    let m = match (dp, dq, qinv, crt_values) {
+        (Some(dp), Some(dq), Some(qinv), Some(crt_values)) => {
             // We have the precalculated values needed for the CRT.
 
             let p = &priv_key.primes()[0];
             let q = &priv_key.primes()[1];
 
-            let mut m = c.modpow(&precomputed.dp, p).into_bigint().unwrap();
-            let mut m2 = c.modpow(&precomputed.dq, q).into_bigint().unwrap();
+            let mut m = c.modpow(dp, p).into_bigint().unwrap();
+            let mut m2 = c.modpow(dq, q).into_bigint().unwrap();
 
             m -= &m2;
 
@@ -65,13 +68,13 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
             while m.is_negative() {
                 m += &primes[0];
             }
-            m *= &precomputed.qinv;
+            m *= qinv;
             m %= &primes[0];
             m *= &primes[1];
             m += &m2;
 
             let mut c = c.into_owned().into_bigint().unwrap();
-            for (i, value) in precomputed.crt_values.iter().enumerate() {
+            for (i, value) in crt_values.iter().enumerate() {
                 let prime = &primes[2 + i];
                 m2 = c.modpow(&value.exp, prime);
                 m2 -= &m;
@@ -94,6 +97,7 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
 
             m.into_biguint().expect("failed to decrypt")
         }
+        _ => c.modpow(priv_key.d(), priv_key.n()),
     };
 
     match ir {
@@ -111,7 +115,7 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
 #[inline]
 pub fn decrypt_and_check<R: CryptoRngCore + ?Sized>(
     rng: Option<&mut R>,
-    priv_key: &RsaPrivateKey,
+    priv_key: &impl PrivateKeyParts,
     c: &BigUint,
 ) -> Result<BigUint> {
     let m = decrypt(rng, priv_key, c)?;

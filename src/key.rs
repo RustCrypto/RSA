@@ -13,7 +13,7 @@ use crate::algorithms::generate::generate_multi_prime_key_with_exp;
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::internals;
-use crate::keytraits::PublicKeyParts;
+use crate::keytraits::{CRTValue, PrivateKeyParts, PublicKeyParts};
 
 use crate::padding::{PaddingScheme, SignatureScheme};
 
@@ -108,25 +108,6 @@ impl Zeroize for PrecomputedValues {
 impl Drop for PrecomputedValues {
     fn drop(&mut self) {
         self.zeroize();
-    }
-}
-
-/// Contains the precomputed Chinese remainder theorem values.
-#[derive(Debug, Clone)]
-pub(crate) struct CRTValue {
-    /// D mod (prime - 1)
-    pub(crate) exp: BigInt,
-    /// R·Coeff ≡ 1 mod Prime.
-    pub(crate) coeff: BigInt,
-    /// product of primes prior to this (inc p and q)
-    pub(crate) r: BigInt,
-}
-
-impl Zeroize for CRTValue {
-    fn zeroize(&mut self) {
-        self.exp.zeroize();
-        self.coeff.zeroize();
-        self.r.zeroize();
     }
 }
 
@@ -335,31 +316,6 @@ impl RsaPrivateKey {
         self.precomputed = None;
     }
 
-    /// Returns the precomputed dp value, D mod (P-1)
-    pub fn dp(&self) -> Option<&BigUint> {
-        self.precomputed.as_ref().map(|p| &p.dp)
-    }
-
-    /// Returns the precomputed dq value, D mod (Q-1)
-    pub fn dq(&self) -> Option<&BigUint> {
-        self.precomputed.as_ref().map(|p| &p.dq)
-    }
-
-    /// Returns the precomputed qinv value, Q^-1 mod P
-    pub fn qinv(&self) -> Option<&BigInt> {
-        self.precomputed.as_ref().map(|p| &p.qinv)
-    }
-
-    /// Returns the private exponent of the key.
-    pub fn d(&self) -> &BigUint {
-        &self.d
-    }
-
-    /// Returns the prime factors.
-    pub fn primes(&self) -> &[BigUint] {
-        &self.primes
-    }
-
     /// Compute CRT coefficient: `(1/q) mod p`.
     pub fn crt_coefficient(&self) -> Option<BigUint> {
         (&self.primes[1]).mod_inverse(&self.primes[0])?.to_biguint()
@@ -448,6 +404,37 @@ impl RsaPrivateKey {
         ciphertext: &BigUint,
     ) -> Result<BigUint> {
         internals::decrypt_and_check(rng, self, ciphertext)
+    }
+}
+
+impl PrivateKeyParts for RsaPrivateKey {
+    fn d(&self) -> &BigUint {
+        &self.d
+    }
+
+    fn primes(&self) -> &[BigUint] {
+        &self.primes
+    }
+
+    fn dp(&self) -> Option<&BigUint> {
+        self.precomputed.as_ref().map(|p| &p.dp)
+    }
+
+    fn dq(&self) -> Option<&BigUint> {
+        self.precomputed.as_ref().map(|p| &p.dq)
+    }
+
+    fn qinv(&self) -> Option<&BigInt> {
+        self.precomputed.as_ref().map(|p| &p.qinv)
+    }
+
+    fn crt_values(&self) -> Option<&[CRTValue]> {
+        /* for some reason the standard self.precomputed.as_ref().map() doesn't work */
+        if let Some(p) = &self.precomputed {
+            Some(p.crt_values.as_slice())
+        } else {
+            None
+        }
     }
 }
 
