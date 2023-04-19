@@ -492,7 +492,6 @@ fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::internals;
 
     use hex_literal::hex;
     use num_traits::{FromPrimitive, ToPrimitive};
@@ -525,12 +524,16 @@ mod tests {
 
         let pub_key: RsaPublicKey = private_key.clone().into();
         let m = BigUint::from_u64(42).expect("invalid 42");
-        let c = internals::encrypt(&pub_key, &m);
-        let m2 = internals::decrypt::<ChaCha8Rng>(None, private_key, &c)
+        let c = pub_key
+            .raw_int_encryption_primitive(&m)
+            .expect("encryption successfull");
+        let m2 = private_key
+            .raw_int_decryption_primitive::<ChaCha8Rng>(None, &c)
             .expect("unable to decrypt without blinding");
         assert_eq!(m, m2);
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let m3 = internals::decrypt(Some(&mut rng), private_key, &c)
+        let m3 = private_key
+            .raw_int_decryption_primitive(Some(&mut rng), &c)
             .expect("unable to decrypt with blinding");
         assert_eq!(m, m3);
     }
