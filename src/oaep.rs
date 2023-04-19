@@ -18,7 +18,8 @@ use crate::algorithms::oaep::*;
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::internals::{uint_to_be_pad, uint_to_zeroizing_be_pad};
-use crate::key::{self, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+use crate::key::{self, RsaPrivateKey, RsaPublicKey};
+use crate::keytraits::PublicKeyParts;
 use crate::padding::PaddingScheme;
 use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 
@@ -411,7 +412,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::key::{PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+    use crate::key::{RsaPrivateKey, RsaPublicKey};
+    use crate::keytraits::PublicKeyParts;
     use crate::oaep::{DecryptingKey, EncryptingKey, Oaep};
     use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 

@@ -34,7 +34,7 @@ use signature::{
 use crate::algorithms::pss::*;
 use crate::errors::{Error, Result};
 use crate::internals::{uint_to_be_pad, uint_to_zeroizing_be_pad};
-use crate::key::PublicKeyParts;
+use crate::keytraits::PublicKeyParts;
 use crate::padding::SignatureScheme;
 use crate::{RsaPrivateKey, RsaPublicKey};
 

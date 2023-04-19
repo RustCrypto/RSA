@@ -7,7 +7,8 @@ use rand_core::CryptoRngCore;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::{Error, Result};
-use crate::key::{PublicKeyParts, RsaPrivateKey};
+use crate::key::RsaPrivateKey;
+use crate::keytraits::PublicKeyParts;
 
 /// Raw RSA encryption of m with the public key. No padding is performed.
 #[inline]

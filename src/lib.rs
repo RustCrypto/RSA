@@ -222,8 +222,9 @@ pub use num_bigint::BigUint;
 pub use rand_core;
 pub use signature;
 
-pub mod algorithms;
+mod algorithms;
 pub mod errors;
+mod keytraits;
 pub mod oaep;
 pub mod pkcs1v15;
 pub mod pss;
@@ -240,7 +241,8 @@ pub use pkcs8;
 pub use sha2;
 
 pub use crate::{
-    key::{PublicKeyParts, RsaPrivateKey, RsaPublicKey},
+    key::{RsaPrivateKey, RsaPublicKey},
+    keytraits::PublicKeyParts,
     oaep::Oaep,
     padding::{PaddingScheme, SignatureScheme},
     pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign},

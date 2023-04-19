@@ -13,23 +13,9 @@ use crate::algorithms::generate::generate_multi_prime_key_with_exp;
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::internals;
+use crate::keytraits::PublicKeyParts;
 
 use crate::padding::{PaddingScheme, SignatureScheme};
-
-/// Components of an RSA public key.
-pub trait PublicKeyParts {
-    /// Returns the modulus of the key.
-    fn n(&self) -> &BigUint;
-
-    /// Returns the public exponent of the key.
-    fn e(&self) -> &BigUint;
-
-    /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
-    /// or by this public key will have the same size.
-    fn size(&self) -> usize {
-        (self.n().bits() + 7) / 8
-    }
-}
 
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
