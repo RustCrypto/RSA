@@ -28,7 +28,7 @@ pub struct RsaPrivateKeyComponents {
 ///
 /// [1]: https://patents.google.com/patent/US4405829A/en
 /// [2]: http://www.cacr.math.uwaterloo.ca/techreports/2006/cacr2006-16.pdf
-pub fn generate_multi_prime_key_with_exp<R: CryptoRngCore + ?Sized>(
+pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore + ?Sized>(
     rng: &mut R,
     nprimes: usize,
     bit_size: usize,

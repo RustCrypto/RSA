@@ -12,12 +12,14 @@ use crate::keytraits::{PrivateKeyParts, PublicKeyParts};
 
 /// Raw RSA encryption of m with the public key. No padding is performed.
 #[inline]
-pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> Result<BigUint> {
+pub(crate) fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> Result<BigUint> {
     Ok(m.modpow(key.e(), key.n()))
 }
 
 /// Performs raw RSA decryption with no padding, resulting in a plaintext `BigUint`.
 /// Peforms RSA blinding if an `Rng` is passed.
+/// WARNING! Raw RSA MUST NOT be used. Instead a proper padding or
+/// signature scheme should be used as implemented by the `rsa` crate.
 #[inline]
 fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     mut rng: Option<&mut R>,
@@ -113,8 +115,10 @@ fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
 /// Performs RSA decryption, resulting in a plaintext `BigUint`.
 /// Peforms RSA blinding if an `Rng` is passed.
 /// This will also check for errors in the CRT computation.
+/// WARNING! Raw RSA MUST NOT be used. Instead a proper padding or
+/// signature scheme should be used as implemented by the `rsa` crate.
 #[inline]
-pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
+pub(crate) fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
     priv_key: &impl PrivateKeyParts,
     rng: Option<&mut R>,
     c: &BigUint,
