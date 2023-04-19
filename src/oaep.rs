@@ -15,10 +15,10 @@ use num_bigint::BigUint;
 use zeroize::Zeroizing;
 
 use crate::algorithms::oaep::*;
+use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
-use crate::internals::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::key::{self, RsaPrivateKey, RsaPublicKey};
 use crate::keytraits::PublicKeyParts;
 use crate::padding::PaddingScheme;

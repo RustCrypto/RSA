@@ -26,11 +26,11 @@ use signature::{
 };
 use zeroize::Zeroizing;
 
+use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pkcs1v15::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
-use crate::internals::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::key;
 use crate::keytraits::PublicKeyParts;
 use crate::padding::{PaddingScheme, SignatureScheme};

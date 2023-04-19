@@ -248,11 +248,3 @@ pub use crate::{
     pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign},
     pss::Pss,
 };
-
-/// Internal raw RSA functions.
-#[cfg(not(feature = "expose-internals"))]
-mod internals;
-
-/// Internal raw RSA functions.
-#[cfg(feature = "expose-internals")]
-pub mod internals;
