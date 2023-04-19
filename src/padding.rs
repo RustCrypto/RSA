@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use rand_core::CryptoRngCore;
 
 use crate::errors::Result;
-use crate::key::{PrivateKey, PublicKey};
+use crate::key::{RsaPrivateKey, RsaPublicKey};
 
 /// Padding scheme used for encryption.
 pub trait PaddingScheme {
@@ -13,18 +13,18 @@ pub trait PaddingScheme {
     ///
     /// If an `rng` is passed, it uses RSA blinding to help mitigate timing
     /// side-channel attacks.
-    fn decrypt<Rng: CryptoRngCore, Priv: PrivateKey>(
+    fn decrypt<Rng: CryptoRngCore>(
         self,
         rng: Option<&mut Rng>,
-        priv_key: &Priv,
+        priv_key: &RsaPrivateKey,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>>;
 
     /// Encrypt the given message using the given public key.
-    fn encrypt<Rng: CryptoRngCore, Pub: PublicKey>(
+    fn encrypt<Rng: CryptoRngCore>(
         self,
         rng: &mut Rng,
-        pub_key: &Pub,
+        pub_key: &RsaPublicKey,
         msg: &[u8],
     ) -> Result<Vec<u8>>;
 }
@@ -32,10 +32,10 @@ pub trait PaddingScheme {
 /// Digital signature scheme.
 pub trait SignatureScheme {
     /// Sign the given digest.
-    fn sign<Rng: CryptoRngCore, Priv: PrivateKey>(
+    fn sign<Rng: CryptoRngCore>(
         self,
         rng: Option<&mut Rng>,
-        priv_key: &Priv,
+        priv_key: &RsaPrivateKey,
         hashed: &[u8],
     ) -> Result<Vec<u8>>;
 
@@ -45,5 +45,5 @@ pub trait SignatureScheme {
     /// passed in through `hash`.
     ///
     /// If the message is valid `Ok(())` is returned, otherwise an `Err` indicating failure.
-    fn verify<Pub: PublicKey>(self, pub_key: &Pub, hashed: &[u8], sig: &[u8]) -> Result<()>;
+    fn verify(self, pub_key: &RsaPublicKey, hashed: &[u8], sig: &[u8]) -> Result<()>;
 }

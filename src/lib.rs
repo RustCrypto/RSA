@@ -14,7 +14,7 @@
 //!
 //! ## PKCS#1 v1.5 encryption
 //! ```
-//! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
+//! use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
 //!
 //! let mut rng = rand::thread_rng();
 //!
@@ -34,7 +34,7 @@
 //!
 //! ## OAEP encryption
 //! ```
-//! use rsa::{PublicKey, RsaPrivateKey, RsaPublicKey, Oaep};
+//! use rsa::{RsaPrivateKey, RsaPublicKey, Oaep};
 //!
 //! let mut rng = rand::thread_rng();
 //!
@@ -233,7 +233,6 @@ mod dummy_rng;
 mod encoding;
 mod key;
 mod padding;
-mod raw;
 
 pub use pkcs1;
 pub use pkcs8;
@@ -241,7 +240,7 @@ pub use pkcs8;
 pub use sha2;
 
 pub use crate::{
-    key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey},
+    key::{PublicKeyParts, RsaPrivateKey, RsaPublicKey},
     oaep::Oaep,
     padding::{PaddingScheme, SignatureScheme},
     pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign},

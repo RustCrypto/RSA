@@ -9,13 +9,13 @@
 //! [Probabilistic Signature Scheme]: https://en.wikipedia.org/wiki/Probabilistic_signature_scheme
 //! [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 
-use alloc::boxed::Box;
-use alloc::vec::Vec;
+use alloc::{boxed::Box, string::ToString, vec::Vec};
 use core::fmt::{self, Debug, Display, Formatter, LowerHex, UpperHex};
 use core::marker::PhantomData;
 
 use const_oid::{AssociatedOid, ObjectIdentifier};
 use digest::{Digest, DynDigest, FixedOutputReset};
+use num_bigint::BigUint;
 use pkcs1::RsaPssParams;
 use pkcs8::{
     spki::{
@@ -30,11 +30,11 @@ use signature::{
     hazmat::{PrehashVerifier, RandomizedPrehashSigner},
     DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, SignatureEncoding, Verifier,
 };
-use subtle::{Choice, ConstantTimeEq};
 
-use crate::algorithms::{mgf1_xor, mgf1_xor_digest};
+use crate::algorithms::pss::*;
 use crate::errors::{Error, Result};
-use crate::key::{PrivateKey, PublicKey};
+use crate::internals::{uint_to_be_pad, uint_to_zeroizing_be_pad};
+use crate::key::PublicKeyParts;
 use crate::padding::SignatureScheme;
 use crate::{RsaPrivateKey, RsaPublicKey};
 
@@ -89,10 +89,10 @@ impl Pss {
 }
 
 impl SignatureScheme for Pss {
-    fn sign<Rng: CryptoRngCore, Priv: PrivateKey>(
+    fn sign<Rng: CryptoRngCore>(
         mut self,
         rng: Option<&mut Rng>,
-        priv_key: &Priv,
+        priv_key: &RsaPrivateKey,
         hashed: &[u8],
     ) -> Result<Vec<u8>> {
         sign(
@@ -105,8 +105,15 @@ impl SignatureScheme for Pss {
         )
     }
 
-    fn verify<Pub: PublicKey>(mut self, pub_key: &Pub, hashed: &[u8], sig: &[u8]) -> Result<()> {
-        verify(pub_key, hashed, sig, &mut *self.digest, self.salt_len)
+    fn verify(mut self, pub_key: &RsaPublicKey, hashed: &[u8], sig: &[u8]) -> Result<()> {
+        verify(
+            pub_key,
+            hashed,
+            &BigUint::from_bytes_be(sig),
+            sig.len(),
+            &mut *self.digest,
+            self.salt_len,
+        )
     }
 }
 
@@ -125,17 +132,12 @@ impl Debug for Pss {
 /// [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 #[derive(Clone, PartialEq, Eq)]
 pub struct Signature {
-    bytes: Box<[u8]>,
+    inner: BigUint,
+    len: usize,
 }
 
 impl SignatureEncoding for Signature {
     type Repr = Box<[u8]>;
-}
-
-impl From<Box<[u8]>> for Signature {
-    fn from(bytes: Box<[u8]>) -> Self {
-        Self { bytes }
-    }
 }
 
 impl TryFrom<&[u8]> for Signature {
@@ -143,44 +145,35 @@ impl TryFrom<&[u8]> for Signature {
 
     fn try_from(bytes: &[u8]) -> signature::Result<Self> {
         Ok(Self {
-            bytes: bytes.into(),
+            len: bytes.len(),
+            inner: BigUint::from_bytes_be(bytes),
         })
     }
 }
 
 impl From<Signature> for Box<[u8]> {
     fn from(signature: Signature) -> Box<[u8]> {
-        signature.bytes
+        signature.inner.to_bytes_be().into_boxed_slice()
     }
 }
 
 impl Debug for Signature {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> core::result::Result<(), core::fmt::Error> {
-        fmt.debug_list().entries(self.bytes.iter()).finish()
-    }
-}
-
-impl AsRef<[u8]> for Signature {
-    fn as_ref(&self) -> &[u8] {
-        self.bytes.as_ref()
+        fmt.debug_tuple("Signature")
+            .field(&self.to_string())
+            .finish()
     }
 }
 
 impl LowerHex for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for byte in self.bytes.iter() {
-            write!(f, "{:02x}", byte)?;
-        }
-        Ok(())
+        write!(f, "{:x}", &self.inner)
     }
 }
 
 impl UpperHex for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        for byte in self.bytes.iter() {
-            write!(f, "{:02X}", byte)?;
-        }
-        Ok(())
+        write!(f, "{:X}", &self.inner)
     }
 }
 
@@ -190,51 +183,40 @@ impl Display for Signature {
     }
 }
 
-pub(crate) fn verify<PK: PublicKey>(
-    pub_key: &PK,
+pub(crate) fn verify(
+    pub_key: &RsaPublicKey,
     hashed: &[u8],
-    sig: &[u8],
+    sig: &BigUint,
+    sig_len: usize,
     digest: &mut dyn DynDigest,
     salt_len: usize,
 ) -> Result<()> {
-    if sig.len() != pub_key.size() {
+    if sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
 
-    let em_bits = pub_key.n().bits() - 1;
-    let em_len = (em_bits + 7) / 8;
-    let key_len = pub_key.size();
-    let mut em = pub_key.raw_encryption_primitive(sig, key_len)?;
+    let mut em = uint_to_be_pad(pub_key.raw_int_encryption_primitive(sig)?, pub_key.size())?;
 
-    emsa_pss_verify(
-        hashed,
-        &mut em[key_len - em_len..],
-        em_bits,
-        salt_len,
-        digest,
-    )
+    emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits())
 }
 
-pub(crate) fn verify_digest<PK, D>(
-    pub_key: &PK,
+pub(crate) fn verify_digest<D>(
+    pub_key: &RsaPublicKey,
     hashed: &[u8],
-    sig: &[u8],
+    sig: &BigUint,
+    sig_len: usize,
     salt_len: usize,
 ) -> Result<()>
 where
-    PK: PublicKey,
     D: Digest + FixedOutputReset,
 {
-    if sig.len() != pub_key.size() {
+    if sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
 
-    let em_bits = pub_key.n().bits() - 1;
-    let em_len = (em_bits + 7) / 8;
-    let key_len = pub_key.size();
-    let mut em = pub_key.raw_encryption_primitive(sig, key_len)?;
+    let mut em = uint_to_be_pad(pub_key.raw_int_encryption_primitive(sig)?, pub_key.size())?;
 
-    emsa_pss_verify_digest::<D>(hashed, &mut em[key_len - em_len..], em_bits, salt_len)
+    emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits())
 }
 
 /// SignPSS calculates the signature of hashed using RSASSA-PSS.
@@ -242,10 +224,10 @@ where
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. The opts argument may be nil, in which case sensible
 /// defaults are used.
-pub(crate) fn sign<T: CryptoRngCore, SK: PrivateKey>(
+pub(crate) fn sign<T: CryptoRngCore>(
     rng: &mut T,
     blind: bool,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     hashed: &[u8],
     salt_len: usize,
     digest: &mut dyn DynDigest,
@@ -256,21 +238,17 @@ pub(crate) fn sign<T: CryptoRngCore, SK: PrivateKey>(
     sign_pss_with_salt(blind.then_some(rng), priv_key, hashed, &salt, digest)
 }
 
-pub(crate) fn sign_digest<
-    T: CryptoRngCore + ?Sized,
-    SK: PrivateKey,
-    D: Digest + FixedOutputReset,
->(
+pub(crate) fn sign_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputReset>(
     rng: &mut T,
     blind: bool,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     hashed: &[u8],
     salt_len: usize,
 ) -> Result<Vec<u8>> {
     let mut salt = vec![0; salt_len];
     rng.fill_bytes(&mut salt[..]);
 
-    sign_pss_with_salt_digest::<_, _, D>(blind.then_some(rng), priv_key, hashed, &salt)
+    sign_pss_with_salt_digest::<_, D>(blind.then_some(rng), priv_key, hashed, &salt)
 }
 
 /// signPSSWithSalt calculates the signature of hashed using PSS with specified salt.
@@ -278,9 +256,9 @@ pub(crate) fn sign_digest<
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. salt is a random sequence of bytes whose length will be
 /// later used to verify the signature.
-fn sign_pss_with_salt<T: CryptoRngCore, SK: PrivateKey>(
+fn sign_pss_with_salt<T: CryptoRngCore>(
     blind_rng: Option<&mut T>,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     hashed: &[u8],
     salt: &[u8],
     digest: &mut dyn DynDigest,
@@ -288,328 +266,25 @@ fn sign_pss_with_salt<T: CryptoRngCore, SK: PrivateKey>(
     let em_bits = priv_key.n().bits() - 1;
     let em = emsa_pss_encode(hashed, em_bits, salt, digest)?;
 
-    priv_key.raw_decryption_primitive(blind_rng, &em, priv_key.size())
+    uint_to_zeroizing_be_pad(
+        priv_key.raw_int_decryption_primitive(blind_rng, &BigUint::from_bytes_be(&em))?,
+        priv_key.size(),
+    )
 }
 
-fn sign_pss_with_salt_digest<
-    T: CryptoRngCore + ?Sized,
-    SK: PrivateKey,
-    D: Digest + FixedOutputReset,
->(
+fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputReset>(
     blind_rng: Option<&mut T>,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     hashed: &[u8],
     salt: &[u8],
 ) -> Result<Vec<u8>> {
     let em_bits = priv_key.n().bits() - 1;
     let em = emsa_pss_encode_digest::<D>(hashed, em_bits, salt)?;
 
-    priv_key.raw_decryption_primitive(blind_rng, &em, priv_key.size())
-}
-
-fn emsa_pss_encode(
-    m_hash: &[u8],
-    em_bits: usize,
-    salt: &[u8],
-    hash: &mut dyn DynDigest,
-) -> Result<Vec<u8>> {
-    // See [1], section 9.1.1
-    let h_len = hash.output_size();
-    let s_len = salt.len();
-    let em_len = (em_bits + 7) / 8;
-
-    // 1. If the length of M is greater than the input limitation for the
-    //     hash function (2^61 - 1 octets for SHA-1), output "message too
-    //     long" and stop.
-    //
-    // 2.  Let mHash = Hash(M), an octet string of length hLen.
-    if m_hash.len() != h_len {
-        return Err(Error::InputNotHashed);
-    }
-
-    // 3. If em_len < h_len + s_len + 2, output "encoding error" and stop.
-    if em_len < h_len + s_len + 2 {
-        // TODO: Key size too small
-        return Err(Error::Internal);
-    }
-
-    let mut em = vec![0; em_len];
-
-    let (db, h) = em.split_at_mut(em_len - h_len - 1);
-    let h = &mut h[..(em_len - 1) - db.len()];
-
-    // 4. Generate a random octet string salt of length s_len; if s_len = 0,
-    //     then salt is the empty string.
-    //
-    // 5.  Let
-    //       M' = (0x)00 00 00 00 00 00 00 00 || m_hash || salt;
-    //
-    //     M' is an octet string of length 8 + h_len + s_len with eight
-    //     initial zero octets.
-    //
-    // 6.  Let H = Hash(M'), an octet string of length h_len.
-    let prefix = [0u8; 8];
-
-    hash.update(&prefix);
-    hash.update(m_hash);
-    hash.update(salt);
-
-    let hashed = hash.finalize_reset();
-    h.copy_from_slice(&hashed);
-
-    // 7.  Generate an octet string PS consisting of em_len - s_len - h_len - 2
-    //     zero octets. The length of PS may be 0.
-    //
-    // 8.  Let DB = PS || 0x01 || salt; DB is an octet string of length
-    //     emLen - hLen - 1.
-    db[em_len - s_len - h_len - 2] = 0x01;
-    db[em_len - s_len - h_len - 1..].copy_from_slice(salt);
-
-    // 9.  Let dbMask = MGF(H, emLen - hLen - 1).
-    //
-    // 10. Let maskedDB = DB \xor dbMask.
-    mgf1_xor(db, hash, h);
-
-    // 11. Set the leftmost 8 * em_len - em_bits bits of the leftmost octet in
-    //     maskedDB to zero.
-    db[0] &= 0xFF >> (8 * em_len - em_bits);
-
-    // 12. Let EM = maskedDB || H || 0xbc.
-    em[em_len - 1] = 0xBC;
-
-    Ok(em)
-}
-
-fn emsa_pss_encode_digest<D>(m_hash: &[u8], em_bits: usize, salt: &[u8]) -> Result<Vec<u8>>
-where
-    D: Digest + FixedOutputReset,
-{
-    // See [1], section 9.1.1
-    let h_len = <D as Digest>::output_size();
-    let s_len = salt.len();
-    let em_len = (em_bits + 7) / 8;
-
-    // 1. If the length of M is greater than the input limitation for the
-    //     hash function (2^61 - 1 octets for SHA-1), output "message too
-    //     long" and stop.
-    //
-    // 2.  Let mHash = Hash(M), an octet string of length hLen.
-    if m_hash.len() != h_len {
-        return Err(Error::InputNotHashed);
-    }
-
-    // 3. If em_len < h_len + s_len + 2, output "encoding error" and stop.
-    if em_len < h_len + s_len + 2 {
-        // TODO: Key size too small
-        return Err(Error::Internal);
-    }
-
-    let mut em = vec![0; em_len];
-
-    let (db, h) = em.split_at_mut(em_len - h_len - 1);
-    let h = &mut h[..(em_len - 1) - db.len()];
-
-    // 4. Generate a random octet string salt of length s_len; if s_len = 0,
-    //     then salt is the empty string.
-    //
-    // 5.  Let
-    //       M' = (0x)00 00 00 00 00 00 00 00 || m_hash || salt;
-    //
-    //     M' is an octet string of length 8 + h_len + s_len with eight
-    //     initial zero octets.
-    //
-    // 6.  Let H = Hash(M'), an octet string of length h_len.
-    let prefix = [0u8; 8];
-
-    let mut hash = D::new();
-
-    Digest::update(&mut hash, prefix);
-    Digest::update(&mut hash, m_hash);
-    Digest::update(&mut hash, salt);
-
-    let hashed = hash.finalize_reset();
-    h.copy_from_slice(&hashed);
-
-    // 7.  Generate an octet string PS consisting of em_len - s_len - h_len - 2
-    //     zero octets. The length of PS may be 0.
-    //
-    // 8.  Let DB = PS || 0x01 || salt; DB is an octet string of length
-    //     emLen - hLen - 1.
-    db[em_len - s_len - h_len - 2] = 0x01;
-    db[em_len - s_len - h_len - 1..].copy_from_slice(salt);
-
-    // 9.  Let dbMask = MGF(H, emLen - hLen - 1).
-    //
-    // 10. Let maskedDB = DB \xor dbMask.
-    mgf1_xor_digest(db, &mut hash, h);
-
-    // 11. Set the leftmost 8 * em_len - em_bits bits of the leftmost octet in
-    //     maskedDB to zero.
-    db[0] &= 0xFF >> (8 * em_len - em_bits);
-
-    // 12. Let EM = maskedDB || H || 0xbc.
-    em[em_len - 1] = 0xBC;
-
-    Ok(em)
-}
-
-fn emsa_pss_verify_pre<'a>(
-    m_hash: &[u8],
-    em: &'a mut [u8],
-    em_bits: usize,
-    s_len: usize,
-    h_len: usize,
-) -> Result<(&'a mut [u8], &'a mut [u8])> {
-    // 1. If the length of M is greater than the input limitation for the
-    //    hash function (2^61 - 1 octets for SHA-1), output "inconsistent"
-    //    and stop.
-    //
-    // 2. Let mHash = Hash(M), an octet string of length hLen
-    if m_hash.len() != h_len {
-        return Err(Error::Verification);
-    }
-
-    // 3. If emLen < hLen + sLen + 2, output "inconsistent" and stop.
-    let em_len = em.len(); //(em_bits + 7) / 8;
-    if em_len < h_len + s_len + 2 {
-        return Err(Error::Verification);
-    }
-
-    // 4. If the rightmost octet of EM does not have hexadecimal value
-    //    0xbc, output "inconsistent" and stop.
-    if em[em.len() - 1] != 0xBC {
-        return Err(Error::Verification);
-    }
-
-    // 5. Let maskedDB be the leftmost emLen - hLen - 1 octets of EM, and
-    //    let H be the next hLen octets.
-    let (db, h) = em.split_at_mut(em_len - h_len - 1);
-    let h = &mut h[..h_len];
-
-    // 6. If the leftmost 8 * em_len - em_bits bits of the leftmost octet in
-    //    maskedDB are not all equal to zero, output "inconsistent" and
-    //    stop.
-    if db[0]
-        & (0xFF_u8
-            .checked_shl(8 - (8 * em_len - em_bits) as u32)
-            .unwrap_or(0))
-        != 0
-    {
-        return Err(Error::Verification);
-    }
-
-    Ok((db, h))
-}
-
-fn emsa_pss_verify_salt(db: &[u8], em_len: usize, s_len: usize, h_len: usize) -> Choice {
-    // 10. If the emLen - hLen - sLen - 2 leftmost octets of DB are not zero
-    //     or if the octet at position emLen - hLen - sLen - 1 (the leftmost
-    //     position is "position 1") does not have hexadecimal value 0x01,
-    //     output "inconsistent" and stop.
-    let (zeroes, rest) = db.split_at(em_len - h_len - s_len - 2);
-    let valid: Choice = zeroes
-        .iter()
-        .fold(Choice::from(1u8), |a, e| a & e.ct_eq(&0x00));
-
-    valid & rest[0].ct_eq(&0x01)
-}
-
-fn emsa_pss_verify(
-    m_hash: &[u8],
-    em: &mut [u8],
-    em_bits: usize,
-    s_len: usize,
-    hash: &mut dyn DynDigest,
-) -> Result<()> {
-    let em_len = em.len(); //(em_bits + 7) / 8;
-    let h_len = hash.output_size();
-
-    let (db, h) = emsa_pss_verify_pre(m_hash, em, em_bits, s_len, h_len)?;
-
-    // 7. Let dbMask = MGF(H, em_len - h_len - 1)
-    //
-    // 8. Let DB = maskedDB \xor dbMask
-    mgf1_xor(db, hash, &*h);
-
-    // 9.  Set the leftmost 8 * emLen - emBits bits of the leftmost octet in DB
-    //     to zero.
-    db[0] &= 0xFF >> /*uint*/(8 * em_len - em_bits);
-
-    let salt_valid = emsa_pss_verify_salt(db, em_len, s_len, h_len);
-
-    // 11. Let salt be the last s_len octets of DB.
-    let salt = &db[db.len() - s_len..];
-
-    // 12. Let
-    //          M' = (0x)00 00 00 00 00 00 00 00 || mHash || salt ;
-    //     M' is an octet string of length 8 + hLen + sLen with eight
-    //     initial zero octets.
-    //
-    // 13. Let H' = Hash(M'), an octet string of length hLen.
-    let prefix = [0u8; 8];
-
-    hash.update(&prefix[..]);
-    hash.update(m_hash);
-    hash.update(salt);
-    let h0 = hash.finalize_reset();
-
-    // 14. If H = H', output "consistent." Otherwise, output "inconsistent."
-    if (salt_valid & h0.ct_eq(h)).into() {
-        Ok(())
-    } else {
-        Err(Error::Verification)
-    }
-}
-
-fn emsa_pss_verify_digest<D>(
-    m_hash: &[u8],
-    em: &mut [u8],
-    em_bits: usize,
-    s_len: usize,
-) -> Result<()>
-where
-    D: Digest + FixedOutputReset,
-{
-    let em_len = em.len(); //(em_bits + 7) / 8;
-    let h_len = <D as Digest>::output_size();
-
-    let (db, h) = emsa_pss_verify_pre(m_hash, em, em_bits, s_len, h_len)?;
-
-    let mut hash = D::new();
-
-    // 7. Let dbMask = MGF(H, em_len - h_len - 1)
-    //
-    // 8. Let DB = maskedDB \xor dbMask
-    mgf1_xor_digest::<D>(db, &mut hash, &*h);
-
-    // 9.  Set the leftmost 8 * emLen - emBits bits of the leftmost octet in DB
-    //     to zero.
-    db[0] &= 0xFF >> /*uint*/(8 * em_len - em_bits);
-
-    let salt_valid = emsa_pss_verify_salt(db, em_len, s_len, h_len);
-
-    // 11. Let salt be the last s_len octets of DB.
-    let salt = &db[db.len() - s_len..];
-
-    // 12. Let
-    //          M' = (0x)00 00 00 00 00 00 00 00 || mHash || salt ;
-    //     M' is an octet string of length 8 + hLen + sLen with eight
-    //     initial zero octets.
-    //
-    // 13. Let H' = Hash(M'), an octet string of length hLen.
-    let prefix = [0u8; 8];
-
-    Digest::update(&mut hash, &prefix[..]);
-    Digest::update(&mut hash, m_hash);
-    Digest::update(&mut hash, salt);
-    let h0 = hash.finalize_reset();
-
-    // 14. If H = H', output "consistent." Otherwise, output "inconsistent."
-    if (salt_valid & h0.ct_eq(h)).into() {
-        Ok(())
-    } else {
-        Err(Error::Verification)
-    }
+    uint_to_zeroizing_be_pad(
+        priv_key.raw_int_decryption_primitive(blind_rng, &BigUint::from_bytes_be(&em))?,
+        priv_key.size(),
+    )
 }
 
 /// Signing key for producing RSASSA-PSS signatures as described in
@@ -762,9 +437,9 @@ where
         rng: &mut impl CryptoRngCore,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, false, &self.inner, &D::digest(msg), self.salt_len)
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign_digest::<_, D>(rng, false, &self.inner, &D::digest(msg), self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -777,9 +452,9 @@ where
         rng: &mut impl CryptoRngCore,
         digest: D,
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, false, &self.inner, &digest.finalize(), self.salt_len)
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign_digest::<_, D>(rng, false, &self.inner, &digest.finalize(), self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -792,9 +467,9 @@ where
         rng: &mut impl CryptoRngCore,
         prehash: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, false, &self.inner, prehash, self.salt_len)
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign_digest::<_, D>(rng, false, &self.inner, prehash, self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -935,9 +610,9 @@ where
         rng: &mut impl CryptoRngCore,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, true, &self.inner, &D::digest(msg), self.salt_len)
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign_digest::<_, D>(rng, true, &self.inner, &D::digest(msg), self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -950,9 +625,9 @@ where
         rng: &mut impl CryptoRngCore,
         digest: D,
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, true, &self.inner, &digest.finalize(), self.salt_len)
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign_digest::<_, D>(rng, true, &self.inner, &digest.finalize(), self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -965,9 +640,9 @@ where
         rng: &mut impl CryptoRngCore,
         prehash: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, _, D>(rng, true, &self.inner, prehash, self.salt_len)
-            .map(|v| v.into_boxed_slice().into())
-            .map_err(|e| e.into())
+        sign_digest::<_, D>(rng, true, &self.inner, prehash, self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -1060,10 +735,11 @@ where
     D: Digest + FixedOutputReset,
 {
     fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify_digest::<_, D>(
+        verify_digest::<D>(
             &self.inner,
             &D::digest(msg),
-            signature.as_ref(),
+            &signature.inner,
+            signature.len,
             self.salt_len,
         )
         .map_err(|e| e.into())
@@ -1075,10 +751,11 @@ where
     D: Digest + FixedOutputReset,
 {
     fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
-        verify_digest::<_, D>(
+        verify_digest::<D>(
             &self.inner,
             &digest.finalize(),
-            signature.as_ref(),
+            &signature.inner,
+            signature.len,
             self.salt_len,
         )
         .map_err(|e| e.into())
@@ -1090,8 +767,14 @@ where
     D: Digest + FixedOutputReset,
 {
     fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify_digest::<_, D>(&self.inner, prehash, signature.as_ref(), self.salt_len)
-            .map_err(|e| e.into())
+        verify_digest::<D>(
+            &self.inner,
+            prehash,
+            &signature.inner,
+            signature.len,
+            self.salt_len,
+        )
+        .map_err(|e| e.into())
     }
 }
 
@@ -1116,7 +799,7 @@ where
 #[cfg(test)]
 mod test {
     use crate::pss::{BlindedSigningKey, Pss, Signature, SigningKey, VerifyingKey};
-    use crate::{PublicKey, RsaPrivateKey, RsaPublicKey};
+    use crate::{RsaPrivateKey, RsaPublicKey};
 
     use hex_literal::hex;
     use num_bigint::BigUint;

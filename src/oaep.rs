@@ -5,26 +5,22 @@
 //! See [code example in the toplevel rustdoc](../index.html#oaep-encryption).
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
-use alloc::vec;
 use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
 use rand_core::CryptoRngCore;
 
 use digest::{Digest, DynDigest, FixedOutputReset};
-use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
+use num_bigint::BigUint;
 use zeroize::Zeroizing;
 
-use crate::algorithms::{mgf1_xor, mgf1_xor_digest};
+use crate::algorithms::oaep::*;
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
-use crate::key::{self, PrivateKey, PublicKey, RsaPrivateKey, RsaPublicKey};
+use crate::internals::{uint_to_be_pad, uint_to_zeroizing_be_pad};
+use crate::key::{self, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 use crate::padding::PaddingScheme;
 use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
-
-// 2**61 -1 (pow is not const yet)
-// TODO: This is the maximum for SHA-1, unclear from the RFC what the values are for other hashing functions.
-const MAX_LABEL_LEN: u64 = 2_305_843_009_213_693_951;
 
 /// Encryption and Decryption using [OAEP padding](https://datatracker.ietf.org/doc/html/rfc8017#section-7.1).
 ///
@@ -55,7 +51,7 @@ impl Oaep {
     /// ```
     /// use sha1::Sha1;
     /// use sha2::Sha256;
-    /// use rsa::{BigUint, RsaPublicKey, Oaep, PublicKey};
+    /// use rsa::{BigUint, RsaPublicKey, Oaep, };
     /// use base64ct::{Base64, Encoding};
     ///
     /// let n = Base64::decode_vec("ALHgDoZmBQIx+jTmgeeHW6KsPOrj11f6CvWsiRleJlQpW77AwSZhd21ZDmlTKfaIHBSUxRUsuYNh7E2SHx8rkFVCQA2/gXkZ5GK2IUbzSTio9qXA25MWHvVxjMfKSL8ZAxZyKbrG94FLLszFAFOaiLLY8ECs7g+dXOriYtBwLUJK+lppbd+El+8ZA/zH0bk7vbqph5pIoiWggxwdq3mEz4LnrUln7r6dagSQzYErKewY8GADVpXcq5mfHC1xF2DFBub7bFjMVM5fHq7RK+pG5xjNDiYITbhLYrbVv3X0z75OvN0dY49ITWjM7xyvMWJXVJS7sJlgmCCL6RwWgP8PhcE=").unwrap();
@@ -92,7 +88,7 @@ impl Oaep {
     /// ```
     /// use sha1::Sha1;
     /// use sha2::Sha256;
-    /// use rsa::{BigUint, RsaPublicKey, Oaep, PublicKey};
+    /// use rsa::{BigUint, RsaPublicKey, Oaep, };
     /// use base64ct::{Base64, Encoding};
     ///
     /// let n = Base64::decode_vec("ALHgDoZmBQIx+jTmgeeHW6KsPOrj11f6CvWsiRleJlQpW77AwSZhd21ZDmlTKfaIHBSUxRUsuYNh7E2SHx8rkFVCQA2/gXkZ5GK2IUbzSTio9qXA25MWHvVxjMfKSL8ZAxZyKbrG94FLLszFAFOaiLLY8ECs7g+dXOriYtBwLUJK+lppbd+El+8ZA/zH0bk7vbqph5pIoiWggxwdq3mEz4LnrUln7r6dagSQzYErKewY8GADVpXcq5mfHC1xF2DFBub7bFjMVM5fHq7RK+pG5xjNDiYITbhLYrbVv3X0z75OvN0dY49ITWjM7xyvMWJXVJS7sJlgmCCL6RwWgP8PhcE=").unwrap();
@@ -131,10 +127,10 @@ impl Oaep {
 }
 
 impl PaddingScheme for Oaep {
-    fn decrypt<Rng: CryptoRngCore, Priv: PrivateKey>(
+    fn decrypt<Rng: CryptoRngCore>(
         mut self,
         rng: Option<&mut Rng>,
-        priv_key: &Priv,
+        priv_key: &RsaPrivateKey,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
         decrypt(
@@ -147,10 +143,10 @@ impl PaddingScheme for Oaep {
         )
     }
 
-    fn encrypt<Rng: CryptoRngCore, Pub: PublicKey>(
+    fn encrypt<Rng: CryptoRngCore>(
         mut self,
         rng: &mut Rng,
-        pub_key: &Pub,
+        pub_key: &RsaPublicKey,
         msg: &[u8],
     ) -> Result<Vec<u8>> {
         encrypt(
@@ -174,39 +170,28 @@ impl fmt::Debug for Oaep {
     }
 }
 
+/// Encrypts the given message with RSA and the padding scheme from
+/// [PKCS#1 OAEP].
+///
+/// The message must be no longer than the length of the public modulus minus
+/// `2 + (2 * hash.size())`.
+///
+/// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-fn encrypt_internal<R: CryptoRngCore + ?Sized, K: PublicKey, MGF: FnMut(&mut [u8], &mut [u8])>(
+fn encrypt<R: CryptoRngCore + ?Sized>(
     rng: &mut R,
-    pub_key: &K,
+    pub_key: &RsaPublicKey,
     msg: &[u8],
-    p_hash: &[u8],
-    h_size: usize,
-    mut mgf: MGF,
+    digest: &mut dyn DynDigest,
+    mgf_digest: &mut dyn DynDigest,
+    label: Option<String>,
 ) -> Result<Vec<u8>> {
     key::check_public(pub_key)?;
 
-    let k = pub_key.size();
+    let em = oaep_encrypt(rng, msg, digest, mgf_digest, label, pub_key.size())?;
 
-    if msg.len() + 2 * h_size + 2 > k {
-        return Err(Error::MessageTooLong);
-    }
-
-    let mut em = Zeroizing::new(vec![0u8; k]);
-
-    let (_, payload) = em.split_at_mut(1);
-    let (seed, db) = payload.split_at_mut(h_size);
-    rng.fill_bytes(seed);
-
-    // Data block DB =  pHash || PS || 01 || M
-    let db_len = k - h_size - 1;
-
-    db[0..h_size].copy_from_slice(p_hash);
-    db[db_len - msg.len() - 1] = 1;
-    db[db_len - msg.len()..].copy_from_slice(msg);
-
-    mgf(seed, db);
-
-    pub_key.raw_encryption_primitive(&em, pub_key.size())
+    let int = Zeroizing::new(BigUint::from_bytes_be(&em));
+    uint_to_be_pad(pub_key.raw_int_encryption_primitive(&int)?, pub_key.size())
 }
 
 /// Encrypts the given message with RSA and the padding scheme from
@@ -216,64 +201,18 @@ fn encrypt_internal<R: CryptoRngCore + ?Sized, K: PublicKey, MGF: FnMut(&mut [u8
 /// `2 + (2 * hash.size())`.
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
-#[inline]
-fn encrypt<R: CryptoRngCore + ?Sized, K: PublicKey>(
+fn encrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutputReset>(
     rng: &mut R,
-    pub_key: &K,
-    msg: &[u8],
-    digest: &mut dyn DynDigest,
-    mgf_digest: &mut dyn DynDigest,
-    label: Option<String>,
-) -> Result<Vec<u8>> {
-    let h_size = digest.output_size();
-
-    let label = label.unwrap_or_default();
-    if label.len() as u64 > MAX_LABEL_LEN {
-        return Err(Error::LabelTooLong);
-    }
-
-    digest.update(label.as_bytes());
-    let p_hash = digest.finalize_reset();
-
-    encrypt_internal(rng, pub_key, msg, &p_hash, h_size, |seed, db| {
-        mgf1_xor(db, mgf_digest, seed);
-        mgf1_xor(seed, mgf_digest, db);
-    })
-}
-
-/// Encrypts the given message with RSA and the padding scheme from
-/// [PKCS#1 OAEP].
-///
-/// The message must be no longer than the length of the public modulus minus
-/// `2 + (2 * hash.size())`.
-///
-/// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
-#[inline]
-fn encrypt_digest<
-    R: CryptoRngCore + ?Sized,
-    K: PublicKey,
-    D: Digest,
-    MGD: Digest + FixedOutputReset,
->(
-    rng: &mut R,
-    pub_key: &K,
+    pub_key: &RsaPublicKey,
     msg: &[u8],
     label: Option<String>,
 ) -> Result<Vec<u8>> {
-    let h_size = <D as Digest>::output_size();
+    key::check_public(pub_key)?;
 
-    let label = label.unwrap_or_default();
-    if label.len() as u64 > MAX_LABEL_LEN {
-        return Err(Error::LabelTooLong);
-    }
+    let em = oaep_encrypt_digest::<_, D, MGD>(rng, msg, label, pub_key.size())?;
 
-    let p_hash = D::digest(label.as_bytes());
-
-    encrypt_internal(rng, pub_key, msg, &p_hash, h_size, |seed, db| {
-        let mut mgf_digest = MGD::new();
-        mgf1_xor_digest(db, &mut mgf_digest, seed);
-        mgf1_xor_digest(seed, &mut mgf_digest, db);
-    })
+    let int = Zeroizing::new(BigUint::from_bytes_be(&em));
+    uint_to_be_pad(pub_key.raw_int_encryption_primitive(&int)?, pub_key.size())
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from [PKCS#1 OAEP].
@@ -289,9 +228,9 @@ fn encrypt_digest<
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-fn decrypt<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
+fn decrypt<R: CryptoRngCore + ?Sized>(
     rng: Option<&mut R>,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
     digest: &mut dyn DynDigest,
     mgf_digest: &mut dyn DynDigest,
@@ -299,35 +238,14 @@ fn decrypt<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
-    let h_size = digest.output_size();
-
-    let label = label.unwrap_or_default();
-    if label.len() as u64 > MAX_LABEL_LEN {
+    if ciphertext.len() != priv_key.size() {
         return Err(Error::Decryption);
     }
 
-    digest.update(label.as_bytes());
+    let em = priv_key.raw_int_decryption_primitive(rng, &BigUint::from_bytes_be(ciphertext))?;
+    let mut em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
-    let expected_p_hash = digest.finalize_reset();
-
-    let res = decrypt_inner(
-        rng,
-        priv_key,
-        ciphertext,
-        h_size,
-        &expected_p_hash,
-        |seed, db| {
-            mgf1_xor(seed, mgf_digest, db);
-            mgf1_xor(db, mgf_digest, seed);
-        },
-    )?;
-    if res.is_none().into() {
-        return Err(Error::Decryption);
-    }
-
-    let (out, index) = res.unwrap();
-
-    Ok(out[index as usize..].to_vec())
+    oaep_decrypt(&mut em, digest, mgf_digest, label, priv_key.size())
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from [PKCS#1 OAEP].
@@ -343,101 +261,22 @@ fn decrypt<R: CryptoRngCore + ?Sized, SK: PrivateKey>(
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-fn decrypt_digest<
-    R: CryptoRngCore + ?Sized,
-    SK: PrivateKey,
-    D: Digest,
-    MGD: Digest + FixedOutputReset,
->(
+fn decrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutputReset>(
     rng: Option<&mut R>,
-    priv_key: &SK,
+    priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
     label: Option<String>,
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
-    let h_size = <D as Digest>::output_size();
-
-    let label = label.unwrap_or_default();
-    if label.len() as u64 > MAX_LABEL_LEN {
-        return Err(Error::LabelTooLong);
-    }
-
-    let expected_p_hash = D::digest(label.as_bytes());
-
-    let res = decrypt_inner(
-        rng,
-        priv_key,
-        ciphertext,
-        h_size,
-        &expected_p_hash,
-        |seed, db| {
-            let mut mgf_digest = MGD::new();
-            mgf1_xor_digest(seed, &mut mgf_digest, db);
-            mgf1_xor_digest(db, &mut mgf_digest, seed);
-        },
-    )?;
-    if res.is_none().into() {
+    if ciphertext.len() != priv_key.size() {
         return Err(Error::Decryption);
     }
 
-    let (out, index) = res.unwrap();
+    let em = priv_key.raw_int_decryption_primitive(rng, &BigUint::from_bytes_be(ciphertext))?;
+    let mut em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
-    Ok(out[index as usize..].to_vec())
-}
-
-/// Decrypts ciphertext using `priv_key` and blinds the operation if
-/// `rng` is given. It returns one or zero in valid that indicates whether the
-/// plaintext was correctly structured.
-#[inline]
-fn decrypt_inner<R: CryptoRngCore + ?Sized, SK: PrivateKey, MGF: FnMut(&mut [u8], &mut [u8])>(
-    rng: Option<&mut R>,
-    priv_key: &SK,
-    ciphertext: &[u8],
-    h_size: usize,
-    expected_p_hash: &[u8],
-    mut mgf: MGF,
-) -> Result<CtOption<(Vec<u8>, u32)>> {
-    let k = priv_key.size();
-    if k < 11 {
-        return Err(Error::Decryption);
-    }
-
-    if ciphertext.len() != k || k < h_size * 2 + 2 {
-        return Err(Error::Decryption);
-    }
-
-    let mut em = priv_key.raw_decryption_primitive(rng, ciphertext, priv_key.size())?;
-
-    let first_byte_is_zero = em[0].ct_eq(&0u8);
-
-    let (_, payload) = em.split_at_mut(1);
-    let (seed, db) = payload.split_at_mut(h_size);
-
-    mgf(seed, db);
-
-    let hash_are_equal = db[0..h_size].ct_eq(expected_p_hash);
-
-    // The remainder of the plaintext must be zero or more 0x00, followed
-    // by 0x01, followed by the message.
-    //   looking_for_index: 1 if we are still looking for the 0x01
-    //   index: the offset of the first 0x01 byte
-    //   zero_before_one: 1 if we saw a non-zero byte before the 1
-    let mut looking_for_index = Choice::from(1u8);
-    let mut index = 0u32;
-    let mut nonzero_before_one = Choice::from(0u8);
-
-    for (i, el) in db.iter().skip(h_size).enumerate() {
-        let equals0 = el.ct_eq(&0u8);
-        let equals1 = el.ct_eq(&1u8);
-        index.conditional_assign(&(i as u32), looking_for_index & equals1);
-        looking_for_index &= !equals1;
-        nonzero_before_one |= looking_for_index & !equals0;
-    }
-
-    let valid = first_byte_is_zero & hash_are_equal & !nonzero_before_one & !looking_for_index;
-
-    Ok(CtOption::new((em, index + 2 + (h_size * 2) as u32), valid))
+    oaep_decrypt_digest::<D, MGD>(&mut em, label, priv_key.size())
 }
 
 /// Encryption key for PKCS#1 v1.5 encryption as described in [RFC8017 § 7.1].
@@ -491,7 +330,7 @@ where
         rng: &mut R,
         msg: &[u8],
     ) -> Result<Vec<u8>> {
-        encrypt_digest::<_, _, D, MGD>(rng, &self.inner, msg, self.label.as_ref().cloned())
+        encrypt_digest::<_, D, MGD>(rng, &self.inner, msg, self.label.as_ref().cloned())
     }
 }
 
@@ -542,7 +381,7 @@ where
     MGD: Digest + FixedOutputReset,
 {
     fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        decrypt_digest::<DummyRng, _, D, MGD>(
+        decrypt_digest::<DummyRng, D, MGD>(
             None,
             &self.inner,
             ciphertext,
@@ -561,7 +400,7 @@ where
         rng: &mut R,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
-        decrypt_digest::<_, _, D, MGD>(
+        decrypt_digest::<_, D, MGD>(
             Some(rng),
             &self.inner,
             ciphertext,
@@ -572,7 +411,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::key::{PublicKey, PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+    use crate::key::{PublicKeyParts, RsaPrivateKey, RsaPublicKey};
     use crate::oaep::{DecryptingKey, EncryptingKey, Oaep};
     use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 

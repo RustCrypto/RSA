@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use num_bigint::{BigInt, BigUint, IntoBigInt, IntoBigUint, ModInverse, RandBigInt, ToBigInt};
 use num_traits::{One, Signed, Zero};
 use rand_core::CryptoRngCore;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::{Error, Result};
 use crate::key::{PublicKeyParts, RsaPrivateKey};
@@ -18,7 +18,7 @@ pub fn encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> BigUint {
 /// Performs raw RSA decryption with no padding, resulting in a plaintext `BigUint`.
 /// Peforms RSA blinding if an `Rng` is passed.
 #[inline]
-pub fn decrypt<R: CryptoRngCore + ?Sized>(
+fn decrypt<R: CryptoRngCore + ?Sized>(
     mut rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     c: &BigUint,
@@ -127,7 +127,7 @@ pub fn decrypt_and_check<R: CryptoRngCore + ?Sized>(
 }
 
 /// Returns the blinded c, along with the unblinding factor.
-pub fn blind<R: CryptoRngCore, K: PublicKeyParts>(
+fn blind<R: CryptoRngCore, K: PublicKeyParts>(
     rng: &mut R,
     key: &K,
     c: &BigUint,
@@ -168,13 +168,13 @@ pub fn blind<R: CryptoRngCore, K: PublicKeyParts>(
 }
 
 /// Given an m and and unblinding factor, unblind the m.
-pub fn unblind(key: &impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> BigUint {
+fn unblind(key: &impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> BigUint {
     (m * unblinder) % key.n()
 }
 
 /// Returns a new vector of the given length, with 0s left padded.
 #[inline]
-pub fn left_pad(input: &[u8], padded_len: usize) -> Result<Vec<u8>> {
+fn left_pad(input: &[u8], padded_len: usize) -> Result<Vec<u8>> {
     if input.len() > padded_len {
         return Err(Error::InvalidPadLen);
     }
@@ -182,6 +182,20 @@ pub fn left_pad(input: &[u8], padded_len: usize) -> Result<Vec<u8>> {
     let mut out = vec![0u8; padded_len];
     out[padded_len - input.len()..].copy_from_slice(input);
     Ok(out)
+}
+
+/// Converts input to the new vector of the given length, using BE and with 0s left padded.
+#[inline]
+pub fn uint_to_be_pad(input: BigUint, padded_len: usize) -> Result<Vec<u8>> {
+    left_pad(&input.to_bytes_be(), padded_len)
+}
+
+/// Converts input to the new vector of the given length, using BE and with 0s left padded.
+#[inline]
+pub fn uint_to_zeroizing_be_pad(input: BigUint, padded_len: usize) -> Result<Vec<u8>> {
+    let m = Zeroizing::new(input);
+    let m = Zeroizing::new(m.to_bytes_be());
+    left_pad(&m, padded_len)
 }
 
 #[cfg(test)]

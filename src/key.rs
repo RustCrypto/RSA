@@ -12,9 +12,9 @@ use zeroize::Zeroize;
 use crate::algorithms::{generate_multi_prime_key, generate_multi_prime_key_with_exp};
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
+use crate::internals;
 
 use crate::padding::{PaddingScheme, SignatureScheme};
-use crate::raw::{DecryptionPrimitive, EncryptionPrimitive};
 
 /// Components of an RSA public key.
 pub trait PublicKeyParts {
@@ -30,8 +30,6 @@ pub trait PublicKeyParts {
         (self.n().bits() + 7) / 8
     }
 }
-
-pub trait PrivateKey: DecryptionPrimitive + PublicKeyParts {}
 
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -161,25 +159,6 @@ impl From<&RsaPrivateKey> for RsaPublicKey {
     }
 }
 
-/// Generic trait for operations on a public key.
-pub trait PublicKey: EncryptionPrimitive + PublicKeyParts {
-    /// Encrypt the given message.
-    fn encrypt<R: CryptoRngCore, P: PaddingScheme>(
-        &self,
-        rng: &mut R,
-        padding: P,
-        msg: &[u8],
-    ) -> Result<Vec<u8>>;
-
-    /// Verify a signed message.
-    ///
-    /// `hashed` must be the result of hashing the input using the hashing function
-    /// passed in through `hash`.
-    ///
-    /// If the message is valid `Ok(())` is returned, otherwise an `Err` indicating failure.
-    fn verify<S: SignatureScheme>(&self, scheme: S, hashed: &[u8], sig: &[u8]) -> Result<()>;
-}
-
 impl PublicKeyParts for RsaPublicKey {
     fn n(&self) -> &BigUint {
         &self.n
@@ -190,8 +169,9 @@ impl PublicKeyParts for RsaPublicKey {
     }
 }
 
-impl PublicKey for RsaPublicKey {
-    fn encrypt<R: CryptoRngCore, P: PaddingScheme>(
+impl RsaPublicKey {
+    /// Encrypt the given message.
+    pub fn encrypt<R: CryptoRngCore, P: PaddingScheme>(
         &self,
         rng: &mut R,
         padding: P,
@@ -200,7 +180,13 @@ impl PublicKey for RsaPublicKey {
         padding.encrypt(rng, self, msg)
     }
 
-    fn verify<S: SignatureScheme>(&self, scheme: S, hashed: &[u8], sig: &[u8]) -> Result<()> {
+    /// Verify a signed message.
+    ///
+    /// `hashed` must be the result of hashing the input using the hashing function
+    /// passed in through `hash`.
+    ///
+    /// If the message is valid `Ok(())` is returned, otherwise an `Err` indicating failure.
+    pub fn verify<S: SignatureScheme>(&self, scheme: S, hashed: &[u8], sig: &[u8]) -> Result<()> {
         scheme.verify(self, hashed, sig)
     }
 }
@@ -239,6 +225,10 @@ impl RsaPublicKey {
     pub fn new_unchecked(n: BigUint, e: BigUint) -> Self {
         Self { n, e }
     }
+
+    pub(crate) fn raw_int_encryption_primitive(&self, plaintext: &BigUint) -> Result<BigUint> {
+        Ok(internals::encrypt(self, plaintext))
+    }
 }
 
 impl PublicKeyParts for RsaPrivateKey {
@@ -250,8 +240,6 @@ impl PublicKeyParts for RsaPrivateKey {
         &self.e
     }
 }
-
-impl PrivateKey for RsaPrivateKey {}
 
 impl RsaPrivateKey {
     /// Generate a new Rsa key pair of the given bit size using the passed in `rng`.
@@ -461,6 +449,15 @@ impl RsaPrivateKey {
     ) -> Result<Vec<u8>> {
         padding.sign(Some(rng), self, digest_in)
     }
+
+    /// Do NOT use directly! Only for implementors.
+    pub(crate) fn raw_int_decryption_primitive<R: CryptoRngCore + ?Sized>(
+        &self,
+        rng: Option<&mut R>,
+        ciphertext: &BigUint,
+    ) -> Result<BigUint> {
+        internals::decrypt_and_check(rng, self, ciphertext)
+    }
 }
 
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
@@ -495,7 +492,6 @@ fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize)
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::internals;
 
     use hex_literal::hex;
     use num_traits::{FromPrimitive, ToPrimitive};
@@ -528,12 +524,16 @@ mod tests {
 
         let pub_key: RsaPublicKey = private_key.clone().into();
         let m = BigUint::from_u64(42).expect("invalid 42");
-        let c = internals::encrypt(&pub_key, &m);
-        let m2 = internals::decrypt::<ChaCha8Rng>(None, private_key, &c)
+        let c = pub_key
+            .raw_int_encryption_primitive(&m)
+            .expect("encryption successfull");
+        let m2 = private_key
+            .raw_int_decryption_primitive::<ChaCha8Rng>(None, &c)
             .expect("unable to decrypt without blinding");
         assert_eq!(m, m2);
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let m3 = internals::decrypt(Some(&mut rng), private_key, &c)
+        let m3 = private_key
+            .raw_int_decryption_primitive(Some(&mut rng), &c)
             .expect("unable to decrypt with blinding");
         assert_eq!(m, m3);
     }
