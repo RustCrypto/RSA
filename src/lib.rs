@@ -1,4 +1,9 @@
+#![cfg_attr(not(test), no_std)]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![doc = include_str!("../README.md")]
+#![doc(html_logo_url = "https://raw.githubusercontent.com/RustCrypto/meta/master/logo_small.png")]
+#![warn(missing_docs)]
+
 //! RSA Implementation in pure Rust.
 //!
 //! It supports several schemes described in [RFC8017]:
@@ -205,11 +210,6 @@
 //! [`pkcs8::DecodePublicKey`]: https://docs.rs/pkcs8/latest/pkcs8/trait.DecodePublicKey.html
 //! [`pkcs8::EncodePublicKey`]: https://docs.rs/pkcs8/latest/pkcs8/trait.EncodePublicKey.html
 
-#![cfg_attr(not(test), no_std)]
-#![cfg_attr(docsrs, feature(doc_cfg))]
-#![doc(html_logo_url = "https://raw.githubusercontent.com/RustCrypto/meta/master/logo_small.png")]
-#![warn(missing_docs)]
-
 #[cfg(doctest)]
 pub struct ReadmeDoctests;
 
@@ -253,5 +253,4 @@ mod internals;
 
 /// Internal raw RSA functions.
 #[cfg(feature = "expose-internals")]
-#[cfg_attr(docsrs, doc(cfg(feature = "expose-internals")))]
 pub mod internals;
