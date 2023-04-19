@@ -67,7 +67,7 @@ jobs:
         with:
           toolchain: nightly
       - run: cargo update -Z minimal-versions
-      - run: cargo test --release --features getrandom,serde,pkcs5,expose-internals
+      - run: cargo test --release --features getrandom,serde,pkcs5
 
   nightly:
     runs-on: ubuntu-latest
