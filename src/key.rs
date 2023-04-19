@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
 use crate::algorithms::generate::generate_multi_prime_key_with_exp;
+use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
-use crate::internals;
 use crate::keytraits::{CRTValue, PrivateKeyParts, PublicKeyParts};
 
 use crate::padding::{PaddingScheme, SignatureScheme};
@@ -194,7 +194,7 @@ impl RsaPublicKey {
     }
 
     pub(crate) fn raw_int_encryption_primitive(&self, plaintext: &BigUint) -> Result<BigUint> {
-        Ok(internals::encrypt(self, plaintext))
+        Ok(rsa_encrypt(self, plaintext))
     }
 }
 
@@ -403,7 +403,7 @@ impl RsaPrivateKey {
         rng: Option<&mut R>,
         ciphertext: &BigUint,
     ) -> Result<BigUint> {
-        internals::decrypt_and_check(rng, self, ciphertext)
+        rsa_decrypt_and_check(rng, self, ciphertext)
     }
 }
 
