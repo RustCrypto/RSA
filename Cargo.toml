@@ -49,7 +49,6 @@ name = "key"
 
 [features]
 default = ["std", "pem"]
-expose-internals = []
 getrandom = ["rand_core/getrandom"]
 nightly = ["num-bigint/nightly"]
 serde = ["dep:serde", "num-bigint/serde"]
@@ -58,7 +57,7 @@ pkcs5 = ["pkcs8/encryption"]
 std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std", "signature/std"]
 
 [package.metadata.docs.rs]
-features = ["std", "pem", "serde", "expose-internals", "sha2"]
+features = ["std", "pem", "serde", "sha2"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.dev]

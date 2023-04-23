@@ -3,33 +3,18 @@ use core::ops::Deref;
 use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
-use num_traits::{One, ToPrimitive};
+use num_traits::{FromPrimitive, One, ToPrimitive};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
-use crate::algorithms::{generate_multi_prime_key, generate_multi_prime_key_with_exp};
+use crate::algorithms::generate::generate_multi_prime_key_with_exp;
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
-use crate::internals;
+use crate::keytraits::{CRTValue, PrivateKeyParts, PublicKeyParts};
 
 use crate::padding::{PaddingScheme, SignatureScheme};
-
-/// Components of an RSA public key.
-pub trait PublicKeyParts {
-    /// Returns the modulus of the key.
-    fn n(&self) -> &BigUint;
-
-    /// Returns the public exponent of the key.
-    fn e(&self) -> &BigUint;
-
-    /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
-    /// or by this public key will have the same size.
-    fn size(&self) -> usize {
-        (self.n().bits() + 7) / 8
-    }
-}
 
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -125,25 +110,6 @@ impl Drop for PrecomputedValues {
     }
 }
 
-/// Contains the precomputed Chinese remainder theorem values.
-#[derive(Debug, Clone)]
-pub(crate) struct CRTValue {
-    /// D mod (prime - 1)
-    pub(crate) exp: BigInt,
-    /// R·Coeff ≡ 1 mod Prime.
-    pub(crate) coeff: BigInt,
-    /// product of primes prior to this (inc p and q)
-    pub(crate) r: BigInt,
-}
-
-impl Zeroize for CRTValue {
-    fn zeroize(&mut self) {
-        self.exp.zeroize();
-        self.coeff.zeroize();
-        self.r.zeroize();
-    }
-}
-
 impl From<RsaPrivateKey> for RsaPublicKey {
     fn from(private_key: RsaPrivateKey) -> Self {
         (&private_key).into()
@@ -225,10 +191,6 @@ impl RsaPublicKey {
     pub fn new_unchecked(n: BigUint, e: BigUint) -> Self {
         Self { n, e }
     }
-
-    pub(crate) fn raw_int_encryption_primitive(&self, plaintext: &BigUint) -> Result<BigUint> {
-        Ok(internals::encrypt(self, plaintext))
-    }
 }
 
 impl PublicKeyParts for RsaPrivateKey {
@@ -242,9 +204,13 @@ impl PublicKeyParts for RsaPrivateKey {
 }
 
 impl RsaPrivateKey {
+    /// Default exponent for RSA keys.
+    const EXP: u64 = 65537;
+
     /// Generate a new Rsa key pair of the given bit size using the passed in `rng`.
     pub fn new<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
-        generate_multi_prime_key(rng, 2, bit_size)
+        let exp = BigUint::from_u64(Self::EXP).expect("invalid static exponent");
+        Self::new_with_exp(rng, bit_size, &exp)
     }
 
     /// Generate a new RSA key pair of the given bit size and the public exponent
@@ -256,7 +222,8 @@ impl RsaPrivateKey {
         bit_size: usize,
         exp: &BigUint,
     ) -> Result<RsaPrivateKey> {
-        generate_multi_prime_key_with_exp(rng, 2, bit_size, exp)
+        let components = generate_multi_prime_key_with_exp(rng, 2, bit_size, exp)?;
+        RsaPrivateKey::from_components(components.n, components.e, components.d, components.primes)
     }
 
     /// Constructs an RSA key pair from the individual components.
@@ -344,31 +311,6 @@ impl RsaPrivateKey {
         self.precomputed = None;
     }
 
-    /// Returns the precomputed dp value, D mod (P-1)
-    pub fn dp(&self) -> Option<&BigUint> {
-        self.precomputed.as_ref().map(|p| &p.dp)
-    }
-
-    /// Returns the precomputed dq value, D mod (Q-1)
-    pub fn dq(&self) -> Option<&BigUint> {
-        self.precomputed.as_ref().map(|p| &p.dq)
-    }
-
-    /// Returns the precomputed qinv value, Q^-1 mod P
-    pub fn qinv(&self) -> Option<&BigInt> {
-        self.precomputed.as_ref().map(|p| &p.qinv)
-    }
-
-    /// Returns the private exponent of the key.
-    pub fn d(&self) -> &BigUint {
-        &self.d
-    }
-
-    /// Returns the prime factors.
-    pub fn primes(&self) -> &[BigUint] {
-        &self.primes
-    }
-
     /// Compute CRT coefficient: `(1/q) mod p`.
     pub fn crt_coefficient(&self) -> Option<BigUint> {
         (&self.primes[1]).mod_inverse(&self.primes[0])?.to_biguint()
@@ -449,14 +391,36 @@ impl RsaPrivateKey {
     ) -> Result<Vec<u8>> {
         padding.sign(Some(rng), self, digest_in)
     }
+}
 
-    /// Do NOT use directly! Only for implementors.
-    pub(crate) fn raw_int_decryption_primitive<R: CryptoRngCore + ?Sized>(
-        &self,
-        rng: Option<&mut R>,
-        ciphertext: &BigUint,
-    ) -> Result<BigUint> {
-        internals::decrypt_and_check(rng, self, ciphertext)
+impl PrivateKeyParts for RsaPrivateKey {
+    fn d(&self) -> &BigUint {
+        &self.d
+    }
+
+    fn primes(&self) -> &[BigUint] {
+        &self.primes
+    }
+
+    fn dp(&self) -> Option<&BigUint> {
+        self.precomputed.as_ref().map(|p| &p.dp)
+    }
+
+    fn dq(&self) -> Option<&BigUint> {
+        self.precomputed.as_ref().map(|p| &p.dq)
+    }
+
+    fn qinv(&self) -> Option<&BigInt> {
+        self.precomputed.as_ref().map(|p| &p.qinv)
+    }
+
+    fn crt_values(&self) -> Option<&[CRTValue]> {
+        /* for some reason the standard self.precomputed.as_ref().map() doesn't work */
+        if let Some(p) = &self.precomputed {
+            Some(p.crt_values.as_slice())
+        } else {
+            None
+        }
     }
 }
 
@@ -492,6 +456,7 @@ fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize)
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 
     use hex_literal::hex;
     use num_traits::{FromPrimitive, ToPrimitive};
@@ -524,16 +489,12 @@ mod tests {
 
         let pub_key: RsaPublicKey = private_key.clone().into();
         let m = BigUint::from_u64(42).expect("invalid 42");
-        let c = pub_key
-            .raw_int_encryption_primitive(&m)
-            .expect("encryption successfull");
-        let m2 = private_key
-            .raw_int_decryption_primitive::<ChaCha8Rng>(None, &c)
+        let c = rsa_encrypt(&pub_key, &m).expect("encryption successfull");
+        let m2 = rsa_decrypt_and_check::<ChaCha8Rng>(private_key, None, &c)
             .expect("unable to decrypt without blinding");
         assert_eq!(m, m2);
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let m3 = private_key
-            .raw_int_decryption_primitive(Some(&mut rng), &c)
+        let m3 = rsa_decrypt_and_check(private_key, Some(&mut rng), &c)
             .expect("unable to decrypt with blinding");
         assert_eq!(m, m3);
     }
@@ -543,13 +504,18 @@ mod tests {
             #[test]
             fn $name() {
                 let mut rng = ChaCha8Rng::from_seed([42; 32]);
+                let exp = BigUint::from_u64(RsaPrivateKey::EXP).expect("invalid static exponent");
 
                 for _ in 0..10 {
-                    let private_key = if $multi == 2 {
-                        RsaPrivateKey::new(&mut rng, $size).expect("failed to generate key")
-                    } else {
-                        generate_multi_prime_key(&mut rng, $multi, $size).unwrap()
-                    };
+                    let components =
+                        generate_multi_prime_key_with_exp(&mut rng, $multi, $size, &exp).unwrap();
+                    let private_key = RsaPrivateKey::from_components(
+                        components.n,
+                        components.e,
+                        components.d,
+                        components.primes,
+                    )
+                    .unwrap();
                     assert_eq!(private_key.n().bits(), $size);
 
                     test_key_basics(&private_key);
@@ -568,17 +534,6 @@ mod tests {
     key_generation!(key_generation_multi_5_64, 5, 64);
     key_generation!(key_generation_multi_8_576, 8, 576);
     key_generation!(key_generation_multi_16_1024, 16, 1024);
-
-    #[test]
-    fn test_impossible_keys() {
-        let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        for i in 0..32 {
-            let _ = RsaPrivateKey::new(&mut rng, i).is_err();
-            let _ = generate_multi_prime_key(&mut rng, 3, i);
-            let _ = generate_multi_prime_key(&mut rng, 4, i);
-            let _ = generate_multi_prime_key(&mut rng, 5, i);
-        }
-    }
 
     #[test]
     fn test_negative_decryption_value() {

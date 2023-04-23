@@ -3,7 +3,10 @@
 //! Note: PKCS#1 support is achieved through a blanket impl of the
 //! `pkcs1` crate's traits for types which impl the `pkcs8` crate's traits.
 
-use crate::{key::PublicKeyParts, BigUint, RsaPrivateKey, RsaPublicKey};
+use crate::{
+    keytraits::{PrivateKeyParts, PublicKeyParts},
+    BigUint, RsaPrivateKey, RsaPublicKey,
+};
 use core::convert::{TryFrom, TryInto};
 use pkcs8::{der::Encode, Document, EncodePrivateKey, EncodePublicKey, SecretDocument};
 use zeroize::Zeroizing;

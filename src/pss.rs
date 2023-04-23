@@ -31,10 +31,11 @@ use signature::{
     DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, SignatureEncoding, Verifier,
 };
 
+use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pss::*;
+use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
-use crate::internals::{uint_to_be_pad, uint_to_zeroizing_be_pad};
-use crate::key::PublicKeyParts;
+use crate::keytraits::PublicKeyParts;
 use crate::padding::SignatureScheme;
 use crate::{RsaPrivateKey, RsaPublicKey};
 
@@ -195,7 +196,7 @@ pub(crate) fn verify(
         return Err(Error::Verification);
     }
 
-    let mut em = uint_to_be_pad(pub_key.raw_int_encryption_primitive(sig)?, pub_key.size())?;
+    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
 
     emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits())
 }
@@ -214,7 +215,7 @@ where
         return Err(Error::Verification);
     }
 
-    let mut em = uint_to_be_pad(pub_key.raw_int_encryption_primitive(sig)?, pub_key.size())?;
+    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
 
     emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits())
 }
@@ -267,7 +268,7 @@ fn sign_pss_with_salt<T: CryptoRngCore>(
     let em = emsa_pss_encode(hashed, em_bits, salt, digest)?;
 
     uint_to_zeroizing_be_pad(
-        priv_key.raw_int_decryption_primitive(blind_rng, &BigUint::from_bytes_be(&em))?,
+        rsa_decrypt_and_check(priv_key, blind_rng, &BigUint::from_bytes_be(&em))?,
         priv_key.size(),
     )
 }
@@ -282,7 +283,7 @@ fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputR
     let em = emsa_pss_encode_digest::<D>(hashed, em_bits, salt)?;
 
     uint_to_zeroizing_be_pad(
-        priv_key.raw_int_decryption_primitive(blind_rng, &BigUint::from_bytes_be(&em))?,
+        rsa_decrypt_and_check(priv_key, blind_rng, &BigUint::from_bytes_be(&em))?,
         priv_key.size(),
     )
 }

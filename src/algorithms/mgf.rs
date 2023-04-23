@@ -5,7 +5,7 @@ use digest::{Digest, DynDigest, FixedOutputReset};
 /// Mask generation function.
 ///
 /// Panics if out is larger than 2**32. This is in accordance with RFC 8017 - PKCS #1 B.2.1
-pub fn mgf1_xor(out: &mut [u8], digest: &mut dyn DynDigest, seed: &[u8]) {
+pub(crate) fn mgf1_xor(out: &mut [u8], digest: &mut dyn DynDigest, seed: &[u8]) {
     let mut counter = [0u8; 4];
     let mut i = 0;
 
@@ -36,7 +36,7 @@ pub fn mgf1_xor(out: &mut [u8], digest: &mut dyn DynDigest, seed: &[u8]) {
 /// Mask generation function.
 ///
 /// Panics if out is larger than 2**32. This is in accordance with RFC 8017 - PKCS #1 B.2.1
-pub fn mgf1_xor_digest<D>(out: &mut [u8], digest: &mut D, seed: &[u8])
+pub(crate) fn mgf1_xor_digest<D>(out: &mut [u8], digest: &mut D, seed: &[u8])
 where
     D: Digest + FixedOutputReset,
 {
