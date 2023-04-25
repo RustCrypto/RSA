@@ -211,7 +211,7 @@ pub(crate) fn verify_digest<D>(
 where
     D: Digest + FixedOutputReset,
 {
-    if sig_len != pub_key.size() {
+    if sig >= pub_key.n() || sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
 

@@ -133,6 +133,7 @@ impl SignatureScheme for Pkcs1v15Sign {
             self.prefix.as_ref(),
             hashed,
             &BigUint::from_bytes_be(sig),
+            sig.len(),
         )
     }
 }
@@ -143,6 +144,7 @@ impl SignatureScheme for Pkcs1v15Sign {
 #[derive(Clone, PartialEq, Eq)]
 pub struct Signature {
     inner: BigUint,
+    len: usize,
 }
 
 impl SignatureEncoding for Signature {
@@ -155,6 +157,7 @@ impl TryFrom<&[u8]> for Signature {
     fn try_from(bytes: &[u8]) -> signature::Result<Self> {
         Ok(Self {
             inner: BigUint::from_bytes_be(bytes),
+            len: bytes.len(),
         })
     }
 }
@@ -260,7 +263,17 @@ fn sign<R: CryptoRngCore + ?Sized>(
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
 #[inline]
-fn verify(pub_key: &RsaPublicKey, prefix: &[u8], hashed: &[u8], sig: &BigUint) -> Result<()> {
+fn verify(
+    pub_key: &RsaPublicKey,
+    prefix: &[u8],
+    hashed: &[u8],
+    sig: &BigUint,
+    sig_len: usize,
+) -> Result<()> {
+    if sig >= pub_key.n() || sig_len != pub_key.size() {
+        return Err(Error::Verification);
+    }
+
     let em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
 
     pkcs1v15_sign_unpad(prefix, hashed, &em, pub_key.size())
@@ -606,6 +619,7 @@ where
             &self.prefix.clone(),
             &D::digest(msg),
             &signature.inner,
+            signature.len,
         )
         .map_err(|e| e.into())
     }
@@ -621,6 +635,7 @@ where
             &self.prefix,
             &digest.finalize(),
             &signature.inner,
+            signature.len,
         )
         .map_err(|e| e.into())
     }
@@ -631,7 +646,14 @@ where
     D: Digest,
 {
     fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify(&self.inner, &self.prefix, prehash, &signature.inner).map_err(|e| e.into())
+        verify(
+            &self.inner,
+            &self.prefix,
+            prehash,
+            &signature.inner,
+            signature.len,
+        )
+        .map_err(|e| e.into())
     }
 }
 
