@@ -3,6 +3,7 @@ use core::ops::Deref;
 use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
+use num_integer::Integer;
 use num_traits::{FromPrimitive, One, ToPrimitive};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
@@ -441,6 +442,14 @@ fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize)
         .e()
         .to_u64()
         .ok_or(Error::PublicExponentTooLarge)?;
+
+    if public_key.e() >= public_key.n() || public_key.n().is_even() {
+        return Err(Error::InvalidModulus);
+    }
+
+    if public_key.e().is_even() {
+        return Err(Error::InvalidExponent);
+    }
 
     if e < RsaPublicKey::MIN_PUB_EXPONENT {
         return Err(Error::PublicExponentTooSmall);
