@@ -1,5 +1,8 @@
 use alloc::vec::Vec;
-use core::ops::Deref;
+use core::{
+    hash::{Hash, Hasher},
+    ops::Deref,
+};
 use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
@@ -40,6 +43,7 @@ pub struct RsaPrivateKey {
     pub(crate) precomputed: Option<PrecomputedValues>,
 }
 
+impl Eq for RsaPrivateKey {}
 impl PartialEq for RsaPrivateKey {
     #[inline]
     fn eq(&self, other: &RsaPrivateKey) -> bool {
@@ -49,7 +53,13 @@ impl PartialEq for RsaPrivateKey {
     }
 }
 
-impl Eq for RsaPrivateKey {}
+impl Hash for RsaPrivateKey {
+    fn hash<H: Hasher>(&self, state: &mut H) -> () {
+        // Domain separator for RSA private keys
+        state.write(b"RsaPrivateKey");
+        Hash::hash(&self.pubkey_components, state);
+    }
+}
 
 impl Zeroize for RsaPrivateKey {
     fn zeroize(&mut self) {
