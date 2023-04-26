@@ -53,7 +53,7 @@ impl PartialEq for RsaPrivateKey {
 }
 
 impl Hash for RsaPrivateKey {
-    fn hash<H: Hasher>(&self, state: &mut H) -> () {
+    fn hash<H: Hasher>(&self, state: &mut H) {
         // Domain separator for RSA private keys
         state.write(b"RsaPrivateKey");
         Hash::hash(&self.pubkey_components, state);
