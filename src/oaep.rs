@@ -3,16 +3,17 @@
 //! # Usage
 //!
 //! See [code example in the toplevel rustdoc](../index.html#oaep-encryption).
+
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
 use core::marker::PhantomData;
-use rand_core::CryptoRngCore;
 
 use digest::{Digest, DynDigest, FixedOutputReset};
 use num_bigint::BigUint;
-use zeroize::Zeroizing;
+use rand_core::CryptoRngCore;
+use zeroize::{ZeroizeOnDrop, Zeroizing};
 
 use crate::algorithms::oaep::*;
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
@@ -409,6 +410,13 @@ where
             self.label.as_ref().cloned(),
         )
     }
+}
+
+impl<D, MGD> ZeroizeOnDrop for DecryptingKey<D, MGD>
+where
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+{
 }
 
 #[cfg(test)]
