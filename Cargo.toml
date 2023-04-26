@@ -13,7 +13,7 @@ readme = "README.md"
 rust-version = "1.65"
 
 [dependencies]
-num-bigint = { version = "0.8.2", features = ["i128", "u64_digit", "prime", "zeroize"], default-features = false, package = "num-bigint-dig" }
+num-bigint = { version = "0.8.2", features = ["i128", "prime", "zeroize"], default-features = false, package = "num-bigint-dig" }
 num-traits = { version= "0.2.9", default-features = false, features = ["libm"] }
 num-integer = { version = "0.1.39", default-features = false }
 num-iter = { version = "0.1.37", default-features = false }
@@ -48,12 +48,13 @@ sha3 = { version = "0.10.5", default-features = false, features = ["oid"] }
 name = "key"
 
 [features]
-default = ["std", "pem"]
+default = ["std", "pem", "u64_digit"]
 getrandom = ["rand_core/getrandom"]
 nightly = ["num-bigint/nightly"]
 serde = ["dep:serde", "num-bigint/serde"]
 pem = ["pkcs1/pem", "pkcs8/pem"]
 pkcs5 = ["pkcs8/encryption"]
+u64_digit = ["num-bigint/u64_digit"]
 std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std", "signature/std"]
 
 [package.metadata.docs.rs]
