@@ -42,18 +42,18 @@ use crate::{RsaPrivateKey, RsaPublicKey};
 pub struct Pkcs1v15Encrypt;
 
 impl PaddingScheme for Pkcs1v15Encrypt {
-    fn decrypt<Rng: CryptoRngCore>(
+    fn decrypt(
         self,
-        rng: Option<&mut Rng>,
+        rng: Option<&mut dyn CryptoRngCore>,
         priv_key: &RsaPrivateKey,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
         decrypt(rng, priv_key, ciphertext)
     }
 
-    fn encrypt<Rng: CryptoRngCore>(
+    fn encrypt(
         self,
-        rng: &mut Rng,
+        rng: &mut dyn CryptoRngCore,
         pub_key: &RsaPublicKey,
         msg: &[u8],
     ) -> Result<Vec<u8>> {
@@ -106,9 +106,9 @@ impl Pkcs1v15Sign {
 }
 
 impl SignatureScheme for Pkcs1v15Sign {
-    fn sign<Rng: CryptoRngCore>(
+    fn sign(
         self,
-        rng: Option<&mut Rng>,
+        rng: Option<&mut dyn CryptoRngCore>,
         priv_key: &RsaPrivateKey,
         hashed: &[u8],
     ) -> Result<Vec<u8>> {

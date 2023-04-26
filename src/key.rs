@@ -14,10 +14,8 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroize;
 
 use crate::algorithms::generate::generate_multi_prime_key_with_exp;
-use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::keytraits::{CRTValue, PrivateKeyParts, PublicKeyParts};
-
 use crate::padding::{PaddingScheme, SignatureScheme};
 
 /// Represents the public part of an RSA key.
@@ -364,7 +362,7 @@ impl RsaPrivateKey {
 
     /// Decrypt the given message.
     pub fn decrypt<P: PaddingScheme>(&self, padding: P, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        padding.decrypt(Option::<&mut DummyRng>::None, self, ciphertext)
+        padding.decrypt(None, self, ciphertext)
     }
 
     /// Decrypt the given message.
@@ -381,7 +379,7 @@ impl RsaPrivateKey {
 
     /// Sign the given digest.
     pub fn sign<S: SignatureScheme>(&self, padding: S, digest_in: &[u8]) -> Result<Vec<u8>> {
-        padding.sign(Option::<&mut DummyRng>::None, self, digest_in)
+        padding.sign(None, self, digest_in)
     }
 
     /// Sign the given digest using the provided `rng`, which is used in the
