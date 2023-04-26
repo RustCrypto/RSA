@@ -24,7 +24,7 @@ use signature::{
     DigestSigner, DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner,
     SignatureEncoding, Signer, Verifier,
 };
-use zeroize::Zeroizing;
+use zeroize::{ZeroizeOnDrop, Zeroizing};
 
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pkcs1v15::*;
@@ -418,6 +418,8 @@ where
     }
 }
 
+impl<D> ZeroizeOnDrop for SigningKey<D> where D: Digest {}
+
 impl<D> Signer<Signature> for SigningKey<D>
 where
     D: Digest,
@@ -730,6 +732,8 @@ impl EncryptingKeypair for DecryptingKey {
         }
     }
 }
+
+impl ZeroizeOnDrop for DecryptingKey {}
 
 mod oid {
     use const_oid::ObjectIdentifier;

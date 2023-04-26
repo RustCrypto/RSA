@@ -11,7 +11,7 @@ use num_traits::{FromPrimitive, One, ToPrimitive};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use zeroize::Zeroize;
+use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::algorithms::generate::generate_multi_prime_key_with_exp;
 use crate::dummy_rng::DummyRng;
@@ -61,22 +61,11 @@ impl Hash for RsaPrivateKey {
     }
 }
 
-impl Zeroize for RsaPrivateKey {
-    fn zeroize(&mut self) {
-        self.d.zeroize();
-        for prime in self.primes.iter_mut() {
-            prime.zeroize();
-        }
-        self.primes.clear();
-        if self.precomputed.is_some() {
-            self.precomputed.take().unwrap().zeroize();
-        }
-    }
-}
-
 impl Drop for RsaPrivateKey {
     fn drop(&mut self) {
-        self.zeroize();
+        self.d.zeroize();
+        self.primes.zeroize();
+        self.precomputed.zeroize();
     }
 }
 
@@ -86,6 +75,8 @@ impl Deref for RsaPrivateKey {
         &self.pubkey_components
     }
 }
+
+impl ZeroizeOnDrop for RsaPrivateKey {}
 
 #[derive(Debug, Clone)]
 pub(crate) struct PrecomputedValues {

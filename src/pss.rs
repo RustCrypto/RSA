@@ -30,6 +30,7 @@ use signature::{
     hazmat::{PrehashVerifier, RandomizedPrehashSigner},
     DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, SignatureEncoding, Verifier,
 };
+use zeroize::ZeroizeOnDrop;
 
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pss::*;
@@ -483,6 +484,8 @@ where
     }
 }
 
+impl<D> ZeroizeOnDrop for SigningKey<D> where D: Digest {}
+
 /// Signing key for producing "blinded" RSASSA-PSS signatures as described in
 /// [draft-irtf-cfrg-rsa-blind-signatures](https://datatracker.ietf.org/doc/draft-irtf-cfrg-rsa-blind-signatures/).
 #[derive(Debug, Clone)]
@@ -655,6 +658,8 @@ where
         &self.inner
     }
 }
+
+impl<D> ZeroizeOnDrop for BlindedSigningKey<D> where D: Digest {}
 
 /// Verifying key for checking the validity of RSASSA-PSS signatures as
 /// described in [RFC8017 § 8.1].
