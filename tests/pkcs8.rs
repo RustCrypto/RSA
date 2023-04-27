@@ -17,7 +17,8 @@ const RSA_2048_PUB_PEM: &str = include_str!("examples/pkcs8/rsa2048-pub.pem");
 use hex_literal::hex;
 use rsa::{
     pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
-    PrivateKeyParts, PublicKeyParts, RsaPrivateKey, RsaPublicKey,
+    traits::{PrivateKeyParts, PublicKeyParts},
+    RsaPrivateKey, RsaPublicKey,
 };
 
 #[cfg(feature = "pem")]

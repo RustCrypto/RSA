@@ -224,7 +224,6 @@ pub use signature;
 
 mod algorithms;
 pub mod errors;
-mod keytraits;
 pub mod oaep;
 pub mod pkcs1v15;
 pub mod pss;
@@ -233,7 +232,6 @@ pub mod traits;
 mod dummy_rng;
 mod encoding;
 mod key;
-mod padding;
 
 pub use pkcs1;
 pub use pkcs8;
@@ -242,9 +240,8 @@ pub use sha2;
 
 pub use crate::{
     key::{RsaPrivateKey, RsaPublicKey},
-    keytraits::{CrtValue, PrivateKeyParts, PublicKeyParts},
     oaep::Oaep,
-    padding::{PaddingScheme, SignatureScheme},
     pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign},
     pss::Pss,
+    traits::keys::CrtValue,
 };

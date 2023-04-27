@@ -4,7 +4,7 @@
 //! `pkcs1` crate's traits for types which impl the `pkcs8` crate's traits.
 
 use crate::{
-    keytraits::{PrivateKeyParts, PublicKeyParts},
+    traits::{PrivateKeyParts, PublicKeyParts},
     BigUint, RsaPrivateKey, RsaPublicKey,
 };
 use core::convert::{TryFrom, TryInto};
