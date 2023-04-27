@@ -23,7 +23,12 @@ use crate::CrtValue;
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RsaPublicKey {
+    /// Modulus: product of prime numbers `p` and `q`
     n: BigUint,
+    /// Public exponent: power to which a plaintext message is raised in
+    /// order to encrypt it.
+    ///
+    /// Typically 0x10001 (65537)
     e: BigUint,
 }
 
