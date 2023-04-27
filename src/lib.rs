@@ -4,38 +4,18 @@
 #![doc(html_logo_url = "https://raw.githubusercontent.com/RustCrypto/meta/master/logo_small.png")]
 #![warn(missing_docs)]
 
-//! RSA Implementation in pure Rust.
+//! # Supported algorithms
 //!
-//! It supports several schemes described in [RFC8017]:
+//! This crate supports several schemes described in [RFC8017]:
 //!
-//! - OAEP encryption scheme
-//! - PKCS#1 v1.5 encryption scheme
-//! - PKCS#1 v1.5 signature scheme
-//! - PSS signature scheme
+//! - [OAEP encryption scheme](#oaep-encryption)
+//! - [PKCS#1 v1.5 encryption scheme](#pkcs1-v15-encryption)
+//! - [PKCS#1 v1.5 signature scheme](#pkcs1-v15-signatures)
+//! - [PSS signature scheme](#pss-signatures)
 //!
 //! These schemes are described below.
 //!
 //! # Usage
-//!
-//! ## PKCS#1 v1.5 encryption
-//! ```
-//! use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
-//!
-//! let mut rng = rand::thread_rng();
-//!
-//! let bits = 2048;
-//! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
-//! let public_key = RsaPublicKey::from(&private_key);
-//!
-//! // Encrypt
-//! let data = b"hello world";
-//! let enc_data = public_key.encrypt(&mut rng, Pkcs1v15Encrypt, &data[..]).expect("failed to encrypt");
-//! assert_ne!(&data[..], &enc_data[..]);
-//!
-//! // Decrypt
-//! let dec_data = private_key.decrypt(Pkcs1v15Encrypt, &enc_data).expect("failed to decrypt");
-//! assert_eq!(&data[..], &dec_data[..]);
-//! ```
 //!
 //! ## OAEP encryption
 //! ```
@@ -56,6 +36,26 @@
 //! // Decrypt
 //! let padding = Oaep::new::<sha2::Sha256>();
 //! let dec_data = private_key.decrypt(padding, &enc_data).expect("failed to decrypt");
+//! assert_eq!(&data[..], &dec_data[..]);
+//! ```
+//!
+//! ## PKCS#1 v1.5 encryption
+//! ```
+//! use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
+//!
+//! let mut rng = rand::thread_rng();
+//!
+//! let bits = 2048;
+//! let private_key = RsaPrivateKey::new(&mut rng, bits).expect("failed to generate a key");
+//! let public_key = RsaPublicKey::from(&private_key);
+//!
+//! // Encrypt
+//! let data = b"hello world";
+//! let enc_data = public_key.encrypt(&mut rng, Pkcs1v15Encrypt, &data[..]).expect("failed to encrypt");
+//! assert_ne!(&data[..], &enc_data[..]);
+//!
+//! // Decrypt
+//! let dec_data = private_key.decrypt(Pkcs1v15Encrypt, &enc_data).expect("failed to decrypt");
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
 //!
