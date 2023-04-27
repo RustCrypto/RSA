@@ -21,9 +21,9 @@ use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::key::{self, RsaPrivateKey, RsaPublicKey};
-use crate::keytraits::PublicKeyParts;
-use crate::padding::PaddingScheme;
+use crate::traits::PaddingScheme;
 use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
+use crate::traits::PublicKeyParts;
 
 /// Encryption and Decryption using [OAEP padding](https://datatracker.ietf.org/doc/html/rfc8017#section-7.1).
 ///
@@ -422,9 +422,9 @@ where
 #[cfg(test)]
 mod tests {
     use crate::key::{RsaPrivateKey, RsaPublicKey};
-    use crate::keytraits::PublicKeyParts;
     use crate::oaep::{DecryptingKey, EncryptingKey, Oaep};
     use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
+    use crate::traits::PublicKeyParts;
 
     use alloc::string::String;
     use digest::{Digest, DynDigest, FixedOutputReset};

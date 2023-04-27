@@ -32,8 +32,8 @@ use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::key;
-use crate::keytraits::PublicKeyParts;
-use crate::padding::{PaddingScheme, SignatureScheme};
+use crate::traits::{PaddingScheme, SignatureScheme};
+use crate::traits::PublicKeyParts;
 use crate::traits::{Decryptor, EncryptingKeypair, RandomizedDecryptor, RandomizedEncryptor};
 use crate::{RsaPrivateKey, RsaPublicKey};
 
@@ -792,7 +792,7 @@ mod tests {
     use sha3::Sha3_256;
     use signature::{RandomizedSigner, Signer, Verifier};
 
-    use crate::{PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+    use crate::{traits::PublicKeyParts, RsaPrivateKey, RsaPublicKey};
 
     fn get_private_key() -> RsaPrivateKey {
         // In order to generate new test vectors you'll need the PEM form of this key:

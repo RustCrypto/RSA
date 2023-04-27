@@ -16,9 +16,8 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 use crate::algorithms::generate::generate_multi_prime_key_with_exp;
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
-use crate::keytraits::{CrtValue, PrivateKeyParts, PublicKeyParts};
-
-use crate::padding::{PaddingScheme, SignatureScheme};
+use crate::traits::{PaddingScheme, PrivateKeyParts, PublicKeyParts, SignatureScheme};
+use crate::CrtValue;
 
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
