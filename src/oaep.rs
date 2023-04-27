@@ -4,26 +4,27 @@
 //!
 //! See [code example in the toplevel rustdoc](../index.html#oaep-encryption).
 
+mod decrypting_key;
+mod encrypting_key;
+
+pub use self::{decrypting_key::DecryptingKey, encrypting_key::EncryptingKey};
+
 use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
-use core::marker::PhantomData;
 
 use digest::{Digest, DynDigest, FixedOutputReset};
 use num_bigint::BigUint;
 use rand_core::CryptoRngCore;
-use zeroize::{ZeroizeOnDrop, Zeroizing};
+use zeroize::Zeroizing;
 
 use crate::algorithms::oaep::*;
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
-use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::key::{self, RsaPrivateKey, RsaPublicKey};
-use crate::traits::PaddingScheme;
-use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
-use crate::traits::PublicKeyParts;
+use crate::traits::{PaddingScheme, PublicKeyParts};
 
 /// Encryption and Decryption using [OAEP padding](https://datatracker.ietf.org/doc/html/rfc8017#section-7.1).
 ///
@@ -282,149 +283,12 @@ fn decrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
     oaep_decrypt_digest::<D, MGD>(&mut em, label, priv_key.size())
 }
 
-/// Encryption key for PKCS#1 v1.5 encryption as described in [RFC8017 § 7.1].
-///
-/// [RFC8017 § 7.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
-#[derive(Debug, Clone)]
-pub struct EncryptingKey<D, MGD = D>
-where
-    D: Digest,
-    MGD: Digest + FixedOutputReset,
-{
-    inner: RsaPublicKey,
-    label: Option<String>,
-    phantom: PhantomData<D>,
-    mg_phantom: PhantomData<MGD>,
-}
-
-impl<D, MGD> EncryptingKey<D, MGD>
-where
-    D: Digest,
-    MGD: Digest + FixedOutputReset,
-{
-    /// Create a new verifying key from an RSA public key.
-    pub fn new(key: RsaPublicKey) -> Self {
-        Self {
-            inner: key,
-            label: None,
-            phantom: Default::default(),
-            mg_phantom: Default::default(),
-        }
-    }
-
-    /// Create a new verifying key from an RSA public key using provided label
-    pub fn new_with_label<S: AsRef<str>>(key: RsaPublicKey, label: S) -> Self {
-        Self {
-            inner: key,
-            label: Some(label.as_ref().to_string()),
-            phantom: Default::default(),
-            mg_phantom: Default::default(),
-        }
-    }
-}
-
-impl<D, MGD> RandomizedEncryptor for EncryptingKey<D, MGD>
-where
-    D: Digest,
-    MGD: Digest + FixedOutputReset,
-{
-    fn encrypt_with_rng<R: CryptoRngCore + ?Sized>(
-        &self,
-        rng: &mut R,
-        msg: &[u8],
-    ) -> Result<Vec<u8>> {
-        encrypt_digest::<_, D, MGD>(rng, &self.inner, msg, self.label.as_ref().cloned())
-    }
-}
-
-/// Decryption key for PKCS#1 v1.5 decryption as described in [RFC8017 § 7.1].
-///
-/// [RFC8017 § 7.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
-#[derive(Debug, Clone)]
-pub struct DecryptingKey<D, MGD = D>
-where
-    D: Digest,
-    MGD: Digest + FixedOutputReset,
-{
-    inner: RsaPrivateKey,
-    label: Option<String>,
-    phantom: PhantomData<D>,
-    mg_phantom: PhantomData<MGD>,
-}
-
-impl<D, MGD> DecryptingKey<D, MGD>
-where
-    D: Digest,
-    MGD: Digest + FixedOutputReset,
-{
-    /// Create a new verifying key from an RSA public key.
-    pub fn new(key: RsaPrivateKey) -> Self {
-        Self {
-            inner: key,
-            label: None,
-            phantom: Default::default(),
-            mg_phantom: Default::default(),
-        }
-    }
-
-    /// Create a new verifying key from an RSA public key using provided label
-    pub fn new_with_label<S: AsRef<str>>(key: RsaPrivateKey, label: S) -> Self {
-        Self {
-            inner: key,
-            label: Some(label.as_ref().to_string()),
-            phantom: Default::default(),
-            mg_phantom: Default::default(),
-        }
-    }
-}
-
-impl<D, MGD> Decryptor for DecryptingKey<D, MGD>
-where
-    D: Digest,
-    MGD: Digest + FixedOutputReset,
-{
-    fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        decrypt_digest::<DummyRng, D, MGD>(
-            None,
-            &self.inner,
-            ciphertext,
-            self.label.as_ref().cloned(),
-        )
-    }
-}
-
-impl<D, MGD> RandomizedDecryptor for DecryptingKey<D, MGD>
-where
-    D: Digest,
-    MGD: Digest + FixedOutputReset,
-{
-    fn decrypt_with_rng<R: CryptoRngCore + ?Sized>(
-        &self,
-        rng: &mut R,
-        ciphertext: &[u8],
-    ) -> Result<Vec<u8>> {
-        decrypt_digest::<_, D, MGD>(
-            Some(rng),
-            &self.inner,
-            ciphertext,
-            self.label.as_ref().cloned(),
-        )
-    }
-}
-
-impl<D, MGD> ZeroizeOnDrop for DecryptingKey<D, MGD>
-where
-    D: Digest,
-    MGD: Digest + FixedOutputReset,
-{
-}
-
 #[cfg(test)]
 mod tests {
     use crate::key::{RsaPrivateKey, RsaPublicKey};
     use crate::oaep::{DecryptingKey, EncryptingKey, Oaep};
-    use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
     use crate::traits::PublicKeyParts;
+    use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 
     use alloc::string::String;
     use digest::{Digest, DynDigest, FixedOutputReset};

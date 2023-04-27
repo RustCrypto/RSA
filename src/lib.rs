@@ -239,6 +239,7 @@ pub use pkcs8;
 pub use sha2;
 
 pub use crate::{
+    errors::{Error, Result},
     key::{RsaPrivateKey, RsaPublicKey},
     oaep::Oaep,
     pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign},

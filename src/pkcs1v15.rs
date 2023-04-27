@@ -6,36 +6,31 @@
 //!
 //! [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 
-use alloc::{boxed::Box, string::ToString, vec::Vec};
-use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
-use core::marker::PhantomData;
+mod decrypting_key;
+mod encrypting_key;
+mod signature;
+mod signing_key;
+mod verifying_key;
+
+pub use self::{
+    decrypting_key::DecryptingKey, encrypting_key::EncryptingKey, signature::Signature,
+    signing_key::SigningKey, verifying_key::VerifyingKey,
+};
+
+use alloc::{boxed::Box, vec::Vec};
+use core::fmt::Debug;
 use digest::Digest;
 use num_bigint::BigUint;
-use pkcs8::{
-    spki::{
-        der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
-        SignatureAlgorithmIdentifier,
-    },
-    AssociatedOid, Document, EncodePrivateKey, EncodePublicKey, SecretDocument,
-};
+use pkcs8::AssociatedOid;
 use rand_core::CryptoRngCore;
-use signature::{
-    hazmat::{PrehashSigner, PrehashVerifier},
-    DigestSigner, DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner,
-    SignatureEncoding, Signer, Verifier,
-};
-use zeroize::{ZeroizeOnDrop, Zeroizing};
+use zeroize::Zeroizing;
 
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pkcs1v15::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
-use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
-use crate::key;
-use crate::traits::{PaddingScheme, SignatureScheme};
-use crate::traits::PublicKeyParts;
-use crate::traits::{Decryptor, EncryptingKeypair, RandomizedDecryptor, RandomizedEncryptor};
-use crate::{RsaPrivateKey, RsaPublicKey};
+use crate::key::{self, RsaPrivateKey, RsaPublicKey};
+use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
 
 /// Encryption using PKCS#1 v1.5 padding.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -138,62 +133,6 @@ impl SignatureScheme for Pkcs1v15Sign {
     }
 }
 
-/// PKCS#1 v1.5 signatures as described in [RFC8017 § 8.2].
-///
-/// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
-#[derive(Clone, PartialEq, Eq)]
-pub struct Signature {
-    inner: BigUint,
-    len: usize,
-}
-
-impl SignatureEncoding for Signature {
-    type Repr = Box<[u8]>;
-}
-
-impl TryFrom<&[u8]> for Signature {
-    type Error = signature::Error;
-
-    fn try_from(bytes: &[u8]) -> signature::Result<Self> {
-        Ok(Self {
-            inner: BigUint::from_bytes_be(bytes),
-            len: bytes.len(),
-        })
-    }
-}
-
-impl From<Signature> for Box<[u8]> {
-    fn from(signature: Signature) -> Box<[u8]> {
-        signature.inner.to_bytes_be().into_boxed_slice()
-    }
-}
-
-impl Debug for Signature {
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> core::result::Result<(), core::fmt::Error> {
-        fmt.debug_tuple("Signature")
-            .field(&self.to_string())
-            .finish()
-    }
-}
-
-impl LowerHex for Signature {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:x}", &self.inner)
-    }
-}
-
-impl UpperHex for Signature {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:X}", &self.inner)
-    }
-}
-
-impl Display for Signature {
-    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:X}", self)
-    }
-}
-
 /// Encrypts the given message with RSA and the padding
 /// scheme from PKCS#1 v1.5.  The message must be no longer than the
 /// length of the public modulus minus 11 bytes.
@@ -279,462 +218,6 @@ fn verify(
     pkcs1v15_sign_unpad(prefix, hashed, &em, pub_key.size())
 }
 
-/// Signing key for PKCS#1 v1.5 signatures as described in [RFC8017 § 8.2].
-///
-/// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
-#[derive(Debug, Clone)]
-pub struct SigningKey<D>
-where
-    D: Digest,
-{
-    inner: RsaPrivateKey,
-    prefix: Vec<u8>,
-    phantom: PhantomData<D>,
-}
-
-impl<D> SigningKey<D>
-where
-    D: Digest,
-{
-    /// Create a new signing key from the give RSA private key with an empty prefix.
-    ///
-    /// ## Note: unprefixed signatures are uncommon
-    ///
-    /// In most cases you'll want to use [`SigningKey::new`].
-    pub fn new_unprefixed(key: RsaPrivateKey) -> Self {
-        Self {
-            inner: key,
-            prefix: Vec::new(),
-            phantom: Default::default(),
-        }
-    }
-
-    /// Generate a new signing key with an empty prefix.
-    pub fn random_unprefixed<R: CryptoRngCore + ?Sized>(
-        rng: &mut R,
-        bit_size: usize,
-    ) -> Result<Self> {
-        Ok(Self {
-            inner: RsaPrivateKey::new(rng, bit_size)?,
-            prefix: Vec::new(),
-            phantom: Default::default(),
-        })
-    }
-}
-
-impl<D> AssociatedAlgorithmIdentifier for SigningKey<D>
-where
-    D: Digest,
-{
-    type Params = AnyRef<'static>;
-
-    const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
-}
-
-impl<D> SignatureAlgorithmIdentifier for SigningKey<D>
-where
-    D: Digest + oid::RsaSignatureAssociatedOid,
-{
-    type Params = AnyRef<'static>;
-
-    const SIGNATURE_ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> =
-        AlgorithmIdentifierRef {
-            oid: D::OID,
-            parameters: Some(AnyRef::NULL),
-        };
-}
-
-impl<D> From<RsaPrivateKey> for SigningKey<D>
-where
-    D: Digest,
-{
-    fn from(key: RsaPrivateKey) -> Self {
-        Self::new_unprefixed(key)
-    }
-}
-
-impl<D> From<SigningKey<D>> for RsaPrivateKey
-where
-    D: Digest,
-{
-    fn from(key: SigningKey<D>) -> Self {
-        key.inner
-    }
-}
-
-impl<D> SigningKey<D>
-where
-    D: Digest + AssociatedOid,
-{
-    /// Create a new signing key with a prefix for the digest `D`.
-    pub fn new(key: RsaPrivateKey) -> Self {
-        Self {
-            inner: key,
-            prefix: pkcs1v15_generate_prefix::<D>(),
-            phantom: Default::default(),
-        }
-    }
-
-    /// Generate a new signing key with a prefix for the digest `D`.
-    pub fn random<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
-        Ok(Self {
-            inner: RsaPrivateKey::new(rng, bit_size)?,
-            prefix: pkcs1v15_generate_prefix::<D>(),
-            phantom: Default::default(),
-        })
-    }
-
-    /// Create a new signing key with a prefix for the digest `D`.
-    #[deprecated(since = "0.9.0", note = "use SigningKey::new instead")]
-    pub fn new_with_prefix(key: RsaPrivateKey) -> Self {
-        Self::new(key)
-    }
-
-    /// Generate a new signing key with a prefix for the digest `D`.
-    #[deprecated(since = "0.9.0", note = "use SigningKey::random instead")]
-    pub fn random_with_prefix<R: CryptoRngCore + ?Sized>(
-        rng: &mut R,
-        bit_size: usize,
-    ) -> Result<Self> {
-        Self::random(rng, bit_size)
-    }
-}
-
-impl<D> AsRef<RsaPrivateKey> for SigningKey<D>
-where
-    D: Digest,
-{
-    fn as_ref(&self) -> &RsaPrivateKey {
-        &self.inner
-    }
-}
-
-impl<D> EncodePrivateKey for SigningKey<D>
-where
-    D: Digest,
-{
-    fn to_pkcs8_der(&self) -> pkcs8::Result<SecretDocument> {
-        self.inner.to_pkcs8_der()
-    }
-}
-
-impl<D> ZeroizeOnDrop for SigningKey<D> where D: Digest {}
-
-impl<D> Signer<Signature> for SigningKey<D>
-where
-    D: Digest,
-{
-    fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
-        sign::<DummyRng>(None, &self.inner, &self.prefix, &D::digest(msg))?
-            .as_slice()
-            .try_into()
-    }
-}
-
-impl<D> RandomizedSigner<Signature> for SigningKey<D>
-where
-    D: Digest,
-{
-    fn try_sign_with_rng(
-        &self,
-        rng: &mut impl CryptoRngCore,
-        msg: &[u8],
-    ) -> signature::Result<Signature> {
-        sign(Some(rng), &self.inner, &self.prefix, &D::digest(msg))?
-            .as_slice()
-            .try_into()
-    }
-}
-
-impl<D> DigestSigner<D, Signature> for SigningKey<D>
-where
-    D: Digest,
-{
-    fn try_sign_digest(&self, digest: D) -> signature::Result<Signature> {
-        sign::<DummyRng>(None, &self.inner, &self.prefix, &digest.finalize())?
-            .as_slice()
-            .try_into()
-    }
-}
-
-impl<D> RandomizedDigestSigner<D, Signature> for SigningKey<D>
-where
-    D: Digest,
-{
-    fn try_sign_digest_with_rng(
-        &self,
-        rng: &mut impl CryptoRngCore,
-        digest: D,
-    ) -> signature::Result<Signature> {
-        sign(Some(rng), &self.inner, &self.prefix, &digest.finalize())?
-            .as_slice()
-            .try_into()
-    }
-}
-
-impl<D> PrehashSigner<Signature> for SigningKey<D>
-where
-    D: Digest,
-{
-    fn sign_prehash(&self, prehash: &[u8]) -> signature::Result<Signature> {
-        sign::<DummyRng>(None, &self.inner, &self.prefix, prehash)?
-            .as_slice()
-            .try_into()
-    }
-}
-
-/// Verifying key for PKCS#1 v1.5 signatures as described in [RFC8017 § 8.2].
-///
-/// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
-#[derive(Debug)]
-pub struct VerifyingKey<D>
-where
-    D: Digest,
-{
-    inner: RsaPublicKey,
-    prefix: Vec<u8>,
-    phantom: PhantomData<D>,
-}
-
-/* Implemented manually so we don't have to bind D with Clone */
-impl<D> Clone for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn clone(&self) -> Self {
-        Self {
-            inner: self.inner.clone(),
-            prefix: self.prefix.clone(),
-            phantom: Default::default(),
-        }
-    }
-}
-
-impl<D> VerifyingKey<D>
-where
-    D: Digest,
-{
-    /// Create a new verifying key from an RSA public key with an empty prefix.
-    ///
-    /// ## Note: unprefixed signatures are uncommon
-    ///
-    /// In most cases you'll want to use [`VerifyingKey::new`] instead.
-    pub fn new_unprefixed(key: RsaPublicKey) -> Self {
-        Self {
-            inner: key,
-            prefix: Vec::new(),
-            phantom: Default::default(),
-        }
-    }
-}
-
-impl<D> AssociatedAlgorithmIdentifier for VerifyingKey<D>
-where
-    D: Digest,
-{
-    type Params = AnyRef<'static>;
-
-    const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
-}
-
-impl<D> SignatureAlgorithmIdentifier for VerifyingKey<D>
-where
-    D: Digest + oid::RsaSignatureAssociatedOid,
-{
-    type Params = AnyRef<'static>;
-
-    const SIGNATURE_ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> =
-        AlgorithmIdentifierRef {
-            oid: D::OID,
-            parameters: Some(AnyRef::NULL),
-        };
-}
-
-impl<D> From<RsaPublicKey> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn from(key: RsaPublicKey) -> Self {
-        Self::new_unprefixed(key)
-    }
-}
-
-impl<D> From<VerifyingKey<D>> for RsaPublicKey
-where
-    D: Digest,
-{
-    fn from(key: VerifyingKey<D>) -> Self {
-        key.inner
-    }
-}
-
-impl<D> VerifyingKey<D>
-where
-    D: Digest + AssociatedOid,
-{
-    /// Create a new verifying key with a prefix for the digest `D`.
-    pub fn new(key: RsaPublicKey) -> Self {
-        Self {
-            inner: key,
-            prefix: pkcs1v15_generate_prefix::<D>(),
-            phantom: Default::default(),
-        }
-    }
-
-    /// Create a new verifying key with a prefix for the digest `D`.
-    #[deprecated(since = "0.9.0", note = "use VerifyingKey::new instead")]
-    pub fn new_with_prefix(key: RsaPublicKey) -> Self {
-        Self::new(key)
-    }
-}
-
-impl<D> AsRef<RsaPublicKey> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn as_ref(&self) -> &RsaPublicKey {
-        &self.inner
-    }
-}
-
-impl<D> Keypair for SigningKey<D>
-where
-    D: Digest,
-{
-    type VerifyingKey = VerifyingKey<D>;
-    fn verifying_key(&self) -> Self::VerifyingKey {
-        VerifyingKey {
-            inner: self.inner.to_public_key(),
-            prefix: self.prefix.clone(),
-            phantom: Default::default(),
-        }
-    }
-}
-
-impl<D> Verifier<Signature> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify(
-            &self.inner,
-            &self.prefix.clone(),
-            &D::digest(msg),
-            &signature.inner,
-            signature.len,
-        )
-        .map_err(|e| e.into())
-    }
-}
-
-impl<D> DigestVerifier<D, Signature> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
-        verify(
-            &self.inner,
-            &self.prefix,
-            &digest.finalize(),
-            &signature.inner,
-            signature.len,
-        )
-        .map_err(|e| e.into())
-    }
-}
-
-impl<D> PrehashVerifier<Signature> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify(
-            &self.inner,
-            &self.prefix,
-            prehash,
-            &signature.inner,
-            signature.len,
-        )
-        .map_err(|e| e.into())
-    }
-}
-
-impl<D> EncodePublicKey for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn to_public_key_der(&self) -> pkcs8::spki::Result<Document> {
-        self.inner.to_public_key_der()
-    }
-}
-
-/// Encryption key for PKCS#1 v1.5 encryption as described in [RFC8017 § 7.2].
-///
-/// [RFC8017 § 7.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.2
-#[derive(Debug, Clone)]
-pub struct EncryptingKey {
-    inner: RsaPublicKey,
-}
-
-impl EncryptingKey {
-    /// Create a new verifying key from an RSA public key.
-    pub fn new(key: RsaPublicKey) -> Self {
-        Self { inner: key }
-    }
-}
-
-impl RandomizedEncryptor for EncryptingKey {
-    fn encrypt_with_rng<R: CryptoRngCore + ?Sized>(
-        &self,
-        rng: &mut R,
-        msg: &[u8],
-    ) -> Result<Vec<u8>> {
-        encrypt(rng, &self.inner, msg)
-    }
-}
-
-/// Decryption key for PKCS#1 v1.5 decryption as described in [RFC8017 § 7.2].
-///
-/// [RFC8017 § 7.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.2
-#[derive(Debug, Clone)]
-pub struct DecryptingKey {
-    inner: RsaPrivateKey,
-}
-
-impl DecryptingKey {
-    /// Create a new verifying key from an RSA public key.
-    pub fn new(key: RsaPrivateKey) -> Self {
-        Self { inner: key }
-    }
-}
-
-impl Decryptor for DecryptingKey {
-    fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        decrypt::<DummyRng>(None, &self.inner, ciphertext)
-    }
-}
-
-impl RandomizedDecryptor for DecryptingKey {
-    fn decrypt_with_rng<R: CryptoRngCore + ?Sized>(
-        &self,
-        rng: &mut R,
-        ciphertext: &[u8],
-    ) -> Result<Vec<u8>> {
-        decrypt(Some(rng), &self.inner, ciphertext)
-    }
-}
-
-impl EncryptingKeypair for DecryptingKey {
-    type EncryptingKey = EncryptingKey;
-    fn encrypting_key(&self) -> EncryptingKey {
-        EncryptingKey {
-            inner: self.inner.clone().into(),
-        }
-    }
-}
-
-impl ZeroizeOnDrop for DecryptingKey {}
-
 mod oid {
     use const_oid::ObjectIdentifier;
 
@@ -778,6 +261,11 @@ mod oid {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ::signature::{
+        hazmat::{PrehashSigner, PrehashVerifier},
+        DigestSigner, DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner,
+        SignatureEncoding, Signer, Verifier,
+    };
     use base64ct::{Base64, Encoding};
     use hex_literal::hex;
     use num_bigint::BigUint;
@@ -790,9 +278,11 @@ mod tests {
     use sha1::{Digest, Sha1};
     use sha2::Sha256;
     use sha3::Sha3_256;
-    use signature::{RandomizedSigner, Signer, Verifier};
 
-    use crate::{traits::PublicKeyParts, RsaPrivateKey, RsaPublicKey};
+    use crate::traits::{
+        Decryptor, EncryptingKeypair, PublicKeyParts, RandomizedDecryptor, RandomizedEncryptor,
+    };
+    use crate::{RsaPrivateKey, RsaPublicKey};
 
     fn get_private_key() -> RsaPrivateKey {
         // In order to generate new test vectors you'll need the PEM form of this key:
