@@ -36,12 +36,12 @@ pub trait PrivateKeyParts: PublicKeyParts {
     fn qinv(&self) -> Option<&BigInt>;
 
     /// Returns an iterator over the CRT Values
-    fn crt_values(&self) -> Option<&[CRTValue]>;
+    fn crt_values(&self) -> Option<&[CrtValue]>;
 }
 
 /// Contains the precomputed Chinese remainder theorem values.
 #[derive(Debug, Clone)]
-pub struct CRTValue {
+pub struct CrtValue {
     /// D mod (prime - 1)
     pub(crate) exp: BigInt,
     /// R·Coeff ≡ 1 mod Prime.
@@ -50,7 +50,7 @@ pub struct CRTValue {
     pub(crate) r: BigInt,
 }
 
-impl Zeroize for CRTValue {
+impl Zeroize for CrtValue {
     fn zeroize(&mut self) {
         self.exp.zeroize();
         self.coeff.zeroize();
@@ -58,7 +58,7 @@ impl Zeroize for CRTValue {
     }
 }
 
-impl Drop for CRTValue {
+impl Drop for CrtValue {
     fn drop(&mut self) {
         self.zeroize();
     }

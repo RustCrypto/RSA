@@ -242,7 +242,7 @@ pub use sha2;
 
 pub use crate::{
     key::{RsaPrivateKey, RsaPublicKey},
-    keytraits::{CRTValue, PrivateKeyParts, PublicKeyParts},
+    keytraits::{CrtValue, PrivateKeyParts, PublicKeyParts},
     oaep::Oaep,
     padding::{PaddingScheme, SignatureScheme},
     pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign},
