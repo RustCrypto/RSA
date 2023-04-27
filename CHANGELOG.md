@@ -4,6 +4,60 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.0 (2023-04-27)
+### Added
+- Function to get salt length from RSA PSS keys ([#277])
+- `AssociatedAlgorithmIdentifier` implementation ([#278])
+- Random key generation for `pss::BlindedSigningKey` ([#295])
+- Impl `Signer` for `pss::SigningKey` ([#297])
+- Impl `core::hash::Hash` for `RsaPrivateKey` ([#308])
+- Impl `ZeroizeOnDrop` for `RsaPrivateKey`, `SigningKey`, `DecryptingKey` ([#311])
+- `u64_digit` feature; on-by-default ([#313])
+- `AsRef<RsaPublicKey>` impl on `RsaPrivateKey` ([#317])
+
+### Changed
+- Use namespaced features for `serde` ([#268])
+- Bump `pkcs1` to v0.7, `pkcs8` to v0.10; MSRV 1.65 ([#270])
+- Rename PKCS#1v1.5 `*_with_prefix` methods ([#290])
+  - `SigningKey::new` => `SigningKey::new_unprefixed`
+  - `SigningKey::new_with_prefix` => `SigningKey::new`
+  - `VerifyingKey::new` => `VerifyingKey::new_unprefixed`
+  - `VerifyingKey::new_with_prefix` => `VerifyingKey::new`
+- Rename `Pkcs1v15Sign::new_raw` to `Pkcs1v15Sign::new_unprefixed` ([#293])
+- Use digest output size as default PSS salt length ([#294])
+- Specify `salt_len` when verifying PSS signatures ([#294])
+- Ensure signatures have the expected length and don't overflow the modulus ([#306])
+- Improved public key checks ([#307])
+- Rename `CRTValue` => `CrtValue` ([#314])
+- Traits under `padding` module now located under `traits` module ([#315])
+- `PublicKeyParts`/`PrivateKeyParts` now located under `traits` module ([#315])
+
+### Removed
+- "Unsalted" PSS support ([#294])
+- `EncryptionPrimitive`/`DecriptionPrimitive` traits ([#300])
+- `PublicKey`/`PrivateKey` traits ([#300])
+- `Zeroize` impl on `RsaPrivateKey`; automatically zeroized on drop ([#311])
+- `Deref<Target=RsaPublicKey>` impl on `RsaPrivateKey`; use `AsRef` instead ([#317])
+
+[#268]: https://github.com/RustCrypto/RSA/pull/268
+[#270]: https://github.com/RustCrypto/RSA/pull/270
+[#277]: https://github.com/RustCrypto/RSA/pull/277
+[#278]: https://github.com/RustCrypto/RSA/pull/278
+[#290]: https://github.com/RustCrypto/RSA/pull/290
+[#293]: https://github.com/RustCrypto/RSA/pull/293
+[#294]: https://github.com/RustCrypto/RSA/pull/294
+[#295]: https://github.com/RustCrypto/RSA/pull/295
+[#297]: https://github.com/RustCrypto/RSA/pull/297
+[#300]: https://github.com/RustCrypto/RSA/pull/300
+[#306]: https://github.com/RustCrypto/RSA/pull/306
+[#307]: https://github.com/RustCrypto/RSA/pull/307
+[#308]: https://github.com/RustCrypto/RSA/pull/308
+[#311]: https://github.com/RustCrypto/RSA/pull/311
+[#313]: https://github.com/RustCrypto/RSA/pull/313
+[#314]: https://github.com/RustCrypto/RSA/pull/314
+[#315]: https://github.com/RustCrypto/RSA/pull/315
+[#317]: https://github.com/RustCrypto/RSA/pull/317
+
 ## 0.8.2 (2023-03-01)
 ### Added
 - Encryption-related traits ([#259])
