@@ -405,6 +405,7 @@ mod test {
                 .expect("failed to sign");
 
             priv_key
+                .to_public_key()
                 .verify(Pss::new::<Sha1>(), &digest, &sig)
                 .expect("failed to verify");
         }
@@ -424,6 +425,7 @@ mod test {
                 .expect("failed to sign");
 
             priv_key
+                .to_public_key()
                 .verify(Pss::new::<Sha1>(), &digest, &sig)
                 .expect("failed to verify");
         }
@@ -595,6 +597,7 @@ mod test {
             .expect("failed to sign");
 
         priv_key
+            .to_public_key()
             .verify(Pss::new::<Sha1>(), &digest, &sig)
             .expect("failed to verify");
     }

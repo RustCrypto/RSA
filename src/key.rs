@@ -1,8 +1,5 @@
 use alloc::vec::Vec;
-use core::{
-    hash::{Hash, Hasher},
-    ops::Deref,
-};
+use core::hash::{Hash, Hasher};
 use num_bigint::traits::ModInverse;
 use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
@@ -57,6 +54,12 @@ impl PartialEq for RsaPrivateKey {
     }
 }
 
+impl AsRef<RsaPublicKey> for RsaPrivateKey {
+    fn as_ref(&self) -> &RsaPublicKey {
+        &self.pubkey_components
+    }
+}
+
 impl Hash for RsaPrivateKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // Domain separator for RSA private keys
@@ -70,13 +73,6 @@ impl Drop for RsaPrivateKey {
         self.d.zeroize();
         self.primes.zeroize();
         self.precomputed.zeroize();
-    }
-}
-
-impl Deref for RsaPrivateKey {
-    type Target = RsaPublicKey;
-    fn deref(&self) -> &RsaPublicKey {
-        &self.pubkey_components
     }
 }
 
@@ -124,9 +120,8 @@ impl From<RsaPrivateKey> for RsaPublicKey {
 
 impl From<&RsaPrivateKey> for RsaPublicKey {
     fn from(private_key: &RsaPrivateKey) -> Self {
-        let n = private_key.n.clone();
-        let e = private_key.e.clone();
-
+        let n = private_key.n().clone();
+        let e = private_key.e().clone();
         RsaPublicKey { n, e }
     }
 }
@@ -201,11 +196,11 @@ impl RsaPublicKey {
 
 impl PublicKeyParts for RsaPrivateKey {
     fn n(&self) -> &BigUint {
-        &self.n
+        &self.pubkey_components.n
     }
 
     fn e(&self) -> &BigUint {
-        &self.e
+        &self.pubkey_components.e
     }
 }
 
@@ -336,7 +331,7 @@ impl RsaPrivateKey {
             }
             m *= prime;
         }
-        if m != self.n {
+        if m != self.pubkey_components.n {
             return Err(Error::InvalidModulus);
         }
 
@@ -345,7 +340,7 @@ impl RsaPrivateKey {
         // inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
         // exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
         // mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
-        let mut de = self.e.clone();
+        let mut de = self.e().clone();
         de *= self.d.clone();
         for prime in &self.primes {
             let congruence: BigUint = &de % (prime - BigUint::one());
