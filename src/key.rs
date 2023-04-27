@@ -16,7 +16,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 use crate::algorithms::generate::generate_multi_prime_key_with_exp;
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
-use crate::keytraits::{CRTValue, PrivateKeyParts, PublicKeyParts};
+use crate::keytraits::{CrtValue, PrivateKeyParts, PublicKeyParts};
 
 use crate::padding::{PaddingScheme, SignatureScheme};
 
@@ -91,7 +91,7 @@ pub(crate) struct PrecomputedValues {
     /// historical accident, the CRT for the first two primes is handled
     /// differently in PKCS#1 and interoperability is sufficiently
     /// important that we mirror this.
-    pub(crate) crt_values: Vec<CRTValue>,
+    pub(crate) crt_values: Vec<CrtValue>,
 }
 
 impl Zeroize for PrecomputedValues {
@@ -276,10 +276,10 @@ impl RsaPrivateKey {
             .ok_or(Error::InvalidPrime)?;
 
         let mut r: BigUint = &self.primes[0] * &self.primes[1];
-        let crt_values: Vec<CRTValue> = {
+        let crt_values: Vec<CrtValue> = {
             let mut values = Vec::with_capacity(self.primes.len() - 2);
             for prime in &self.primes[2..] {
-                let res = CRTValue {
+                let res = CrtValue {
                     exp: BigInt::from_biguint(Plus, &self.d % (prime - BigUint::one())),
                     r: BigInt::from_biguint(Plus, r.clone()),
                     coeff: BigInt::from_biguint(
@@ -416,7 +416,7 @@ impl PrivateKeyParts for RsaPrivateKey {
         self.precomputed.as_ref().map(|p| &p.qinv)
     }
 
-    fn crt_values(&self) -> Option<&[CRTValue]> {
+    fn crt_values(&self) -> Option<&[CrtValue]> {
         /* for some reason the standard self.precomputed.as_ref().map() doesn't work */
         if let Some(p) = &self.precomputed {
             Some(p.crt_values.as_slice())
