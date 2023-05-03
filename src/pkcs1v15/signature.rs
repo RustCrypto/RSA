@@ -4,6 +4,7 @@ pub use ::signature::{
     SignatureEncoding, Signer, Verifier,
 };
 
+use crate::algorithms::pad::uint_to_be_pad;
 use alloc::{boxed::Box, string::ToString};
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use num_bigint::BigUint;
@@ -34,7 +35,9 @@ impl TryFrom<&[u8]> for Signature {
 
 impl From<Signature> for Box<[u8]> {
     fn from(signature: Signature) -> Box<[u8]> {
-        signature.inner.to_bytes_be().into_boxed_slice()
+        uint_to_be_pad(signature.inner, signature.len)
+            .expect("RSASSA-PKCS1-v1_5 length invariants should've been enforced")
+            .into_boxed_slice()
     }
 }
 
