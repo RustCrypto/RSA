@@ -16,7 +16,7 @@ use signature::{
 };
 use zeroize::ZeroizeOnDrop;
 
-/// Signing key for PKCS#1 v1.5 signatures as described in [RFC8017 § 8.2].
+/// Signing key for `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
 ///
 /// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 #[derive(Debug, Clone)]
