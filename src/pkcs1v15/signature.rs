@@ -8,7 +8,7 @@ use alloc::{boxed::Box, string::ToString};
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use num_bigint::BigUint;
 
-/// PKCS#1 v1.5 signatures as described in [RFC8017 § 8.2].
+/// `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
 ///
 /// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 #[derive(Clone, PartialEq, Eq)]

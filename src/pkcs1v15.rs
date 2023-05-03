@@ -56,7 +56,7 @@ impl PaddingScheme for Pkcs1v15Encrypt {
     }
 }
 
-/// Digital signatures using PKCS#1 v1.5 padding.
+/// `RSASSA-PKCS1-v1_5`: digital signatures using PKCS#1 v1.5 padding.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Pkcs1v15Sign {
     /// Length of hash to use.
