@@ -3,6 +3,10 @@ pub use ::signature::{
     DigestSigner, DigestVerifier, Error, Keypair, RandomizedDigestSigner, RandomizedSigner, Result,
     SignatureEncoding, Signer, Verifier,
 };
+use spki::{
+    der::{asn1::BitString, Result as DerResult},
+    SignatureBitStringEncoding,
+};
 
 use crate::algorithms::pad::uint_to_be_pad;
 use alloc::{boxed::Box, string::ToString};
@@ -20,6 +24,12 @@ pub struct Signature {
 
 impl SignatureEncoding for Signature {
     type Repr = Box<[u8]>;
+}
+
+impl SignatureBitStringEncoding for Signature {
+    fn to_bitstring(&self) -> DerResult<BitString> {
+        BitString::new(0, self.to_vec())
+    }
 }
 
 impl TryFrom<&[u8]> for Signature {
