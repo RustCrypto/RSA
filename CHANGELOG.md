@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.1 (2023-05-03)
+### Fixed
+- Left pad signatures when encoding ([#325])
+
+[#325]: https://github.com/RustCrypto/RSA/pull/325
+
 ## 0.9.0 (2023-04-27)
 ### Added
 - Function to get salt length from RSA PSS keys ([#277])

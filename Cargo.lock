@@ -512,7 +512,7 @@ checksum = "f162c6dd7b008981e4d40210aca20b4bd0f9b60ca9271061b07f78537722f2e1"
 
 [[package]]
 name = "rsa"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "base64ct",
  "byteorder",
