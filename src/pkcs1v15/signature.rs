@@ -61,13 +61,19 @@ impl Debug for Signature {
 
 impl LowerHex for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:x}", &self.inner)
+        for byte in self.to_bytes().iter() {
+            write!(f, "{:02x}", byte)?;
+        }
+        Ok(())
     }
 }
 
 impl UpperHex for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        write!(f, "{:X}", &self.inner)
+        for byte in self.to_bytes().iter() {
+            write!(f, "{:02X}", byte)?;
+        }
+        Ok(())
     }
 }
 
