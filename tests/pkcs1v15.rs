@@ -1,12 +1,51 @@
-use rsa::pkcs1v15::Signature;
+use pkcs8::DecodePrivateKey;
+use signature::Signer;
+
+use rsa::pkcs1v15::SigningKey;
+use rsa::RsaPrivateKey;
+
+const RSA_PRIV_PEM: &str = r#"-----BEGIN PRIVATE KEY-----
+MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCxfecMGXkCgfz9
+ECLQlvTEYToty+m+RjFJufAp2ZvfL+jLNZKjqNvyRHbmvFZG24vFL0IkN6/e3k/H
+grTZoBJAdZ/sNtzNCiW7VHyTv4g6r9qi3rxmh7EDgqjN/HJb+EIMzskQqBipjrPV
+YiwBW8xRhwSfR4Drc7Oo++4kcDNi5he/+V6dyBszeDZaBSFEWCJaySgV5KUaOKIr
+tm1S+Gq0PMnf4ffixmyvM7COGxYY54Ij8j9ardhDYzO5MTsYV+5xkW8mbKRKFDgB
+VUzH6Pubp/k2j35fSA1ESw3WSLEEUaQz0oya5oWP3OqthMXTASWHdCyXOijTN/5K
+M7AVfR+BAgMBAAECggEAAfVEnkKNrjRm6RfLeoefzabQ8H5mZr35fzm4541KBe1O
+YSeHJZ0QSBzvPt5nCUMUyKkbzrB6lTfYo3fSrO/yI5nomL+GMhDhl6537V1YkGUu
+QUu5wlvO3R4M5LDbRh54BBIn77IbC4vSehEqMR2lJGUb7PHp/y74lW2qE+bU+ktQ
+ziTSSkk6vHh0xi1J+LXsl/OQVzokyLlK3hw9gpmKjv5MdbzmfaBfN0calZQEIbUY
+5jwv7bQV8yifbGl6elSnrM+aZ1y70RcvpafDW3Cy0XEXgetvE6iVlHQq9i5SWQDn
+daiRTeZB5+x4gv7sem73t7v2IVcoxw+DRoX29IV9DQKBgQC+ikg8HhlVEPkKeY6M
+2gxy2DFfi9t1NS5S4nkEtXuafIFEFtGvnEfxqIFDPjf/EqazBMWxyecXOy3QB5I/
+m5xUVeixl6s4QbGp0yIJ4Up9WW1iCJwke16qR5sM+HBPHyyn8QJrJLvahFQWSUL8
+0R4qWsMtrQz/M5EdHvM2CST51wKBgQDueAmASr2jL+I6K4GA8OIP3S6EoTvRDFDq
+la7ZRPMFI/ReeDSr8IBOiT1Gec9dOu4X8dI0YEMosObueyCdXpbGjqL/yGwGeVXm
+wbTZqsKElR2S7Sy2oGcAL2kKTaJgAnGoJQ+GNYZxnrLPn5aYudm4torNlzgY521m
+SlNte7j2ZwKBgD1pjnyp6tpLHSmuIi7tvKNrYQZ9ql8to9+dFQpagBs70+IhRLZI
+NbwC5p7It/2jgk0i1aFHBQ+syEhLmGyd+BYKlnRfARWhvuSQo2Dx1zNtll7JjaII
+jWtupt/YV0J5NshuWqwz68QzcHK6bDfWItXd6RiYtR6v/S6YoiUhb2SDAoGAWMT+
+ZG9uIG0WvaisUJ9ax6UCSATtC2iWRnzp1Z9BB8zWjsQYd1jTqmiUEsQNWRsyvl8a
+bLzYwzD3Bhd3kJ1BazB1pNmqvM42F+xLsitKtaf8llELsAAN15fOdjNoGm1OedUx
+7jfGkE0PKxKxMLEeRxBMozODgmHD66wHWl4QAEkCgYBWmmPKfUbCj+LUW+fKp8fx
+PhyvmJOm9dVkmyGOr8c28DVJZFzK1WCWn6r/sc5gfbir8McWvoy5ztFT8nUQAGmw
+ZKxu535xdbIQdh+XwB03HqcrsJYPVSzHz2lV8X3DVZ9v0ckQrA3Akq6mlWZbs72A
+TAVCoLQUA76jqB4eLsvCNQ==
+-----END PRIVATE KEY-----"#;
 
 // simple but prevent regression - see https://github.com/RustCrypto/RSA/issues/329
+#[cfg(feature = "pem")]
 #[test]
 fn signature_stringify() {
-        let bytes: &[u8] = &[0x03u8, 0x0Fu8];
-        let signature = Signature::try_from(bytes).unwrap();
-        assert_eq!(format!("{}", signature), "030F");
-        assert_eq!(format!("{:x}", signature), "030f");
-        assert_eq!(format!("{:X}", signature), "030F");
-        assert_eq!(signature.to_string(), "030F");
+    let private_key = RsaPrivateKey::from_pkcs8_pem(RSA_PRIV_PEM).unwrap();
+    let signing_key = SigningKey::<sha2::Sha256>::new(private_key);
+
+    let bytes: &[u8] = &[160, 185, 22, 183, 47, 48, 187, 224, 87, 122, 90, 214];
+    let signature = signing_key.sign(bytes);
+
+    let expected = "08B9629B08389F05DFF3E4A0ED0A9902880A9D2F13F86655BB219C9449A4B42A3925F98F906C9C817CA5F3F15F58FB307AB37825DCA2E37AF5CEBE4A741A5C8EFC613AEFD1542513416BCF4AF886B424775C0C233B7675B669BC36D4D1E16986F0129580FA4A3F2BA592F047C0DD34209573A3A4AAC141766C90601B7B70D7B640A9C5918B419E0A1DB3421626C166489051C497C712739C97E378788B98ABE132844E2A2A476AE010B81A797DCCB4E6BB2E8304701DDE4867327EBB2C4B566EE158A0F76F08943B86CCE1DACF76A945BEE088670E4AFB4FA1BCB1DFFA336620A193791F318989AACFE49EDB0D8B4840B1711DF6E89AD093F8307EC8A05D0594";
+    assert_eq!(format!("{}", signature), expected);
+    assert_eq!(format!("{:x}", signature), expected.to_lowercase());
+    assert_eq!(format!("{:X}", signature), expected);
+    assert_eq!(signature.to_string(), expected);
 }
