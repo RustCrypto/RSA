@@ -19,7 +19,7 @@
 //!
 //! ## OAEP encryption
 //! ```
-//! use rsa::{RsaPrivateKey, RsaPublicKey, Oaep};
+//! use rsa::{RsaPrivateKey, RsaPublicKey, Oaep, sha2};
 //!
 //! let mut rng = rand::thread_rng();
 //!
