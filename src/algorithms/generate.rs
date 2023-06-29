@@ -104,6 +104,8 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore + ?Sized>(
             continue 'next;
         }
 
+        // NOTE: `mod_inverse` checks if `exp` evenly divides `totient` and returns `None` if so.
+        // This ensures that `exp` is not a factor of any `(prime - 1)`.
         if let Some(d) = exp.mod_inverse(totient) {
             n_final = n;
             d_final = d.to_biguint().unwrap();
