@@ -31,36 +31,6 @@ where
 
 impl<D> SigningKey<D>
 where
-    D: Digest,
-{
-    /// Create a new signing key from the give RSA private key with an empty prefix.
-    ///
-    /// ## Note: unprefixed signatures are uncommon
-    ///
-    /// In most cases you'll want to use [`SigningKey::new`].
-    pub fn new_unprefixed(key: RsaPrivateKey) -> Self {
-        Self {
-            inner: key,
-            prefix: Vec::new(),
-            phantom: Default::default(),
-        }
-    }
-
-    /// Generate a new signing key with an empty prefix.
-    pub fn random_unprefixed<R: CryptoRngCore + ?Sized>(
-        rng: &mut R,
-        bit_size: usize,
-    ) -> Result<Self> {
-        Ok(Self {
-            inner: RsaPrivateKey::new(rng, bit_size)?,
-            prefix: Vec::new(),
-            phantom: Default::default(),
-        })
-    }
-}
-
-impl<D> SigningKey<D>
-where
     D: Digest + AssociatedOid,
 {
     /// Create a new signing key with a prefix for the digest `D`.
@@ -94,6 +64,36 @@ where
         bit_size: usize,
     ) -> Result<Self> {
         Self::random(rng, bit_size)
+    }
+}
+
+impl<D> SigningKey<D>
+where
+    D: Digest,
+{
+    /// Create a new signing key from the give RSA private key with an empty prefix.
+    ///
+    /// ## Note: unprefixed signatures are uncommon
+    ///
+    /// In most cases you'll want to use [`SigningKey::new`].
+    pub fn new_unprefixed(key: RsaPrivateKey) -> Self {
+        Self {
+            inner: key,
+            prefix: Vec::new(),
+            phantom: Default::default(),
+        }
+    }
+
+    /// Generate a new signing key with an empty prefix.
+    pub fn random_unprefixed<R: CryptoRngCore + ?Sized>(
+        rng: &mut R,
+        bit_size: usize,
+    ) -> Result<Self> {
+        Ok(Self {
+            inner: RsaPrivateKey::new(rng, bit_size)?,
+            prefix: Vec::new(),
+            phantom: Default::default(),
+        })
     }
 }
 
@@ -239,6 +239,17 @@ where
             oid: D::OID,
             parameters: Some(AnyRef::NULL),
         };
+}
+
+impl<D> TryFrom<pkcs8::PrivateKeyInfo<'_>> for SigningKey<D>
+where
+    D: Digest + AssociatedOid,
+{
+    type Error = pkcs8::Error;
+
+    fn try_from(private_key_info: pkcs8::PrivateKeyInfo<'_>) -> pkcs8::Result<Self> {
+        RsaPrivateKey::try_from(private_key_info).map(Self::new)
+    }
 }
 
 impl<D> ZeroizeOnDrop for SigningKey<D> where D: Digest {}

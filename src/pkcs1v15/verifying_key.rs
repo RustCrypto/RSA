@@ -27,24 +27,6 @@ where
 
 impl<D> VerifyingKey<D>
 where
-    D: Digest,
-{
-    /// Create a new verifying key from an RSA public key with an empty prefix.
-    ///
-    /// ## Note: unprefixed signatures are uncommon
-    ///
-    /// In most cases you'll want to use [`VerifyingKey::new`] instead.
-    pub fn new_unprefixed(key: RsaPublicKey) -> Self {
-        Self {
-            inner: key,
-            prefix: Vec::new(),
-            phantom: Default::default(),
-        }
-    }
-}
-
-impl<D> VerifyingKey<D>
-where
     D: Digest + AssociatedOid,
 {
     /// Create a new verifying key with a prefix for the digest `D`.
@@ -60,6 +42,24 @@ where
     #[deprecated(since = "0.9.0", note = "use VerifyingKey::new instead")]
     pub fn new_with_prefix(key: RsaPublicKey) -> Self {
         Self::new(key)
+    }
+}
+
+impl<D> VerifyingKey<D>
+where
+    D: Digest,
+{
+    /// Create a new verifying key from an RSA public key with an empty prefix.
+    ///
+    /// ## Note: unprefixed signatures are uncommon
+    ///
+    /// In most cases you'll want to use [`VerifyingKey::new`] instead.
+    pub fn new_unprefixed(key: RsaPublicKey) -> Self {
+        Self {
+            inner: key,
+            prefix: Vec::new(),
+            phantom: Default::default(),
+        }
     }
 }
 
@@ -189,4 +189,15 @@ where
             oid: D::OID,
             parameters: Some(AnyRef::NULL),
         };
+}
+
+impl<D> TryFrom<pkcs8::SubjectPublicKeyInfoRef<'_>> for VerifyingKey<D>
+where
+    D: Digest + AssociatedOid,
+{
+    type Error = pkcs8::spki::Error;
+
+    fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> pkcs8::spki::Result<Self> {
+        RsaPublicKey::try_from(spki).map(Self::new)
+    }
 }
