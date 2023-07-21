@@ -51,6 +51,7 @@ name = "key"
 
 [features]
 default = ["std", "pem", "u64_digit"]
+hazmat = []
 getrandom = ["rand_core/getrandom"]
 nightly = ["num-bigint/nightly"]
 serde = ["dep:serde", "num-bigint/serde"]
@@ -60,7 +61,7 @@ u64_digit = ["num-bigint/u64_digit"]
 std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std", "signature/std"]
 
 [package.metadata.docs.rs]
-features = ["std", "pem", "serde", "sha2"]
+features = ["std", "pem", "serde", "hazmat", "sha2"]
 rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.dev]
