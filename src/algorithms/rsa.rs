@@ -17,7 +17,7 @@ pub(crate) fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> Result<Big
 }
 
 /// Performs raw RSA decryption with no padding, resulting in a plaintext `BigUint`.
-/// Peforms RSA blinding if an `Rng` is passed.
+/// Performs RSA blinding if an `Rng` is passed.
 /// WARNING! Raw RSA MUST NOT be used. Instead a proper padding or
 /// signature scheme should be used as implemented by the `rsa` crate.
 #[inline]
@@ -113,7 +113,7 @@ fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
 }
 
 /// Performs RSA decryption, resulting in a plaintext `BigUint`.
-/// Peforms RSA blinding if an `Rng` is passed.
+/// Performs RSA blinding if an `Rng` is passed.
 /// This will also check for errors in the CRT computation.
 /// WARNING! Raw RSA MUST NOT be used. Instead a proper padding or
 /// signature scheme should be used as implemented by the `rsa` crate.
