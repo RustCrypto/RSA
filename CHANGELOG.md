@@ -50,6 +50,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `PublicKey`/`PrivateKey` traits ([#300])
 - `Zeroize` impl on `RsaPrivateKey`; automatically zeroized on drop ([#311])
 - `Deref<Target=RsaPublicKey>` impl on `RsaPrivateKey`; use `AsRef` instead ([#317])
+- `expose-internals` feature and public access to all functions it gated ([#304])
 
 [#268]: https://github.com/RustCrypto/RSA/pull/268
 [#270]: https://github.com/RustCrypto/RSA/pull/270
