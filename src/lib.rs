@@ -246,3 +246,6 @@ pub use crate::{
     pss::Pss,
     traits::keys::CrtValue,
 };
+
+#[cfg(feature = "hazmat")]
+pub mod hazmat;

@@ -10,18 +10,27 @@ use zeroize::Zeroize;
 use crate::errors::{Error, Result};
 use crate::traits::{PrivateKeyParts, PublicKeyParts};
 
-/// Raw RSA encryption of m with the public key. No padding is performed.
+/// ⚠️ Raw RSA encryption of m with the public key. No padding is performed.
+///
+/// # ☢️️ WARNING: HAZARDOUS API ☢️
+///
+/// Use this function with great care! Raw RSA should never be used without an appropriate padding
+/// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
-pub(crate) fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> Result<BigUint> {
+pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> Result<BigUint> {
     Ok(m.modpow(key.e(), key.n()))
 }
 
-/// Performs raw RSA decryption with no padding, resulting in a plaintext `BigUint`.
-/// Peforms RSA blinding if an `Rng` is passed.
-/// WARNING! Raw RSA MUST NOT be used. Instead a proper padding or
-/// signature scheme should be used as implemented by the `rsa` crate.
+/// ⚠️ Performs raw RSA decryption with no padding or error checking.
+///
+/// Returns a plaintext `BigUint`. Performs RSA blinding if an `Rng` is passed.
+///
+/// # ☢️️ WARNING: HAZARDOUS API ☢️
+///
+/// Use this function with great care! Raw RSA should never be used without an appropriate padding
+/// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
-fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
+pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     mut rng: Option<&mut R>,
     priv_key: &impl PrivateKeyParts,
     c: &BigUint,
@@ -112,13 +121,17 @@ fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     }
 }
 
-/// Performs RSA decryption, resulting in a plaintext `BigUint`.
-/// Peforms RSA blinding if an `Rng` is passed.
-/// This will also check for errors in the CRT computation.
-/// WARNING! Raw RSA MUST NOT be used. Instead a proper padding or
-/// signature scheme should be used as implemented by the `rsa` crate.
+/// ⚠️ Performs raw RSA decryption with no padding.
+///
+/// Returns a plaintext `BigUint`. Performs RSA blinding if an `Rng` is passed.  This will also
+/// check for errors in the CRT computation.
+///
+/// # ☢️️ WARNING: HAZARDOUS API ☢️
+///
+/// Use this function with great care! Raw RSA should never be used without an appropriate padding
+/// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
-pub(crate) fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
+pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
     priv_key: &impl PrivateKeyParts,
     rng: Option<&mut R>,
     c: &BigUint,
