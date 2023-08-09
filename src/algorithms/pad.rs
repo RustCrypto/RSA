@@ -8,7 +8,7 @@ use crate::errors::{Error, Result};
 
 /// Returns a new vector of the given length, with 0s left padded.
 #[inline]
-fn left_pad(input: &[u8], padded_len: usize) -> Result<Vec<u8>> {
+pub(crate) fn left_pad(input: &[u8], padded_len: usize) -> Result<Vec<u8>> {
     if input.len() > padded_len {
         return Err(Error::InvalidPadLen);
     }

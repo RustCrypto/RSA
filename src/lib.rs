@@ -228,10 +228,12 @@ pub mod oaep;
 pub mod pkcs1v15;
 pub mod pss;
 pub mod traits;
+pub mod rsa_ext;
 
 mod dummy_rng;
 mod encoding;
 mod key;
+
 
 pub use pkcs1;
 pub use pkcs8;
