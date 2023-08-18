@@ -508,13 +508,11 @@ name = "rsa"
 version = "0.9.2"
 dependencies = [
  "base64ct",
- "byteorder",
  "const-oid",
  "digest",
  "hex-literal",
  "num-bigint-dig",
  "num-integer",
- "num-iter",
  "num-traits",
  "pkcs1",
  "pkcs8",
