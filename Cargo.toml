@@ -29,8 +29,7 @@ zeroize = { version = "1.5", features = ["alloc"] }
 # optional dependencies
 sha1 = { version = "0.10.5", optional = true, default-features = false, features = ["oid"] }
 sha2 = { version = "0.10.6", optional = true, default-features = false, features = ["oid"] }
-# Pin upper version of serde to work around https://github.com/serde-rs/serde/issues/2538
-serde = { version = "1.0.103, <1.0.172", optional = true, default-features = false, features = ["derive"] }
+serde = { version = "1.0.184", optional = true, default-features = false, features = ["derive"] }
 
 [dev-dependencies]
 base64ct = { version = "1", features = ["alloc"] }
