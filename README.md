@@ -72,6 +72,10 @@ only one minor finding which has since been addressed.
 
 See the [open security issues] on our issue tracker for other known problems.
 
+Notably the implementation of [modular exponentiation is not constant time],
+but timing variability is masked using random blinding, a commonly used
+technique.
+
 ## Minimum Supported Rust Version (MSRV)
 
 All crates in this repository support Rust 1.65 or higher.
@@ -112,3 +116,4 @@ dual licensed as above, without any additional terms or conditions.
 [RustCrypto]: https://github.com/RustCrypto/
 [audit]: https://www.opentech.fund/results/security-safety-audits/deltachat/
 [open security issues]: https://github.com/RustCrypto/RSA/issues?q=is%3Aissue+is%3Aopen+label%3Asecurity
+[modular exponentiation is not constant time]: https://github.com/RustCrypto/RSA/issues/19
