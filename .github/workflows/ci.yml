@@ -63,10 +63,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: RustCrypto/actions/cargo-cache@master
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: nightly
+      - uses: dtolnay/rust-toolchain@nightly
       - run: cargo update -Z minimal-versions
+      - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --release --features getrandom,serde,pkcs5
 
   nightly:
@@ -76,6 +75,6 @@ jobs:
       - uses: RustCrypto/actions/cargo-cache@master
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly
+          toolchain: nightly-2023-10-01
       - run: cargo test --release --features nightly
       - run: cargo build --benches
