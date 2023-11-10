@@ -3,7 +3,8 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use num_bigint::{BigInt, BigUint, IntoBigInt, IntoBigUint, ModInverse, RandBigInt, ToBigInt};
-use num_traits::{One, Signed, Zero};
+use num_integer::{sqrt, Integer};
+use num_traits::{FromPrimitive, One, Pow, Signed, Zero};
 use rand_core::CryptoRngCore;
 use zeroize::Zeroize;
 
@@ -195,60 +196,68 @@ fn unblind(key: &impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> BigUi
     (m * unblinder) % key.n()
 }
 
-/// TODO
-/// Probabilistic algorithm that given `d` returns `p` and `q`
+/// The following (deterministic) algorithm also recovers the prime factors `p` and `q` of a modulus `n`, given the
+/// public exponent `e` and private exponent `d`.
 pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint, BigUint)> {
-    const ITER_LIMIT: usize = 100;
-    use num_integer::Integer;
-    use rand_core::OsRng;
-    let one = BigUint::one();
+    // 1. Let a = (de – 1) × GCD(n – 1, de – 1).
+    let mut a = (d * e - BigUint::one()) * (n - BigUint::one()).gcd(&(d * e - BigUint::one()));
 
-    // decompose e·d - 1 in odd and even components: r·2^t
-    let mut r = (e * d) - &one;
-    if r.is_odd() {
+    // 2. Let m = floor(a /n) and r = a – m n, so that a = m n + r and 0 ≤ r < n.
+    let mut m = &a / n;
+    let mut r = &a - &m * n;
+
+    a.zeroize();
+    drop(a);
+
+    // 3. Let b = ( (n – r)/(m + 1) ) + 1; if b is not an integer or b2 ≤ 4n, then output an error indicator,
+    //    and exit without further processing.
+    let one = BigUint::one();
+    let mut modulus_check = (n - &r) % (&m + &one);
+    if !modulus_check.is_zero() {
+        modulus_check.zeroize();
+        m.zeroize();
+        r.zeroize();
         return Err(Error::InvalidArguments);
     }
-    let mut t = BigUint::zero();
-    while r.is_even() {
-        t += 1_u8;
-        r >>= 1;
+    let mut b = (n - &r) / (&m + &one) + &one;
+    m.zeroize();
+    drop(m);
+    r.zeroize();
+    drop(r);
+
+    let four = BigUint::from_u8(4).unwrap();
+    let mut four_n = n * &four;
+    let two = BigUint::from_u8(2).unwrap();
+    let mut b_squared = b.pow(2u32);
+    if b_squared <= four_n {
+        b.zeroize();
+        four_n.zeroize();
+        return Err(Error::InvalidArguments);
     }
+    let mut b_squared_minus_four_n: BigUint = &b_squared - &four_n;
+    four_n.zeroize();
+    drop(four_n);
+    b_squared.zeroize();
+    drop(b_squared);
+    // 4. Let ϒ be the positive square root of b2 – 4n; if ϒ is not an integer,
+    //    then output an error indicator, and exit without further processing.
+    let mut y = sqrt(b_squared_minus_four_n.clone());
 
-    let n_min1 = n - &one;
-    let two = 2_u8.into();
-
-    for _ in 0..ITER_LIMIT {
-        let mut g = OsRng.gen_biguint_range(&two, &n);
-        let q = n.gcd(&g);
-        if !q.is_one() {
-            // if we are so lucky, we already found a factor.
-            return Ok((g, q));
-        }
-
-        g = g.modpow(&r, &n);
-        if g.is_one() || g == n_min1 {
-            continue;
-        }
-
-        let mut count = BigUint::one();
-        while count < t {
-            let g_next = g.modpow(&two, n);
-            if g_next.is_one() {
-                // x^2 - 1 = (x-1)(x+1) = 0 (mod n)  then   n | (x-1)(x+1)
-                let g = (g - &one) % n;
-                let p = n.gcd(&g);
-                let q = n / &p;
-                std::println!("count: {}", count);
-                return Ok((p, q));
-            } else if g_next == n_min1 {
-                continue;
-            }
-            g = g_next;
-            count += &one;
-        }
+    let mut y_squared = y.pow(2u32);
+    let sqrt_is_whole_number = y_squared == b_squared_minus_four_n;
+    y_squared.zeroize();
+    b_squared_minus_four_n.zeroize();
+    if !sqrt_is_whole_number {
+        b.zeroize();
+        y.zeroize();
+        return Err(Error::InvalidArguments);
     }
+    let p = (&b + &y) / &two;
+    let q = (&b - &y) / two;
+    b.zeroize();
+    y.zeroize();
 
-    Err(Error::InvalidArguments)
+    Ok((p, q))
 }
 
 #[cfg(test)]
