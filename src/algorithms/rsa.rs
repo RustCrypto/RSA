@@ -205,11 +205,9 @@ pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint,
     // 2. Let m = floor(a /n) and r = a – m n, so that a = m n + r and 0 ≤ r < n.
     let mut m = &a / n;
     let mut r = &a - &m * n;
-
     a.zeroize();
-    drop(a);
 
-    // 3. Let b = ( (n – r)/(m + 1) ) + 1; if b is not an integer or b2 ≤ 4n, then output an error indicator,
+    // 3. Let b = ( (n – r)/(m + 1) ) + 1; if b is not an integer or b^2 ≤ 4n, then output an error indicator,
     //    and exit without further processing.
     let one = BigUint::one();
     let mut modulus_check = (n - &r) % (&m + &one);
@@ -221,9 +219,7 @@ pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint,
     }
     let mut b = (n - &r) / (&m + &one) + &one;
     m.zeroize();
-    drop(m);
     r.zeroize();
-    drop(r);
 
     let four = BigUint::from_u8(4).unwrap();
     let mut four_n = n * &four;
@@ -232,14 +228,14 @@ pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint,
     if b_squared <= four_n {
         b.zeroize();
         four_n.zeroize();
+        b_squared.zeroize();
         return Err(Error::InvalidArguments);
     }
     let mut b_squared_minus_four_n: BigUint = &b_squared - &four_n;
     four_n.zeroize();
-    drop(four_n);
     b_squared.zeroize();
-    drop(b_squared);
-    // 4. Let ϒ be the positive square root of b2 – 4n; if ϒ is not an integer,
+
+    // 4. Let ϒ be the positive square root of b^2 – 4n; if ϒ is not an integer,
     //    then output an error indicator, and exit without further processing.
     let mut y = sqrt(b_squared_minus_four_n.clone());
 
