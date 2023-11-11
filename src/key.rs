@@ -236,6 +236,7 @@ impl RsaPrivateKey {
         d: BigUint,
         mut primes: Vec<BigUint>,
     ) -> Result<RsaPrivateKey> {
+        let mut should_validate = false;
         if primes.len() < 2 {
             if !primes.is_empty() {
                 return Err(Error::NprimesTooSmall);
@@ -245,6 +246,7 @@ impl RsaPrivateKey {
             let (p, q) = recover_primes(&n, &e, &d)?;
             primes.push(p);
             primes.push(q);
+            should_validate = true;
         }
 
         let mut k = RsaPrivateKey {
@@ -253,6 +255,11 @@ impl RsaPrivateKey {
             primes,
             precomputed: None,
         };
+
+        // Validate the key if we had to recover the primes.
+        if should_validate {
+            k.validate()?;
+        }
 
         // precompute when possible, ignore error otherwise.
         let _ = k.precompute();
