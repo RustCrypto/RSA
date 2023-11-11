@@ -210,7 +210,6 @@ pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint,
 
     // 3. Let b = ( (n – r)/(m + 1) ) + 1; if b is not an integer or b^2 ≤ 4n, then output an error indicator,
     //    and exit without further processing.
-
     let modulus_check = Zeroizing::new((n - &*r) % (&*m + &one));
     if !modulus_check.is_zero() {
         return Err(Error::InvalidArguments);
