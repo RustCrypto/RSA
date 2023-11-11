@@ -200,10 +200,9 @@ fn unblind(key: &impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> BigUi
 /// public exponent `e` and private exponent `d` using the method described in
 /// [NIST 800-56B Appendix C.2](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf).
 pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint, BigUint)> {
+    let one = BigUint::one();
     // 1. Let a = (de – 1) × GCD(n – 1, de – 1).
-    let a = Zeroizing::new(
-        (d * e - BigUint::one()) * (n - BigUint::one()).gcd(&(d * e - BigUint::one())),
-    );
+    let a = Zeroizing::new((d * e - &one) * (n - &one).gcd(&(d * e - &one)));
 
     // 2. Let m = floor(a /n) and r = a – m n, so that a = m n + r and 0 ≤ r < n.
     let m = Zeroizing::new(&*a / n);
@@ -211,7 +210,7 @@ pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint,
 
     // 3. Let b = ( (n – r)/(m + 1) ) + 1; if b is not an integer or b^2 ≤ 4n, then output an error indicator,
     //    and exit without further processing.
-    let one = BigUint::one();
+
     let modulus_check = Zeroizing::new((n - &*r) % (&*m + &one));
     if !modulus_check.is_zero() {
         return Err(Error::InvalidArguments);
@@ -219,7 +218,7 @@ pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint,
     let b = Zeroizing::new((n - &*r) / (&*m + &one) + one);
 
     let four = BigUint::from_u8(4).unwrap();
-    let four_n = Zeroizing::new(n * &four);
+    let four_n = Zeroizing::new(n * four);
     let two = BigUint::from_u8(2).unwrap();
     let b_squared = Zeroizing::new(b.pow(2u32));
     if *b_squared <= *four_n {
