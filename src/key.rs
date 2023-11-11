@@ -241,7 +241,7 @@ impl RsaPrivateKey {
                 return Err(Error::NprimesTooSmall);
             }
             // Recover `p` and `q` from `d`.
-            // See method in Appendix C: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br1.pdf
+            // See method in Appendix C.2: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf
             let (p, q) = recover_primes(&n, &e, &d)?;
             primes.push(p);
             primes.push(q);

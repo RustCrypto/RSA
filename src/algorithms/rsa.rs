@@ -197,7 +197,8 @@ fn unblind(key: &impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> BigUi
 }
 
 /// The following (deterministic) algorithm also recovers the prime factors `p` and `q` of a modulus `n`, given the
-/// public exponent `e` and private exponent `d`.
+/// public exponent `e` and private exponent `d` using the method described in
+/// [NIST 800-56B Appendix C.2](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf).
 pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint, BigUint)> {
     // 1. Let a = (de – 1) × GCD(n – 1, de – 1).
     let mut a = (d * e - BigUint::one()) * (n - BigUint::one()).gcd(&(d * e - BigUint::one()));
