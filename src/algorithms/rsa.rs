@@ -200,8 +200,14 @@ fn unblind(key: &impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> BigUi
 /// public exponent `e` and private exponent `d` using the method described in
 /// [NIST 800-56B Appendix C.2](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf).
 pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint, BigUint)> {
-    let one = BigUint::one();
+    // Check precondition
+    let two = BigUint::from_u8(2).unwrap();
+    if e <= &two.pow(16u32) || e >= &two.pow(256u32) {
+        return Err(Error::InvalidArguments);
+    }
+
     // 1. Let a = (de – 1) × GCD(n – 1, de – 1).
+    let one = BigUint::one();
     let a = Zeroizing::new((d * e - &one) * (n - &one).gcd(&(d * e - &one)));
 
     // 2. Let m = floor(a /n) and r = a – m n, so that a = m n + r and 0 ≤ r < n.
@@ -218,7 +224,6 @@ pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint,
 
     let four = BigUint::from_u8(4).unwrap();
     let four_n = Zeroizing::new(n * four);
-    let two = BigUint::from_u8(2).unwrap();
     let b_squared = Zeroizing::new(b.pow(2u32));
     if *b_squared <= *four_n {
         return Err(Error::InvalidArguments);
