@@ -6,7 +6,7 @@ use num_bigint::{BigInt, BigUint, IntoBigInt, IntoBigUint, ModInverse, RandBigIn
 use num_integer::{sqrt, Integer};
 use num_traits::{FromPrimitive, One, Pow, Signed, Zero};
 use rand_core::CryptoRngCore;
-use zeroize::Zeroize;
+use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::{Error, Result};
 use crate::traits::{PrivateKeyParts, PublicKeyParts};
@@ -201,58 +201,43 @@ fn unblind(key: &impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> BigUi
 /// [NIST 800-56B Appendix C.2](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf).
 pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint, BigUint)> {
     // 1. Let a = (de – 1) × GCD(n – 1, de – 1).
-    let mut a = (d * e - BigUint::one()) * (n - BigUint::one()).gcd(&(d * e - BigUint::one()));
+    let a = Zeroizing::new(
+        (d * e - BigUint::one()) * (n - BigUint::one()).gcd(&(d * e - BigUint::one())),
+    );
 
     // 2. Let m = floor(a /n) and r = a – m n, so that a = m n + r and 0 ≤ r < n.
-    let mut m = &a / n;
-    let mut r = &a - &m * n;
-    a.zeroize();
+    let m = Zeroizing::new(&*a / n);
+    let r = Zeroizing::new(&*a - &*m * n);
 
     // 3. Let b = ( (n – r)/(m + 1) ) + 1; if b is not an integer or b^2 ≤ 4n, then output an error indicator,
     //    and exit without further processing.
     let one = BigUint::one();
-    let mut modulus_check = (n - &r) % (&m + &one);
+    let modulus_check = Zeroizing::new((n - &*r) % (&*m + &one));
     if !modulus_check.is_zero() {
-        modulus_check.zeroize();
-        m.zeroize();
-        r.zeroize();
         return Err(Error::InvalidArguments);
     }
-    let mut b = (n - &r) / (&m + &one) + &one;
-    m.zeroize();
-    r.zeroize();
+    let b = Zeroizing::new((n - &*r) / (&*m + &one) + one);
 
     let four = BigUint::from_u8(4).unwrap();
-    let mut four_n = n * &four;
+    let four_n = Zeroizing::new(n * &four);
     let two = BigUint::from_u8(2).unwrap();
-    let mut b_squared = b.pow(2u32);
-    if b_squared <= four_n {
-        b.zeroize();
-        four_n.zeroize();
-        b_squared.zeroize();
+    let b_squared = Zeroizing::new(b.pow(2u32));
+    if *b_squared <= *four_n {
         return Err(Error::InvalidArguments);
     }
-    let mut b_squared_minus_four_n: BigUint = &b_squared - &four_n;
-    four_n.zeroize();
-    b_squared.zeroize();
+    let b_squared_minus_four_n = Zeroizing::new(&*b_squared - &*four_n);
 
     // 4. Let ϒ be the positive square root of b^2 – 4n; if ϒ is not an integer,
     //    then output an error indicator, and exit without further processing.
-    let mut y = sqrt(b_squared_minus_four_n.clone());
+    let y = Zeroizing::new(sqrt((*b_squared_minus_four_n).clone()));
 
-    let mut y_squared = y.pow(2u32);
+    let y_squared = Zeroizing::new(y.pow(2u32));
     let sqrt_is_whole_number = y_squared == b_squared_minus_four_n;
-    y_squared.zeroize();
-    b_squared_minus_four_n.zeroize();
     if !sqrt_is_whole_number {
-        b.zeroize();
-        y.zeroize();
         return Err(Error::InvalidArguments);
     }
-    let p = (&b + &y) / &two;
-    let q = (&b - &y) / two;
-    b.zeroize();
-    y.zeroize();
+    let p = (&*b + &*y) / &two;
+    let q = (&*b - &*y) / two;
 
     Ok((p, q))
 }
