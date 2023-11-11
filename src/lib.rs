@@ -18,8 +18,12 @@
 //! # Usage
 //!
 //! ## OAEP encryption
-//! ```
-//! use rsa::{RsaPrivateKey, RsaPublicKey, Oaep};
+//!
+//! Note: requires `sha2` feature of `rsa` crate is enabled.
+//!
+#![cfg_attr(feature = "sha2", doc = "```")]
+#![cfg_attr(not(feature = "sha2"), doc = "```ignore")]
+//! use rsa::{RsaPrivateKey, RsaPublicKey, Oaep, sha2::Sha256};
 //!
 //! let mut rng = rand::thread_rng();
 //!
@@ -29,12 +33,12 @@
 //!
 //! // Encrypt
 //! let data = b"hello world";
-//! let padding = Oaep::new::<sha2::Sha256>();
+//! let padding = Oaep::new::<Sha256>();
 //! let enc_data = public_key.encrypt(&mut rng, padding, &data[..]).expect("failed to encrypt");
 //! assert_ne!(&data[..], &enc_data[..]);
 //!
 //! // Decrypt
-//! let padding = Oaep::new::<sha2::Sha256>();
+//! let padding = Oaep::new::<Sha256>();
 //! let dec_data = private_key.decrypt(padding, &enc_data).expect("failed to decrypt");
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
