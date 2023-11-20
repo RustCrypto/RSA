@@ -1,6 +1,6 @@
 [package]
 name = "rsa"
-version = "0.9.3"
+version = "0.9.4"
 authors = ["RustCrypto Developers", "dignifiedquire <dignifiedquire@gmail.com>"]
 edition = "2021"
 description = "Pure Rust RSA implementation"
@@ -22,7 +22,7 @@ subtle = { version = "2.1.1", default-features = false }
 digest = { version = "0.10.5", default-features = false, features = ["alloc", "oid"] }
 pkcs1 = { version = "0.7.5", default-features = false, features = ["alloc", "pkcs8"] }
 pkcs8 = { version = "0.10.2", default-features = false, features = ["alloc"] }
-signature = { version = "2", default-features = false , features = ["alloc", "digest", "rand_core"] }
+signature = { version = ">2.0, <2.3", default-features = false , features = ["alloc", "digest", "rand_core"] }
 spki = { version = "0.7.2", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
 
