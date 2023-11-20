@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.4 (2023-11-20)
+### Added
+- Deterministic implementation of prime factors recovery ([#380])
+
+[#380]: https://github.com/RustCrypto/RSA/pull/380
+
 ## 0.9.3 (2023-10-26)
 ### Added
 - PKCS#8/SPKI decoding trait impls for `pkcs1v15` keys ([#346])

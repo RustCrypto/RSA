@@ -229,7 +229,19 @@ impl RsaPrivateKey {
         RsaPrivateKey::from_components(components.n, components.e, components.d, components.primes)
     }
 
-    /// Constructs an RSA key pair from the individual components.
+    /// Constructs an RSA key pair from individual components:
+    ///
+    /// - `n`: RSA modulus
+    /// - `e`: public exponent (i.e. encrypting exponent)
+    /// - `d`: private exponent (i.e. decrypting exponent)
+    /// - `primes`: prime factors of `n`: typically two primes `p` and `q`. More than two primes can
+    ///   be provided for multiprime RSA, however this is generally not recommended. If no `primes`
+    ///   are provided, a prime factor recovery algorithm will be employed to attempt to recover the
+    ///   factors (as described in [NIST SP 800-56B Revision 2] Appendix C.2). This algorithm only
+    ///   works if there are just two prime factors `p` and `q` (as opposed to multiprime), and `e`
+    ///   is between 2^16 and 2^256.
+    ///
+    ///  [NIST SP 800-56B Revision 2]: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf
     pub fn from_components(
         n: BigUint,
         e: BigUint,
