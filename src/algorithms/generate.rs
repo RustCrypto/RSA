@@ -1,14 +1,16 @@
 //! Generate prime components for the RSA Private Key
 
 use alloc::vec::Vec;
-use num_bigint::traits::ModInverse;
 use num_bigint::{BigUint, RandPrime};
 #[allow(unused_imports)]
 use num_traits::Float;
-use num_traits::{One, Zero};
+use num_traits::Zero;
 use rand_core::CryptoRngCore;
 
-use crate::errors::{Error, Result};
+use crate::{
+    algorithms::rsa::{compute_modulus, compute_private_exponent_euler_totient},
+    errors::{Error, Result},
+};
 
 pub struct RsaPrivateKeyComponents {
     pub n: BigUint,
@@ -89,13 +91,7 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore + ?Sized>(
             }
         }
 
-        let mut n = BigUint::one();
-        let mut totient = BigUint::one();
-
-        for prime in &primes {
-            n *= prime;
-            totient *= prime - BigUint::one();
-        }
+        let n = compute_modulus(&primes);
 
         if n.bits() != bit_size {
             // This should never happen for nprimes == 2 because
@@ -104,11 +100,9 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore + ?Sized>(
             continue 'next;
         }
 
-        // NOTE: `mod_inverse` checks if `exp` evenly divides `totient` and returns `None` if so.
-        // This ensures that `exp` is not a factor of any `(prime - 1)`.
-        if let Some(d) = exp.mod_inverse(totient) {
+        if let Ok(d) = compute_private_exponent_euler_totient(&primes, exp) {
             n_final = n;
-            d_final = d.to_biguint().unwrap();
+            d_final = d;
             break;
         }
     }

@@ -245,6 +245,64 @@ pub fn recover_primes(n: &BigUint, e: &BigUint, d: &BigUint) -> Result<(BigUint,
     Ok((p, q))
 }
 
+/// Compute the modulus of a key from its primes.
+pub(crate) fn compute_modulus(primes: &[BigUint]) -> BigUint {
+    primes.iter().product()
+}
+
+/// Compute the private exponent from its primes (p and q) and public exponent
+/// This uses Euler's totient function
+#[inline]
+pub(crate) fn compute_private_exponent_euler_totient(
+    primes: &[BigUint],
+    exp: &BigUint,
+) -> Result<BigUint> {
+    if primes.len() < 2 {
+        return Err(Error::InvalidPrime);
+    }
+
+    let mut totient = BigUint::one();
+
+    for prime in primes {
+        totient *= prime - BigUint::one();
+    }
+
+    // NOTE: `mod_inverse` checks if `exp` evenly divides `totient` and returns `None` if so.
+    // This ensures that `exp` is not a factor of any `(prime - 1)`.
+    if let Some(d) = exp.mod_inverse(totient) {
+        Ok(d.to_biguint().unwrap())
+    } else {
+        // `exp` evenly divides `totient`
+        Err(Error::InvalidPrime)
+    }
+}
+
+/// Compute the private exponent from its primes (p and q) and public exponent
+///
+/// This is using the method defined by
+/// [NIST 800-56B Section 6.2.1](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf#page=47).
+/// (Carmichael function)
+///
+/// FIPS 186-4 **requires** the private exponent to be less than λ(n), which would
+/// make Euler's totiem unreliable.
+#[inline]
+pub(crate) fn compute_private_exponent_carmicheal(
+    p: &BigUint,
+    q: &BigUint,
+    exp: &BigUint,
+) -> Result<BigUint> {
+    let p1 = p - BigUint::one();
+    let q1 = q - BigUint::one();
+
+    let lcm = p1.lcm(&q1);
+    if let Some(d) = exp.mod_inverse(lcm) {
+        Ok(d.to_biguint().unwrap())
+    } else {
+        // `exp` evenly divides `lcm`
+        Err(Error::InvalidPrime)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use num_traits::FromPrimitive;
