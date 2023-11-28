@@ -227,6 +227,15 @@ fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputR
     )
 }
 
+/// Returns the [`AlgorithmIdentifierOwned`] associated with PSS signature using a given digest.
+pub fn get_default_pss_signature_algo_id<D>() -> pkcs8::spki::Result<AlgorithmIdentifierOwned>
+where
+    D: Digest + AssociatedOid,
+{
+    let salt_len: u8 = <D as Digest>::output_size() as u8;
+    get_pss_signature_algo_id::<D>(salt_len)
+}
+
 fn get_pss_signature_algo_id<D>(salt_len: u8) -> pkcs8::spki::Result<AlgorithmIdentifierOwned>
 where
     D: Digest + AssociatedOid,
