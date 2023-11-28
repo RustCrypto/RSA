@@ -11,7 +11,10 @@ use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::algorithms::generate::generate_multi_prime_key_with_exp;
-use crate::algorithms::rsa::recover_primes;
+use crate::algorithms::rsa::{
+    compute_modulus, compute_private_exponent_carmicheal, compute_private_exponent_euler_totient,
+    recover_primes,
+};
 
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
@@ -279,6 +282,46 @@ impl RsaPrivateKey {
         Ok(k)
     }
 
+    /// Constructs an RSA key pair from its two primes p and q.
+    ///
+    /// This will rebuild the private exponent and the modulus.
+    ///
+    /// Private exponent will be rebuilt using the method defined in
+    /// [NIST 800-56B Section 6.2.1](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf#page=47).
+    pub fn from_p_q(p: BigUint, q: BigUint, public_exponent: BigUint) -> Result<RsaPrivateKey> {
+        if p == q {
+            return Err(Error::InvalidPrime);
+        }
+
+        let n = compute_modulus(&[p.clone(), q.clone()]);
+        let d = compute_private_exponent_carmicheal(&p, &q, &public_exponent)?;
+
+        Self::from_components(n, public_exponent, d, vec![p, q])
+    }
+
+    /// Constructs an RSA key pair from its primes.
+    ///
+    /// This will rebuild the private exponent and the modulus.
+    pub fn from_primes(primes: Vec<BigUint>, public_exponent: BigUint) -> Result<RsaPrivateKey> {
+        if primes.len() < 2 {
+            return Err(Error::NprimesTooSmall);
+        }
+
+        // Makes sure that primes is pairwise unequal.
+        for (i, prime1) in primes.iter().enumerate() {
+            for prime2 in primes.iter().take(i) {
+                if prime1 == prime2 {
+                    return Err(Error::InvalidPrime);
+                }
+            }
+        }
+
+        let n = compute_modulus(&primes);
+        let d = compute_private_exponent_euler_totient(&primes, &public_exponent)?;
+
+        Self::from_components(n, public_exponent, d, primes)
+    }
+
     /// Get the public key from the private key, cloning `n` and `e`.
     ///
     /// Generally this is not needed since `RsaPrivateKey` implements the `PublicKey` trait,
@@ -495,6 +538,7 @@ mod tests {
 
     use hex_literal::hex;
     use num_traits::{FromPrimitive, ToPrimitive};
+    use pkcs8::DecodePrivateKey;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 
     #[test]
@@ -752,5 +796,48 @@ mod tests {
             RsaPublicKey::new(n, e).err().unwrap(),
             Error::ModulusTooLarge
         );
+    }
+
+    #[test]
+    fn build_key_from_primes() {
+        const RSA_2048_PRIV_DER: &[u8] = include_bytes!("../tests/examples/pkcs8/rsa2048-priv.der");
+        let ref_key = RsaPrivateKey::from_pkcs8_der(RSA_2048_PRIV_DER).unwrap();
+        assert_eq!(ref_key.validate(), Ok(()));
+
+        let primes = ref_key.primes().to_vec();
+
+        let exp = ref_key.e().clone();
+        let key =
+            RsaPrivateKey::from_primes(primes, exp).expect("failed to import key from primes");
+        assert_eq!(key.validate(), Ok(()));
+
+        assert_eq!(key.n(), ref_key.n());
+
+        assert_eq!(key.dp(), ref_key.dp());
+        assert_eq!(key.dq(), ref_key.dq());
+
+        assert_eq!(key.d(), ref_key.d());
+    }
+
+    #[test]
+    fn build_key_from_p_q() {
+        const RSA_2048_SP800_PRIV_DER: &[u8] =
+            include_bytes!("../tests/examples/pkcs8/rsa2048-sp800-56b-priv.der");
+        let ref_key = RsaPrivateKey::from_pkcs8_der(RSA_2048_SP800_PRIV_DER).unwrap();
+        assert_eq!(ref_key.validate(), Ok(()));
+
+        let primes = ref_key.primes().to_vec();
+        let exp = ref_key.e().clone();
+
+        let key = RsaPrivateKey::from_p_q(primes[0].clone(), primes[1].clone(), exp)
+            .expect("failed to import key from primes");
+        assert_eq!(key.validate(), Ok(()));
+
+        assert_eq!(key.n(), ref_key.n());
+
+        assert_eq!(key.dp(), ref_key.dp());
+        assert_eq!(key.dq(), ref_key.dq());
+
+        assert_eq!(key.d(), ref_key.d());
     }
 }
