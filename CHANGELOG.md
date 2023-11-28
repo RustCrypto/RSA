@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.5 (2023-11-27)
+### Added
+- Adds `RsaPrivateKey::from_primes` and `RsaPrivateKey::from_p_q` methods ([#386])
+
+[#386]: https://github.com/RustCrypto/RSA/pull/386
+
 ## 0.9.4 (2023-11-20)
 ### Added
 - Deterministic implementation of prime factors recovery ([#380])
