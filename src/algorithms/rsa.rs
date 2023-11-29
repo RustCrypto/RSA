@@ -7,7 +7,6 @@ use num_bigint::{BigUint, IntoBigInt, IntoBigUint, ModInverse, ToBigInt};
 use num_integer::{sqrt, Integer};
 use num_traits::{FromPrimitive, One, Pow, Signed, Zero as _};
 use rand_core::CryptoRngCore;
-use subtle::CtOption;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::{Error, Result};
@@ -129,10 +128,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
 
             to_uint_exact(m.into_biguint().expect("failed to decrypt"), nbits)
         }
-        _ => {
-            let c = reduce(&c, n_params.clone());
-            c.pow(&d).retrieve()
-        }
+        _ => pow(&c, &d, &n_params),
     };
 
     match ir {
@@ -185,35 +181,30 @@ fn blind<R: CryptoRngCore, K: PublicKeyPartsNew>(
     // which equals mr mod n. The factor of r can then be removed
     // by multiplying by the multiplicative inverse of r.
 
-    let mut r: BoxedUint;
-    let mut ir: CtOption<BoxedUint>;
-    let unblinder;
-    loop {
-        // TODO: use constant time gen
+    let mut r: BoxedUint = BoxedUint::one();
+    let mut ir: Option<BoxedUint> = None;
+    while ir.is_none() {
         r = BoxedUint::random_mod(rng, key.n());
-        // TODO: correct mapping
         if r.is_zero().into() {
             r = BoxedUint::one();
         }
-        ir = r.inv_mod(key.n());
-
-        // TODO: constant time?
-        if let Some(ir) = ir.into() {
-            unblinder = ir;
-            break;
-        }
+        ir = r.inv_mod(key.n()).into();
     }
 
     let c = {
-        let r = reduce(&r, n_params.clone());
-        let mut rpowe = r.pow(key.e()).retrieve();
+        let mut rpowe = pow(&r, key.e(), n_params);
         let c = mul_mod_params(c, &rpowe, n_params.clone());
         rpowe.zeroize();
 
         c
     };
 
-    (c, unblinder)
+    (c, ir.unwrap())
+}
+
+fn pow(base: &BoxedUint, exp: &BoxedUint, n_params: &BoxedResidueParams) -> BoxedUint {
+    let base = reduce(&base, n_params.clone());
+    base.pow(exp).retrieve()
 }
 
 /// Computes `lhs.mul_mod(rhs, n)` with precomputed `n_param`.
