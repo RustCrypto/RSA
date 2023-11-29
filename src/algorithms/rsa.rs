@@ -125,10 +125,12 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
             primes.clear();
             c.zeroize();
             m2.zeroize();
-
             to_uint_exact(m.into_biguint().expect("failed to decrypt"), nbits)
         }
-        _ => pow(&c, &d, &n_params),
+        _ => {
+            // c^d (mod n)
+            pow_mod_params(&c, &d, n_params.clone())
+        }
     };
 
     match ir {
@@ -157,6 +159,8 @@ pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
     c: &BigUint,
 ) -> Result<BigUint> {
     let m = rsa_decrypt(rng, priv_key, c)?;
+    let m2 = rsa_decrypt::<R>(None, priv_key, c)?;
+    assert_eq!(m, m2);
 
     // In order to defend against errors in the CRT computation, m^e is
     // calculated, which should match the original ciphertext.
@@ -180,6 +184,7 @@ fn blind<R: CryptoRngCore, K: PublicKeyPartsNew>(
     // Then the decryption operation performs (m^e * r^e)^d mod n
     // which equals mr mod n. The factor of r can then be removed
     // by multiplying by the multiplicative inverse of r.
+    debug_assert_eq!(&key.n().clone().get(), n_params.modulus());
 
     let mut r: BoxedUint = BoxedUint::one();
     let mut ir: Option<BoxedUint> = None;
@@ -188,36 +193,42 @@ fn blind<R: CryptoRngCore, K: PublicKeyPartsNew>(
         if r.is_zero().into() {
             r = BoxedUint::one();
         }
+
+        // r^-1 (mod n)
         ir = r.inv_mod(key.n()).into();
     }
 
-    let c = {
-        let mut rpowe = pow(&r, key.e(), n_params);
+    let blinded = {
+        // r^e (mod n)
+        let mut rpowe = pow_mod_params(&r, key.e(), n_params.clone());
+        // c * r^e (mod n)
         let c = mul_mod_params(c, &rpowe, n_params.clone());
         rpowe.zeroize();
 
         c
     };
 
-    (c, ir.unwrap())
+    (blinded, ir.unwrap())
 }
 
-fn pow(base: &BoxedUint, exp: &BoxedUint, n_params: &BoxedResidueParams) -> BoxedUint {
-    let base = reduce(&base, n_params.clone());
+/// Given an m and and unblinding factor, unblind the m.
+fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: BoxedResidueParams) -> BoxedUint {
+    // m * r^-1 (mod n)
+    mul_mod_params(m, unblinder, n_params)
+}
+
+/// Computes `base.pow_mod(exp, n)` with precomputed `n_params`.
+fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: BoxedResidueParams) -> BoxedUint {
+    let base = reduce(&base, n_params);
     base.pow(exp).retrieve()
 }
 
-/// Computes `lhs.mul_mod(rhs, n)` with precomputed `n_param`.
+/// Computes `lhs.mul_mod(rhs, n)` with precomputed `n_params`.
 fn mul_mod_params(lhs: &BoxedUint, rhs: &BoxedUint, n_params: BoxedResidueParams) -> BoxedUint {
     // TODO: nicer api in crypto-bigint?
     let lhs = BoxedResidue::new(lhs, n_params.clone());
     let rhs = BoxedResidue::new(rhs, n_params);
     (lhs * rhs).retrieve()
-}
-
-/// Given an m and and unblinding factor, unblind the m.
-fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: BoxedResidueParams) -> BoxedUint {
-    mul_mod_params(m, unblinder, n_params)
 }
 
 /// The following (deterministic) algorithm also recovers the prime factors `p` and `q` of a modulus `n`, given the
