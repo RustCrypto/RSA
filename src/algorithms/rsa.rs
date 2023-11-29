@@ -1,7 +1,7 @@
 //! Generic RSA implementation
 
 use alloc::vec::Vec;
-use crypto_bigint::modular::BoxedResidueParams;
+use crypto_bigint::modular::{BoxedResidue, BoxedResidueParams};
 use crypto_bigint::{BoxedUint, RandomMod};
 use num_bigint::{BigUint, IntoBigInt, IntoBigUint, ModInverse, ToBigInt};
 use num_integer::{sqrt, Integer};
@@ -11,7 +11,7 @@ use subtle::CtOption;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::{Error, Result};
-use crate::key::{reduce, to_biguint, to_uint};
+use crate::key::{reduce, to_biguint, to_uint_exact};
 use crate::traits::keys::{PrivateKeyPartsNew, PublicKeyPartsNew};
 use crate::traits::PublicKeyParts;
 
@@ -40,10 +40,12 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     priv_key: &impl PrivateKeyPartsNew,
     c_orig: &BigUint,
 ) -> Result<BigUint> {
-    // convert to crypto bigint
-    let c = to_uint(c_orig.clone());
     let n = priv_key.n();
+    let nbits = n.bits_precision();
+    let c = to_uint_exact(c_orig.clone(), nbits);
     let d = priv_key.d();
+
+    std::dbg!(nbits, d.bits_precision(), c.bits_precision());
 
     if c >= **n {
         return Err(Error::Decryption);
@@ -124,10 +126,10 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
             c.zeroize();
             m2.zeroize();
 
-            to_uint(m.into_biguint().expect("failed to decrypt"))
+            to_uint_exact(m.into_biguint().expect("failed to decrypt"), nbits)
         }
         _ => {
-            let c = reduce(&c, n_params);
+            let c = reduce(&c, n_params.clone());
             c.pow(&d).retrieve()
         }
     };
@@ -135,7 +137,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     match ir {
         Some(ref ir) => {
             // unblind
-            let res = to_biguint(&unblind(priv_key, &m, ir));
+            let res = to_biguint(&unblind(&m, ir, n_params));
             Ok(res)
         }
         None => Ok(to_biguint(&m)),
@@ -204,7 +206,7 @@ fn blind<R: CryptoRngCore, K: PublicKeyPartsNew>(
     let c = {
         let r = reduce(&r, n_params.clone());
         let mut rpowe = r.pow(key.e()).retrieve();
-        let c = c.mul_mod(&rpowe, key.n());
+        let c = mul_mod_params(c, &rpowe, n_params.clone());
         rpowe.zeroize();
 
         c
@@ -213,9 +215,17 @@ fn blind<R: CryptoRngCore, K: PublicKeyPartsNew>(
     (c, unblinder)
 }
 
+/// Computes `lhs.mul_mod(rhs, n)` with precomputed `n_param`.
+fn mul_mod_params(lhs: &BoxedUint, rhs: &BoxedUint, n_params: BoxedResidueParams) -> BoxedUint {
+    // TODO: nicer api in crypto-bigint?
+    let lhs = BoxedResidue::new(lhs, n_params.clone());
+    let rhs = BoxedResidue::new(rhs, n_params);
+    (lhs * rhs).retrieve()
+}
+
 /// Given an m and and unblinding factor, unblind the m.
-fn unblind(key: &impl PublicKeyPartsNew, m: &BoxedUint, unblinder: &BoxedUint) -> BoxedUint {
-    m.mul_mod(unblinder, key.n())
+fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: BoxedResidueParams) -> BoxedUint {
+    mul_mod_params(m, unblinder, n_params)
 }
 
 /// The following (deterministic) algorithm also recovers the prime factors `p` and `q` of a modulus `n`, given the
