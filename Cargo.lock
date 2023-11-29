@@ -20,6 +20,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d468802bab17cbc0cc575e9b053f41e72aa36bfa6b7f55e3529ffa43161b97fa"
 
 [[package]]
+name = "base16ct"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
+
+[[package]]
 name = "base64ct"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -114,6 +120,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce420fe07aecd3e67c5f910618fe65e94158f6dcc0adf44e00d69ce2bdfe0fd0"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "crypto-bigint"
+version = "0.6.0-pre.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b60cb3dc0bfcdf8199b7eabd5df62f7b7af001c7da89b89eba17ebf3fea01638"
+dependencies = [
+ "rand_core",
+ "serdect",
+ "subtle",
+ "zeroize",
 ]
 
 [[package]]
@@ -469,6 +487,7 @@ version = "0.9.5"
 dependencies = [
  "base64ct",
  "const-oid",
+ "crypto-bigint",
  "digest",
  "hex-literal",
  "num-bigint-dig",
@@ -563,6 +582,16 @@ version = "1.0.176"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5a2f49ace1498612d14f7e0b8245519584db8299541dfe31a06374a828d620ab"
 dependencies = [
+ "serde",
+]
+
+[[package]]
+name = "serdect"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
+dependencies = [
+ "base16ct",
  "serde",
 ]
 

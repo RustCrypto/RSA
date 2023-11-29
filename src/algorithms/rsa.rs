@@ -1,11 +1,16 @@
 //! Generic RSA implementation
 
+use core::cmp::Ordering;
+
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
+use crypto_bigint::modular::{BoxedResidue, BoxedResidueParams};
+use crypto_bigint::{BoxedUint, Limb, NonZero, Zero};
 use num_bigint::{BigInt, BigUint, IntoBigInt, IntoBigUint, ModInverse, RandBigInt, ToBigInt};
 use num_integer::{sqrt, Integer};
-use num_traits::{FromPrimitive, One, Pow, Signed, Zero};
+use num_traits::{FromPrimitive, One, Pow, Signed, Zero as _};
 use rand_core::CryptoRngCore;
+use subtle::CtOption;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::{Error, Result};
@@ -138,6 +143,24 @@ pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
     c: &BigUint,
 ) -> Result<BigUint> {
     let m = rsa_decrypt(rng, priv_key, c)?;
+
+    // In order to defend against errors in the CRT computation, m^e is
+    // calculated, which should match the original ciphertext.
+    let check = rsa_encrypt(priv_key, &m)?;
+
+    if c != &check {
+        return Err(Error::Internal);
+    }
+
+    Ok(m)
+}
+
+pub fn rsa_decrypt_and_check_new<R: CryptoRngCore + ?Sized>(
+    priv_key: &impl PrivateKeyParts,
+    rng: Option<&mut R>,
+    c: &BigUint,
+) -> Result<BigUint> {
+    let m = rsa_decrypt_new(rng, priv_key, c)?;
 
     // In order to defend against errors in the CRT computation, m^e is
     // calculated, which should match the original ciphertext.
@@ -300,6 +323,123 @@ pub(crate) fn compute_private_exponent_carmicheal(
     } else {
         // `exp` evenly divides `lcm`
         Err(Error::InvalidPrime)
+    }
+}
+
+fn to_biguint(uint: &BoxedUint) -> BigUint {
+    BigUint::from_bytes_be(&uint.to_be_bytes())
+}
+
+fn to_uint(big_uint: BigUint) -> BoxedUint {
+    let bytes = big_uint.to_bytes_be();
+    let pad_count = Limb::BYTES - (bytes.len() % Limb::BYTES);
+    let mut padded_bytes = vec![0u8; pad_count];
+    padded_bytes.extend_from_slice(&bytes);
+    BoxedUint::from_be_slice(&padded_bytes, padded_bytes.len() * 8).unwrap()
+}
+
+fn blind_new<R: CryptoRngCore, K: PublicKeyParts>(
+    rng: &mut R,
+    key: &K,
+    c: &BoxedUint,
+) -> (BoxedUint, BoxedUint) {
+    let n = NonZero::new(to_uint(key.n().clone())).unwrap();
+    let mut r: BoxedUint;
+    let mut ir: CtOption<BoxedUint>;
+    let unblinder;
+    loop {
+        r = todo!(); // BoxedUint::random_mod(&mut rng, &n);
+        if r.is_zero().into() {
+            r = BoxedUint::one();
+        }
+        ir = r.inv_mod(&n);
+
+        // TODO: constant time?
+        if let Some(ir) = ir.into() {
+            unblinder = ir;
+            break;
+        }
+    }
+
+    let n_params = BoxedResidueParams::new(n.get()).unwrap();
+    let e = to_uint(key.e().clone());
+    let c = {
+        let r = reduce(&r, n_params);
+        let rpowe = r.pow(&e).retrieve();
+
+        let c = c.wrapping_mul(&rpowe);
+        let c = c.rem_vartime(&n);
+
+        rpowe.zeroize();
+
+        c
+    };
+
+    (c, unblinder)
+}
+
+fn unblind_new(key: &impl PublicKeyParts, m: &BoxedUint, unblinder: &BoxedUint) -> BoxedUint {
+    let n = to_uint(key.n().clone());
+    let n = NonZero::new(n).expect("should have been checked before");
+    let a = m.wrapping_mul(unblinder);
+    a.rem_vartime(&n)
+}
+
+fn reduce(n: &BoxedUint, p: BoxedResidueParams) -> BoxedResidue {
+    let bits_precision = p.modulus().bits_precision();
+    let modulus = NonZero::new(p.modulus().clone()).unwrap();
+
+    let n = match n.bits_precision().cmp(&bits_precision) {
+        Ordering::Less => n.widen(bits_precision),
+        Ordering::Equal => n.clone(),
+        Ordering::Greater => n.shorten(bits_precision),
+    };
+
+    let n_reduced = n.rem_vartime(&modulus).widen(p.bits_precision());
+    BoxedResidue::new(&n_reduced, p)
+}
+
+pub fn rsa_decrypt_new<R: CryptoRngCore + ?Sized>(
+    mut rng: Option<&mut R>,
+    priv_key: &impl PrivateKeyParts,
+    c: &BigUint,
+) -> Result<BigUint> {
+    // convert to crypto bigint
+    let c = to_uint(c.clone());
+    let n = to_uint(priv_key.n().clone());
+    let d = to_uint(priv_key.d().clone());
+
+    if c >= n {
+        return Err(Error::Decryption);
+    }
+
+    // TODO: is this fine?
+    if n.is_zero().into() {
+        return Err(Error::Decryption);
+    }
+
+    let mut ir = None;
+
+    let c = if let Some(ref mut rng) = rng {
+        let (blinded, unblinder) = blind_new(rng, priv_key, &c);
+        ir = Some(unblinder);
+        blinded
+    } else {
+        c
+    };
+
+    // TODO: fast path with precalculated values;
+    let n_params = BoxedResidueParams::new(n).unwrap();
+    let c = reduce(&c, n_params);
+    let m = c.pow(&d).retrieve();
+
+    match ir {
+        Some(ref ir) => {
+            // unblind
+            let m = unblind_new(priv_key, &m, ir);
+            Ok(to_biguint(&m))
+        }
+        None => Ok(to_biguint(&m)),
     }
 }
 
