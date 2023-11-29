@@ -223,7 +223,7 @@ fn verify(
     sig: &BigUint,
     sig_len: usize,
 ) -> Result<()> {
-    if sig >= pub_key.n() || sig_len != pub_key.size() {
+    if sig >= &pub_key.n() || sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
 

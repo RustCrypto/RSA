@@ -4,6 +4,7 @@
 //! `pkcs1` crate's traits for types which impl the `pkcs8` crate's traits.
 
 use crate::{
+    key::to_biguint,
     traits::{PrivateKeyParts, PublicKeyParts},
     BigUint, RsaPrivateKey, RsaPublicKey,
 };
@@ -72,10 +73,12 @@ impl EncodePrivateKey for RsaPrivateKey {
         let modulus = self.n().to_bytes_be();
         let public_exponent = self.e().to_bytes_be();
         let private_exponent = Zeroizing::new(self.d().to_bytes_be());
-        let prime1 = Zeroizing::new(self.primes[0].to_bytes_be());
-        let prime2 = Zeroizing::new(self.primes[1].to_bytes_be());
-        let exponent1 = Zeroizing::new((self.d() % (&self.primes[0] - 1u8)).to_bytes_be());
-        let exponent2 = Zeroizing::new((self.d() % (&self.primes[1] - 1u8)).to_bytes_be());
+        let prime1 = Zeroizing::new(to_biguint(&self.primes[0]).to_bytes_be());
+        let prime2 = Zeroizing::new(to_biguint(&self.primes[1]).to_bytes_be());
+        let exponent1 =
+            Zeroizing::new((self.d() % (&to_biguint(&self.primes[0]) - 1u8)).to_bytes_be());
+        let exponent2 =
+            Zeroizing::new((self.d() % (&to_biguint(&self.primes[1]) - 1u8)).to_bytes_be());
         let coefficient = Zeroizing::new(
             self.crt_coefficient()
                 .ok_or(pkcs1::Error::Crypto)?

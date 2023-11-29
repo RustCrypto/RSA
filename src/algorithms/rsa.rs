@@ -1,11 +1,9 @@
 //! Generic RSA implementation
 
-use core::cmp::Ordering;
-
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
-use crypto_bigint::modular::{BoxedResidue, BoxedResidueParams};
-use crypto_bigint::{BoxedUint, Limb, NonZero, Zero};
+use crypto_bigint::modular::BoxedResidueParams;
+use crypto_bigint::{BoxedUint, NonZero, Zero};
 use num_bigint::{BigInt, BigUint, IntoBigInt, IntoBigUint, ModInverse, RandBigInt, ToBigInt};
 use num_integer::{sqrt, Integer};
 use num_traits::{FromPrimitive, One, Pow, Signed, Zero as _};
@@ -14,6 +12,8 @@ use subtle::CtOption;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::{Error, Result};
+use crate::key::{reduce, to_biguint, to_uint};
+use crate::traits::keys::{PrivateKeyPartsNew, PublicKeyPartsNew};
 use crate::traits::{PrivateKeyParts, PublicKeyParts};
 
 /// ⚠️ Raw RSA encryption of m with the public key. No padding is performed.
@@ -24,7 +24,7 @@ use crate::traits::{PrivateKeyParts, PublicKeyParts};
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
 pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> Result<BigUint> {
-    Ok(m.modpow(key.e(), key.n()))
+    Ok(m.modpow(&key.e(), &key.n()))
 }
 
 /// ⚠️ Performs raw RSA decryption with no padding or error checking.
@@ -41,7 +41,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     priv_key: &impl PrivateKeyParts,
     c: &BigUint,
 ) -> Result<BigUint> {
-    if c >= priv_key.n() {
+    if c >= &priv_key.n() {
         return Err(Error::Decryption);
     }
 
@@ -71,8 +71,8 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
             let p = &priv_key.primes()[0];
             let q = &priv_key.primes()[1];
 
-            let mut m = c.modpow(dp, p).into_bigint().unwrap();
-            let mut m2 = c.modpow(dq, q).into_bigint().unwrap();
+            let mut m = c.modpow(&dp, p).into_bigint().unwrap();
+            let mut m2 = c.modpow(&dq, q).into_bigint().unwrap();
 
             m -= &m2;
 
@@ -115,7 +115,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
 
             m.into_biguint().expect("failed to decrypt")
         }
-        _ => c.modpow(priv_key.d(), priv_key.n()),
+        _ => c.modpow(&priv_key.d(), &priv_key.n()),
     };
 
     match ir {
@@ -156,7 +156,7 @@ pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
 }
 
 pub fn rsa_decrypt_and_check_new<R: CryptoRngCore + ?Sized>(
-    priv_key: &impl PrivateKeyParts,
+    priv_key: &impl PrivateKeyPartsNew,
     rng: Option<&mut R>,
     c: &BigUint,
 ) -> Result<BigUint> {
@@ -188,7 +188,7 @@ fn blind<R: CryptoRngCore, K: PublicKeyParts>(
     let mut ir: Option<BigInt>;
     let unblinder;
     loop {
-        r = rng.gen_biguint_below(key.n());
+        r = rng.gen_biguint_below(&key.n());
         if r.is_zero() {
             r = BigUint::one();
         }
@@ -202,7 +202,7 @@ fn blind<R: CryptoRngCore, K: PublicKeyParts>(
     }
 
     let c = {
-        let mut rpowe = r.modpow(key.e(), key.n()); // N != 0
+        let mut rpowe = r.modpow(&key.e(), &key.n()); // N != 0
         let mut c = c * &rpowe;
         c %= key.n();
 
@@ -326,18 +326,6 @@ pub(crate) fn compute_private_exponent_carmicheal(
     }
 }
 
-fn to_biguint(uint: &BoxedUint) -> BigUint {
-    BigUint::from_bytes_be(&uint.to_be_bytes())
-}
-
-fn to_uint(big_uint: BigUint) -> BoxedUint {
-    let bytes = big_uint.to_bytes_be();
-    let pad_count = Limb::BYTES - (bytes.len() % Limb::BYTES);
-    let mut padded_bytes = vec![0u8; pad_count];
-    padded_bytes.extend_from_slice(&bytes);
-    BoxedUint::from_be_slice(&padded_bytes, padded_bytes.len() * 8).unwrap()
-}
-
 fn blind_new<R: CryptoRngCore, K: PublicKeyParts>(
     rng: &mut R,
     key: &K,
@@ -378,38 +366,23 @@ fn blind_new<R: CryptoRngCore, K: PublicKeyParts>(
     (c, unblinder)
 }
 
-fn unblind_new(key: &impl PublicKeyParts, m: &BoxedUint, unblinder: &BoxedUint) -> BoxedUint {
-    let n = to_uint(key.n().clone());
-    let n = NonZero::new(n).expect("should have been checked before");
+fn unblind_new(key: &impl PublicKeyPartsNew, m: &BoxedUint, unblinder: &BoxedUint) -> BoxedUint {
+    let n = key.n();
     let a = m.wrapping_mul(unblinder);
     a.rem_vartime(&n)
 }
 
-fn reduce(n: &BoxedUint, p: BoxedResidueParams) -> BoxedResidue {
-    let bits_precision = p.modulus().bits_precision();
-    let modulus = NonZero::new(p.modulus().clone()).unwrap();
-
-    let n = match n.bits_precision().cmp(&bits_precision) {
-        Ordering::Less => n.widen(bits_precision),
-        Ordering::Equal => n.clone(),
-        Ordering::Greater => n.shorten(bits_precision),
-    };
-
-    let n_reduced = n.rem_vartime(&modulus).widen(p.bits_precision());
-    BoxedResidue::new(&n_reduced, p)
-}
-
 pub fn rsa_decrypt_new<R: CryptoRngCore + ?Sized>(
     mut rng: Option<&mut R>,
-    priv_key: &impl PrivateKeyParts,
+    priv_key: &impl PrivateKeyPartsNew,
     c: &BigUint,
 ) -> Result<BigUint> {
     // convert to crypto bigint
     let c = to_uint(c.clone());
-    let n = to_uint(priv_key.n().clone());
-    let d = to_uint(priv_key.d().clone());
+    let n = priv_key.n();
+    let d = priv_key.d();
 
-    if c >= n {
+    if c >= **n {
         return Err(Error::Decryption);
     }
 
@@ -429,7 +402,7 @@ pub fn rsa_decrypt_new<R: CryptoRngCore + ?Sized>(
     };
 
     // TODO: fast path with precalculated values;
-    let n_params = BoxedResidueParams::new(n).unwrap();
+    let n_params = BoxedResidueParams::new(n.clone().get()).unwrap();
     let c = reduce(&c, n_params);
     let m = c.pow(&d).retrieve();
 

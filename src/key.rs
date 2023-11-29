@@ -1,7 +1,9 @@
 use alloc::vec::Vec;
+use core::cmp::Ordering;
 use core::hash::{Hash, Hasher};
+use crypto_bigint::modular::{BoxedResidue, BoxedResidueParams};
+use crypto_bigint::{BoxedUint, Limb, NonZero};
 use num_bigint::traits::ModInverse;
-use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
 use num_integer::Integer;
 use num_traits::{FromPrimitive, One, ToPrimitive};
@@ -18,20 +20,30 @@ use crate::algorithms::rsa::{
 
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
+use crate::traits::keys::{CrtValueNew, PrivateKeyPartsNew, PublicKeyPartsNew};
 use crate::traits::{PaddingScheme, PrivateKeyParts, PublicKeyParts, SignatureScheme};
-use crate::CrtValue;
 
 /// Represents the public part of an RSA key.
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RsaPublicKey {
     /// Modulus: product of prime numbers `p` and `q`
-    n: BigUint,
+    n: NonZero<BoxedUint>,
     /// Public exponent: power to which a plaintext message is raised in
     /// order to encrypt it.
     ///
     /// Typically 0x10001 (65537)
-    e: BigUint,
+    e: BoxedUint,
+}
+
+// TODO: derive `Hash` impl when `BoxedUint` supports it
+impl Hash for RsaPublicKey {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // Domain separator for RSA private keys
+        state.write(b"RsaPublicKey");
+        Hash::hash(&self.n.as_words(), state);
+        Hash::hash(&self.e.as_words(), state);
+    }
 }
 
 /// Represents a whole RSA key, public and private parts.
@@ -41,9 +53,9 @@ pub struct RsaPrivateKey {
     /// Public components of the private key.
     pubkey_components: RsaPublicKey,
     /// Private exponent
-    pub(crate) d: BigUint,
+    pub(crate) d: BoxedUint,
     /// Prime factors of N, contains >= 2 elements.
-    pub(crate) primes: Vec<BigUint>,
+    pub(crate) primes: Vec<BoxedUint>,
     /// precomputed values to speed up private operations
     #[cfg_attr(feature = "serde", serde(skip))]
     pub(crate) precomputed: Option<PrecomputedValues>,
@@ -86,17 +98,17 @@ impl ZeroizeOnDrop for RsaPrivateKey {}
 #[derive(Debug, Clone)]
 pub(crate) struct PrecomputedValues {
     /// D mod (P-1)
-    pub(crate) dp: BigUint,
+    pub(crate) dp: BoxedUint,
     /// D mod (Q-1)
-    pub(crate) dq: BigUint,
+    pub(crate) dq: BoxedUint,
     /// Q^-1 mod P
-    pub(crate) qinv: BigInt,
+    pub(crate) qinv: BoxedUint,
 
     /// CRTValues is used for the 3rd and subsequent primes. Due to a
     /// historical accident, the CRT for the first two primes is handled
     /// differently in PKCS#1 and interoperability is sufficiently
     /// important that we mirror this.
-    pub(crate) crt_values: Vec<CrtValue>,
+    pub(crate) crt_values: Vec<CrtValueNew>,
 }
 
 impl Zeroize for PrecomputedValues {
@@ -125,18 +137,21 @@ impl From<RsaPrivateKey> for RsaPublicKey {
 
 impl From<&RsaPrivateKey> for RsaPublicKey {
     fn from(private_key: &RsaPrivateKey) -> Self {
-        let n = private_key.n().clone();
-        let e = private_key.e().clone();
-        RsaPublicKey { n, e }
+        let n = PublicKeyPartsNew::n(private_key);
+        let e = PublicKeyPartsNew::e(private_key);
+        RsaPublicKey {
+            n: n.clone(),
+            e: e.clone(),
+        }
     }
 }
 
-impl PublicKeyParts for RsaPublicKey {
-    fn n(&self) -> &BigUint {
+impl PublicKeyPartsNew for RsaPublicKey {
+    fn n(&self) -> &NonZero<BoxedUint> {
         &self.n
     }
 
-    fn e(&self) -> &BigUint {
+    fn e(&self) -> &BoxedUint {
         &self.e
     }
 }
@@ -183,7 +198,10 @@ impl RsaPublicKey {
 
     /// Create a new public key from its components.
     pub fn new_with_max_size(n: BigUint, e: BigUint, max_size: usize) -> Result<Self> {
-        let k = Self { n, e };
+        let k = Self {
+            n: NonZero::new(to_uint(n)).unwrap(),
+            e: to_uint(e),
+        };
         check_public_with_max_size(&k, max_size)?;
         Ok(k)
     }
@@ -195,16 +213,19 @@ impl RsaPublicKey {
     /// Most applications should use [`RsaPublicKey::new`] or
     /// [`RsaPublicKey::new_with_max_size`] instead.
     pub fn new_unchecked(n: BigUint, e: BigUint) -> Self {
-        Self { n, e }
+        Self {
+            n: NonZero::new(to_uint(n)).unwrap(),
+            e: to_uint(e),
+        }
     }
 }
 
-impl PublicKeyParts for RsaPrivateKey {
-    fn n(&self) -> &BigUint {
+impl PublicKeyPartsNew for RsaPrivateKey {
+    fn n(&self) -> &NonZero<BoxedUint> {
         &self.pubkey_components.n
     }
 
-    fn e(&self) -> &BigUint {
+    fn e(&self) -> &BoxedUint {
         &self.pubkey_components.e
     }
 }
@@ -252,6 +273,8 @@ impl RsaPrivateKey {
         mut primes: Vec<BigUint>,
     ) -> Result<RsaPrivateKey> {
         let mut should_validate = false;
+        let mut primes: Vec<_> = primes.into_iter().map(to_uint).collect();
+
         if primes.len() < 2 {
             if !primes.is_empty() {
                 return Err(Error::NprimesTooSmall);
@@ -259,14 +282,17 @@ impl RsaPrivateKey {
             // Recover `p` and `q` from `d`.
             // See method in Appendix C.2: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf
             let (p, q) = recover_primes(&n, &e, &d)?;
-            primes.push(p);
-            primes.push(q);
+            primes.push(to_uint(p));
+            primes.push(to_uint(q));
             should_validate = true;
         }
 
         let mut k = RsaPrivateKey {
-            pubkey_components: RsaPublicKey { n, e },
-            d,
+            pubkey_components: RsaPublicKey {
+                n: NonZero::new(to_uint(n)).unwrap(),
+                e: to_uint(e),
+            },
+            d: to_uint(d),
             primes,
             precomputed: None,
         };
@@ -335,25 +361,26 @@ impl RsaPrivateKey {
         if self.precomputed.is_some() {
             return Ok(());
         }
+        let d = to_biguint(&self.d);
+        let dp = &d % (&to_biguint(&self.primes[0]) - BigUint::one());
+        let dq = &d % (&to_biguint(&self.primes[1]) - BigUint::one());
+        let qinv = self.primes[1].inv_mod(&self.primes[0]);
+        if qinv.is_none().into() {
+            return Err(Error::InvalidPrime);
+        }
+        let qinv = qinv.unwrap();
 
-        let dp = &self.d % (&self.primes[0] - BigUint::one());
-        let dq = &self.d % (&self.primes[1] - BigUint::one());
-        let qinv = self.primes[1]
-            .clone()
-            .mod_inverse(&self.primes[0])
-            .ok_or(Error::InvalidPrime)?;
-
-        let mut r: BigUint = &self.primes[0] * &self.primes[1];
-        let crt_values: Vec<CrtValue> = {
+        let mut r: BigUint = &to_biguint(&self.primes[0]) * &to_biguint(&self.primes[1]);
+        let crt_values: Vec<CrtValueNew> = {
             let mut values = Vec::with_capacity(self.primes.len() - 2);
             for prime in &self.primes[2..] {
-                let res = CrtValue {
-                    exp: BigInt::from_biguint(Plus, &self.d % (prime - BigUint::one())),
-                    r: BigInt::from_biguint(Plus, r.clone()),
-                    coeff: BigInt::from_biguint(
-                        Plus,
+                let prime = to_biguint(prime);
+                let res = CrtValueNew {
+                    exp: to_uint(&d % (&prime - BigUint::one())),
+                    r: to_uint(r.clone()),
+                    coeff: to_uint(
                         r.clone()
-                            .mod_inverse(prime)
+                            .mod_inverse(&prime)
                             .ok_or(Error::InvalidCoefficient)?
                             .to_biguint()
                             .unwrap(),
@@ -367,8 +394,8 @@ impl RsaPrivateKey {
         };
 
         self.precomputed = Some(PrecomputedValues {
-            dp,
-            dq,
+            dp: to_uint(dp),
+            dq: to_uint(dq),
             qinv,
             crt_values,
         });
@@ -383,7 +410,9 @@ impl RsaPrivateKey {
 
     /// Compute CRT coefficient: `(1/q) mod p`.
     pub fn crt_coefficient(&self) -> Option<BigUint> {
-        (&self.primes[1]).mod_inverse(&self.primes[0])?.to_biguint()
+        (&to_biguint(&self.primes[1]))
+            .mod_inverse(&to_biguint(&self.primes[0]))?
+            .to_biguint()
     }
 
     /// Performs basic sanity checks on the key.
@@ -394,13 +423,14 @@ impl RsaPrivateKey {
         // Check that Πprimes == n.
         let mut m = BigUint::one();
         for prime in &self.primes {
+            let prime = to_biguint(&prime);
             // Any primes ≤ 1 will cause divide-by-zero panics later.
-            if *prime < BigUint::one() {
+            if prime < BigUint::one() {
                 return Err(Error::InvalidPrime);
             }
             m *= prime;
         }
-        if m != self.pubkey_components.n {
+        if m != to_biguint(&self.pubkey_components.n) {
             return Err(Error::InvalidModulus);
         }
 
@@ -409,9 +439,11 @@ impl RsaPrivateKey {
         // inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
         // exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
         // mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
-        let mut de = self.e().clone();
-        de *= self.d.clone();
+        let mut de = PublicKeyParts::e(self);
+        de *= PrivateKeyParts::d(self);
+
         for prime in &self.primes {
+            let prime = to_biguint(&prime);
             let congruence: BigUint = &de % (prime - BigUint::one());
             if !congruence.is_one() {
                 return Err(Error::InvalidExponent);
@@ -463,29 +495,28 @@ impl RsaPrivateKey {
     }
 }
 
-impl PrivateKeyParts for RsaPrivateKey {
-    fn d(&self) -> &BigUint {
+impl PrivateKeyPartsNew for RsaPrivateKey {
+    fn d(&self) -> &BoxedUint {
         &self.d
     }
 
-    fn primes(&self) -> &[BigUint] {
+    fn primes(&self) -> &[BoxedUint] {
         &self.primes
     }
 
-    fn dp(&self) -> Option<&BigUint> {
+    fn dp(&self) -> Option<&BoxedUint> {
         self.precomputed.as_ref().map(|p| &p.dp)
     }
 
-    fn dq(&self) -> Option<&BigUint> {
+    fn dq(&self) -> Option<&BoxedUint> {
         self.precomputed.as_ref().map(|p| &p.dq)
     }
 
-    fn qinv(&self) -> Option<&BigInt> {
+    fn qinv(&self) -> Option<&BoxedUint> {
         self.precomputed.as_ref().map(|p| &p.qinv)
     }
 
-    fn crt_values(&self) -> Option<&[CrtValue]> {
-        /* for some reason the standard self.precomputed.as_ref().map() doesn't work */
+    fn crt_values(&self) -> Option<&[CrtValueNew]> {
         if let Some(p) = &self.precomputed {
             Some(p.crt_values.as_slice())
         } else {
@@ -531,10 +562,37 @@ fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize)
     Ok(())
 }
 
+pub(crate) fn to_biguint(uint: &BoxedUint) -> BigUint {
+    BigUint::from_bytes_be(&uint.to_be_bytes())
+}
+
+pub(crate) fn to_uint(big_uint: BigUint) -> BoxedUint {
+    let bytes = big_uint.to_bytes_be();
+    let pad_count = Limb::BYTES - (bytes.len() % Limb::BYTES);
+    let mut padded_bytes = vec![0u8; pad_count];
+    padded_bytes.extend_from_slice(&bytes);
+    BoxedUint::from_be_slice(&padded_bytes, padded_bytes.len() * 8).unwrap()
+}
+
+pub(crate) fn reduce(n: &BoxedUint, p: BoxedResidueParams) -> BoxedResidue {
+    let bits_precision = p.modulus().bits_precision();
+    let modulus = NonZero::new(p.modulus().clone()).unwrap();
+
+    let n = match n.bits_precision().cmp(&bits_precision) {
+        Ordering::Less => n.widen(bits_precision),
+        Ordering::Equal => n.clone(),
+        Ordering::Greater => n.shorten(bits_precision),
+    };
+
+    let n_reduced = n.rem_vartime(&modulus).widen(p.bits_precision());
+    BoxedResidue::new(&n_reduced, p)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
+    use crate::traits::PublicKeyParts;
 
     use hex_literal::hex;
     use num_traits::{FromPrimitive, ToPrimitive};
@@ -545,24 +603,24 @@ mod tests {
     fn test_from_into() {
         let private_key = RsaPrivateKey {
             pubkey_components: RsaPublicKey {
-                n: BigUint::from_u64(100).unwrap(),
-                e: BigUint::from_u64(200).unwrap(),
+                n: NonZero::new(to_uint(BigUint::from_u64(100).unwrap())).unwrap(),
+                e: to_uint(BigUint::from_u64(200).unwrap()),
             },
-            d: BigUint::from_u64(123).unwrap(),
+            d: to_uint(BigUint::from_u64(123).unwrap()),
             primes: vec![],
             precomputed: None,
         };
         let public_key: RsaPublicKey = private_key.into();
 
-        assert_eq!(public_key.n().to_u64(), Some(100));
-        assert_eq!(public_key.e().to_u64(), Some(200));
+        assert_eq!(PublicKeyParts::n(&public_key).to_u64(), Some(100));
+        assert_eq!(PublicKeyParts::e(&public_key).to_u64(), Some(200));
     }
 
     fn test_key_basics(private_key: &RsaPrivateKey) {
         private_key.validate().expect("invalid private key");
 
         assert!(
-            private_key.d() < private_key.n(),
+            PrivateKeyParts::d(private_key) < PublicKeyParts::n(private_key),
             "private exponent too large"
         );
 
@@ -595,7 +653,7 @@ mod tests {
                         components.primes,
                     )
                     .unwrap();
-                    assert_eq!(private_key.n().bits(), $size);
+                    assert_eq!(PublicKeyParts::n(&private_key).bits(), $size);
 
                     test_key_basics(&private_key);
                 }
@@ -804,19 +862,19 @@ mod tests {
         let ref_key = RsaPrivateKey::from_pkcs8_der(RSA_2048_PRIV_DER).unwrap();
         assert_eq!(ref_key.validate(), Ok(()));
 
-        let primes = ref_key.primes().to_vec();
+        let primes = PrivateKeyParts::primes(&ref_key).to_vec();
 
-        let exp = ref_key.e().clone();
+        let exp = PublicKeyParts::e(&ref_key);
         let key =
             RsaPrivateKey::from_primes(primes, exp).expect("failed to import key from primes");
         assert_eq!(key.validate(), Ok(()));
 
-        assert_eq!(key.n(), ref_key.n());
+        assert_eq!(PublicKeyParts::n(&key), PublicKeyParts::n(&ref_key));
 
-        assert_eq!(key.dp(), ref_key.dp());
-        assert_eq!(key.dq(), ref_key.dq());
+        assert_eq!(PrivateKeyParts::dp(&key), PrivateKeyParts::dp(&ref_key));
+        assert_eq!(PrivateKeyParts::dq(&key), PrivateKeyParts::dq(&ref_key));
 
-        assert_eq!(key.d(), ref_key.d());
+        assert_eq!(PrivateKeyParts::d(&key), PrivateKeyParts::d(&ref_key));
     }
 
     #[test]
@@ -826,18 +884,18 @@ mod tests {
         let ref_key = RsaPrivateKey::from_pkcs8_der(RSA_2048_SP800_PRIV_DER).unwrap();
         assert_eq!(ref_key.validate(), Ok(()));
 
-        let primes = ref_key.primes().to_vec();
-        let exp = ref_key.e().clone();
+        let primes = PrivateKeyParts::primes(&ref_key).to_vec();
+        let exp = PublicKeyParts::e(&ref_key);
 
         let key = RsaPrivateKey::from_p_q(primes[0].clone(), primes[1].clone(), exp)
             .expect("failed to import key from primes");
         assert_eq!(key.validate(), Ok(()));
 
-        assert_eq!(key.n(), ref_key.n());
+        assert_eq!(PublicKeyParts::n(&key), PublicKeyParts::n(&ref_key));
 
-        assert_eq!(key.dp(), ref_key.dp());
-        assert_eq!(key.dq(), ref_key.dq());
+        assert_eq!(PrivateKeyParts::dp(&key), PrivateKeyParts::dp(&ref_key));
+        assert_eq!(PrivateKeyParts::dq(&key), PrivateKeyParts::dq(&ref_key));
 
-        assert_eq!(key.d(), ref_key.d());
+        assert_eq!(PrivateKeyParts::d(&key), PrivateKeyParts::d(&ref_key));
     }
 }
