@@ -330,6 +330,7 @@ fn blind_new<R: CryptoRngCore, K: PublicKeyParts>(
     rng: &mut R,
     key: &K,
     c: &BoxedUint,
+    n_params: &BoxedResidueParams,
 ) -> (BoxedUint, BoxedUint) {
     let n = NonZero::new(to_uint(key.n().clone())).unwrap();
     let mut r: BoxedUint;
@@ -349,10 +350,9 @@ fn blind_new<R: CryptoRngCore, K: PublicKeyParts>(
         }
     }
 
-    let n_params = BoxedResidueParams::new(n.get()).unwrap();
     let e = to_uint(key.e().clone());
     let c = {
-        let r = reduce(&r, n_params);
+        let r = reduce(&r, n_params.clone());
         let rpowe = r.pow(&e).retrieve();
 
         let c = c.wrapping_mul(&rpowe);
@@ -393,8 +393,13 @@ pub fn rsa_decrypt_new<R: CryptoRngCore + ?Sized>(
 
     let mut ir = None;
 
+    let n_params = priv_key
+        .residue_params()
+        .cloned()
+        .unwrap_or_else(|| BoxedResidueParams::new(n.clone().get()).unwrap());
+
     let c = if let Some(ref mut rng) = rng {
-        let (blinded, unblinder) = blind_new(rng, priv_key, &c);
+        let (blinded, unblinder) = blind_new(rng, priv_key, &c, &n_params);
         ir = Some(unblinder);
         blinded
     } else {
@@ -402,7 +407,6 @@ pub fn rsa_decrypt_new<R: CryptoRngCore + ?Sized>(
     };
 
     // TODO: fast path with precalculated values;
-    let n_params = BoxedResidueParams::new(n.clone().get()).unwrap();
     let c = reduce(&c, n_params);
     let m = c.pow(&d).retrieve();
 

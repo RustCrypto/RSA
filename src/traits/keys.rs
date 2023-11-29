@@ -2,7 +2,7 @@
 
 use alloc::vec::Vec;
 
-use crypto_bigint::{BoxedUint, NonZero};
+use crypto_bigint::{modular::BoxedResidueParams, BoxedUint, NonZero};
 use num_bigint::{BigInt, BigUint, IntoBigInt};
 use zeroize::Zeroize;
 
@@ -126,6 +126,8 @@ pub trait PrivateKeyPartsNew: PublicKeyPartsNew {
 
     /// Returns an iterator over the CRT Values
     fn crt_values(&self) -> Option<&[CrtValueNew]>;
+
+    fn residue_params(&self) -> Option<&BoxedResidueParams>;
 }
 
 /// Contains the precomputed Chinese remainder theorem values.

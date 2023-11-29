@@ -109,6 +109,8 @@ pub(crate) struct PrecomputedValues {
     /// differently in PKCS#1 and interoperability is sufficiently
     /// important that we mirror this.
     pub(crate) crt_values: Vec<CrtValueNew>,
+
+    pub(crate) residue_params: BoxedResidueParams,
 }
 
 impl Zeroize for PrecomputedValues {
@@ -393,11 +395,16 @@ impl RsaPrivateKey {
             values
         };
 
+        // TODO: how to handle error?
+        let residue_params =
+            BoxedResidueParams::new(self.pubkey_components.n.clone().get()).unwrap();
+
         self.precomputed = Some(PrecomputedValues {
             dp: to_uint(dp),
             dq: to_uint(dq),
             qinv,
             crt_values,
+            residue_params,
         });
 
         Ok(())
@@ -522,6 +529,10 @@ impl PrivateKeyPartsNew for RsaPrivateKey {
         } else {
             None
         }
+    }
+
+    fn residue_params(&self) -> Option<&BoxedResidueParams> {
+        self.precomputed.as_ref().map(|p| &p.residue_params)
     }
 }
 
