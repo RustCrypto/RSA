@@ -62,6 +62,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         .residue_params()
         .cloned()
         .unwrap_or_else(|| BoxedResidueParams::new(n.clone().get()).unwrap());
+
     let c = if let Some(ref mut rng) = rng {
         let (blinded, unblinder) = blind(rng, priv_key, &c, &n_params);
         ir = Some(unblinder);

@@ -229,7 +229,13 @@ fn needed_bits(n: &BigUint) -> usize {
     let n_bits = n.bits();
 
     // TODO: better algorithm/more sizes
-    if n_bits <= 512 {
+    if n_bits <= 64 {
+        64
+    } else if n_bits <= 128 {
+        128
+    } else if n_bits <= 256 {
+        256
+    } else if n_bits <= 512 {
         512
     } else if n_bits <= 1024 {
         1024
@@ -608,12 +614,7 @@ pub(crate) fn to_biguint(uint: &BoxedUint) -> BigUint {
 }
 
 pub(crate) fn to_uint_exact(big_uint: BigUint, nbits: usize) -> BoxedUint {
-    let bytes = big_uint.to_bytes_be();
-    let pad_count = Limb::BYTES - (bytes.len() % Limb::BYTES);
-    let mut padded_bytes = vec![0u8; pad_count];
-    padded_bytes.extend_from_slice(&bytes);
-
-    let res = BoxedUint::from_be_slice(&padded_bytes, padded_bytes.len() * 8).unwrap();
+    let res = inner_to_uint(big_uint);
 
     match res.bits_precision().cmp(&nbits) {
         Ordering::Equal => res,
@@ -622,17 +623,23 @@ pub(crate) fn to_uint_exact(big_uint: BigUint, nbits: usize) -> BoxedUint {
     }
 }
 
-pub(crate) fn to_uint(big_uint: BigUint) -> BoxedUint {
-    let nbits = needed_bits(&big_uint);
-
+fn inner_to_uint(big_uint: BigUint) -> BoxedUint {
     let bytes = big_uint.to_bytes_be();
-    let pad_count = Limb::BYTES - (bytes.len() % Limb::BYTES);
+    let rem = bytes.len() % Limb::BYTES;
+    let pad_count = if rem == 0 { 0 } else { Limb::BYTES - rem };
+
     let mut padded_bytes = vec![0u8; pad_count];
     padded_bytes.extend_from_slice(&bytes);
 
-    let res = BoxedUint::from_be_slice(&padded_bytes, padded_bytes.len() * 8).unwrap();
+    BoxedUint::from_be_slice(&padded_bytes, padded_bytes.len() * 8).unwrap()
+}
 
-    if res.bits() < nbits {
+pub(crate) fn to_uint(big_uint: BigUint) -> BoxedUint {
+    let nbits = needed_bits(&big_uint);
+
+    let res = inner_to_uint(big_uint);
+    std::dbg!(res.bits_precision(), nbits);
+    if res.bits_precision() < nbits {
         return res.widen(nbits);
     }
     res
@@ -667,10 +674,10 @@ mod tests {
     fn test_from_into() {
         let private_key = RsaPrivateKey {
             pubkey_components: RsaPublicKey {
-                n: NonZero::new(to_uint(BigUint::from_u64(100).unwrap()).widen(64)).unwrap(),
-                e: to_uint(BigUint::from_u64(200).unwrap()).widen(64),
+                n: NonZero::new(to_uint_exact(BigUint::from_u64(100).unwrap(), 64)).unwrap(),
+                e: to_uint_exact(BigUint::from_u64(200).unwrap(), 64),
             },
-            d: to_uint(BigUint::from_u64(123).unwrap()).widen(64),
+            d: to_uint_exact(BigUint::from_u64(123).unwrap(), 64),
             primes: vec![],
             precomputed: None,
         };
