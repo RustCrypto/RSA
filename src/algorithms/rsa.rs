@@ -1,10 +1,9 @@
 //! Generic RSA implementation
 
-use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use crypto_bigint::modular::BoxedResidueParams;
-use crypto_bigint::{BoxedUint, NonZero};
-use num_bigint::{BigInt, BigUint, IntoBigInt, IntoBigUint, ModInverse, RandBigInt, ToBigInt};
+use crypto_bigint::{BoxedUint, RandomMod};
+use num_bigint::{BigUint, IntoBigInt, IntoBigUint, ModInverse, ToBigInt};
 use num_integer::{sqrt, Integer};
 use num_traits::{FromPrimitive, One, Pow, Signed, Zero as _};
 use rand_core::CryptoRngCore;
@@ -14,7 +13,7 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::errors::{Error, Result};
 use crate::key::{reduce, to_biguint, to_uint};
 use crate::traits::keys::{PrivateKeyPartsNew, PublicKeyPartsNew};
-use crate::traits::{PrivateKeyParts, PublicKeyParts};
+use crate::traits::PublicKeyParts;
 
 /// ⚠️ Raw RSA encryption of m with the public key. No padding is performed.
 ///
@@ -38,25 +37,35 @@ pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> Result<BigUint> {
 #[inline]
 pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     mut rng: Option<&mut R>,
-    priv_key: &impl PrivateKeyParts,
-    c: &BigUint,
+    priv_key: &impl PrivateKeyPartsNew,
+    c_orig: &BigUint,
 ) -> Result<BigUint> {
-    if c >= &priv_key.n() {
+    // convert to crypto bigint
+    let c = to_uint(c_orig.clone());
+    let n = priv_key.n();
+    let d = priv_key.d();
+
+    if c >= **n {
         return Err(Error::Decryption);
     }
 
-    if priv_key.n().is_zero() {
+    // TODO: is this fine?
+    if n.is_zero().into() {
         return Err(Error::Decryption);
     }
 
     let mut ir = None;
 
+    let n_params = priv_key
+        .residue_params()
+        .cloned()
+        .unwrap_or_else(|| BoxedResidueParams::new(n.clone().get()).unwrap());
     let c = if let Some(ref mut rng) = rng {
-        let (blinded, unblinder) = blind(rng, priv_key, c);
+        let (blinded, unblinder) = blind(rng, priv_key, &c, &n_params);
         ir = Some(unblinder);
-        Cow::Owned(blinded)
+        blinded
     } else {
-        Cow::Borrowed(c)
+        c
     };
 
     let dp = priv_key.dp();
@@ -68,19 +77,21 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         (Some(dp), Some(dq), Some(qinv), Some(crt_values)) => {
             // We have the precalculated values needed for the CRT.
 
-            let p = &priv_key.primes()[0];
-            let q = &priv_key.primes()[1];
+            let dp = to_biguint(dp);
+            let dq = to_biguint(dq);
+            let qinv = to_biguint(qinv).to_bigint().unwrap();
+            let p = to_biguint(&priv_key.primes()[0]);
+            let q = to_biguint(&priv_key.primes()[1]);
 
-            let mut m = c.modpow(&dp, p).into_bigint().unwrap();
-            let mut m2 = c.modpow(&dq, q).into_bigint().unwrap();
+            let mut m = c_orig.modpow(&dp, &p).into_bigint().unwrap();
+            let mut m2 = c_orig.modpow(&dq, &q).into_bigint().unwrap();
 
             m -= &m2;
 
             let mut primes: Vec<_> = priv_key
                 .primes()
                 .iter()
-                .map(ToBigInt::to_bigint)
-                .map(Option::unwrap)
+                .map(|p| to_biguint(p).to_bigint().unwrap())
                 .collect();
 
             while m.is_negative() {
@@ -91,17 +102,17 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
             m *= &primes[1];
             m += &m2;
 
-            let mut c = c.into_owned().into_bigint().unwrap();
+            let mut c = c_orig.to_bigint().unwrap();
             for (i, value) in crt_values.iter().enumerate() {
                 let prime = &primes[2 + i];
-                m2 = c.modpow(&value.exp, prime);
+                m2 = c.modpow(&to_biguint(&value.exp).to_bigint().unwrap(), prime);
                 m2 -= &m;
-                m2 *= &value.coeff;
+                m2 *= &to_biguint(&value.coeff).to_bigint().unwrap();
                 m2 %= prime;
                 while m2.is_negative() {
                     m2 += prime;
                 }
-                m2 *= &value.r;
+                m2 *= &to_biguint(&value.r).to_bigint().unwrap();
                 m += &m2;
             }
 
@@ -113,17 +124,21 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
             c.zeroize();
             m2.zeroize();
 
-            m.into_biguint().expect("failed to decrypt")
+            to_uint(m.into_biguint().expect("failed to decrypt"))
         }
-        _ => c.modpow(&priv_key.d(), &priv_key.n()),
+        _ => {
+            let c = reduce(&c, n_params);
+            c.pow(&d).retrieve()
+        }
     };
 
     match ir {
         Some(ref ir) => {
             // unblind
-            Ok(unblind(priv_key, &m, ir))
+            let res = to_biguint(&unblind(priv_key, &m, ir));
+            Ok(res)
         }
-        None => Ok(m),
+        None => Ok(to_biguint(&m)),
     }
 }
 
@@ -138,7 +153,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
 pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
-    priv_key: &impl PrivateKeyParts,
+    priv_key: &impl PrivateKeyPartsNew,
     rng: Option<&mut R>,
     c: &BigUint,
 ) -> Result<BigUint> {
@@ -155,57 +170,41 @@ pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
     Ok(m)
 }
 
-pub fn rsa_decrypt_and_check_new<R: CryptoRngCore + ?Sized>(
-    priv_key: &impl PrivateKeyPartsNew,
-    rng: Option<&mut R>,
-    c: &BigUint,
-) -> Result<BigUint> {
-    let m = rsa_decrypt_new(rng, priv_key, c)?;
-
-    // In order to defend against errors in the CRT computation, m^e is
-    // calculated, which should match the original ciphertext.
-    let check = rsa_encrypt(priv_key, &m)?;
-
-    if c != &check {
-        return Err(Error::Internal);
-    }
-
-    Ok(m)
-}
-
 /// Returns the blinded c, along with the unblinding factor.
-fn blind<R: CryptoRngCore, K: PublicKeyParts>(
+fn blind<R: CryptoRngCore, K: PublicKeyPartsNew>(
     rng: &mut R,
     key: &K,
-    c: &BigUint,
-) -> (BigUint, BigUint) {
+    c: &BoxedUint,
+    n_params: &BoxedResidueParams,
+) -> (BoxedUint, BoxedUint) {
     // Blinding involves multiplying c by r^e.
     // Then the decryption operation performs (m^e * r^e)^d mod n
     // which equals mr mod n. The factor of r can then be removed
     // by multiplying by the multiplicative inverse of r.
 
-    let mut r: BigUint;
-    let mut ir: Option<BigInt>;
+    let mut r: BoxedUint;
+    let mut ir: CtOption<BoxedUint>;
     let unblinder;
     loop {
-        r = rng.gen_biguint_below(&key.n());
-        if r.is_zero() {
-            r = BigUint::one();
+        // TODO: use constant time gen
+        r = BoxedUint::random_mod(rng, key.n());
+        // TODO: correct mapping
+        if r.is_zero().into() {
+            r = BoxedUint::one();
         }
-        ir = r.clone().mod_inverse(key.n());
-        if let Some(ir) = ir {
-            if let Some(ub) = ir.into_biguint() {
-                unblinder = ub;
-                break;
-            }
+        ir = r.inv_mod(key.n());
+
+        // TODO: constant time?
+        if let Some(ir) = ir.into() {
+            unblinder = ir;
+            break;
         }
     }
 
     let c = {
-        let mut rpowe = r.modpow(&key.e(), &key.n()); // N != 0
-        let mut c = c * &rpowe;
-        c %= key.n();
-
+        let r = reduce(&r, n_params.clone());
+        let mut rpowe = r.pow(key.e()).retrieve();
+        let c = c.mul_mod(&rpowe, key.n());
         rpowe.zeroize();
 
         c
@@ -215,8 +214,8 @@ fn blind<R: CryptoRngCore, K: PublicKeyParts>(
 }
 
 /// Given an m and and unblinding factor, unblind the m.
-fn unblind(key: &impl PublicKeyParts, m: &BigUint, unblinder: &BigUint) -> BigUint {
-    (m * unblinder) % key.n()
+fn unblind(key: &impl PublicKeyPartsNew, m: &BoxedUint, unblinder: &BoxedUint) -> BoxedUint {
+    m.mul_mod(unblinder, key.n())
 }
 
 /// The following (deterministic) algorithm also recovers the prime factors `p` and `q` of a modulus `n`, given the
@@ -323,99 +322,6 @@ pub(crate) fn compute_private_exponent_carmicheal(
     } else {
         // `exp` evenly divides `lcm`
         Err(Error::InvalidPrime)
-    }
-}
-
-fn blind_new<R: CryptoRngCore, K: PublicKeyPartsNew>(
-    rng: &mut R,
-    key: &K,
-    c: &BoxedUint,
-    n_params: &BoxedResidueParams,
-) -> (BoxedUint, BoxedUint) {
-    let mut r: BoxedUint;
-    let mut ir: CtOption<BoxedUint>;
-    let unblinder;
-    loop {
-        // TODO: use constant time gen
-        r = to_uint(rng.gen_biguint_below(&to_biguint(&key.n())));
-        // TODO: correct mapping
-        if r.is_zero().into() {
-            r = BoxedUint::one();
-        }
-        ir = r.inv_mod(key.n());
-
-        // TODO: constant time?
-        if let Some(ir) = ir.into() {
-            unblinder = ir;
-            break;
-        }
-    }
-
-    let c = {
-        let r = reduce(&r, n_params.clone());
-        let mut rpowe = r.pow(key.e()).retrieve();
-
-        let c = c.wrapping_mul(&rpowe);
-        let c = c.rem_vartime(key.n());
-
-        rpowe.zeroize();
-
-        c
-    };
-
-    (c, unblinder)
-}
-
-fn unblind_new(key: &impl PublicKeyPartsNew, m: &BoxedUint, unblinder: &BoxedUint) -> BoxedUint {
-    let a = m.wrapping_mul(unblinder);
-    a.rem_vartime(key.n())
-}
-
-pub fn rsa_decrypt_new<R: CryptoRngCore + ?Sized>(
-    mut rng: Option<&mut R>,
-    priv_key: &impl PrivateKeyPartsNew,
-    c: &BigUint,
-) -> Result<BigUint> {
-    // convert to crypto bigint
-    let c = to_uint(c.clone());
-    let n = priv_key.n();
-    let d = priv_key.d();
-
-    if c >= **n {
-        return Err(Error::Decryption);
-    }
-
-    // TODO: is this fine?
-    if n.is_zero().into() {
-        return Err(Error::Decryption);
-    }
-
-    let mut ir = None;
-
-    let n_params = priv_key
-        .residue_params()
-        .cloned()
-        .unwrap_or_else(|| BoxedResidueParams::new(n.clone().get()).unwrap());
-
-    let c = if let Some(ref mut rng) = rng {
-        let (blinded, unblinder) = blind_new(rng, priv_key, &c, &n_params);
-        ir = Some(unblinder);
-        blinded
-    } else {
-        c
-    };
-
-    // TODO: fast path with precalculated values;
-    let c = reduce(&c, n_params);
-    let m = c.pow(&d).retrieve();
-
-    match ir {
-        Some(ref ir) => {
-            // unblind
-            let m = unblind_new(priv_key, &m, ir);
-            Ok(to_biguint(&m))
-        }
-        None => Ok(to_biguint(&m)),
     }
 }
 

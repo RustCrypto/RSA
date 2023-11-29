@@ -27,7 +27,7 @@ use zeroize::Zeroizing;
 
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pkcs1v15::*;
-use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_decrypt_and_check_new, rsa_encrypt};
+use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
 use crate::key::{self, RsaPrivateKey, RsaPublicKey};
 use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
@@ -167,20 +167,6 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
     key::check_public(priv_key)?;
 
     let em = rsa_decrypt_and_check(priv_key, rng, &BigUint::from_bytes_be(ciphertext))?;
-    let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
-
-    pkcs1v15_encrypt_unpad(em, priv_key.size())
-}
-
-#[inline]
-fn decrypt_new<R: CryptoRngCore + ?Sized>(
-    rng: Option<&mut R>,
-    priv_key: &RsaPrivateKey,
-    ciphertext: &[u8],
-) -> Result<Vec<u8>> {
-    key::check_public(priv_key)?;
-
-    let em = rsa_decrypt_and_check_new(priv_key, rng, &BigUint::from_bytes_be(ciphertext))?;
     let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
     pkcs1v15_encrypt_unpad(em, priv_key.size())
@@ -367,30 +353,6 @@ mod tests {
             let blind: bool = rng.next_u32() < (1u32 << 31);
             let blinder = if blind { Some(&mut rng) } else { None };
             let plaintext = decrypt(blinder, &priv_key, &ciphertext).unwrap();
-            assert_eq!(input, plaintext);
-        }
-    }
-
-    #[test]
-    fn test_new_encrypt_decrypt_pkcs1v15() {
-        let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let priv_key = get_private_key();
-        let k = priv_key.size();
-
-        for i in 1..100 {
-            let mut input = vec![0u8; i * 8];
-            rng.fill_bytes(&mut input);
-            if input.len() > k - 11 {
-                input = input[0..k - 11].to_vec();
-            }
-
-            let pub_key: RsaPublicKey = priv_key.clone().into();
-            let ciphertext = encrypt(&mut rng, &pub_key, &input).unwrap();
-            assert_ne!(input, ciphertext);
-
-            let blind: bool = rng.next_u32() < (1u32 << 31);
-            let blinder = if blind { Some(&mut rng) } else { None };
-            let plaintext = decrypt_new(blinder, &priv_key, &ciphertext).unwrap();
             assert_eq!(input, plaintext);
         }
     }
