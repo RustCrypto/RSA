@@ -3,7 +3,7 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use crypto_bigint::modular::BoxedResidueParams;
-use crypto_bigint::{BoxedUint, NonZero, Zero};
+use crypto_bigint::{BoxedUint, NonZero};
 use num_bigint::{BigInt, BigUint, IntoBigInt, IntoBigUint, ModInverse, RandBigInt, ToBigInt};
 use num_integer::{sqrt, Integer};
 use num_traits::{FromPrimitive, One, Pow, Signed, Zero as _};
@@ -326,22 +326,23 @@ pub(crate) fn compute_private_exponent_carmicheal(
     }
 }
 
-fn blind_new<R: CryptoRngCore, K: PublicKeyParts>(
+fn blind_new<R: CryptoRngCore, K: PublicKeyPartsNew>(
     rng: &mut R,
     key: &K,
     c: &BoxedUint,
     n_params: &BoxedResidueParams,
 ) -> (BoxedUint, BoxedUint) {
-    let n = NonZero::new(to_uint(key.n().clone())).unwrap();
     let mut r: BoxedUint;
     let mut ir: CtOption<BoxedUint>;
     let unblinder;
     loop {
-        r = todo!(); // BoxedUint::random_mod(&mut rng, &n);
+        // TODO: use constant time gen
+        r = to_uint(rng.gen_biguint_below(&to_biguint(&key.n())));
+        // TODO: correct mapping
         if r.is_zero().into() {
             r = BoxedUint::one();
         }
-        ir = r.inv_mod(&n);
+        ir = r.inv_mod(key.n());
 
         // TODO: constant time?
         if let Some(ir) = ir.into() {
@@ -350,13 +351,12 @@ fn blind_new<R: CryptoRngCore, K: PublicKeyParts>(
         }
     }
 
-    let e = to_uint(key.e().clone());
     let c = {
         let r = reduce(&r, n_params.clone());
-        let rpowe = r.pow(&e).retrieve();
+        let mut rpowe = r.pow(key.e()).retrieve();
 
         let c = c.wrapping_mul(&rpowe);
-        let c = c.rem_vartime(&n);
+        let c = c.rem_vartime(key.n());
 
         rpowe.zeroize();
 
@@ -367,9 +367,8 @@ fn blind_new<R: CryptoRngCore, K: PublicKeyParts>(
 }
 
 fn unblind_new(key: &impl PublicKeyPartsNew, m: &BoxedUint, unblinder: &BoxedUint) -> BoxedUint {
-    let n = key.n();
     let a = m.wrapping_mul(unblinder);
-    a.rem_vartime(&n)
+    a.rem_vartime(key.n())
 }
 
 pub fn rsa_decrypt_new<R: CryptoRngCore + ?Sized>(

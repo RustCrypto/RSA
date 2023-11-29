@@ -389,9 +389,7 @@ mod tests {
             assert_ne!(input, ciphertext);
 
             let blind: bool = rng.next_u32() < (1u32 << 31);
-            // TODO:
-            // let blinder = if blind { Some(&mut rng) } else { None };
-            let blinder: Option<&mut ChaCha8Rng> = None;
+            let blinder = if blind { Some(&mut rng) } else { None };
             let plaintext = decrypt_new(blinder, &priv_key, &ciphertext).unwrap();
             assert_eq!(input, plaintext);
         }

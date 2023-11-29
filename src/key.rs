@@ -4,7 +4,7 @@ use core::hash::{Hash, Hasher};
 use crypto_bigint::modular::{BoxedResidue, BoxedResidueParams};
 use crypto_bigint::{BoxedUint, Limb, NonZero};
 use num_bigint::traits::ModInverse;
-use num_bigint::{BigInt, BigUint};
+use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::{FromPrimitive, One, ToPrimitive};
 use rand_core::CryptoRngCore;
@@ -272,7 +272,7 @@ impl RsaPrivateKey {
         n: BigUint,
         e: BigUint,
         d: BigUint,
-        mut primes: Vec<BigUint>,
+        primes: Vec<BigUint>,
     ) -> Result<RsaPrivateKey> {
         let mut should_validate = false;
         let mut primes: Vec<_> = primes.into_iter().map(to_uint).collect();
