@@ -305,8 +305,6 @@ impl RsaPrivateKey {
         let n_c = NonZero::new(to_uint(n.clone())).unwrap();
         let nbits = n_c.bits_precision();
 
-        std::dbg!(nbits);
-
         let mut should_validate = false;
         let mut primes: Vec<_> = primes
             .into_iter()
@@ -636,9 +634,7 @@ fn inner_to_uint(big_uint: BigUint) -> BoxedUint {
 
 pub(crate) fn to_uint(big_uint: BigUint) -> BoxedUint {
     let nbits = needed_bits(&big_uint);
-
     let res = inner_to_uint(big_uint);
-    std::dbg!(res.bits_precision(), nbits);
     if res.bits_precision() < nbits {
         return res.widen(nbits);
     }
@@ -714,8 +710,7 @@ mod tests {
                 let mut rng = ChaCha8Rng::from_seed([42; 32]);
                 let exp = BigUint::from_u64(RsaPrivateKey::EXP).expect("invalid static exponent");
 
-                for i in 0..10 {
-                    std::dbg!(i, $size);
+                for _ in 0..10 {
                     let components =
                         generate_multi_prime_key_with_exp(&mut rng, $multi, $size, &exp).unwrap();
                     let private_key = RsaPrivateKey::from_components(

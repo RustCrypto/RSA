@@ -43,8 +43,6 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     let c = to_uint_exact(c_orig.clone(), nbits);
     let d = priv_key.d();
 
-    std::dbg!(nbits, d.bits_precision(), c.bits_precision());
-
     if c >= **n {
         return Err(Error::Decryption);
     }
@@ -133,8 +131,6 @@ pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
     c: &BigUint,
 ) -> Result<BigUint> {
     let m = rsa_decrypt(rng, priv_key, c)?;
-    let m2 = rsa_decrypt::<R>(None, priv_key, c)?;
-    assert_eq!(m, m2);
 
     // In order to defend against errors in the CRT computation, m^e is
     // calculated, which should match the original ciphertext.
