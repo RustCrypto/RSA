@@ -1,11 +1,10 @@
 //! Generic RSA implementation
 
-use alloc::vec::Vec;
 use crypto_bigint::modular::{BoxedResidue, BoxedResidueParams};
 use crypto_bigint::{BoxedUint, RandomMod};
-use num_bigint::{BigUint, IntoBigInt, IntoBigUint, ModInverse, ToBigInt};
+use num_bigint::{BigUint, ModInverse};
 use num_integer::{sqrt, Integer};
-use num_traits::{FromPrimitive, One, Pow, Signed, Zero as _};
+use num_traits::{FromPrimitive, One, Pow, Zero as _};
 use rand_core::CryptoRngCore;
 use zeroize::{Zeroize, Zeroizing};
 
@@ -70,67 +69,42 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         c
     };
 
-    let dp = priv_key.dp();
-    let dq = priv_key.dq();
-    let qinv = priv_key.qinv();
-    let crt_values = priv_key.crt_values();
+    let has_precomputes = priv_key.dp().is_some();
+    let is_multiprime = priv_key.primes().len() > 2;
 
-    let m = match (dp, dq, qinv, crt_values) {
-        (Some(dp), Some(dq), Some(qinv), Some(crt_values)) => {
-            // We have the precalculated values needed for the CRT.
+    let m = if is_multiprime || !has_precomputes {
+        // c^d (mod n)
+        pow_mod_params(&c, &d, n_params.clone())
+    } else {
+        // We have the precalculated values needed for the CRT.
 
-            let dp = to_biguint(dp);
-            let dq = to_biguint(dq);
-            let qinv = to_biguint(qinv).to_bigint().unwrap();
-            let p = to_biguint(&priv_key.primes()[0]);
-            let q = to_biguint(&priv_key.primes()[1]);
+        let dp = priv_key.dp().unwrap();
+        let dq = priv_key.dq().unwrap();
+        let qinv = priv_key.qinv().unwrap();
 
-            let mut m = c_orig.modpow(&dp, &p).into_bigint().unwrap();
-            let mut m2 = c_orig.modpow(&dq, &q).into_bigint().unwrap();
+        let p = &priv_key.primes()[0];
+        let q = &priv_key.primes()[1];
 
-            m -= &m2;
+        // TODO: store
+        let p_params = BoxedResidueParams::new(p.clone()).unwrap();
+        let q_params = BoxedResidueParams::new(q.clone()).unwrap();
 
-            let mut primes: Vec<_> = priv_key
-                .primes()
-                .iter()
-                .map(|p| to_biguint(p).to_bigint().unwrap())
-                .collect();
+        // precomputed: dP = (1/e) mod (p-1) = d mod (p-1)
+        // precomputed: dQ = (1/e) mod (q-1) = d mod (q-1)
 
-            while m.is_negative() {
-                m += &primes[0];
-            }
-            m *= qinv;
-            m %= &primes[0];
-            m *= &primes[1];
-            m += &m2;
+        // m1 = c^dP mod p
+        let m1 = pow_mod_params(&c, &dp, p_params.clone());
+        // m2 = c^dQ mod q
+        let m2 = pow_mod_params(&c, &dq, q_params);
 
-            let mut c = c_orig.to_bigint().unwrap();
-            for (i, value) in crt_values.iter().enumerate() {
-                let prime = &primes[2 + i];
-                m2 = c.modpow(&to_biguint(&value.exp).to_bigint().unwrap(), prime);
-                m2 -= &m;
-                m2 *= &to_biguint(&value.coeff).to_bigint().unwrap();
-                m2 %= prime;
-                while m2.is_negative() {
-                    m2 += prime;
-                }
-                m2 *= &to_biguint(&value.r).to_bigint().unwrap();
-                m += &m2;
-            }
+        // precomputed: qInv = (1/q) mod p
 
-            // clear tmp values
-            for prime in primes.iter_mut() {
-                prime.zeroize();
-            }
-            primes.clear();
-            c.zeroize();
-            m2.zeroize();
-            to_uint_exact(m.into_biguint().expect("failed to decrypt"), nbits)
-        }
-        _ => {
-            // c^d (mod n)
-            pow_mod_params(&c, &d, n_params.clone())
-        }
+        // h = qInv.(m1 - m2) mod p
+        let x = m1.sub_mod(&m2, p);
+        let h = mul_mod_params(qinv, &x, p_params.clone());
+        // m = m2 + h.q
+        let m = m2.wrapping_add(&h.wrapping_mul(q)); // TODO: verify wrapping is correct here
+        m
     };
 
     match ir {
