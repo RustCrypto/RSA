@@ -95,15 +95,7 @@ impl<T: PrivateKeyPartsNew> PrivateKeyParts for T {
     }
 
     fn crt_values(&self) -> Option<Vec<CrtValue>> {
-        PrivateKeyPartsNew::crt_values(self).map(|v| {
-            v.iter()
-                .map(|v| CrtValue {
-                    exp: to_biguint(&v.exp).into_bigint().unwrap(),
-                    coeff: to_biguint(&v.coeff).into_bigint().unwrap(),
-                    r: to_biguint(&v.r).into_bigint().unwrap(),
-                })
-                .collect()
-        })
+        None
     }
 }
 

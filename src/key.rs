@@ -3,10 +3,9 @@ use core::cmp::Ordering;
 use core::hash::{Hash, Hasher};
 use crypto_bigint::modular::{BoxedResidue, BoxedResidueParams};
 use crypto_bigint::{BoxedUint, Limb, NonZero};
-use num_bigint::traits::ModInverse;
 use num_bigint::BigUint;
 use num_integer::Integer;
-use num_traits::{FromPrimitive, One, ToPrimitive};
+use num_traits::{FromPrimitive, ToPrimitive};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -21,7 +20,7 @@ use crate::algorithms::rsa::{
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::traits::keys::{CrtValueNew, PrivateKeyPartsNew, PublicKeyPartsNew};
-use crate::traits::{PaddingScheme, PrivateKeyParts, PublicKeyParts, SignatureScheme};
+use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
 
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -104,12 +103,6 @@ pub(crate) struct PrecomputedValues {
     /// Q^-1 mod P
     pub(crate) qinv: BoxedUint,
 
-    /// CRTValues is used for the 3rd and subsequent primes. Due to a
-    /// historical accident, the CRT for the first two primes is handled
-    /// differently in PKCS#1 and interoperability is sufficiently
-    /// important that we mirror this.
-    pub(crate) crt_values: Vec<CrtValueNew>,
-
     pub(crate) residue_params: BoxedResidueParams,
 }
 
@@ -118,10 +111,6 @@ impl Zeroize for PrecomputedValues {
         self.dp.zeroize();
         self.dq.zeroize();
         self.qinv.zeroize();
-        for val in self.crt_values.iter_mut() {
-            val.zeroize();
-        }
-        self.crt_values.clear();
     }
 }
 
@@ -396,51 +385,29 @@ impl RsaPrivateKey {
             return Ok(());
         }
 
-        // already widened to what we need
-        let nbits = self.pubkey_components.n.bits_precision();
+        let d = &self.d;
+        let p = &self.primes[0];
+        let q = &self.primes[1];
 
-        let d = to_biguint(&self.d);
-        let dp = &d % (&to_biguint(&self.primes[0]) - BigUint::one());
-        let dq = &d % (&to_biguint(&self.primes[1]) - BigUint::one());
-        let qinv = self.primes[1].inv_mod(&self.primes[0]);
+        // TODO: error handling
+
+        let x = NonZero::new(p.wrapping_sub(&BoxedUint::one())).unwrap();
+        let dp = d.rem_vartime(&x);
+        let x = NonZero::new(q.wrapping_sub(&BoxedUint::one())).unwrap();
+        let dq = d.rem_vartime(&x);
+        let qinv = q.inv_mod(p);
         if qinv.is_none().into() {
             return Err(Error::InvalidPrime);
         }
         let qinv = qinv.unwrap();
 
-        let mut r: BigUint = &to_biguint(&self.primes[0]) * &to_biguint(&self.primes[1]);
-        let crt_values: Vec<CrtValueNew> = {
-            let mut values = Vec::with_capacity(self.primes.len() - 2);
-            for prime in &self.primes[2..] {
-                let prime = to_biguint(prime);
-                let res = CrtValueNew {
-                    exp: to_uint_exact(&d % (&prime - BigUint::one()), nbits),
-                    r: to_uint_exact(r.clone(), nbits),
-                    coeff: to_uint_exact(
-                        r.clone()
-                            .mod_inverse(&prime)
-                            .ok_or(Error::InvalidCoefficient)?
-                            .to_biguint()
-                            .unwrap(),
-                        nbits,
-                    ),
-                };
-                r *= prime;
-
-                values.push(res);
-            }
-            values
-        };
-
-        // TODO: how to handle error?
         let residue_params =
             BoxedResidueParams::new(self.pubkey_components.n.clone().get()).unwrap();
 
         self.precomputed = Some(PrecomputedValues {
-            dp: to_uint_exact(dp, nbits),
-            dq: to_uint_exact(dq, nbits),
+            dp,
+            dq,
             qinv,
-            crt_values,
             residue_params,
         });
 
@@ -454,9 +421,10 @@ impl RsaPrivateKey {
 
     /// Compute CRT coefficient: `(1/q) mod p`.
     pub fn crt_coefficient(&self) -> Option<BigUint> {
-        (&to_biguint(&self.primes[1]))
-            .mod_inverse(&to_biguint(&self.primes[0]))?
-            .to_biguint()
+        let p = &self.primes[0];
+        let q = &self.primes[1];
+
+        Option::from(q.inv_mod(p)).map(|x| to_biguint(&x))
     }
 
     /// Performs basic sanity checks on the key.
@@ -465,16 +433,15 @@ impl RsaPrivateKey {
         check_public(self)?;
 
         // Check that Πprimes == n.
-        let mut m = BigUint::one();
+        let mut m = BoxedUint::one_with_precision(self.pubkey_components.n.bits_precision());
         for prime in &self.primes {
-            let prime = to_biguint(&prime);
             // Any primes ≤ 1 will cause divide-by-zero panics later.
-            if prime < BigUint::one() {
+            if prime < &BoxedUint::one() {
                 return Err(Error::InvalidPrime);
             }
-            m *= prime;
+            m = m.wrapping_mul(prime);
         }
-        if m != to_biguint(&self.pubkey_components.n) {
+        if m != *self.pubkey_components.n {
             return Err(Error::InvalidModulus);
         }
 
@@ -483,13 +450,14 @@ impl RsaPrivateKey {
         // inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
         // exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
         // mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
-        let mut de = PublicKeyParts::e(self);
-        de *= PrivateKeyParts::d(self);
+        let d = self.d.widen(2 * self.d.bits_precision());
+        let de = d.wrapping_mul(&self.pubkey_components.e);
 
         for prime in &self.primes {
-            let prime = to_biguint(&prime);
-            let congruence: BigUint = &de % (prime - BigUint::one());
-            if !congruence.is_one() {
+            let prime = prime.widen(d.bits_precision());
+            let x = NonZero::new(prime.wrapping_sub(&BoxedUint::one())).unwrap();
+            let congruence = de.rem_vartime(&x);
+            if !bool::from(congruence.is_one()) {
                 return Err(Error::InvalidExponent);
             }
         }
@@ -561,11 +529,7 @@ impl PrivateKeyPartsNew for RsaPrivateKey {
     }
 
     fn crt_values(&self) -> Option<&[CrtValueNew]> {
-        if let Some(p) = &self.precomputed {
-            Some(p.crt_values.as_slice())
-        } else {
-            None
-        }
+        None
     }
 
     fn residue_params(&self) -> Option<&BoxedResidueParams> {
@@ -659,7 +623,7 @@ pub(crate) fn reduce(n: &BoxedUint, p: BoxedResidueParams) -> BoxedResidue {
 mod tests {
     use super::*;
     use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
-    use crate::traits::PublicKeyParts;
+    use crate::traits::{PrivateKeyParts, PublicKeyParts};
 
     use hex_literal::hex;
     use num_traits::{FromPrimitive, ToPrimitive};
