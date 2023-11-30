@@ -29,7 +29,7 @@ use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pkcs1v15::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
-use crate::key::{self, RsaPrivateKey, RsaPublicKey};
+use crate::key::{self, to_uint_exact, RsaPrivateKey, RsaPublicKey};
 use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
 
 /// Encryption using PKCS#1 v1.5 padding.
@@ -166,7 +166,11 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
-    let em = rsa_decrypt_and_check(priv_key, rng, &BigUint::from_bytes_be(ciphertext))?;
+    let ciphertext = to_uint_exact(
+        BigUint::from_bytes_be(ciphertext),
+        crate::traits::keys::PublicKeyPartsNew::n(priv_key).bits_precision(),
+    );
+    let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
     let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
     pkcs1v15_encrypt_unpad(em, priv_key.size())
@@ -194,10 +198,11 @@ fn sign<R: CryptoRngCore + ?Sized>(
 ) -> Result<Vec<u8>> {
     let em = pkcs1v15_sign_pad(prefix, hashed, priv_key.size())?;
 
-    uint_to_zeroizing_be_pad(
-        rsa_decrypt_and_check(priv_key, rng, &BigUint::from_bytes_be(&em))?,
-        priv_key.size(),
-    )
+    let em = to_uint_exact(
+        BigUint::from_bytes_be(&em),
+        crate::traits::keys::PublicKeyPartsNew::n(priv_key).bits_precision(),
+    );
+    uint_to_zeroizing_be_pad(rsa_decrypt_and_check(priv_key, rng, &em)?, priv_key.size())
 }
 
 /// Verifies an RSA PKCS#1 v1.5 signature.

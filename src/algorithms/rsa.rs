@@ -1,5 +1,6 @@
 //! Generic RSA implementation
 
+use alloc::borrow::Cow;
 use crypto_bigint::modular::{BoxedResidue, BoxedResidueParams};
 use crypto_bigint::{BoxedUint, RandomMod};
 use num_bigint::{BigUint, ModInverse};
@@ -9,7 +10,7 @@ use rand_core::CryptoRngCore;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::{Error, Result};
-use crate::key::{reduce, to_biguint, to_uint_exact};
+use crate::key::{reduce, to_biguint};
 use crate::traits::keys::{PrivateKeyPartsNew, PublicKeyPartsNew};
 use crate::traits::PublicKeyParts;
 
@@ -36,14 +37,12 @@ pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> Result<BigUint> {
 pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     mut rng: Option<&mut R>,
     priv_key: &impl PrivateKeyPartsNew,
-    c_orig: &BigUint,
+    c: &BoxedUint,
 ) -> Result<BigUint> {
     let n = priv_key.n();
-    let nbits = n.bits_precision();
-    let c = to_uint_exact(c_orig.clone(), nbits);
     let d = priv_key.d();
 
-    if c >= **n {
+    if c >= n {
         return Err(Error::Decryption);
     }
 
@@ -62,9 +61,9 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     let c = if let Some(ref mut rng) = rng {
         let (blinded, unblinder) = blind(rng, priv_key, &c, &n_params);
         ir = Some(unblinder);
-        blinded
+        Cow::Owned(blinded)
     } else {
-        c
+        Cow::Borrowed(c)
     };
 
     let has_precomputes = priv_key.dp().is_some();
@@ -126,7 +125,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
 pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
     priv_key: &impl PrivateKeyPartsNew,
     rng: Option<&mut R>,
-    c: &BigUint,
+    c: &BoxedUint,
 ) -> Result<BigUint> {
     let m = rsa_decrypt(rng, priv_key, c)?;
 
@@ -134,7 +133,7 @@ pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
     // calculated, which should match the original ciphertext.
     let check = rsa_encrypt(priv_key, &m)?;
 
-    if c != &check {
+    if to_biguint(c) != check {
         return Err(Error::Internal);
     }
 

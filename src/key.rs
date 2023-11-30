@@ -674,6 +674,8 @@ mod tests {
         let pub_key: RsaPublicKey = private_key.clone().into();
         let m = BigUint::from_u64(42).expect("invalid 42");
         let c = rsa_encrypt(&pub_key, &m).expect("encryption successfull");
+        let c = to_uint_exact(c, PublicKeyPartsNew::n(&pub_key).bits_precision());
+
         let m2 = rsa_decrypt_and_check::<ChaCha8Rng>(private_key, None, &c)
             .expect("unable to decrypt without blinding");
         assert_eq!(m, m2);
