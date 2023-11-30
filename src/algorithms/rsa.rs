@@ -79,13 +79,11 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         let dp = priv_key.dp().unwrap();
         let dq = priv_key.dq().unwrap();
         let qinv = priv_key.qinv().unwrap();
+        let p_params = priv_key.p_params().unwrap();
+        let q_params = priv_key.q_params().unwrap();
 
         let p = &priv_key.primes()[0];
         let q = &priv_key.primes()[1];
-
-        // TODO: store
-        let p_params = BoxedResidueParams::new(p.clone()).unwrap();
-        let q_params = BoxedResidueParams::new(q.clone()).unwrap();
 
         // precomputed: dP = (1/e) mod (p-1) = d mod (p-1)
         // precomputed: dQ = (1/e) mod (q-1) = d mod (q-1)
@@ -93,7 +91,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         // m1 = c^dP mod p
         let m1 = pow_mod_params(&c, &dp, p_params.clone());
         // m2 = c^dQ mod q
-        let m2 = pow_mod_params(&c, &dq, q_params);
+        let m2 = pow_mod_params(&c, &dq, q_params.clone());
 
         // precomputed: qInv = (1/q) mod p
 

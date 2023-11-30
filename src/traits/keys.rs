@@ -120,6 +120,10 @@ pub trait PrivateKeyPartsNew: PublicKeyPartsNew {
     fn crt_values(&self) -> Option<&[CrtValueNew]>;
 
     fn residue_params(&self) -> Option<&BoxedResidueParams>;
+
+    fn p_params(&self) -> Option<&BoxedResidueParams>;
+
+    fn q_params(&self) -> Option<&BoxedResidueParams>;
 }
 
 /// Contains the precomputed Chinese remainder theorem values.

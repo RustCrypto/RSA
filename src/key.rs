@@ -104,6 +104,9 @@ pub(crate) struct PrecomputedValues {
     pub(crate) qinv: BoxedUint,
 
     pub(crate) residue_params: BoxedResidueParams,
+
+    pub(crate) p_params: BoxedResidueParams,
+    pub(crate) q_params: BoxedResidueParams,
 }
 
 impl Zeroize for PrecomputedValues {
@@ -404,11 +407,16 @@ impl RsaPrivateKey {
         let residue_params =
             BoxedResidueParams::new(self.pubkey_components.n.clone().get()).unwrap();
 
+        let p_params = BoxedResidueParams::new(p.clone()).unwrap();
+        let q_params = BoxedResidueParams::new(q.clone()).unwrap();
+
         self.precomputed = Some(PrecomputedValues {
             dp,
             dq,
             qinv,
             residue_params,
+            p_params,
+            q_params,
         });
 
         Ok(())
@@ -534,6 +542,14 @@ impl PrivateKeyPartsNew for RsaPrivateKey {
 
     fn residue_params(&self) -> Option<&BoxedResidueParams> {
         self.precomputed.as_ref().map(|p| &p.residue_params)
+    }
+
+    fn p_params(&self) -> Option<&BoxedResidueParams> {
+        self.precomputed.as_ref().map(|p| &p.p_params)
+    }
+
+    fn q_params(&self) -> Option<&BoxedResidueParams> {
+        self.precomputed.as_ref().map(|p| &p.q_params)
     }
 }
 
