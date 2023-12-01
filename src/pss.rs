@@ -30,7 +30,7 @@ use pkcs1::RsaPssParams;
 use pkcs8::spki::{der::Any, AlgorithmIdentifierOwned};
 use rand_core::CryptoRngCore;
 
-use crate::algorithms::pad::{uint_to_be_pad_new, uint_to_zeroizing_be_pad_new};
+use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pss::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
@@ -141,7 +141,7 @@ pub(crate) fn verify(
         sig.clone(),
         crate::traits::keys::PublicKeyPartsNew::n_bits_precision(pub_key),
     );
-    let mut em = uint_to_be_pad_new(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
+    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
 
     emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits())
 }
@@ -149,22 +149,18 @@ pub(crate) fn verify(
 pub(crate) fn verify_digest<D>(
     pub_key: &RsaPublicKey,
     hashed: &[u8],
-    sig: &BigUint,
+    sig: &BoxedUint,
     sig_len: usize,
     salt_len: usize,
 ) -> Result<()>
 where
     D: Digest + FixedOutputReset,
 {
-    if sig >= &pub_key.n() || sig_len != pub_key.size() {
+    if sig >= crate::traits::keys::PublicKeyPartsNew::n(pub_key) || sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
 
-    let sig = to_uint_exact(
-        sig.clone(),
-        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(pub_key),
-    );
-    let mut em = uint_to_be_pad_new(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
+    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
 
     emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits())
 }
@@ -220,7 +216,7 @@ fn sign_pss_with_salt<T: CryptoRngCore>(
         &em,
         crate::traits::keys::PublicKeyPartsNew::n_bits_precision(priv_key),
     )?;
-    uint_to_zeroizing_be_pad_new(
+    uint_to_zeroizing_be_pad(
         rsa_decrypt_and_check(priv_key, blind_rng, &em)?,
         priv_key.size(),
     )
@@ -239,7 +235,7 @@ fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputR
         &em,
         crate::traits::keys::PublicKeyPartsNew::n_bits_precision(priv_key),
     )?;
-    uint_to_zeroizing_be_pad_new(
+    uint_to_zeroizing_be_pad(
         rsa_decrypt_and_check(priv_key, blind_rng, &em)?,
         priv_key.size(),
     )

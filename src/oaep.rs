@@ -19,7 +19,7 @@ use digest::{Digest, DynDigest, FixedOutputReset};
 use rand_core::CryptoRngCore;
 
 use crate::algorithms::oaep::*;
-use crate::algorithms::pad::{uint_to_be_pad_new, uint_to_zeroizing_be_pad_new};
+use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
 use crate::key::{self, RsaPrivateKey, RsaPublicKey};
@@ -197,7 +197,7 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
         &em,
         crate::traits::keys::PublicKeyPartsNew::n_bits_precision(pub_key),
     )?;
-    uint_to_be_pad_new(rsa_encrypt(pub_key, &int)?, pub_key.size())
+    uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
 /// Encrypts the given message with RSA and the padding scheme from
@@ -221,7 +221,7 @@ fn encrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
         &em,
         crate::traits::keys::PublicKeyPartsNew::n_bits_precision(pub_key),
     )?;
-    uint_to_be_pad_new(rsa_encrypt(pub_key, &int)?, pub_key.size())
+    uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from [PKCS#1 OAEP].
@@ -257,7 +257,7 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
     )?;
 
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
-    let mut em = uint_to_zeroizing_be_pad_new(em, priv_key.size())?;
+    let mut em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
     oaep_decrypt(&mut em, digest, mgf_digest, label, priv_key.size())
 }
@@ -292,7 +292,7 @@ fn decrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
         crate::traits::keys::PublicKeyPartsNew::n_bits_precision(priv_key),
     )?;
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
-    let mut em = uint_to_zeroizing_be_pad_new(em, priv_key.size())?;
+    let mut em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
     oaep_decrypt_digest::<D, MGD>(&mut em, label, priv_key.size())
 }

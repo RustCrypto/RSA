@@ -21,15 +21,14 @@ use alloc::{boxed::Box, vec::Vec};
 use core::fmt::Debug;
 use crypto_bigint::BoxedUint;
 use digest::Digest;
-use num_bigint::BigUint;
 use pkcs8::AssociatedOid;
 use rand_core::CryptoRngCore;
 
-use crate::algorithms::pad::{uint_to_be_pad_new, uint_to_zeroizing_be_pad_new};
+use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pkcs1v15::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
-use crate::key::{self, to_uint_exact, RsaPrivateKey, RsaPublicKey};
+use crate::key::{self, RsaPrivateKey, RsaPublicKey};
 use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
 
 /// Encryption using PKCS#1 v1.5 padding.
@@ -127,7 +126,7 @@ impl SignatureScheme for Pkcs1v15Sign {
             pub_key,
             self.prefix.as_ref(),
             hashed,
-            &BigUint::from_bytes_be(sig),
+            &BoxedUint::from_be_slice(sig, sig.len() * 8)?,
             sig.len(),
         )
     }
@@ -149,7 +148,7 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
         &em,
         crate::traits::keys::PublicKeyPartsNew::n_bits_precision(pub_key),
     )?;
-    uint_to_be_pad_new(rsa_encrypt(pub_key, &int)?, pub_key.size())
+    uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5.
@@ -174,7 +173,7 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
         crate::traits::keys::PublicKeyPartsNew::n_bits_precision(priv_key),
     )?;
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
-    let em = uint_to_zeroizing_be_pad_new(em, priv_key.size())?;
+    let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
     pkcs1v15_encrypt_unpad(em, priv_key.size())
 }
@@ -205,7 +204,7 @@ fn sign<R: CryptoRngCore + ?Sized>(
         &em,
         crate::traits::keys::PublicKeyPartsNew::n_bits_precision(priv_key),
     )?;
-    uint_to_zeroizing_be_pad_new(rsa_decrypt_and_check(priv_key, rng, &em)?, priv_key.size())
+    uint_to_zeroizing_be_pad(rsa_decrypt_and_check(priv_key, rng, &em)?, priv_key.size())
 }
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
@@ -214,18 +213,14 @@ fn verify(
     pub_key: &RsaPublicKey,
     prefix: &[u8],
     hashed: &[u8],
-    sig: &BigUint,
+    sig: &BoxedUint,
     sig_len: usize,
 ) -> Result<()> {
-    if sig >= &pub_key.n() || sig_len != pub_key.size() {
+    if sig >= crate::traits::keys::PublicKeyPartsNew::n(pub_key) || sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
 
-    let sig = to_uint_exact(
-        sig.clone(),
-        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(pub_key),
-    );
-    let em = uint_to_be_pad_new(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
+    let em = uint_to_be_pad(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
 
     pkcs1v15_sign_unpad(prefix, hashed, &em, pub_key.size())
 }

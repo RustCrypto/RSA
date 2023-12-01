@@ -3,6 +3,7 @@ pub use ::signature::{
     DigestSigner, DigestVerifier, Error, Keypair, RandomizedDigestSigner, RandomizedSigner, Result,
     SignatureEncoding, Signer, Verifier,
 };
+use crypto_bigint::BoxedUint;
 use spki::{
     der::{asn1::BitString, Result as DerResult},
     SignatureBitStringEncoding,
@@ -11,14 +12,13 @@ use spki::{
 use crate::algorithms::pad::uint_to_be_pad;
 use alloc::{boxed::Box, string::ToString};
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
-use num_bigint::BigUint;
 
 /// `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
 ///
 /// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 #[derive(Clone, PartialEq, Eq)]
 pub struct Signature {
-    pub(super) inner: BigUint,
+    pub(super) inner: BoxedUint,
     pub(super) len: usize,
 }
 
@@ -36,9 +36,11 @@ impl TryFrom<&[u8]> for Signature {
     type Error = signature::Error;
 
     fn try_from(bytes: &[u8]) -> signature::Result<Self> {
+        let len = bytes.len();
         Ok(Self {
-            inner: BigUint::from_bytes_be(bytes),
-            len: bytes.len(),
+            // TODO: how to convert error?
+            inner: BoxedUint::from_be_slice(bytes, len * 8).unwrap(),
+            len,
         })
     }
 }
