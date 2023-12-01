@@ -23,7 +23,7 @@ use crate::traits::keys::{CrtValueNew, PrivateKeyPartsNew, PublicKeyPartsNew};
 use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
 
 /// Represents the public part of an RSA key.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RsaPublicKey {
     /// Modulus: product of prime numbers `p` and `q`
@@ -34,16 +34,24 @@ pub struct RsaPublicKey {
     /// Typically 0x10001 (65537)
     e: BoxedUint,
 
+    #[cfg_attr(feature = "serde", serde(skip))]
     n_params: BoxedResidueParams,
 }
 
-// TODO: derive `Hash` impl when `BoxedUint` supports it
+impl Eq for RsaPublicKey {}
+impl PartialEq for RsaPublicKey {
+    #[inline]
+    fn eq(&self, other: &RsaPublicKey) -> bool {
+        self.n == other.n && self.e == other.e
+    }
+}
+
 impl Hash for RsaPublicKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // Domain separator for RSA private keys
         state.write(b"RsaPublicKey");
-        Hash::hash(&self.n.as_words(), state);
-        Hash::hash(&self.e.as_words(), state);
+        Hash::hash(&self.n, state);
+        Hash::hash(&self.e, state);
     }
 }
 
