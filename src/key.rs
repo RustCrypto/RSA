@@ -32,7 +32,7 @@ pub struct RsaPublicKey {
     /// order to encrypt it.
     ///
     /// Typically 0x10001 (65537)
-    e: BoxedUint,
+    e: u64,
 
     #[cfg_attr(feature = "serde", serde(skip))]
     n_params: BoxedResidueParams,
@@ -155,8 +155,8 @@ impl PublicKeyPartsNew for RsaPublicKey {
         &self.n
     }
 
-    fn e(&self) -> &BoxedUint {
-        &self.e
+    fn e(&self) -> u64 {
+        self.e
     }
 
     fn n_params(&self) -> BoxedResidueParams {
@@ -207,13 +207,12 @@ impl RsaPublicKey {
     /// Create a new public key from its components.
     pub fn new_with_max_size(n: BigUint, e: BigUint, max_size: usize) -> Result<Self> {
         check_public_with_max_size(&n, &e, max_size)?;
+        let e = e.to_u64().unwrap();
 
         let raw_n = to_uint(n);
         let n_params = BoxedResidueParams::new(raw_n.clone()).unwrap();
         let n = NonZero::new(raw_n).unwrap();
 
-        // widen to 64bit
-        let e = to_uint_exact(e, 64);
         let k = Self { n, e, n_params };
 
         Ok(k)
@@ -229,7 +228,7 @@ impl RsaPublicKey {
         let raw_n = to_uint(n);
         let n_params = BoxedResidueParams::new(raw_n.clone()).unwrap();
         let n = NonZero::new(raw_n).unwrap();
-        let e = to_uint_exact(e, 64);
+        let e = e.to_u64().unwrap();
         Self { n, e, n_params }
     }
 }
@@ -265,8 +264,8 @@ impl PublicKeyPartsNew for RsaPrivateKey {
         &self.pubkey_components.n
     }
 
-    fn e(&self) -> &BoxedUint {
-        &self.pubkey_components.e
+    fn e(&self) -> u64 {
+        self.pubkey_components.e
     }
 
     fn n_params(&self) -> BoxedResidueParams {
@@ -317,8 +316,8 @@ impl RsaPrivateKey {
         primes: Vec<BigUint>,
     ) -> Result<RsaPrivateKey> {
         let n = to_uint(n.clone());
+        let e = e.to_u64().ok_or_else(|| Error::InvalidExponent)?;
         let nbits = n.bits_precision();
-        let e = to_uint_exact(e, 64);
         let d = to_uint_exact(d, nbits);
         let primes = primes
             .into_iter()
@@ -329,7 +328,7 @@ impl RsaPrivateKey {
 
     pub(crate) fn from_components_new(
         n: BoxedUint,
-        e: BoxedUint,
+        e: u64,
         d: BoxedUint,
         mut primes: Vec<BoxedUint>,
     ) -> Result<RsaPrivateKey> {
@@ -345,7 +344,11 @@ impl RsaPrivateKey {
             }
             // Recover `p` and `q` from `d`.
             // See method in Appendix C.2: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf
-            let (p, q) = recover_primes(&to_biguint(&n), &to_biguint(&e), &to_biguint(&d))?;
+            let (p, q) = recover_primes(
+                &to_biguint(&n),
+                &BigUint::from_u64(e).unwrap(),
+                &to_biguint(&d),
+            )?;
             primes.push(to_uint_exact(p, nbits));
             primes.push(to_uint_exact(q, nbits));
             should_validate = true;
@@ -494,7 +497,7 @@ impl RsaPrivateKey {
         // exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
         // mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
         let d = self.d.widen(2 * self.d.bits_precision());
-        let de = d.wrapping_mul(&self.pubkey_components.e);
+        let de = d.wrapping_mul(&BoxedUint::from(self.pubkey_components.e));
 
         for prime in &self.primes {
             let prime = prime.widen(d.bits_precision());
@@ -683,7 +686,7 @@ mod tests {
         let private_key = RsaPrivateKey {
             pubkey_components: RsaPublicKey {
                 n: NonZero::new(raw_n.clone()).unwrap(),
-                e: BoxedUint::from(200u64),
+                e: 200u64,
                 n_params: BoxedResidueParams::new(raw_n).unwrap(),
             },
             d: BoxedUint::from(123u64),

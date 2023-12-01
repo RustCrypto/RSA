@@ -4,6 +4,7 @@ use alloc::vec::Vec;
 
 use crypto_bigint::{modular::BoxedResidueParams, BoxedUint, NonZero};
 use num_bigint::{BigInt, BigUint, IntoBigInt};
+use num_traits::FromPrimitive;
 use zeroize::Zeroize;
 
 use crate::key::to_biguint;
@@ -28,7 +29,7 @@ pub trait PublicKeyPartsNew {
     fn n(&self) -> &NonZero<BoxedUint>;
 
     /// Returns the public exponent of the key.
-    fn e(&self) -> &BoxedUint;
+    fn e(&self) -> u64;
 
     fn n_params(&self) -> BoxedResidueParams;
 
@@ -49,7 +50,7 @@ impl<T: PublicKeyPartsNew> PublicKeyParts for T {
     }
 
     fn e(&self) -> BigUint {
-        to_biguint(PublicKeyPartsNew::e(self))
+        BigUint::from_u64(PublicKeyPartsNew::e(self)).unwrap()
     }
 
     fn size(&self) -> usize {

@@ -21,7 +21,7 @@ use crate::traits::keys::{PrivateKeyPartsNew, PublicKeyPartsNew};
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
 pub fn rsa_encrypt<K: PublicKeyPartsNew>(key: &K, m: &BoxedUint) -> Result<BoxedUint> {
-    let res = pow_mod_params(m, key.e(), key.n_params());
+    let res = pow_mod_params(m, &BoxedUint::from(key.e()), key.n_params());
     Ok(res)
 }
 
@@ -164,7 +164,7 @@ fn blind<R: CryptoRngCore, K: PublicKeyPartsNew>(
 
     let blinded = {
         // r^e (mod n)
-        let mut rpowe = pow_mod_params(&r, key.e(), n_params.clone());
+        let mut rpowe = pow_mod_params(&r, &BoxedUint::from(key.e()), n_params.clone());
         // c * r^e (mod n)
         let c = mul_mod_params(c, &rpowe, n_params.clone());
         rpowe.zeroize();
