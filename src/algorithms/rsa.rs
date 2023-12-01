@@ -27,7 +27,7 @@ pub fn rsa_encrypt<K: PublicKeyPartsNew>(key: &K, m: &BoxedUint) -> Result<Boxed
 
 /// ⚠️ Performs raw RSA decryption with no padding or error checking.
 ///
-/// Returns a plaintext `BigUint`. Performs RSA blinding if an `Rng` is passed.
+/// Returns a plaintext `BoxedUint`. Performs RSA blinding if an `Rng` is passed.
 ///
 /// # ☢️️ WARNING: HAZARDOUS API ☢️
 ///
@@ -111,7 +111,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
 
 /// ⚠️ Performs raw RSA decryption with no padding.
 ///
-/// Returns a plaintext `BigUint`. Performs RSA blinding if an `Rng` is passed.  This will also
+/// Returns a plaintext `BoxedUint`. Performs RSA blinding if an `Rng` is passed.  This will also
 /// check for errors in the CRT computation.
 ///
 /// # ☢️️ WARNING: HAZARDOUS API ☢️

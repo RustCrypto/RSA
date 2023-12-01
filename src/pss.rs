@@ -25,7 +25,6 @@ use crypto_bigint::BoxedUint;
 
 use const_oid::{AssociatedOid, ObjectIdentifier};
 use digest::{Digest, DynDigest, FixedOutputReset};
-use num_bigint::BigUint;
 use pkcs1::RsaPssParams;
 use pkcs8::spki::{der::Any, AlgorithmIdentifierOwned};
 use rand_core::CryptoRngCore;
@@ -34,7 +33,6 @@ use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pss::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
-use crate::key::to_uint_exact;
 use crate::traits::PublicKeyParts;
 use crate::traits::SignatureScheme;
 use crate::{RsaPrivateKey, RsaPublicKey};
@@ -107,7 +105,7 @@ impl SignatureScheme for Pss {
         verify(
             pub_key,
             hashed,
-            &BigUint::from_bytes_be(sig),
+            &BoxedUint::from_be_slice(sig, sig.len() * 8)?,
             sig.len(),
             &mut *self.digest,
             self.salt_len,
@@ -128,7 +126,7 @@ impl Debug for Pss {
 pub(crate) fn verify(
     pub_key: &RsaPublicKey,
     hashed: &[u8],
-    sig: &BigUint,
+    sig: &BoxedUint,
     sig_len: usize,
     digest: &mut dyn DynDigest,
     salt_len: usize,
@@ -137,10 +135,6 @@ pub(crate) fn verify(
         return Err(Error::Verification);
     }
 
-    let sig = to_uint_exact(
-        sig.clone(),
-        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(pub_key),
-    );
     let mut em = uint_to_be_pad(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
 
     emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits())

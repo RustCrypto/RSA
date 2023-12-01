@@ -308,16 +308,28 @@ impl RsaPrivateKey {
         d: BigUint,
         primes: Vec<BigUint>,
     ) -> Result<RsaPrivateKey> {
-        let raw_n = to_uint(n.clone());
-        let n_params = BoxedResidueParams::new(raw_n.clone()).unwrap();
-        let n_c = NonZero::new(raw_n).unwrap();
-        let nbits = n_c.bits_precision();
-
-        let mut should_validate = false;
-        let mut primes: Vec<_> = primes
+        let n = to_uint(n.clone());
+        let nbits = n.bits_precision();
+        let e = to_uint_exact(e, 64);
+        let d = to_uint_exact(d, nbits);
+        let primes = primes
             .into_iter()
             .map(|p| to_uint_exact(p, nbits))
             .collect();
+        Self::from_components_new(n, e, d, primes)
+    }
+
+    pub(crate) fn from_components_new(
+        n: BoxedUint,
+        e: BoxedUint,
+        d: BoxedUint,
+        mut primes: Vec<BoxedUint>,
+    ) -> Result<RsaPrivateKey> {
+        let n_params = BoxedResidueParams::new(n.clone()).unwrap();
+        let n_c = NonZero::new(n.clone()).unwrap();
+        let nbits = n_c.bits_precision();
+
+        let mut should_validate = false;
 
         if primes.len() < 2 {
             if !primes.is_empty() {
@@ -325,20 +337,19 @@ impl RsaPrivateKey {
             }
             // Recover `p` and `q` from `d`.
             // See method in Appendix C.2: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf
-            let (p, q) = recover_primes(&n, &e, &d)?;
+            let (p, q) = recover_primes(&to_biguint(&n), &to_biguint(&e), &to_biguint(&d))?;
             primes.push(to_uint_exact(p, nbits));
             primes.push(to_uint_exact(q, nbits));
             should_validate = true;
         }
 
-        let e = to_uint_exact(e, 64);
         let mut k = RsaPrivateKey {
             pubkey_components: RsaPublicKey {
                 n: n_c,
                 e,
                 n_params,
             },
-            d: to_uint_exact(d, nbits),
+            d,
             primes,
             precomputed: None,
         };
