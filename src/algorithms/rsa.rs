@@ -10,9 +10,8 @@ use rand_core::CryptoRngCore;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::{Error, Result};
-use crate::key::{reduce, to_biguint};
+use crate::key::{reduce, to_biguint, to_uint_exact};
 use crate::traits::keys::{PrivateKeyPartsNew, PublicKeyPartsNew};
-use crate::traits::PublicKeyParts;
 
 /// ⚠️ Raw RSA encryption of m with the public key. No padding is performed.
 ///
@@ -21,8 +20,10 @@ use crate::traits::PublicKeyParts;
 /// Use this function with great care! Raw RSA should never be used without an appropriate padding
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
-pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> Result<BigUint> {
-    Ok(m.modpow(&key.e(), &key.n()))
+pub fn rsa_encrypt<K: PublicKeyPartsNew>(key: &K, m: &BigUint) -> Result<BigUint> {
+    let m = to_uint_exact(m.clone(), key.n().bits_precision()); // TODO: change input
+    let res = pow_mod_params(&m, key.e(), key.n_params());
+    Ok(to_biguint(&res))
 }
 
 /// ⚠️ Performs raw RSA decryption with no padding or error checking.
@@ -53,10 +54,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
 
     let mut ir = None;
 
-    let n_params = priv_key
-        .residue_params()
-        .cloned()
-        .unwrap_or_else(|| BoxedResidueParams::new(n.clone().get()).unwrap());
+    let n_params = priv_key.n_params();
 
     let c = if let Some(ref mut rng) = rng {
         let (blinded, unblinder) = blind(rng, priv_key, &c, &n_params);

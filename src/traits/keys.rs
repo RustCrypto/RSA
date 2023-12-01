@@ -30,6 +30,8 @@ pub trait PublicKeyPartsNew {
     /// Returns the public exponent of the key.
     fn e(&self) -> &BoxedUint;
 
+    fn n_params(&self) -> BoxedResidueParams;
+
     /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
     /// or by this public key will have the same size.
     fn size(&self) -> usize {
@@ -118,8 +120,6 @@ pub trait PrivateKeyPartsNew: PublicKeyPartsNew {
 
     /// Returns an iterator over the CRT Values
     fn crt_values(&self) -> Option<&[CrtValueNew]>;
-
-    fn residue_params(&self) -> Option<&BoxedResidueParams>;
 
     fn p_params(&self) -> Option<&BoxedResidueParams>;
 

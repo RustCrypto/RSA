@@ -33,6 +33,8 @@ pub struct RsaPublicKey {
     ///
     /// Typically 0x10001 (65537)
     e: BoxedUint,
+
+    n_params: BoxedResidueParams,
 }
 
 // TODO: derive `Hash` impl when `BoxedUint` supports it
@@ -103,8 +105,6 @@ pub(crate) struct PrecomputedValues {
     /// Q^-1 mod P
     pub(crate) qinv: BoxedUint,
 
-    pub(crate) residue_params: BoxedResidueParams,
-
     pub(crate) p_params: BoxedResidueParams,
     pub(crate) q_params: BoxedResidueParams,
 }
@@ -133,9 +133,11 @@ impl From<&RsaPrivateKey> for RsaPublicKey {
     fn from(private_key: &RsaPrivateKey) -> Self {
         let n = PublicKeyPartsNew::n(private_key);
         let e = PublicKeyPartsNew::e(private_key);
+        let n_params = PublicKeyPartsNew::n_params(private_key);
         RsaPublicKey {
             n: n.clone(),
             e: e.clone(),
+            n_params,
         }
     }
 }
@@ -147,6 +149,10 @@ impl PublicKeyPartsNew for RsaPublicKey {
 
     fn e(&self) -> &BoxedUint {
         &self.e
+    }
+
+    fn n_params(&self) -> BoxedResidueParams {
+        self.n_params.clone()
     }
 }
 
@@ -194,10 +200,13 @@ impl RsaPublicKey {
     pub fn new_with_max_size(n: BigUint, e: BigUint, max_size: usize) -> Result<Self> {
         check_public_with_max_size(&n, &e, max_size)?;
 
-        let n = NonZero::new(to_uint(n)).unwrap();
+        let raw_n = to_uint(n);
+        let n_params = BoxedResidueParams::new(raw_n.clone()).unwrap();
+        let n = NonZero::new(raw_n).unwrap();
+
         // widen to 64bit
         let e = to_uint_exact(e, 64);
-        let k = Self { n, e };
+        let k = Self { n, e, n_params };
 
         Ok(k)
     }
@@ -209,10 +218,11 @@ impl RsaPublicKey {
     /// Most applications should use [`RsaPublicKey::new`] or
     /// [`RsaPublicKey::new_with_max_size`] instead.
     pub fn new_unchecked(n: BigUint, e: BigUint) -> Self {
-        // TODO: widen?
-        let n = NonZero::new(to_uint(n)).unwrap();
+        let raw_n = to_uint(n);
+        let n_params = BoxedResidueParams::new(raw_n.clone()).unwrap();
+        let n = NonZero::new(raw_n).unwrap();
         let e = to_uint_exact(e, 64);
-        Self { n, e }
+        Self { n, e, n_params }
     }
 }
 
@@ -249,6 +259,10 @@ impl PublicKeyPartsNew for RsaPrivateKey {
 
     fn e(&self) -> &BoxedUint {
         &self.pubkey_components.e
+    }
+
+    fn n_params(&self) -> BoxedResidueParams {
+        self.pubkey_components.n_params.clone()
     }
 }
 
@@ -294,7 +308,9 @@ impl RsaPrivateKey {
         d: BigUint,
         primes: Vec<BigUint>,
     ) -> Result<RsaPrivateKey> {
-        let n_c = NonZero::new(to_uint(n.clone())).unwrap();
+        let raw_n = to_uint(n.clone());
+        let n_params = BoxedResidueParams::new(raw_n.clone()).unwrap();
+        let n_c = NonZero::new(raw_n).unwrap();
         let nbits = n_c.bits_precision();
 
         let mut should_validate = false;
@@ -317,7 +333,11 @@ impl RsaPrivateKey {
 
         let e = to_uint_exact(e, 64);
         let mut k = RsaPrivateKey {
-            pubkey_components: RsaPublicKey { n: n_c, e },
+            pubkey_components: RsaPublicKey {
+                n: n_c,
+                e,
+                n_params,
+            },
             d: to_uint_exact(d, nbits),
             primes,
             precomputed: None,
@@ -404,9 +424,6 @@ impl RsaPrivateKey {
         }
         let qinv = qinv.unwrap();
 
-        let residue_params =
-            BoxedResidueParams::new(self.pubkey_components.n.clone().get()).unwrap();
-
         let p_params = BoxedResidueParams::new(p.clone()).unwrap();
         let q_params = BoxedResidueParams::new(q.clone()).unwrap();
 
@@ -414,7 +431,6 @@ impl RsaPrivateKey {
             dp,
             dq,
             qinv,
-            residue_params,
             p_params,
             q_params,
         });
@@ -540,10 +556,6 @@ impl PrivateKeyPartsNew for RsaPrivateKey {
         None
     }
 
-    fn residue_params(&self) -> Option<&BoxedResidueParams> {
-        self.precomputed.as_ref().map(|p| &p.residue_params)
-    }
-
     fn p_params(&self) -> Option<&BoxedResidueParams> {
         self.precomputed.as_ref().map(|p| &p.p_params)
     }
@@ -648,18 +660,20 @@ mod tests {
 
     #[test]
     fn test_from_into() {
+        let raw_n = BoxedUint::from(101u64);
         let private_key = RsaPrivateKey {
             pubkey_components: RsaPublicKey {
-                n: NonZero::new(to_uint_exact(BigUint::from_u64(100).unwrap(), 64)).unwrap(),
-                e: to_uint_exact(BigUint::from_u64(200).unwrap(), 64),
+                n: NonZero::new(raw_n.clone()).unwrap(),
+                e: BoxedUint::from(200u64),
+                n_params: BoxedResidueParams::new(raw_n).unwrap(),
             },
-            d: to_uint_exact(BigUint::from_u64(123).unwrap(), 64),
+            d: BoxedUint::from(123u64),
             primes: vec![],
             precomputed: None,
         };
         let public_key: RsaPublicKey = private_key.into();
 
-        assert_eq!(PublicKeyParts::n(&public_key).to_u64(), Some(100));
+        assert_eq!(PublicKeyParts::n(&public_key).to_u64(), Some(101));
         assert_eq!(PublicKeyParts::e(&public_key).to_u64(), Some(200));
     }
 
