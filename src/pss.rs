@@ -21,6 +21,7 @@ pub use self::{
 
 use alloc::{boxed::Box, vec::Vec};
 use core::fmt::{self, Debug};
+use crypto_bigint::BoxedUint;
 
 use const_oid::{AssociatedOid, ObjectIdentifier};
 use digest::{Digest, DynDigest, FixedOutputReset};
@@ -29,7 +30,7 @@ use pkcs1::RsaPssParams;
 use pkcs8::spki::{der::Any, AlgorithmIdentifierOwned};
 use rand_core::CryptoRngCore;
 
-use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
+use crate::algorithms::pad::{uint_to_be_pad_new, uint_to_zeroizing_be_pad_new};
 use crate::algorithms::pss::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
@@ -136,7 +137,11 @@ pub(crate) fn verify(
         return Err(Error::Verification);
     }
 
-    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
+    let sig = to_uint_exact(
+        sig.clone(),
+        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(pub_key),
+    );
+    let mut em = uint_to_be_pad_new(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
 
     emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits())
 }
@@ -155,7 +160,11 @@ where
         return Err(Error::Verification);
     }
 
-    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
+    let sig = to_uint_exact(
+        sig.clone(),
+        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(pub_key),
+    );
+    let mut em = uint_to_be_pad_new(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
 
     emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits())
 }
@@ -207,11 +216,11 @@ fn sign_pss_with_salt<T: CryptoRngCore>(
     let em_bits = priv_key.n().bits() - 1;
     let em = emsa_pss_encode(hashed, em_bits, salt, digest)?;
 
-    let em = to_uint_exact(
-        BigUint::from_bytes_be(&em),
-        crate::traits::keys::PublicKeyPartsNew::n(priv_key).bits_precision(),
-    );
-    uint_to_zeroizing_be_pad(
+    let em = BoxedUint::from_be_slice(
+        &em,
+        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(priv_key),
+    )?;
+    uint_to_zeroizing_be_pad_new(
         rsa_decrypt_and_check(priv_key, blind_rng, &em)?,
         priv_key.size(),
     )
@@ -226,11 +235,11 @@ fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputR
     let em_bits = priv_key.n().bits() - 1;
     let em = emsa_pss_encode_digest::<D>(hashed, em_bits, salt)?;
 
-    let em = to_uint_exact(
-        BigUint::from_bytes_be(&em),
-        crate::traits::keys::PublicKeyPartsNew::n(priv_key).bits_precision(),
-    );
-    uint_to_zeroizing_be_pad(
+    let em = BoxedUint::from_be_slice(
+        &em,
+        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(priv_key),
+    )?;
+    uint_to_zeroizing_be_pad_new(
         rsa_decrypt_and_check(priv_key, blind_rng, &em)?,
         priv_key.size(),
     )

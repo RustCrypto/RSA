@@ -32,6 +32,10 @@ pub trait PublicKeyPartsNew {
 
     fn n_params(&self) -> BoxedResidueParams;
 
+    fn n_bits_precision(&self) -> usize {
+        self.n().bits_precision()
+    }
+
     /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
     /// or by this public key will have the same size.
     fn size(&self) -> usize {

@@ -13,17 +13,16 @@ use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
+use crypto_bigint::BoxedUint;
 
 use digest::{Digest, DynDigest, FixedOutputReset};
-use num_bigint::BigUint;
 use rand_core::CryptoRngCore;
-use zeroize::Zeroizing;
 
 use crate::algorithms::oaep::*;
-use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
+use crate::algorithms::pad::{uint_to_be_pad_new, uint_to_zeroizing_be_pad_new};
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
-use crate::key::{self, to_uint_exact, RsaPrivateKey, RsaPublicKey};
+use crate::key::{self, RsaPrivateKey, RsaPublicKey};
 use crate::traits::{PaddingScheme, PublicKeyParts};
 
 /// Encryption and Decryption using [OAEP padding](https://datatracker.ietf.org/doc/html/rfc8017#section-7.1).
@@ -194,8 +193,11 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
 
     let em = oaep_encrypt(rng, msg, digest, mgf_digest, label, pub_key.size())?;
 
-    let int = Zeroizing::new(BigUint::from_bytes_be(&em));
-    uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
+    let int = BoxedUint::from_be_slice(
+        &em,
+        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(pub_key),
+    )?;
+    uint_to_be_pad_new(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
 /// Encrypts the given message with RSA and the padding scheme from
@@ -215,8 +217,11 @@ fn encrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
 
     let em = oaep_encrypt_digest::<_, D, MGD>(rng, msg, label, pub_key.size())?;
 
-    let int = Zeroizing::new(BigUint::from_bytes_be(&em));
-    uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
+    let int = BoxedUint::from_be_slice(
+        &em,
+        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(pub_key),
+    )?;
+    uint_to_be_pad_new(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from [PKCS#1 OAEP].
@@ -246,12 +251,13 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
         return Err(Error::Decryption);
     }
 
-    let ciphertext = to_uint_exact(
-        BigUint::from_bytes_be(ciphertext),
-        crate::traits::keys::PublicKeyPartsNew::n(priv_key).bits_precision(),
-    );
+    let ciphertext = BoxedUint::from_be_slice(
+        ciphertext,
+        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(priv_key),
+    )?;
+
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
-    let mut em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
+    let mut em = uint_to_zeroizing_be_pad_new(em, priv_key.size())?;
 
     oaep_decrypt(&mut em, digest, mgf_digest, label, priv_key.size())
 }
@@ -281,12 +287,12 @@ fn decrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
         return Err(Error::Decryption);
     }
 
-    let ciphertext = to_uint_exact(
-        BigUint::from_bytes_be(ciphertext),
-        crate::traits::keys::PublicKeyPartsNew::n(priv_key).bits_precision(),
-    );
+    let ciphertext = BoxedUint::from_be_slice(
+        ciphertext,
+        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(priv_key),
+    )?;
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
-    let mut em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
+    let mut em = uint_to_zeroizing_be_pad_new(em, priv_key.size())?;
 
     oaep_decrypt_digest::<D, MGD>(&mut em, label, priv_key.size())
 }

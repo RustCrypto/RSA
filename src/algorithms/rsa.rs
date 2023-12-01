@@ -10,7 +10,7 @@ use rand_core::CryptoRngCore;
 use zeroize::{Zeroize, Zeroizing};
 
 use crate::errors::{Error, Result};
-use crate::key::{reduce, to_biguint, to_uint_exact};
+use crate::key::reduce;
 use crate::traits::keys::{PrivateKeyPartsNew, PublicKeyPartsNew};
 
 /// ⚠️ Raw RSA encryption of m with the public key. No padding is performed.
@@ -20,10 +20,9 @@ use crate::traits::keys::{PrivateKeyPartsNew, PublicKeyPartsNew};
 /// Use this function with great care! Raw RSA should never be used without an appropriate padding
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
-pub fn rsa_encrypt<K: PublicKeyPartsNew>(key: &K, m: &BigUint) -> Result<BigUint> {
-    let m = to_uint_exact(m.clone(), key.n().bits_precision()); // TODO: change input
-    let res = pow_mod_params(&m, key.e(), key.n_params());
-    Ok(to_biguint(&res))
+pub fn rsa_encrypt<K: PublicKeyPartsNew>(key: &K, m: &BoxedUint) -> Result<BoxedUint> {
+    let res = pow_mod_params(m, key.e(), key.n_params());
+    Ok(res)
 }
 
 /// ⚠️ Performs raw RSA decryption with no padding or error checking.
@@ -39,7 +38,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     mut rng: Option<&mut R>,
     priv_key: &impl PrivateKeyPartsNew,
     c: &BoxedUint,
-) -> Result<BigUint> {
+) -> Result<BoxedUint> {
     let n = priv_key.n();
     let d = priv_key.d();
 
@@ -103,10 +102,10 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     match ir {
         Some(ref ir) => {
             // unblind
-            let res = to_biguint(&unblind(&m, ir, n_params));
+            let res = unblind(&m, ir, n_params);
             Ok(res)
         }
-        None => Ok(to_biguint(&m)),
+        None => Ok(m),
     }
 }
 
@@ -124,14 +123,14 @@ pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
     priv_key: &impl PrivateKeyPartsNew,
     rng: Option<&mut R>,
     c: &BoxedUint,
-) -> Result<BigUint> {
+) -> Result<BoxedUint> {
     let m = rsa_decrypt(rng, priv_key, c)?;
 
     // In order to defend against errors in the CRT computation, m^e is
     // calculated, which should match the original ciphertext.
     let check = rsa_encrypt(priv_key, &m)?;
 
-    if to_biguint(c) != check {
+    if c != &check {
         return Err(Error::Internal);
     }
 

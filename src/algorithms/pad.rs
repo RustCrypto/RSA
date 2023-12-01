@@ -1,6 +1,7 @@
 //! Special handling for converting the BigUint to u8 vectors
 
 use alloc::vec::Vec;
+use crypto_bigint::BoxedUint;
 use num_bigint::BigUint;
 use zeroize::Zeroizing;
 
@@ -26,9 +27,15 @@ pub(crate) fn uint_to_be_pad(input: BigUint, padded_len: usize) -> Result<Vec<u8
 
 /// Converts input to the new vector of the given length, using BE and with 0s left padded.
 #[inline]
-pub(crate) fn uint_to_zeroizing_be_pad(input: BigUint, padded_len: usize) -> Result<Vec<u8>> {
+pub(crate) fn uint_to_be_pad_new(input: BoxedUint, padded_len: usize) -> Result<Vec<u8>> {
+    left_pad(&input.to_be_bytes(), padded_len)
+}
+
+/// Converts input to the new vector of the given length, using BE and with 0s left padded.
+#[inline]
+pub(crate) fn uint_to_zeroizing_be_pad_new(input: BoxedUint, padded_len: usize) -> Result<Vec<u8>> {
     let m = Zeroizing::new(input);
-    let m = Zeroizing::new(m.to_bytes_be());
+    let m = Zeroizing::new(m.to_be_bytes());
     left_pad(&m, padded_len)
 }
 
