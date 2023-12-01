@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.6 (2023-12-01)
+### Added
+- expose a `pss::get_default_pss_signature_algo_id` helper ([#393])
+- expose `pkcs1v15::RsaSignatureAssociatedOid` ([#392])
+
+[#392]: https://github.com/RustCrypto/RSA/pull/392
+[#393]: https://github.com/RustCrypto/RSA/pull/393
+
 ## 0.9.5 (2023-11-27)
 ### Added
 - Adds `RsaPrivateKey::from_primes` and `RsaPrivateKey::from_p_q` methods ([#386])
