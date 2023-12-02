@@ -78,7 +78,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         let p_params = priv_key.p_params().unwrap();
         let q_params = priv_key.q_params().unwrap();
 
-        let p = &priv_key.primes()[0];
+        let _p = &priv_key.primes()[0];
         let q = &priv_key.primes()[1];
 
         // precomputed: dP = (1/e) mod (p-1) = d mod (p-1)
@@ -89,11 +89,16 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         // m2 = c^dQ mod q
         let m2 = pow_mod_params(&c, &dq, q_params.clone());
 
+        // (m1 - m2) mod p = (m1 mod p) - (m2 mod p) mod p
+        let m1r = BoxedResidue::new(&m1, p_params.clone());
+        let m2r = BoxedResidue::new(&m2, p_params.clone());
+        let x = m1r.sub(&m2r);
+
         // precomputed: qInv = (1/q) mod p
+        let qinv = BoxedResidue::new(&qinv, p_params.clone());
 
         // h = qInv.(m1 - m2) mod p
-        let x = m1.sub_mod(&m2, p);
-        let h = mul_mod_params(qinv, &x, p_params.clone());
+        let h = qinv.mul(&x).retrieve();
         // m = m2 + h.q
         let m = m2.wrapping_add(&h.wrapping_mul(q)); // TODO: verify wrapping is correct here
         m
