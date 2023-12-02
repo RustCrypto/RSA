@@ -2,7 +2,7 @@
 
 use alloc::borrow::Cow;
 use crypto_bigint::modular::{BoxedResidue, BoxedResidueParams};
-use crypto_bigint::{BoxedUint, RandomMod};
+use crypto_bigint::{BoxedUint, RandomMod, Wrapping};
 use num_bigint::{BigUint, ModInverse};
 use num_integer::{sqrt, Integer};
 use num_traits::{FromPrimitive, One, Pow, Zero as _};
@@ -85,22 +85,25 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         // precomputed: dQ = (1/e) mod (q-1) = d mod (q-1)
 
         // m1 = c^dP mod p
-        let m1 = pow_mod_params(&c, &dp, p_params.clone());
+        let cp = BoxedResidue::new(&c, p_params.clone());
+        let mut m1 = cp.pow(&dp);
         // m2 = c^dQ mod q
-        let m2 = pow_mod_params(&c, &dq, q_params.clone());
+        let cq = BoxedResidue::new(&c, q_params.clone());
+        let m2 = cq.pow(&dq).retrieve();
 
         // (m1 - m2) mod p = (m1 mod p) - (m2 mod p) mod p
-        let m1r = BoxedResidue::new(&m1, p_params.clone());
         let m2r = BoxedResidue::new(&m2, p_params.clone());
-        let x = m1r.sub(&m2r);
+        m1 -= &m2r;
 
         // precomputed: qInv = (1/q) mod p
 
         // h = qInv.(m1 - m2) mod p
-        let h = qinv.mul(&x).retrieve();
+        let mut m: Wrapping<BoxedUint> = Wrapping(qinv.mul(&m1).retrieve());
+
         // m = m2 + h.q
-        let m = m2.wrapping_add(&h.wrapping_mul(q)); // TODO: verify wrapping is correct here
-        m
+        m *= Wrapping(q.clone());
+        m += Wrapping(m2);
+        m.0
     };
 
     match ir {

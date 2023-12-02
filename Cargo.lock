@@ -125,7 +125,7 @@ dependencies = [
 [[package]]
 name = "crypto-bigint"
 version = "0.6.0-pre.0"
-source = "git+https://github.com/RustCrypto/crypto-bigint?branch=master#31d9373e632da6dc3dcf4e61e83a8931839ba721"
+source = "git+https://github.com/RustCrypto/crypto-bigint?branch=master#0cd01b7a210adfe0e8da7e0c875cc06360f3f934"
 dependencies = [
  "rand_core",
  "serdect",
