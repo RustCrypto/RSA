@@ -2,7 +2,10 @@
 
 use alloc::vec::Vec;
 
-use crypto_bigint::{modular::BoxedResidueParams, BoxedUint, NonZero};
+use crypto_bigint::{
+    modular::{BoxedResidue, BoxedResidueParams},
+    BoxedUint, NonZero,
+};
 use num_bigint::{BigInt, BigUint, IntoBigInt};
 use num_traits::FromPrimitive;
 use zeroize::Zeroize;
@@ -98,7 +101,7 @@ impl<T: PrivateKeyPartsNew> PrivateKeyParts for T {
         PrivateKeyPartsNew::dq(self).map(to_biguint)
     }
     fn qinv(&self) -> Option<BigInt> {
-        PrivateKeyPartsNew::qinv(self).and_then(|v| to_biguint(v).into_bigint())
+        PrivateKeyPartsNew::qinv(self).and_then(|v| to_biguint(&v.retrieve()).into_bigint())
     }
 
     fn crt_values(&self) -> Option<Vec<CrtValue>> {
@@ -121,7 +124,7 @@ pub trait PrivateKeyPartsNew: PublicKeyPartsNew {
     fn dq(&self) -> Option<&BoxedUint>;
 
     /// Returns the precomputed qinv value, Q^-1 mod P
-    fn qinv(&self) -> Option<&BoxedUint>;
+    fn qinv(&self) -> Option<&BoxedResidue>;
 
     /// Returns an iterator over the CRT Values
     fn crt_values(&self) -> Option<&[CrtValueNew]>;

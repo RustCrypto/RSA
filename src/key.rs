@@ -111,7 +111,7 @@ pub(crate) struct PrecomputedValues {
     /// D mod (Q-1)
     pub(crate) dq: BoxedUint,
     /// Q^-1 mod P
-    pub(crate) qinv: BoxedUint,
+    pub(crate) qinv: BoxedResidue,
 
     pub(crate) p_params: BoxedResidueParams,
     pub(crate) q_params: BoxedResidueParams,
@@ -121,7 +121,6 @@ impl Zeroize for PrecomputedValues {
     fn zeroize(&mut self) {
         self.dp.zeroize();
         self.dq.zeroize();
-        self.qinv.zeroize();
     }
 }
 
@@ -436,18 +435,19 @@ impl RsaPrivateKey {
 
         // TODO: error handling
 
+        let p_params = BoxedResidueParams::new(p.clone()).unwrap();
+        let q_params = BoxedResidueParams::new(q.clone()).unwrap();
+
         let x = NonZero::new(p.wrapping_sub(&BoxedUint::one())).unwrap();
         let dp = d.rem_vartime(&x);
         let x = NonZero::new(q.wrapping_sub(&BoxedUint::one())).unwrap();
         let dq = d.rem_vartime(&x);
-        let qinv = q.inv_mod(p);
+        let qinv = BoxedResidue::new(q, p_params.clone());
+        let qinv = qinv.invert();
         if qinv.is_none().into() {
             return Err(Error::InvalidPrime);
         }
         let qinv = qinv.unwrap();
-
-        let p_params = BoxedResidueParams::new(p.clone()).unwrap();
-        let q_params = BoxedResidueParams::new(q.clone()).unwrap();
 
         self.precomputed = Some(PrecomputedValues {
             dp,
@@ -570,7 +570,7 @@ impl PrivateKeyPartsNew for RsaPrivateKey {
         self.precomputed.as_ref().map(|p| &p.dq)
     }
 
-    fn qinv(&self) -> Option<&BoxedUint> {
+    fn qinv(&self) -> Option<&BoxedResidue> {
         self.precomputed.as_ref().map(|p| &p.qinv)
     }
 

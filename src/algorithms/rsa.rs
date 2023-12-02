@@ -95,7 +95,6 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         let x = m1r.sub(&m2r);
 
         // precomputed: qInv = (1/q) mod p
-        let qinv = BoxedResidue::new(&qinv, p_params.clone());
 
         // h = qInv.(m1 - m2) mod p
         let h = qinv.mul(&x).retrieve();
