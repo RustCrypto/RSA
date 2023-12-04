@@ -39,7 +39,7 @@ impl TryFrom<&[u8]> for Signature {
         let len = bytes.len();
         Ok(Self {
             // TODO: how to convert error?
-            inner: BoxedUint::from_be_slice(bytes, len * 8).unwrap(),
+            inner: BoxedUint::from_be_slice(bytes, len as u32 * 8).unwrap(),
             len,
         })
     }

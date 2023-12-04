@@ -232,7 +232,7 @@ impl RsaPublicKey {
     }
 }
 
-fn needed_bits(n: &BigUint) -> usize {
+fn needed_bits(n: &BigUint) -> u32 {
     // widen to the max size bits
     let n_bits = n.bits();
 
@@ -625,7 +625,7 @@ pub(crate) fn to_biguint(uint: &BoxedUint) -> BigUint {
     BigUint::from_bytes_be(&uint.to_be_bytes())
 }
 
-pub(crate) fn to_uint_exact(big_uint: BigUint, nbits: usize) -> BoxedUint {
+pub(crate) fn to_uint_exact(big_uint: BigUint, nbits: u32) -> BoxedUint {
     let res = inner_to_uint(big_uint);
 
     match res.bits_precision().cmp(&nbits) {
@@ -643,13 +643,13 @@ fn inner_to_uint(big_uint: BigUint) -> BoxedUint {
     let mut padded_bytes = vec![0u8; pad_count];
     padded_bytes.extend_from_slice(&bytes);
 
-    BoxedUint::from_be_slice(&padded_bytes, padded_bytes.len() * 8).unwrap()
+    BoxedUint::from_be_slice(&padded_bytes, padded_bytes.len() as u32 * 8).unwrap()
 }
 
 pub(crate) fn to_uint(big_uint: BigUint) -> BoxedUint {
     let nbits = needed_bits(&big_uint);
     let res = inner_to_uint(big_uint);
-    if res.bits_precision() < nbits {
+    if (res.bits_precision() as u32) < nbits {
         return res.widen(nbits);
     }
     res
