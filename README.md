@@ -117,7 +117,7 @@ dual licensed as above, without any additional terms or conditions.
 [//]: # (links)
 
 [RustCrypto]: https://github.com/RustCrypto/
-[audit]: https://www.opentech.fund/results/security-safety-audits/deltachat/
+[audit]: https://public.opentech.fund/documents/1907_OTF_DeltaChat_RPGP_RustRSA_GB_Report_v1.pdf
 [open security issues]: https://github.com/RustCrypto/RSA/issues?q=is%3Aissue+is%3Aopen+label%3Asecurity
 [modular exponentiation is not constant time]: https://github.com/RustCrypto/RSA/issues/19
 [random blinding]: https://en.wikipedia.org/wiki/Blinding_(cryptography)
