@@ -85,14 +85,14 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         // precomputed: dQ = (1/e) mod (q-1) = d mod (q-1)
 
         // m1 = c^dP mod p
-        let cp = BoxedResidue::new(&c, p_params.clone());
+        let cp = BoxedResidue::new(c.clone().into_owned(), p_params.clone());
         let mut m1 = cp.pow(&dp);
         // m2 = c^dQ mod q
-        let cq = BoxedResidue::new(&c, q_params.clone());
+        let cq = BoxedResidue::new(c.into_owned(), q_params.clone());
         let m2 = cq.pow(&dq).retrieve();
 
         // (m1 - m2) mod p = (m1 mod p) - (m2 mod p) mod p
-        let m2r = BoxedResidue::new(&m2, p_params.clone());
+        let m2r = BoxedResidue::new(m2.clone(), p_params.clone());
         m1 -= &m2r;
 
         // precomputed: qInv = (1/q) mod p
@@ -197,8 +197,8 @@ fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: BoxedResidueParam
 /// Computes `lhs.mul_mod(rhs, n)` with precomputed `n_params`.
 fn mul_mod_params(lhs: &BoxedUint, rhs: &BoxedUint, n_params: BoxedResidueParams) -> BoxedUint {
     // TODO: nicer api in crypto-bigint?
-    let lhs = BoxedResidue::new(lhs, n_params.clone());
-    let rhs = BoxedResidue::new(rhs, n_params);
+    let lhs = BoxedResidue::new(lhs.clone(), n_params.clone());
+    let rhs = BoxedResidue::new(rhs.clone(), n_params);
     (lhs * rhs).retrieve()
 }
 

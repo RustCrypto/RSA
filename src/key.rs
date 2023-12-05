@@ -442,7 +442,7 @@ impl RsaPrivateKey {
         let dp = d.rem_vartime(&x);
         let x = NonZero::new(q.wrapping_sub(&BoxedUint::one())).unwrap();
         let dq = d.rem_vartime(&x);
-        let qinv = BoxedResidue::new(q, p_params.clone());
+        let qinv = BoxedResidue::new(q.clone(), p_params.clone());
         let qinv = qinv.invert();
         if qinv.is_none().into() {
             return Err(Error::InvalidPrime);
@@ -666,7 +666,7 @@ pub(crate) fn reduce(n: &BoxedUint, p: BoxedResidueParams) -> BoxedResidue {
     };
 
     let n_reduced = n.rem_vartime(&modulus).widen(p.bits_precision());
-    BoxedResidue::new(&n_reduced, p)
+    BoxedResidue::new(n_reduced, p)
 }
 
 #[cfg(test)]
