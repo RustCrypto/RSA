@@ -209,7 +209,7 @@ impl RsaPublicKey {
         let e = e.to_u64().unwrap();
 
         let raw_n = to_uint(n);
-        let n_params = BoxedResidueParams::new(raw_n.clone()).unwrap();
+        let n_params = BoxedResidueParams::new_vartime(raw_n.clone()).unwrap();
         let n = NonZero::new(raw_n).unwrap();
 
         let k = Self { n, e, n_params };
@@ -225,7 +225,7 @@ impl RsaPublicKey {
     /// [`RsaPublicKey::new_with_max_size`] instead.
     pub fn new_unchecked(n: BigUint, e: BigUint) -> Self {
         let raw_n = to_uint(n);
-        let n_params = BoxedResidueParams::new(raw_n.clone()).unwrap();
+        let n_params = BoxedResidueParams::new_vartime(raw_n.clone()).unwrap();
         let n = NonZero::new(raw_n).unwrap();
         let e = e.to_u64().unwrap();
         Self { n, e, n_params }
@@ -331,7 +331,7 @@ impl RsaPrivateKey {
         d: BoxedUint,
         mut primes: Vec<BoxedUint>,
     ) -> Result<RsaPrivateKey> {
-        let n_params = BoxedResidueParams::new(n.clone()).unwrap();
+        let n_params = BoxedResidueParams::new_vartime(n.clone()).unwrap();
         let n_c = NonZero::new(n.clone()).unwrap();
         let nbits = n_c.bits_precision();
 
@@ -435,8 +435,8 @@ impl RsaPrivateKey {
 
         // TODO: error handling
 
-        let p_params = BoxedResidueParams::new(p.clone()).unwrap();
-        let q_params = BoxedResidueParams::new(q.clone()).unwrap();
+        let p_params = BoxedResidueParams::new_vartime(p.clone()).unwrap();
+        let q_params = BoxedResidueParams::new_vartime(q.clone()).unwrap();
 
         let x = NonZero::new(p.wrapping_sub(&BoxedUint::one())).unwrap();
         let dp = d.rem_vartime(&x);
@@ -687,7 +687,7 @@ mod tests {
             pubkey_components: RsaPublicKey {
                 n: NonZero::new(raw_n.clone()).unwrap(),
                 e: 200u64,
-                n_params: BoxedResidueParams::new(raw_n).unwrap(),
+                n_params: BoxedResidueParams::new_vartime(raw_n).unwrap(),
             },
             d: BoxedUint::from(123u64),
             primes: vec![],
