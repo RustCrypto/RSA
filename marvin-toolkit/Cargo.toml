@@ -9,5 +9,5 @@ clap = { version = "4", features = ["derive"] }
 rsa = "0.9"
 
 [patch.crates-io]
-rsa = { git = "https://github.com/xuganyu96/RSA", branch = "const-crypto-biguint" }
+rsa = { git = "https://github.com/RustCrypto/RSA", branch = "const-crypto-biguint" }
 crypto-bigint = { git = "https://github.com/RustCrypto/crypto-bigint", branch = "master" }
