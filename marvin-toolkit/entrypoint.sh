@@ -2,8 +2,8 @@
 
 # Build the test harness
 cd example/rust-crypto
-cargo update
-cargo build --profile release
+cargo update --quiet
+cargo build --profile release --quiet
 cd ~/marvin-toolkit
 
 # Parse CLI inputs to $size and $repeat
