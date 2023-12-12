@@ -128,6 +128,6 @@ PYTHONPATH=tlsfuzzer marvin-venv/bin/python3 tlsfuzzer/tlsfuzzer/analysis.py \
 
 # Copy over the keys and the results, if the results directory exists
 if [[ -d ~/marvin-toolkit/outputs ]]; then
-  copy -r rsa${size} ~/marvin-toolkit/outputs/keys
-  copy -r rsa${size}_repeat ~/marvin-toolkit/outputs/results
+  cp -r rsa${size} ~/marvin-toolkit/outputs/keys
+  cp -r rsa${size}_repeat ~/marvin-toolkit/outputs/results
 fi

@@ -3,15 +3,24 @@ This document describes the procedure for replicating the analysis for the Marvi
 
 **TL;DR**:
 ```bash
+# Build the image
 docker build -t marvin:latest .
 
-# Compile RustCrypto/RSA 0.9 then Run the analysis using RSA 2048 and with 
-# 100000 repeat
+# Create the output directory and allow container to write to it
+mkdir -p outputs
+chmod a+rw outputs
+
+# Run the analysis
 docker run -d --rm \
     --name marvin \
+    -v $(pwd)/outputs:/home/rustcrypto/marvin-toolkit/outputs \
+    -v $(pwd)/Cargo.toml:/home/rustcrypto/marvin-toolkit/example/rust-crypto/Cargo.toml \
     marvin:latest
 
 # Use "docker logs -f marvin" to read live output
+
+# Read the output
+cat outputs/results/report.txt
 ```
 
 ## Adjusting analysis parameters
@@ -36,13 +45,12 @@ docker run -d --rm \
 After the analysis is done, the generate keys, ciphertexts, and the analysis outputs are all copied into the directory `/home/rustcrypto/marvin-toolkit/outputs`. To extract and preserve these artifacts, mount a volume into this directory, such as using a bind mount:
 
 ```bash
-HOST_OUTPUT_DIR="..."
-mkdir -p ${HOST_OUTPUT_DIR}
-chmod a+rw ${HOST_OUTPUT_DIR}
+mkdir -p outputs
+chmod a+rw outputs
 
 # Mount
 docker run -d --rm --name "marvin" \
-    -v ${HOST_OUTPUT_DIR}:/home/rustcrypto/marvin-toolkit/outputs \
+    -v $(pwd)/outputs:/home/rustcrypto/marvin-toolkit/outputs \
     marvin:latest
 ```
 
@@ -51,6 +59,8 @@ The test harness is compiled at container run-time, so a custom `Cargo.toml` can
 
 ```bash
 docker run -d --rm --name "marvin" \
-    -v /host/path/Cargo.toml:/home/rustcrypto/marvin-toolkit/example/rust-crypto/Cargo.toml \
+    -v $(pwd)/Cargo.toml:/home/rustcrypto/marvin-toolkit/example/rust-crypto/Cargo.toml \
     marvin:latest
 ```
+
+If no `Cargo.toml` is specified, the default one will use `rsa = 0.9`
