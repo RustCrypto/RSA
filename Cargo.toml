@@ -70,5 +70,5 @@ opt-level = 2
 debug = true
 
 [patch.crates-io]
-crypto-bigint = { git = "https://github.com/RustCrypto/crypto-bigint", branch = "boxed-residue/almost-montgomery-multiplication" }
+crypto-bigint = { git = "https://github.com/RustCrypto/crypto-bigint", branch = "master" }
 # crypto-bigint = { path = "../rustcrypto/crypto-bigint" }
