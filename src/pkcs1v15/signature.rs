@@ -1,17 +1,14 @@
-pub use ::signature::{
-    hazmat::{PrehashSigner, PrehashVerifier},
-    DigestSigner, DigestVerifier, Error, Keypair, RandomizedDigestSigner, RandomizedSigner, Result,
-    SignatureEncoding, Signer, Verifier,
-};
+//! `RSASSA-PKCS1-v1_5` signatures.
+
+use crate::algorithms::pad::uint_to_be_pad;
+use ::signature::SignatureEncoding;
+use alloc::{boxed::Box, string::ToString};
+use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
+use num_bigint::BigUint;
 use spki::{
     der::{asn1::BitString, Result as DerResult},
     SignatureBitStringEncoding,
 };
-
-use crate::algorithms::pad::uint_to_be_pad;
-use alloc::{boxed::Box, string::ToString};
-use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
-use num_bigint::BigUint;
 
 /// `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
 ///
