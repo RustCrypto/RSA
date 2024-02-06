@@ -19,10 +19,10 @@ num-integer = { version = "0.1.39", default-features = false }
 rand_core = { version = "0.6.4", default-features = false }
 const-oid = { version = "=0.10.0-pre.2", default-features = false }
 subtle = { version = "2.1.1", default-features = false }
-digest = { version = "=0.11.0-pre.7", default-features = false, features = ["alloc", "oid"] }
+digest = { version = "=0.11.0-pre.8", default-features = false, features = ["alloc", "oid"] }
 pkcs1 = { version = "=0.8.0-pre.0", default-features = false, features = ["alloc", "pkcs8"] }
 pkcs8 = { version = "=0.11.0-pre.0", default-features = false, features = ["alloc"] }
-signature = { version = "=2.3.0-pre.2", default-features = false , features = ["alloc", "digest", "rand_core"] }
+signature = { version = "=2.3.0-pre.3", default-features = false , features = ["alloc", "digest", "rand_core"] }
 spki = { version = "=0.8.0-pre.0", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
 
