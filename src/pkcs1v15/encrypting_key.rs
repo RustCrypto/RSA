@@ -1,12 +1,15 @@
 use super::encrypt;
 use crate::{traits::RandomizedEncryptor, Result, RsaPublicKey};
 use alloc::vec::Vec;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use rand_core::CryptoRngCore;
 
 /// Encryption key for PKCS#1 v1.5 encryption as described in [RFC8017 § 7.2].
 ///
 /// [RFC8017 § 7.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.2
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct EncryptingKey {
     pub(super) inner: RsaPublicKey,
 }

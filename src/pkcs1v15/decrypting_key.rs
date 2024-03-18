@@ -4,6 +4,8 @@ use crate::{
     traits::{Decryptor, EncryptingKeypair, RandomizedDecryptor},
     Result, RsaPrivateKey,
 };
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use alloc::vec::Vec;
 use rand_core::CryptoRngCore;
 use zeroize::ZeroizeOnDrop;
@@ -12,6 +14,7 @@ use zeroize::ZeroizeOnDrop;
 ///
 /// [RFC8017 § 7.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.2
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DecryptingKey {
     inner: RsaPrivateKey,
 }

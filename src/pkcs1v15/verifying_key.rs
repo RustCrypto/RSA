@@ -3,6 +3,8 @@ use crate::RsaPublicKey;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use digest::Digest;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use pkcs8::{
     spki::{
         der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
@@ -16,6 +18,7 @@ use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
 ///
 /// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct VerifyingKey<D>
 where
     D: Digest,

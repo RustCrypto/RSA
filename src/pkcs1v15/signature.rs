@@ -3,6 +3,8 @@
 use crate::algorithms::pad::uint_to_be_pad;
 use ::signature::SignatureEncoding;
 use alloc::{boxed::Box, string::ToString};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use num_bigint::BigUint;
 use spki::{
@@ -14,6 +16,7 @@ use spki::{
 ///
 /// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 #[derive(Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Signature {
     pub(super) inner: BigUint,
     pub(super) len: usize,
