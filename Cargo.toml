@@ -34,7 +34,6 @@ serde = { version = "1.0.184", optional = true, default-features = false, featur
 
 [dev-dependencies]
 base64ct = { version = "1", features = ["alloc"] }
-serde_json = "1.0.114"
 hex-literal = "0.4.1"
 proptest = "1"
 serde_test = "1.0.89"
