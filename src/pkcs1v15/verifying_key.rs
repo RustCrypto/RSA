@@ -13,7 +13,7 @@ use pkcs8::{
 #[cfg(feature = "serde")]
 use serdect::serde::{ser, de, Deserialize, Serialize};
 use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
-use spki::{der::Decode, Document, EncodePublicKey, SubjectPublicKeyInfo};
+use spki::{Document, EncodePublicKey};
 
 /// Verifying key for `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
 ///

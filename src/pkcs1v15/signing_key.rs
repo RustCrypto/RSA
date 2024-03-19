@@ -1,15 +1,13 @@
 use super::{oid, pkcs1v15_generate_prefix, sign, Signature, VerifyingKey};
 use crate::{dummy_rng::DummyRng, Result, RsaPrivateKey};
 use alloc::vec::Vec;
-use spki::der::Decode;
 use core::marker::PhantomData;
 use digest::Digest;
-use pkcs1::EncodeRsaPrivateKey;
 use pkcs8::{
     spki::{
         der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
         SignatureAlgorithmIdentifier,
-    }, AssociatedOid, EncodePrivateKey, PrivateKeyInfo, SecretDocument
+    }, AssociatedOid, EncodePrivateKey, SecretDocument
 };
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]

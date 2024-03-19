@@ -5,11 +5,9 @@ use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
 use num_integer::Integer;
 use num_traits::{FromPrimitive, One, ToPrimitive};
-use pkcs8::{DecodePrivateKey, EncodePrivateKey};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serdect::serde::{de, ser, Deserialize, Serialize};
-use spki::{DecodePublicKey, EncodePublicKey};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::algorithms::generate::generate_multi_prime_key_with_exp;
@@ -580,6 +578,7 @@ mod tests {
     use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 
     use hex_literal::hex;
+    use pkcs8::DecodePrivateKey;
     use num_traits::{FromPrimitive, ToPrimitive};
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 
