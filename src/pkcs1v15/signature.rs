@@ -16,7 +16,6 @@ use spki::{
 ///
 /// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 #[derive(Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Signature {
     pub(super) inner: BigUint,
     pub(super) len: usize,
