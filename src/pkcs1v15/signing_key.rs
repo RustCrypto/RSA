@@ -7,11 +7,17 @@ use pkcs8::{
     spki::{
         der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
         SignatureAlgorithmIdentifier,
-    }, AssociatedOid, EncodePrivateKey, SecretDocument
+    },
+    AssociatedOid, EncodePrivateKey, SecretDocument,
 };
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
-use serdect::serde::{de, ser, Deserialize, Serialize};
+use {
+    pkcs8::PrivateKeyInfo,
+    serdect::serde::{de, ser, Deserialize, Serialize},
+    spki::der::Decode,
+};
+
 use signature::{
     hazmat::PrehashSigner, DigestSigner, Keypair, RandomizedDigestSigner, RandomizedSigner, Signer,
 };

@@ -7,11 +7,17 @@ use pkcs8::{
     spki::{
         der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
         SignatureAlgorithmIdentifier,
-    }, AssociatedOid
+    },
+    AssociatedOid,
 };
 
 #[cfg(feature = "serde")]
-use serdect::serde::{ser, de, Deserialize, Serialize};
+use {
+    pkcs8::SubjectPublicKeyInfo,
+    serdect::serde::{de, ser, Deserialize, Serialize},
+    spki::der::Decode, 
+};
+
 use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
 use spki::{Document, EncodePublicKey};
 
