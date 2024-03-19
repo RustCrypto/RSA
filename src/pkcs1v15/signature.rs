@@ -4,7 +4,7 @@ use crate::algorithms::pad::uint_to_be_pad;
 use ::signature::SignatureEncoding;
 use alloc::{boxed::Box, string::ToString};
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use serdect::serde::{Deserialize, Serialize};
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use num_bigint::BigUint;
 use spki::{
@@ -80,5 +80,31 @@ impl UpperHex for Signature {
 impl Display for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:X}", self)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for Signature {
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: serdect::serde::Serializer,
+    {
+        serdect::slice::serialize_hex_lower_or_bin(&self.inner.to_bytes_be(), serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Signature {
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: serdect::serde::Deserializer<'de>,
+    {
+        let bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
+        let inner = BigUint::from_bytes_be(&bytes);
+
+        Ok(Self {
+            inner,
+            len: bytes.len(),
+        })
     }
 }
