@@ -5,9 +5,11 @@ use num_bigint::Sign::Plus;
 use num_bigint::{BigInt, BigUint};
 use num_integer::Integer;
 use num_traits::{FromPrimitive, One, ToPrimitive};
+use pkcs8::{DecodePrivateKey, EncodePrivateKey};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use serdect::serde::{de, ser, Deserialize, Serialize};
+use spki::{DecodePublicKey, EncodePublicKey};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::algorithms::generate::generate_multi_prime_key_with_exp;
@@ -23,7 +25,6 @@ use crate::CrtValue;
 
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RsaPublicKey {
     /// Modulus: product of prime numbers `p` and `q`
     n: BigUint,
@@ -36,7 +37,6 @@ pub struct RsaPublicKey {
 
 /// Represents a whole RSA key, public and private parts.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RsaPrivateKey {
     /// Public components of the private key.
     pubkey_components: RsaPublicKey,
@@ -45,7 +45,6 @@ pub struct RsaPrivateKey {
     /// Prime factors of N, contains >= 2 elements.
     pub(crate) primes: Vec<BigUint>,
     /// precomputed values to speed up private operations
-    #[cfg_attr(feature = "serde", serde(skip))]
     pub(crate) precomputed: Option<PrecomputedValues>,
 }
 
@@ -531,6 +530,50 @@ fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize)
     Ok(())
 }
 
+#[cfg(feature = "serde")]
+impl Serialize for RsaPublicKey {
+    fn serialize<S>(&self, serializer: S) -> core::prelude::v1::Result<S::Ok, S::Error>
+    where
+        S: serdect::serde::Serializer,
+    {
+        let der = self.to_public_key_der().map_err(ser::Error::custom)?;
+        serdect::slice::serialize_hex_lower_or_bin(&der, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for RsaPublicKey {
+    fn deserialize<D>(deserializer: D) -> core::prelude::v1::Result<Self, D::Error>
+    where
+        D: serdect::serde::Deserializer<'de>,
+    {
+        let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
+        Self::from_public_key_der(&der_bytes).map_err(de::Error::custom)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for RsaPrivateKey {
+    fn serialize<S>(&self, serializer: S) -> core::prelude::v1::Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        let der = self.to_pkcs8_der().map_err(ser::Error::custom)?;
+        serdect::slice::serialize_hex_lower_or_bin(&der.as_bytes(), serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for RsaPrivateKey {
+    fn deserialize<D>(deserializer: D) -> core::prelude::v1::Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
+        Self::from_pkcs8_der(&der_bytes).map_err(de::Error::custom)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -538,7 +581,6 @@ mod tests {
 
     use hex_literal::hex;
     use num_traits::{FromPrimitive, ToPrimitive};
-    use pkcs8::DecodePrivateKey;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 
     #[test]
@@ -640,66 +682,23 @@ mod tests {
     #[cfg(feature = "serde")]
     fn test_serde() {
         use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
-        use serde_test::{assert_tokens, Token};
+        use serde_test::{assert_tokens, Configure, Token};
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
 
         let priv_tokens = [
-            Token::Struct {
-                name: "RsaPrivateKey",
-                len: 3,
-            },
-            Token::Str("pubkey_components"),
-            Token::Struct {
-                name: "RsaPublicKey",
-                len: 2,
-            },
-            Token::Str("n"),
-            Token::Seq { len: Some(2) },
-            Token::U32(3814409919),
-            Token::U32(3429654832),
-            Token::SeqEnd,
-            Token::Str("e"),
-            Token::Seq { len: Some(1) },
-            Token::U32(65537),
-            Token::SeqEnd,
-            Token::StructEnd,
-            Token::Str("d"),
-            Token::Seq { len: Some(2) },
-            Token::U32(1482162201),
-            Token::U32(1675500232),
-            Token::SeqEnd,
-            Token::Str("primes"),
-            Token::Seq { len: Some(2) },
-            Token::Seq { len: Some(1) },
-            Token::U32(4133289821),
-            Token::SeqEnd,
-            Token::Seq { len: Some(1) },
-            Token::U32(3563808971),
-            Token::SeqEnd,
-            Token::SeqEnd,
-            Token::StructEnd,
+            Token::Str("3054020100300d06092a864886f70d01010105000440303e020100020900cc6c6130e35b46bf0203010001020863de1ac858580019020500f65cff5d020500d46b68cb02046d9a09f102047b4e3a4f020500f45065cc")
         ];
-        assert_tokens(&priv_key, &priv_tokens);
+        assert_tokens(&priv_key.clone().readable(), &priv_tokens);
 
-        let priv_tokens = [
-            Token::Struct {
-                name: "RsaPublicKey",
-                len: 2,
-            },
-            Token::Str("n"),
-            Token::Seq { len: Some(2) },
-            Token::U32(3814409919),
-            Token::U32(3429654832),
-            Token::SeqEnd,
-            Token::Str("e"),
-            Token::Seq { len: Some(1) },
-            Token::U32(65537),
-            Token::SeqEnd,
-            Token::StructEnd,
-        ];
-        assert_tokens(&RsaPublicKey::from(priv_key), &priv_tokens);
+        let priv_tokens = [Token::Str(
+            "3024300d06092a864886f70d01010105000313003010020900cc6c6130e35b46bf0203010001",
+        )];
+        assert_tokens(
+            &RsaPublicKey::from(priv_key.clone()).readable(),
+            &priv_tokens,
+        );
     }
 
     #[test]

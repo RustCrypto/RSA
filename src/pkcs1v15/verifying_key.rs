@@ -3,22 +3,22 @@ use crate::RsaPublicKey;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use digest::Digest;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use pkcs8::{
     spki::{
         der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
         SignatureAlgorithmIdentifier,
-    },
-    AssociatedOid, Document, EncodePublicKey,
+    }, AssociatedOid
 };
+
+#[cfg(feature = "serde")]
+use serdect::serde::{ser, de, Deserialize, Serialize};
 use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
+use spki::{der::Decode, Document, EncodePublicKey, SubjectPublicKeyInfo};
 
 /// Verifying key for `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
 ///
 /// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 #[derive(Debug)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct VerifyingKey<D>
 where
     D: Digest,
@@ -202,5 +202,34 @@ where
 
     fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> pkcs8::spki::Result<Self> {
         RsaPublicKey::try_from(spki).map(Self::new)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<D> Serialize for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let der = self.inner.to_public_key_der().map_err(ser::Error::custom)?;
+        serdect::slice::serialize_hex_lower_or_bin(&der, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, D> Deserialize<'de> for VerifyingKey<D>
+where
+    D: Digest + AssociatedOid,
+{
+    fn deserialize<De>(deserializer: De) -> Result<Self, De::Error>
+    where
+        De: serde::Deserializer<'de>,
+    {
+        let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
+        let spki = SubjectPublicKeyInfo::from_der(&der_bytes).map_err(de::Error::custom)?;
+        Self::try_from(spki).map_err(de::Error::custom)
     }
 }

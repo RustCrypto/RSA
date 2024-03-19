@@ -1,18 +1,19 @@
 use super::{oid, pkcs1v15_generate_prefix, sign, Signature, VerifyingKey};
 use crate::{dummy_rng::DummyRng, Result, RsaPrivateKey};
 use alloc::vec::Vec;
+use spki::der::Decode;
 use core::marker::PhantomData;
 use digest::Digest;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
+use pkcs1::EncodeRsaPrivateKey;
 use pkcs8::{
     spki::{
         der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
         SignatureAlgorithmIdentifier,
-    },
-    AssociatedOid, EncodePrivateKey, SecretDocument,
+    }, AssociatedOid, EncodePrivateKey, PrivateKeyInfo, SecretDocument
 };
 use rand_core::CryptoRngCore;
+#[cfg(feature = "serde")]
+use serdect::serde::{de, ser, Deserialize, Serialize};
 use signature::{
     hazmat::PrehashSigner, DigestSigner, Keypair, RandomizedDigestSigner, RandomizedSigner, Signer,
 };
@@ -22,7 +23,6 @@ use zeroize::ZeroizeOnDrop;
 ///
 /// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct SigningKey<D>
 where
     D: Digest,
@@ -256,3 +256,32 @@ where
 }
 
 impl<D> ZeroizeOnDrop for SigningKey<D> where D: Digest {}
+
+#[cfg(feature = "serde")]
+impl<D> Serialize for SigningKey<D>
+where
+    D: Digest,
+{
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: serdect::serde::Serializer,
+    {
+        let der = self.inner.to_pkcs8_der().map_err(ser::Error::custom)?;
+        serdect::slice::serialize_hex_lower_or_bin(&der.as_bytes(), serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, D> Deserialize<'de> for SigningKey<D>
+where
+    D: Digest + AssociatedOid,
+{
+    fn deserialize<De>(deserializer: De) -> core::result::Result<Self, De::Error>
+    where
+        De: serdect::serde::Deserializer<'de>,
+    {
+        let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
+        let pki = PrivateKeyInfo::from_der(&der_bytes).map_err(de::Error::custom)?;
+        Self::try_from(pki).map_err(de::Error::custom)
+    }
+}
