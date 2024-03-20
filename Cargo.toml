@@ -25,10 +25,10 @@ pkcs8 = { version = "=0.11.0-pre.0", default-features = false, features = ["allo
 signature = { version = "=2.3.0-pre.3", default-features = false , features = ["alloc", "digest", "rand_core"] }
 spki = { version = "=0.8.0-pre.0", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
-serdect = "0.2.0"
 
 # optional dependencies
 sha1 = { version = "=0.11.0-pre.3", optional = true, default-features = false, features = ["oid"] }
+serdect = { version = "0.2.0", optional = true }
 sha2 = { version = "=0.11.0-pre.3", optional = true, default-features = false, features = ["oid"] }
 serde = { version = "1.0.184", optional = true, default-features = false, features = ["derive"] }
 
