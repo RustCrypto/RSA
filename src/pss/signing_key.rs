@@ -257,3 +257,25 @@ where
             .map(Self::new)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde() {
+        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+        use sha2::Sha256;
+
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let priv_key = crate::RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
+        let signing_key = SigningKey::<Sha256>::new(priv_key);
+
+        let ser_signing_key = serde_json::to_string(&signing_key).expect("unable to serialize signing key");
+        let deser_signing_key = serde_json::from_str::<SigningKey<Sha256>>(&ser_signing_key).expect("unable to deserialize signing key");
+        
+        assert_eq!(signing_key.inner, deser_signing_key.inner);
+        assert_eq!(signing_key.salt_len, deser_signing_key.salt_len);
+    }
+}

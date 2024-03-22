@@ -107,3 +107,23 @@ impl<'de> Deserialize<'de> for Signature {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde() {
+        use serde_test::{assert_tokens, Configure, Token};
+        let signature = Signature {
+            inner: BigUint::new(Vec::from([42])),
+            len: 1,
+        };
+
+        let tokens = [
+            Token::Str("2a"),
+        ];
+        assert_tokens(&signature.readable(), &tokens);
+    }
+}

@@ -15,7 +15,7 @@ use pkcs8::{
 use {
     pkcs8::SubjectPublicKeyInfo,
     serdect::serde::{de, ser, Deserialize, Serialize},
-    spki::der::Decode, 
+    spki::der::Decode,
 };
 
 use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
@@ -237,5 +237,30 @@ where
         let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
         let spki = SubjectPublicKeyInfo::from_der(&der_bytes).map_err(de::Error::custom)?;
         Self::try_from(spki).map_err(de::Error::custom)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde() {
+        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+        use sha2::Sha256;
+
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let priv_key = crate::RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
+        let pub_key = priv_key.to_public_key();
+        let verifying_key = VerifyingKey::<Sha256>::new(pub_key);
+
+        let ser_verifying_key =
+            serde_json::to_string(&verifying_key).expect("unable to serialize verifying key");
+        let deser_verifying_key = serde_json::from_str::<VerifyingKey<Sha256>>(&ser_verifying_key)
+            .expect("unable to deserialize verifying key");
+
+        assert_eq!(verifying_key.inner, deser_verifying_key.inner);
+        assert_eq!(verifying_key.prefix, deser_verifying_key.prefix);
     }
 }

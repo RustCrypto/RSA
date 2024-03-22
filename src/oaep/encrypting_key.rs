@@ -65,3 +65,31 @@ where
         encrypt_digest::<_, D, MGD>(rng, &self.inner, msg, self.label.as_ref().cloned())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde() {
+        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+        use sha2::Sha256;
+
+        use crate::RsaPrivateKey;
+
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let encrypting_key = EncryptingKey::<Sha256>::new_with_label(
+            RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key").to_public_key(),
+            "label",
+        );
+
+        let ser_encrypting_key =
+            serde_json::to_string(&encrypting_key).expect("unable to serialize encrypting key");
+        let deser_encrypting_key = serde_json::from_str::<EncryptingKey<Sha256>>(&ser_encrypting_key)
+            .expect("unable to serialize encrypting key");
+
+        assert_eq!(encrypting_key.label, deser_encrypting_key.label);
+        assert_eq!(encrypting_key.inner, deser_encrypting_key.inner);
+    }
+}

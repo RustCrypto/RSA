@@ -193,3 +193,28 @@ where
             .map(Self::new)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde() {
+        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+        use sha2::Sha256;
+
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let priv_key = crate::RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
+        let pub_key = priv_key.to_public_key();
+        let verifying_key = VerifyingKey::<Sha256>::new(pub_key);
+
+        let ser_verifying_key =
+            serde_json::to_string(&verifying_key).expect("unable to serialize verifying key");
+        let deser_verifying_key = serde_json::from_str::<VerifyingKey<Sha256>>(&ser_verifying_key)
+            .expect("unable to deserialize verifying key");
+
+        assert_eq!(verifying_key.inner, deser_verifying_key.inner);
+        assert_eq!(verifying_key.salt_len, deser_verifying_key.salt_len);
+    }
+}
