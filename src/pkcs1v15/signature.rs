@@ -1,13 +1,15 @@
-pub use ::signature::SignatureEncoding;
+//! `RSASSA-PKCS1-v1_5` signatures.
+
+use crate::algorithms::pad::uint_to_be_pad;
+use ::signature::SignatureEncoding;
+use alloc::{boxed::Box, string::ToString};
+use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use crypto_bigint::BoxedUint;
+
 use spki::{
     der::{asn1::BitString, Result as DerResult},
     SignatureBitStringEncoding,
 };
-
-use crate::algorithms::pad::uint_to_be_pad;
-use alloc::{boxed::Box, string::ToString};
-use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 
 /// `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
 ///

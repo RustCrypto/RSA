@@ -1,16 +1,17 @@
+//! `RSASSA-PSS` signatures.
+
+use crate::algorithms::pad::uint_to_be_pad;
+use ::signature::SignatureEncoding;
 use alloc::{boxed::Box, string::ToString};
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
-
 use crypto_bigint::BoxedUint;
+
 use spki::{
     der::{asn1::BitString, Result as DerResult},
     SignatureBitStringEncoding,
 };
 
-use crate::algorithms::pad::uint_to_be_pad;
-pub use crate::signature::SignatureEncoding;
-
-/// RSASSA-PSS signatures as described in [RFC8017 § 8.1].
+/// `RSASSA-PSS` signatures as described in [RFC8017 § 8.1].
 ///
 /// [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 #[derive(Clone, PartialEq, Eq)]

@@ -1,0 +1,13 @@
+[package]
+name = "rust-crypto"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+rsa = "0.9"
+
+[patch.crates-io]
+rsa = { git = "https://github.com/RustCrypto/RSA", branch = "const-crypto-biguint" }
+crypto-bigint = { git = "https://github.com/RustCrypto/crypto-bigint", branch = "master" }
