@@ -4,10 +4,10 @@ use crate::{
     traits::{Decryptor, EncryptingKeypair, RandomizedDecryptor},
     Result, RsaPrivateKey,
 };
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use alloc::vec::Vec;
 use rand_core::CryptoRngCore;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use zeroize::ZeroizeOnDrop;
 
 /// Decryption key for PKCS#1 v1.5 decryption as described in [RFC8017 § 7.2].
@@ -55,16 +55,16 @@ impl ZeroizeOnDrop for DecryptingKey {}
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     #[cfg(feature = "serde")]
     fn test_serde() {
+        use super::*;
         use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
         use serde_test::{assert_tokens, Configure, Token};
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let decrypting_key = DecryptingKey::new(RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key"));
+        let decrypting_key =
+            DecryptingKey::new(RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key"));
 
         let tokens = [
             Token::Struct { name: "DecryptingKey", len: 1 },

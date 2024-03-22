@@ -68,11 +68,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     #[cfg(feature = "serde")]
     fn test_serde() {
+        use super::*;
         use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
         use sha2::Sha256;
 

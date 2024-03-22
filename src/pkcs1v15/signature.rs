@@ -110,11 +110,10 @@ impl<'de> Deserialize<'de> for Signature {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     #[cfg(feature = "serde")]
     fn test_serde() {
+        use super::*;
         use serde_test::{assert_tokens, Configure, Token};
         let signature = Signature {
             inner: BigUint::new(Vec::from([42])),

@@ -100,11 +100,10 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
     #[test]
     #[cfg(feature = "serde")]
     fn test_serde() {
+        use super::*;
         use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
         use sha2::Sha256;
 
@@ -116,8 +115,9 @@ mod tests {
 
         let ser_decrypting_key =
             serde_json::to_string(&decrypting_key).expect("unable to serialize decrypting key");
-        let deser_decrypting_key = serde_json::from_str::<DecryptingKey<Sha256>>(&ser_decrypting_key)
-            .expect("unable to serialize decrypting key");
+        let deser_decrypting_key =
+            serde_json::from_str::<DecryptingKey<Sha256>>(&ser_decrypting_key)
+                .expect("unable to serialize decrypting key");
 
         assert_eq!(decrypting_key.label, deser_decrypting_key.label);
         assert_eq!(decrypting_key.inner, deser_decrypting_key.inner);
