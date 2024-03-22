@@ -227,6 +227,15 @@ where
 
 impl<D> ZeroizeOnDrop for SigningKey<D> where D: Digest {}
 
+impl<D> PartialEq for SigningKey<D>
+where
+    D: Digest,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner && self.salt_len == other.salt_len
+    }
+}
+
 #[cfg(feature = "serde")]
 impl<D> Serialize for SigningKey<D>
 where
@@ -265,16 +274,17 @@ mod tests {
     fn test_serde() {
         use super::*;
         use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+        use serde_test::{assert_tokens, Configure, Token};
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = crate::RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
         let signing_key = SigningKey::<Sha256>::new(priv_key);
 
-        let ser_signing_key = serde_json::to_string(&signing_key).expect("unable to serialize signing key");
-        let deser_signing_key = serde_json::from_str::<SigningKey<Sha256>>(&ser_signing_key).expect("unable to deserialize signing key");
-        
-        assert_eq!(signing_key.inner, deser_signing_key.inner);
-        assert_eq!(signing_key.salt_len, deser_signing_key.salt_len);
+        let tokens = [
+            Token::Str("3054020100300d06092a864886f70d01010105000440303e020100020900cc6c6130e35b46bf0203010001020863de1ac858580019020500f65cff5d020500d46b68cb02046d9a09f102047b4e3a4f020500f45065cc")
+        ];
+
+        assert_tokens(&signing_key.readable(), &tokens);
     }
 }

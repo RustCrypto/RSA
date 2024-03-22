@@ -211,6 +211,15 @@ where
     }
 }
 
+impl<D> PartialEq for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner && self.prefix == other.prefix
+    }
+}
+
 #[cfg(feature = "serde")]
 impl<D> Serialize for VerifyingKey<D>
 where
@@ -247,6 +256,7 @@ mod tests {
     fn test_serde() {
         use super::*;
         use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+        use serde_test::{assert_tokens, Configure, Token};
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
@@ -254,12 +264,10 @@ mod tests {
         let pub_key = priv_key.to_public_key();
         let verifying_key = VerifyingKey::<Sha256>::new(pub_key);
 
-        let ser_verifying_key =
-            serde_json::to_string(&verifying_key).expect("unable to serialize verifying key");
-        let deser_verifying_key = serde_json::from_str::<VerifyingKey<Sha256>>(&ser_verifying_key)
-            .expect("unable to deserialize verifying key");
+        let tokens = [
+            Token::Str("3024300d06092a864886f70d01010105000313003010020900cc6c6130e35b46bf0203010001")
+        ];
 
-        assert_eq!(verifying_key.inner, deser_verifying_key.inner);
-        assert_eq!(verifying_key.prefix, deser_verifying_key.prefix);
+        assert_tokens(&verifying_key.readable(), &tokens);
     }
 }

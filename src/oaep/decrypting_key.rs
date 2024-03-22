@@ -98,6 +98,16 @@ where
 {
 }
 
+impl<D, MGD> PartialEq for DecryptingKey<D, MGD>
+where
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner && self.label == other.label
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -105,21 +115,26 @@ mod tests {
     fn test_serde() {
         use super::*;
         use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+        use serde_test::{assert_tokens, Configure, Token};
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let decrypting_key = DecryptingKey::<Sha256>::new_with_label(
+        let decrypting_key = DecryptingKey::<Sha256>::new(
             RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key"),
-            "label",
         );
 
-        let ser_decrypting_key =
-            serde_json::to_string(&decrypting_key).expect("unable to serialize decrypting key");
-        let deser_decrypting_key =
-            serde_json::from_str::<DecryptingKey<Sha256>>(&ser_decrypting_key)
-                .expect("unable to serialize decrypting key");
-
-        assert_eq!(decrypting_key.label, deser_decrypting_key.label);
-        assert_eq!(decrypting_key.inner, deser_decrypting_key.inner);
+        let tokens = [
+            Token::Struct { name: "DecryptingKey", len: 4 },
+            Token::Str("inner"),
+            Token::Str("3054020100300d06092a864886f70d01010105000440303e020100020900cc6c6130e35b46bf0203010001020863de1ac858580019020500f65cff5d020500d46b68cb02046d9a09f102047b4e3a4f020500f45065cc"),
+            Token::Str("label"),
+            Token::None,
+            Token::Str("phantom"),
+            Token::UnitStruct { name: "PhantomData", },
+            Token::Str("mg_phantom"),
+            Token::UnitStruct { name: "PhantomData", },
+            Token::StructEnd,
+        ];
+        assert_tokens(&decrypting_key.readable(), &tokens);
     }
 }
