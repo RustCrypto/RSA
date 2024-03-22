@@ -216,7 +216,8 @@ fn verify(
     sig: &BoxedUint,
     sig_len: usize,
 ) -> Result<()> {
-    if sig >= crate::traits::keys::PublicKeyPartsNew::n(pub_key) || sig_len != pub_key.size() {
+    let n = crate::traits::keys::PublicKeyPartsNew::n(pub_key);
+    if sig >= n.as_ref() || sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
 

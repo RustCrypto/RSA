@@ -1,8 +1,8 @@
 //! Generic RSA implementation
 
 use alloc::borrow::Cow;
-use crypto_bigint::modular::{BoxedResidue, BoxedResidueParams};
-use crypto_bigint::{BoxedUint, RandomMod, Wrapping};
+use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
+use crypto_bigint::{BoxedUint, InvMod, NonZero, RandomMod, Wrapping};
 use num_bigint::{BigUint, ModInverse};
 use num_integer::{sqrt, Integer};
 use num_traits::{FromPrimitive, One, Pow, Zero as _};
@@ -42,12 +42,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     let n = priv_key.n();
     let d = priv_key.d();
 
-    if c >= n {
-        return Err(Error::Decryption);
-    }
-
-    // TODO: is this fine?
-    if n.is_zero().into() {
+    if c >= n.as_ref() {
         return Err(Error::Decryption);
     }
 
@@ -85,14 +80,14 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         // precomputed: dQ = (1/e) mod (q-1) = d mod (q-1)
 
         // m1 = c^dP mod p
-        let cp = BoxedResidue::new(c.clone().into_owned(), p_params.clone());
+        let cp = BoxedMontyForm::new(c.clone().into_owned(), p_params.clone());
         let mut m1 = cp.pow(&dp);
         // m2 = c^dQ mod q
-        let cq = BoxedResidue::new(c.into_owned(), q_params.clone());
+        let cq = BoxedMontyForm::new(c.into_owned(), q_params.clone());
         let m2 = cq.pow(&dq).retrieve();
 
         // (m1 - m2) mod p = (m1 mod p) - (m2 mod p) mod p
-        let m2r = BoxedResidue::new(m2.clone(), p_params.clone());
+        let m2r = BoxedMontyForm::new(m2.clone(), p_params.clone());
         m1 -= &m2r;
 
         // precomputed: qInv = (1/q) mod p
@@ -149,7 +144,7 @@ fn blind<R: CryptoRngCore, K: PublicKeyPartsNew>(
     rng: &mut R,
     key: &K,
     c: &BoxedUint,
-    n_params: &BoxedResidueParams,
+    n_params: &BoxedMontyParams,
 ) -> (BoxedUint, BoxedUint) {
     // Blinding involves multiplying c by r^e.
     // Then the decryption operation performs (m^e * r^e)^d mod n
@@ -183,22 +178,22 @@ fn blind<R: CryptoRngCore, K: PublicKeyPartsNew>(
 }
 
 /// Given an m and and unblinding factor, unblind the m.
-fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: BoxedResidueParams) -> BoxedUint {
+fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: BoxedMontyParams) -> BoxedUint {
     // m * r^-1 (mod n)
     mul_mod_params(m, unblinder, n_params)
 }
 
 /// Computes `base.pow_mod(exp, n)` with precomputed `n_params`.
-fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: BoxedResidueParams) -> BoxedUint {
+fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: BoxedMontyParams) -> BoxedUint {
     let base = reduce(&base, n_params);
     base.pow(exp).retrieve()
 }
 
 /// Computes `lhs.mul_mod(rhs, n)` with precomputed `n_params`.
-fn mul_mod_params(lhs: &BoxedUint, rhs: &BoxedUint, n_params: BoxedResidueParams) -> BoxedUint {
+fn mul_mod_params(lhs: &BoxedUint, rhs: &BoxedUint, n_params: BoxedMontyParams) -> BoxedUint {
     // TODO: nicer api in crypto-bigint?
-    let lhs = BoxedResidue::new(lhs.clone(), n_params.clone());
-    let rhs = BoxedResidue::new(rhs.clone(), n_params);
+    let lhs = BoxedMontyForm::new(lhs.clone(), n_params.clone());
+    let rhs = BoxedMontyForm::new(rhs.clone(), n_params);
     (lhs * rhs).retrieve()
 }
 

@@ -150,7 +150,8 @@ pub(crate) fn verify_digest<D>(
 where
     D: Digest + FixedOutputReset,
 {
-    if sig >= crate::traits::keys::PublicKeyPartsNew::n(pub_key) || sig_len != pub_key.size() {
+    let n = crate::traits::keys::PublicKeyPartsNew::n(pub_key);
+    if sig >= n.as_ref() || sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
 

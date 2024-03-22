@@ -1,8 +1,8 @@
 use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::hash::{Hash, Hasher};
-use crypto_bigint::modular::{BoxedResidue, BoxedResidueParams};
-use crypto_bigint::{BoxedUint, Limb, NonZero};
+use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
+use crypto_bigint::{BoxedUint, InvMod, Limb, NonZero, Odd};
 use num_bigint::BigUint;
 use num_integer::Integer;
 use num_traits::{FromPrimitive, ToPrimitive};
@@ -35,7 +35,7 @@ pub struct RsaPublicKey {
     e: u64,
 
     #[cfg_attr(feature = "serde", serde(skip))]
-    n_params: BoxedResidueParams,
+    n_params: BoxedMontyParams,
 }
 
 impl Eq for RsaPublicKey {}
@@ -111,10 +111,10 @@ pub(crate) struct PrecomputedValues {
     /// D mod (Q-1)
     pub(crate) dq: BoxedUint,
     /// Q^-1 mod P
-    pub(crate) qinv: BoxedResidue,
+    pub(crate) qinv: BoxedMontyForm,
 
-    pub(crate) p_params: BoxedResidueParams,
-    pub(crate) q_params: BoxedResidueParams,
+    pub(crate) p_params: BoxedMontyParams,
+    pub(crate) q_params: BoxedMontyParams,
 }
 
 impl Zeroize for PrecomputedValues {
@@ -158,7 +158,7 @@ impl PublicKeyPartsNew for RsaPublicKey {
         self.e
     }
 
-    fn n_params(&self) -> BoxedResidueParams {
+    fn n_params(&self) -> BoxedMontyParams {
         self.n_params.clone()
     }
 }
@@ -209,7 +209,8 @@ impl RsaPublicKey {
         let e = e.to_u64().unwrap();
 
         let raw_n = to_uint(n);
-        let n_params = BoxedResidueParams::new_vartime(raw_n.clone()).unwrap();
+        let n_odd = Odd::new(raw_n.clone()).unwrap();
+        let n_params = BoxedMontyParams::new(n_odd);
         let n = NonZero::new(raw_n).unwrap();
 
         let k = Self { n, e, n_params };
@@ -225,7 +226,8 @@ impl RsaPublicKey {
     /// [`RsaPublicKey::new_with_max_size`] instead.
     pub fn new_unchecked(n: BigUint, e: BigUint) -> Self {
         let raw_n = to_uint(n);
-        let n_params = BoxedResidueParams::new_vartime(raw_n.clone()).unwrap();
+        let n_odd = Odd::new(raw_n.clone()).unwrap();
+        let n_params = BoxedMontyParams::new(n_odd);
         let n = NonZero::new(raw_n).unwrap();
         let e = e.to_u64().unwrap();
         Self { n, e, n_params }
@@ -267,7 +269,7 @@ impl PublicKeyPartsNew for RsaPrivateKey {
         self.pubkey_components.e
     }
 
-    fn n_params(&self) -> BoxedResidueParams {
+    fn n_params(&self) -> BoxedMontyParams {
         self.pubkey_components.n_params.clone()
     }
 }
@@ -322,17 +324,19 @@ impl RsaPrivateKey {
             .into_iter()
             .map(|p| to_uint_exact(p, nbits))
             .collect();
-        Self::from_components_new(n, e, d, primes)
+
+        let n_odd = Odd::new(n).unwrap();
+        Self::from_components_new(n_odd, e, d, primes)
     }
 
     pub(crate) fn from_components_new(
-        n: BoxedUint,
+        n: Odd<BoxedUint>,
         e: u64,
         d: BoxedUint,
         mut primes: Vec<BoxedUint>,
     ) -> Result<RsaPrivateKey> {
-        let n_params = BoxedResidueParams::new_vartime(n.clone()).unwrap();
-        let n_c = NonZero::new(n.clone()).unwrap();
+        let n_params = BoxedMontyParams::new(n.clone());
+        let n_c = NonZero::new(n.as_ref().clone()).unwrap();
         let nbits = n_c.bits_precision();
 
         let mut should_validate = false;
@@ -435,14 +439,16 @@ impl RsaPrivateKey {
 
         // TODO: error handling
 
-        let p_params = BoxedResidueParams::new_vartime(p.clone()).unwrap();
-        let q_params = BoxedResidueParams::new_vartime(q.clone()).unwrap();
+        let p_odd = Odd::new(p.clone()).unwrap();
+        let p_params = BoxedMontyParams::new(p_odd);
+        let q_odd = Odd::new(q.clone()).unwrap();
+        let q_params = BoxedMontyParams::new(q_odd);
 
         let x = NonZero::new(p.wrapping_sub(&BoxedUint::one())).unwrap();
         let dp = d.rem_vartime(&x);
         let x = NonZero::new(q.wrapping_sub(&BoxedUint::one())).unwrap();
         let dq = d.rem_vartime(&x);
-        let qinv = BoxedResidue::new(q.clone(), p_params.clone());
+        let qinv = BoxedMontyForm::new(q.clone(), p_params.clone());
         let qinv = qinv.invert();
         if qinv.is_none().into() {
             return Err(Error::InvalidPrime);
@@ -570,7 +576,7 @@ impl PrivateKeyPartsNew for RsaPrivateKey {
         self.precomputed.as_ref().map(|p| &p.dq)
     }
 
-    fn qinv(&self) -> Option<&BoxedResidue> {
+    fn qinv(&self) -> Option<&BoxedMontyForm> {
         self.precomputed.as_ref().map(|p| &p.qinv)
     }
 
@@ -578,11 +584,11 @@ impl PrivateKeyPartsNew for RsaPrivateKey {
         None
     }
 
-    fn p_params(&self) -> Option<&BoxedResidueParams> {
+    fn p_params(&self) -> Option<&BoxedMontyParams> {
         self.precomputed.as_ref().map(|p| &p.p_params)
     }
 
-    fn q_params(&self) -> Option<&BoxedResidueParams> {
+    fn q_params(&self) -> Option<&BoxedMontyParams> {
         self.precomputed.as_ref().map(|p| &p.q_params)
     }
 }
@@ -655,9 +661,9 @@ pub(crate) fn to_uint(big_uint: BigUint) -> BoxedUint {
     res
 }
 
-pub(crate) fn reduce(n: &BoxedUint, p: BoxedResidueParams) -> BoxedResidue {
+pub(crate) fn reduce(n: &BoxedUint, p: BoxedMontyParams) -> BoxedMontyForm {
     let bits_precision = p.modulus().bits_precision();
-    let modulus = NonZero::new(p.modulus().clone()).unwrap();
+    let modulus = NonZero::new(p.modulus().as_ref().clone()).unwrap();
 
     let n = match n.bits_precision().cmp(&bits_precision) {
         Ordering::Less => n.widen(bits_precision),
@@ -666,7 +672,7 @@ pub(crate) fn reduce(n: &BoxedUint, p: BoxedResidueParams) -> BoxedResidue {
     };
 
     let n_reduced = n.rem_vartime(&modulus).widen(p.bits_precision());
-    BoxedResidue::new(n_reduced, p)
+    BoxedMontyForm::new(n_reduced, p)
 }
 
 #[cfg(test)]
@@ -683,11 +689,12 @@ mod tests {
     #[test]
     fn test_from_into() {
         let raw_n = BoxedUint::from(101u64);
+        let n_odd = Odd::new(raw_n.clone()).unwrap();
         let private_key = RsaPrivateKey {
             pubkey_components: RsaPublicKey {
                 n: NonZero::new(raw_n.clone()).unwrap(),
                 e: 200u64,
-                n_params: BoxedResidueParams::new_vartime(raw_n).unwrap(),
+                n_params: BoxedMontyParams::new(n_odd),
             },
             d: BoxedUint::from(123u64),
             primes: vec![],

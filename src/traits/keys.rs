@@ -3,7 +3,7 @@
 use alloc::vec::Vec;
 
 use crypto_bigint::{
-    modular::{BoxedResidue, BoxedResidueParams},
+    modular::{BoxedMontyForm, BoxedMontyParams},
     BoxedUint, NonZero,
 };
 use num_bigint::{BigInt, BigUint, IntoBigInt};
@@ -34,7 +34,7 @@ pub trait PublicKeyPartsNew {
     /// Returns the public exponent of the key.
     fn e(&self) -> u64;
 
-    fn n_params(&self) -> BoxedResidueParams;
+    fn n_params(&self) -> BoxedMontyParams;
 
     fn n_bits_precision(&self) -> u32 {
         self.n().bits_precision()
@@ -124,14 +124,14 @@ pub trait PrivateKeyPartsNew: PublicKeyPartsNew {
     fn dq(&self) -> Option<&BoxedUint>;
 
     /// Returns the precomputed qinv value, Q^-1 mod P
-    fn qinv(&self) -> Option<&BoxedResidue>;
+    fn qinv(&self) -> Option<&BoxedMontyForm>;
 
     /// Returns an iterator over the CRT Values
     fn crt_values(&self) -> Option<&[CrtValueNew]>;
 
-    fn p_params(&self) -> Option<&BoxedResidueParams>;
+    fn p_params(&self) -> Option<&BoxedMontyParams>;
 
-    fn q_params(&self) -> Option<&BoxedResidueParams>;
+    fn q_params(&self) -> Option<&BoxedMontyParams>;
 }
 
 /// Contains the precomputed Chinese remainder theorem values.
