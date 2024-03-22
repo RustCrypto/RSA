@@ -81,7 +81,7 @@ You can follow our work on mitigating this issue in [#390].
 
 ## Minimum Supported Rust Version (MSRV)
 
-This crate supports Rust 1.72 or higher.
+This crate supports Rust 1.73 or higher.
 
 In the future MSRV can be changed, but it will be done with a minor version bump.
 
@@ -108,7 +108,7 @@ dual licensed as above, without any additional terms or conditions.
 [doc-link]: https://docs.rs/rsa
 [build-image]: https://github.com/rustcrypto/RSA/workflows/CI/badge.svg
 [build-link]: https://github.com/RustCrypto/RSA/actions?query=workflow%3ACI+branch%3Amaster
-[msrv-image]: https://img.shields.io/badge/rustc-1.72+-blue.svg
+[msrv-image]: https://img.shields.io/badge/rustc-1.73+-blue.svg
 [chat-image]: https://img.shields.io/badge/zulip-join_chat-blue.svg
 [chat-link]: https://rustcrypto.zulipchat.com/#narrow/stream/260047-RSA
 [deps-image]: https://deps.rs/repo/github/RustCrypto/RSA/status.svg
