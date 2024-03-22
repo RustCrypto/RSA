@@ -4,6 +4,8 @@ use alloc::{
     string::{String, ToString},
     vec::Vec,
 };
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset};
 use rand_core::CryptoRngCore;
@@ -12,6 +14,7 @@ use rand_core::CryptoRngCore;
 ///
 /// [RFC8017 § 7.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct EncryptingKey<D, MGD = D>
 where
     D: Digest,

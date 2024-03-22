@@ -7,6 +7,12 @@ use pkcs8::{
     Document, EncodePublicKey,
 };
 use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
+#[cfg(feature = "serde")]
+use {
+    pkcs8::{AssociatedOid, SubjectPublicKeyInfo},
+    serdect::serde::{de, ser, Deserialize, Serialize},
+    spki::der::Decode,
+};
 
 /// Verifying key for checking the validity of RSASSA-PSS signatures as
 /// described in [RFC8017 § 8.1].
@@ -154,5 +160,36 @@ where
 {
     fn from(key: VerifyingKey<D>) -> Self {
         key.inner
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<D> Serialize for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let der = self.inner.to_public_key_der().map_err(ser::Error::custom)?;
+        serdect::slice::serialize_hex_lower_or_bin(&der, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, D> Deserialize<'de> for VerifyingKey<D>
+where
+    D: Digest + AssociatedOid,
+{
+    fn deserialize<De>(deserializer: De) -> Result<Self, De::Error>
+    where
+        De: serde::Deserializer<'de>,
+    {
+        let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
+        let spki = SubjectPublicKeyInfo::from_der(&der_bytes).map_err(de::Error::custom)?;
+        RsaPublicKey::try_from(spki)
+            .map_err(de::Error::custom)
+            .map(Self::new)
     }
 }

@@ -15,7 +15,12 @@ use signature::{
     hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedSigner,
 };
 use zeroize::ZeroizeOnDrop;
-
+#[cfg(feature = "serde")]
+use {
+    pkcs8::PrivateKeyInfo,
+    serdect::serde::{de, ser, Deserialize, Serialize},
+    spki::der::Decode,
+};
 /// Signing key for producing "blinded" RSASSA-PSS signatures as described in
 /// [draft-irtf-cfrg-rsa-blind-signatures](https://datatracker.ietf.org/doc/draft-irtf-cfrg-rsa-blind-signatures/).
 #[derive(Debug, Clone)]
@@ -198,3 +203,34 @@ where
 }
 
 impl<D> ZeroizeOnDrop for BlindedSigningKey<D> where D: Digest {}
+
+#[cfg(feature = "serde")]
+impl<D> Serialize for BlindedSigningKey<D>
+where
+    D: Digest,
+{
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let der = self.inner.to_pkcs8_der().map_err(ser::Error::custom)?;
+        serdect::slice::serialize_hex_lower_or_bin(&der.as_bytes(), serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, D> Deserialize<'de> for BlindedSigningKey<D>
+where
+    D: Digest + AssociatedOid,
+{
+    fn deserialize<De>(deserializer: De) -> core::result::Result<Self, De::Error>
+    where
+        De: serde::Deserializer<'de>,
+    {
+        let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
+        let pki = PrivateKeyInfo::from_der(&der_bytes).map_err(de::Error::custom)?;
+        RsaPrivateKey::try_from(pki)
+            .map_err(de::Error::custom)
+            .map(Self::new)
+    }
+}
