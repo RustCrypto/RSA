@@ -2,7 +2,7 @@
 
 use alloc::borrow::Cow;
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
-use crypto_bigint::{BoxedUint, InvMod, NonZero, RandomMod, Wrapping};
+use crypto_bigint::{BoxedUint, InvMod, RandomMod, Wrapping};
 use num_bigint::{BigUint, ModInverse};
 use num_integer::{sqrt, Integer};
 use num_traits::{FromPrimitive, One, Pow, Zero as _};
