@@ -35,13 +35,27 @@ impl TryFrom<pkcs8::PrivateKeyInfo<'_>> for RsaPrivateKey {
         if pkcs1_key.version() != pkcs1::Version::TwoPrime {
             return Err(pkcs1::Error::Version.into());
         }
-        let bits = 512; // TODO: read from data
-        let n = BoxedUint::from_be_slice(pkcs1_key.modulus.as_bytes(), bits).unwrap();
-        let n = Odd::new(n).unwrap();
-        let e = u64::from_be_bytes(pkcs1_key.public_exponent.as_bytes().try_into().unwrap());
-        let d = BoxedUint::from_be_slice(pkcs1_key.private_exponent.as_bytes(), bits).unwrap();
-        let prime1 = BoxedUint::from_be_slice(pkcs1_key.prime1.as_bytes(), bits).unwrap();
-        let prime2 = BoxedUint::from_be_slice(pkcs1_key.prime2.as_bytes(), bits).unwrap();
+
+        let key_malformed = pkcs8::Error::KeyMalformed;
+
+        let bits =
+            u32::try_from(pkcs1_key.modulus.as_bytes().len()).map_err(|_| key_malformed)? / 8;
+        let n = BoxedUint::from_be_slice(pkcs1_key.modulus.as_bytes(), bits)
+            .map_err(|_| key_malformed)?;
+        let n = Option::from(Odd::new(n)).ok_or_else(|| key_malformed)?;
+        let e = u64::from_be_bytes(
+            pkcs1_key
+                .public_exponent
+                .as_bytes()
+                .try_into()
+                .map_err(|_| key_malformed)?,
+        );
+        let d = BoxedUint::from_be_slice(pkcs1_key.private_exponent.as_bytes(), bits)
+            .map_err(|_| key_malformed)?;
+        let prime1 = BoxedUint::from_be_slice(pkcs1_key.prime1.as_bytes(), bits)
+            .map_err(|_| key_malformed)?;
+        let prime2 = BoxedUint::from_be_slice(pkcs1_key.prime2.as_bytes(), bits)
+            .map_err(|_| key_malformed)?;
         let primes = vec![prime1, prime2];
         RsaPrivateKey::from_components(n, e, d, primes).map_err(|_| pkcs8::Error::KeyMalformed)
     }
@@ -59,9 +73,18 @@ impl TryFrom<pkcs8::SubjectPublicKeyInfoRef<'_>> for RsaPublicKey {
                 .ok_or(pkcs8::spki::Error::KeyMalformed)?,
         )?;
 
-        let bits = 512; // TODO: determine at runtime
-        let n = BoxedUint::from_be_slice(pkcs1_key.modulus.as_bytes(), bits).unwrap();
-        let e = u64::from_be_bytes(pkcs1_key.public_exponent.as_bytes().try_into().unwrap());
+        let key_malformed = pkcs8::spki::Error::KeyMalformed;
+        let bits =
+            u32::try_from(pkcs1_key.modulus.as_bytes().len()).map_err(|_| key_malformed)? / 8;
+        let n = BoxedUint::from_be_slice(pkcs1_key.modulus.as_bytes(), bits)
+            .map_err(|_| key_malformed)?;
+        let e = u64::from_be_bytes(
+            pkcs1_key
+                .public_exponent
+                .as_bytes()
+                .try_into()
+                .map_err(|_| key_malformed)?,
+        );
         RsaPublicKey::new(n, e).map_err(|_| pkcs8::spki::Error::KeyMalformed)
     }
 }
