@@ -13,9 +13,6 @@ readme = "README.md"
 rust-version = "1.73"
 
 [dependencies]
-num-bigint = { version = "0.8.2", features = ["i128", "prime", "zeroize"], default-features = false, package = "num-bigint-dig" }
-num-traits = { version= "0.2.9", default-features = false, features = ["libm"] }
-num-integer = { version = "0.1.39", default-features = false }
 rand_core = { version = "0.6.4", default-features = false }
 const-oid = { version = "=0.10.0-pre.2", default-features = false }
 subtle = { version = "2.1.1", default-features = false }
@@ -26,6 +23,7 @@ signature = { version = "=2.3.0-pre.3", default-features = false , features = ["
 spki = { version = "=0.8.0-pre.0", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
 crypto-bigint = { version = "0.6.0-pre.12", features = ["zeroize", "alloc"] }
+crypto-primes = { version = "0.6.0-pre.0" }
 
 # optional dependencies
 sha1 = { version = "=0.11.0-pre.3", optional = true, default-features = false, features = ["oid"] }
@@ -49,14 +47,12 @@ sha3 = { version = "=0.11.0-pre.3", default-features = false, features = ["oid"]
 name = "key"
 
 [features]
-default = ["std", "pem", "u64_digit"]
+default = ["std", "pem"]
 hazmat = []
 getrandom = ["rand_core/getrandom"]
-nightly = ["num-bigint/nightly"]
-serde = ["dep:serde", "num-bigint/serde"]
+serde = ["dep:serde", "crypto-bigint/serde"]
 pem = ["pkcs1/pem", "pkcs8/pem"]
 pkcs5 = ["pkcs8/encryption"]
-u64_digit = ["num-bigint/u64_digit"]
 std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std", "signature/std"]
 
 [package.metadata.docs.rs]

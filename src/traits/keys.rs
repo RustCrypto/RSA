@@ -1,116 +1,34 @@
 //! Traits related to the key components
 
-use alloc::vec::Vec;
-
 use crypto_bigint::{
     modular::{BoxedMontyForm, BoxedMontyParams},
     BoxedUint, NonZero,
 };
-use num_bigint::{BigInt, BigUint, IntoBigInt};
-use num_traits::FromPrimitive;
 use zeroize::Zeroize;
-
-use crate::key::to_biguint;
 
 /// Components of an RSA public key.
 pub trait PublicKeyParts {
-    /// Returns the modulus of the key.
-    fn n(&self) -> BigUint;
-
-    /// Returns the public exponent of the key.
-    fn e(&self) -> BigUint;
-
-    /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
-    /// or by this public key will have the same size.
-    fn size(&self) -> usize {
-        (self.n().bits() + 7) / 8
-    }
-}
-
-pub trait PublicKeyPartsNew {
     /// Returns the modulus of the key.
     fn n(&self) -> &NonZero<BoxedUint>;
 
     /// Returns the public exponent of the key.
     fn e(&self) -> u64;
 
-    fn n_params(&self) -> BoxedMontyParams;
-
-    fn n_bits_precision(&self) -> u32 {
-        self.n().bits_precision()
-    }
-
     /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
     /// or by this public key will have the same size.
     fn size(&self) -> usize {
         (self.n().bits() as usize + 7) / 8
     }
-}
 
-impl<T: PublicKeyPartsNew> PublicKeyParts for T {
-    fn n(&self) -> BigUint {
-        to_biguint(&PublicKeyPartsNew::n(self).clone().get())
-    }
+    fn n_params(&self) -> BoxedMontyParams;
 
-    fn e(&self) -> BigUint {
-        BigUint::from_u64(PublicKeyPartsNew::e(self)).unwrap()
-    }
-
-    fn size(&self) -> usize {
-        PublicKeyPartsNew::size(self)
+    fn n_bits_precision(&self) -> u32 {
+        self.n().bits_precision()
     }
 }
 
 /// Components of an RSA private key.
 pub trait PrivateKeyParts: PublicKeyParts {
-    /// Returns the private exponent of the key.
-    fn d(&self) -> BigUint;
-
-    /// Returns the prime factors.
-    fn primes(&self) -> Vec<BigUint>;
-
-    /// Returns the precomputed dp value, D mod (P-1)
-    fn dp(&self) -> Option<BigUint>;
-
-    /// Returns the precomputed dq value, D mod (Q-1)
-    fn dq(&self) -> Option<BigUint>;
-
-    /// Returns the precomputed qinv value, Q^-1 mod P
-    fn qinv(&self) -> Option<BigInt>;
-
-    /// Returns an iterator over the CRT Values
-    fn crt_values(&self) -> Option<Vec<CrtValue>>;
-}
-
-/// Components of an RSA private key.
-impl<T: PrivateKeyPartsNew> PrivateKeyParts for T {
-    fn d(&self) -> BigUint {
-        to_biguint(PrivateKeyPartsNew::d(self))
-    }
-    fn primes(&self) -> Vec<BigUint> {
-        PrivateKeyPartsNew::primes(self)
-            .iter()
-            .map(to_biguint)
-            .collect()
-    }
-    fn dp(&self) -> Option<BigUint> {
-        PrivateKeyPartsNew::dp(self).map(to_biguint)
-    }
-
-    fn dq(&self) -> Option<BigUint> {
-        PrivateKeyPartsNew::dq(self).map(to_biguint)
-    }
-    fn qinv(&self) -> Option<BigInt> {
-        PrivateKeyPartsNew::qinv(self).and_then(|v| to_biguint(&v.retrieve()).into_bigint())
-    }
-
-    fn crt_values(&self) -> Option<Vec<CrtValue>> {
-        None
-    }
-}
-
-/// Components of an RSA private key.
-pub trait PrivateKeyPartsNew: PublicKeyPartsNew {
     /// Returns the private exponent of the key.
     fn d(&self) -> &BoxedUint;
 
@@ -127,33 +45,21 @@ pub trait PrivateKeyPartsNew: PublicKeyPartsNew {
     fn qinv(&self) -> Option<&BoxedMontyForm>;
 
     /// Returns an iterator over the CRT Values
-    fn crt_values(&self) -> Option<&[CrtValueNew]>;
+    fn crt_values(&self) -> Option<&[CrtValue]>;
 
     fn p_params(&self) -> Option<&BoxedMontyParams>;
-
     fn q_params(&self) -> Option<&BoxedMontyParams>;
-}
-
-/// Contains the precomputed Chinese remainder theorem values.
-#[derive(Debug, Clone)]
-pub struct CrtValueNew {
-    /// D mod (prime - 1)
-    pub(crate) exp: BoxedUint,
-    /// R·Coeff ≡ 1 mod Prime.
-    pub(crate) coeff: BoxedUint,
-    /// product of primes prior to this (inc p and q)
-    pub(crate) r: BoxedUint,
 }
 
 /// Contains the precomputed Chinese remainder theorem values.
 #[derive(Debug, Clone)]
 pub struct CrtValue {
     /// D mod (prime - 1)
-    pub(crate) exp: BigInt,
+    pub(crate) exp: BoxedUint,
     /// R·Coeff ≡ 1 mod Prime.
-    pub(crate) coeff: BigInt,
+    pub(crate) coeff: BoxedUint,
     /// product of primes prior to this (inc p and q)
-    pub(crate) r: BigInt,
+    pub(crate) r: BoxedUint,
 }
 
 impl Zeroize for CrtValue {
@@ -165,20 +71,6 @@ impl Zeroize for CrtValue {
 }
 
 impl Drop for CrtValue {
-    fn drop(&mut self) {
-        self.zeroize();
-    }
-}
-
-impl Zeroize for CrtValueNew {
-    fn zeroize(&mut self) {
-        self.exp.zeroize();
-        self.coeff.zeroize();
-        self.r.zeroize();
-    }
-}
-
-impl Drop for CrtValueNew {
     fn drop(&mut self) {
         self.zeroize();
     }

@@ -43,7 +43,7 @@ where
     }
 
     /// Generate a new signing key with a prefix for the digest `D`.
-    pub fn random<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random<R: CryptoRngCore>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
             prefix: pkcs1v15_generate_prefix::<D>(),
@@ -59,10 +59,7 @@ where
 
     /// Generate a new signing key with a prefix for the digest `D`.
     #[deprecated(since = "0.9.0", note = "use SigningKey::random instead")]
-    pub fn random_with_prefix<R: CryptoRngCore + ?Sized>(
-        rng: &mut R,
-        bit_size: usize,
-    ) -> Result<Self> {
+    pub fn random_with_prefix<R: CryptoRngCore>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Self::random(rng, bit_size)
     }
 }
@@ -85,10 +82,7 @@ where
     }
 
     /// Generate a new signing key with an empty prefix.
-    pub fn random_unprefixed<R: CryptoRngCore + ?Sized>(
-        rng: &mut R,
-        bit_size: usize,
-    ) -> Result<Self> {
+    pub fn random_unprefixed<R: CryptoRngCore>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
             prefix: Vec::new(),

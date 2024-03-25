@@ -137,7 +137,7 @@ pub(crate) fn verify(
 
     let mut em = uint_to_be_pad(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
 
-    emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits())
+    emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits() as _)
 }
 
 pub(crate) fn verify_digest<D>(
@@ -150,14 +150,14 @@ pub(crate) fn verify_digest<D>(
 where
     D: Digest + FixedOutputReset,
 {
-    let n = crate::traits::keys::PublicKeyPartsNew::n(pub_key);
+    let n = crate::traits::keys::PublicKeyParts::n(pub_key);
     if sig >= n.as_ref() || sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
 
     let mut em = uint_to_be_pad(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
 
-    emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits())
+    emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits() as _)
 }
 
 /// SignPSS calculates the signature of hashed using RSASSA-PSS.
@@ -205,11 +205,11 @@ fn sign_pss_with_salt<T: CryptoRngCore>(
     digest: &mut dyn DynDigest,
 ) -> Result<Vec<u8>> {
     let em_bits = priv_key.n().bits() - 1;
-    let em = emsa_pss_encode(hashed, em_bits, salt, digest)?;
+    let em = emsa_pss_encode(hashed, em_bits as _, salt, digest)?;
 
     let em = BoxedUint::from_be_slice(
         &em,
-        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(priv_key),
+        crate::traits::keys::PublicKeyParts::n_bits_precision(priv_key),
     )?;
     uint_to_zeroizing_be_pad(
         rsa_decrypt_and_check(priv_key, blind_rng, &em)?,
@@ -224,11 +224,11 @@ fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputR
     salt: &[u8],
 ) -> Result<Vec<u8>> {
     let em_bits = priv_key.n().bits() - 1;
-    let em = emsa_pss_encode_digest::<D>(hashed, em_bits, salt)?;
+    let em = emsa_pss_encode_digest::<D>(hashed, em_bits as _, salt)?;
 
     let em = BoxedUint::from_be_slice(
         &em,
-        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(priv_key),
+        crate::traits::keys::PublicKeyParts::n_bits_precision(priv_key),
     )?;
     uint_to_zeroizing_be_pad(
         rsa_decrypt_and_check(priv_key, blind_rng, &em)?,
@@ -264,9 +264,8 @@ mod test {
     use crate::pss::{BlindedSigningKey, Pss, Signature, SigningKey, VerifyingKey};
     use crate::{RsaPrivateKey, RsaPublicKey};
 
+    use crypto_bigint::{BoxedUint, Odd};
     use hex_literal::hex;
-    use num_bigint::BigUint;
-    use num_traits::{FromPrimitive, Num};
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
     use sha1::{Digest, Sha1};
     use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
@@ -284,13 +283,14 @@ mod test {
         // tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         // -----END RSA PRIVATE KEY-----
 
+        let bits = 512;
         RsaPrivateKey::from_components(
-            BigUint::from_str_radix("9353930466774385905609975137998169297361893554149986716853295022578535724979677252958524466350471210367835187480748268864277464700638583474144061408845077", 10).unwrap(),
-            BigUint::from_u64(65537).unwrap(),
-            BigUint::from_str_radix("7266398431328116344057699379749222532279343923819063639497049039389899328538543087657733766554155839834519529439851673014800261285757759040931985506583861", 10).unwrap(),
+            Odd::new(BoxedUint::from_be_hex("9353930466774385905609975137998169297361893554149986716853295022578535724979677252958524466350471210367835187480748268864277464700638583474144061408845077", bits).unwrap()).unwrap(),
+            65537,
+            BoxedUint::from_be_hex("7266398431328116344057699379749222532279343923819063639497049039389899328538543087657733766554155839834519529439851673014800261285757759040931985506583861", bits).unwrap(),
             vec![
-                BigUint::from_str_radix("98920366548084643601728869055592650835572950932266967461790948584315647051443",10).unwrap(),
-                BigUint::from_str_radix("94560208308847015747498523884063394671606671904944666360068158221458669711639", 10).unwrap()
+                BoxedUint::from_be_hex("98920366548084643601728869055592650835572950932266967461790948584315647051443",bits).unwrap(),
+                BoxedUint::from_be_hex("94560208308847015747498523884063394671606671904944666360068158221458669711639", bits).unwrap()
             ],
         ).unwrap()
     }

@@ -195,7 +195,7 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
 
     let int = BoxedUint::from_be_slice(
         &em,
-        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(pub_key),
+        crate::traits::keys::PublicKeyParts::n_bits_precision(pub_key),
     )?;
     uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
@@ -219,7 +219,7 @@ fn encrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
 
     let int = BoxedUint::from_be_slice(
         &em,
-        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(pub_key),
+        crate::traits::keys::PublicKeyParts::n_bits_precision(pub_key),
     )?;
     uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
@@ -253,7 +253,7 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
 
     let ciphertext = BoxedUint::from_be_slice(
         ciphertext,
-        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(priv_key),
+        crate::traits::keys::PublicKeyParts::n_bits_precision(priv_key),
     )?;
 
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
@@ -289,7 +289,7 @@ fn decrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
 
     let ciphertext = BoxedUint::from_be_slice(
         ciphertext,
-        crate::traits::keys::PublicKeyPartsNew::n_bits_precision(priv_key),
+        crate::traits::keys::PublicKeyParts::n_bits_precision(priv_key),
     )?;
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
     let mut em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
@@ -305,9 +305,8 @@ mod tests {
     use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 
     use alloc::string::String;
+    use crypto_bigint::{BoxedUint, Odd};
     use digest::{Digest, DynDigest, FixedOutputReset};
-    use num_bigint::BigUint;
-    use num_traits::FromPrimitive;
     use rand_chacha::{
         rand_core::{RngCore, SeedableRng},
         ChaCha8Rng,
@@ -345,13 +344,14 @@ mod tests {
         // BoB0er/UmDm4Ly/97EO9A0PKMOE5YbMq9s3t3RlWcsdrU7dvw+p2+A==
         // -----END RSA PRIVATE KEY-----
 
+        let bits = 1024;
         RsaPrivateKey::from_components(
-            BigUint::parse_bytes(b"00d397b84d98a4c26138ed1b695a8106ead91d553bf06041b62d3fdc50a041e222b8f4529689c1b82c5e71554f5dd69fa2f4b6158cf0dbeb57811a0fc327e1f28e74fe74d3bc166c1eabdc1b8b57b934ca8be5b00b4f29975bcc99acaf415b59bb28a6782bb41a2c3c2976b3c18dbadef62f00c6bb226640095096c0cc60d22fe7ef987d75c6a81b10d96bf292028af110dc7cc1bbc43d22adab379a0cd5d8078cc780ff5cd6209dea34c922cf784f7717e428d75b5aec8ff30e5f0141510766e2e0ab8d473c84e8710b2b98227c3db095337ad3452f19e2b9bfbccdd8148abf6776fa552775e6e75956e45229ae5a9c46949bab1e622f0e48f56524a84ed3483b", 16).unwrap(),
-            BigUint::from_u64(65537).unwrap(),
-            BigUint::parse_bytes(b"00c4e70c689162c94c660828191b52b4d8392115df486a9adbe831e458d73958320dc1b755456e93701e9702d76fb0b92f90e01d1fe248153281fe79aa9763a92fae69d8d7ecd144de29fa135bd14f9573e349e45031e3b76982f583003826c552e89a397c1a06bd2163488630d92e8c2bb643d7abef700da95d685c941489a46f54b5316f62b5d2c3a7f1bbd134cb37353a44683fdc9d95d36458de22f6c44057fe74a0a436c4308f73f4da42f35c47ac16a7138d483afc91e41dc3a1127382e0c0f5119b0221b4fc639d6b9c38177a6de9b526ebd88c38d7982c07f98a0efd877d508aae275b946915c02e2e1106d175d74ec6777f5e80d12c053d9c7be1e341", 16).unwrap(),
+            Odd::new(BoxedUint::from_be_hex("00d397b84d98a4c26138ed1b695a8106ead91d553bf06041b62d3fdc50a041e222b8f4529689c1b82c5e71554f5dd69fa2f4b6158cf0dbeb57811a0fc327e1f28e74fe74d3bc166c1eabdc1b8b57b934ca8be5b00b4f29975bcc99acaf415b59bb28a6782bb41a2c3c2976b3c18dbadef62f00c6bb226640095096c0cc60d22fe7ef987d75c6a81b10d96bf292028af110dc7cc1bbc43d22adab379a0cd5d8078cc780ff5cd6209dea34c922cf784f7717e428d75b5aec8ff30e5f0141510766e2e0ab8d473c84e8710b2b98227c3db095337ad3452f19e2b9bfbccdd8148abf6776fa552775e6e75956e45229ae5a9c46949bab1e622f0e48f56524a84ed3483b", bits).unwrap()).unwrap(),
+            65537,
+            BoxedUint::from_be_hex("00c4e70c689162c94c660828191b52b4d8392115df486a9adbe831e458d73958320dc1b755456e93701e9702d76fb0b92f90e01d1fe248153281fe79aa9763a92fae69d8d7ecd144de29fa135bd14f9573e349e45031e3b76982f583003826c552e89a397c1a06bd2163488630d92e8c2bb643d7abef700da95d685c941489a46f54b5316f62b5d2c3a7f1bbd134cb37353a44683fdc9d95d36458de22f6c44057fe74a0a436c4308f73f4da42f35c47ac16a7138d483afc91e41dc3a1127382e0c0f5119b0221b4fc639d6b9c38177a6de9b526ebd88c38d7982c07f98a0efd877d508aae275b946915c02e2e1106d175d74ec6777f5e80d12c053d9c7be1e341", bits).unwrap(),
             vec![
-                BigUint::parse_bytes(b"00f827bbf3a41877c7cc59aebf42ed4b29c32defcb8ed96863d5b090a05a8930dd624a21c9dcf9838568fdfa0df65b8462a5f2ac913d6c56f975532bd8e78fb07bd405ca99a484bcf59f019bbddcb3933f2bce706300b4f7b110120c5df9018159067c35da3061a56c8635a52b54273b31271b4311f0795df6021e6355e1a42e61",16).unwrap(),
-                BigUint::parse_bytes(b"00da4817ce0089dd36f2ade6a3ff410c73ec34bf1b4f6bda38431bfede11cef1f7f6efa70e5f8063a3b1f6e17296ffb15feefa0912a0325b8d1fd65a559e717b5b961ec345072e0ec5203d03441d29af4d64054a04507410cf1da78e7b6119d909ec66e6ad625bf995b279a4b3c5be7d895cd7c5b9c4c497fde730916fcdb4e41b", 16).unwrap()
+                BoxedUint::from_be_hex("00f827bbf3a41877c7cc59aebf42ed4b29c32defcb8ed96863d5b090a05a8930dd624a21c9dcf9838568fdfa0df65b8462a5f2ac913d6c56f975532bd8e78fb07bd405ca99a484bcf59f019bbddcb3933f2bce706300b4f7b110120c5df9018159067c35da3061a56c8635a52b54273b31271b4311f0795df6021e6355e1a42e61", bits).unwrap(),
+                BoxedUint::from_be_hex("00da4817ce0089dd36f2ade6a3ff410c73ec34bf1b4f6bda38431bfede11cef1f7f6efa70e5f8063a3b1f6e17296ffb15feefa0912a0325b8d1fd65a559e717b5b961ec345072e0ec5203d03441d29af4d64054a04507410cf1da78e7b6119d909ec66e6ad625bf995b279a4b3c5be7d895cd7c5b9c4c497fde730916fcdb4e41b", bits).unwrap()
             ],
         ).unwrap()
     }

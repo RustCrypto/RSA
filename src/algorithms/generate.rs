@@ -1,10 +1,8 @@
 //! Generate prime components for the RSA Private Key
 
 use alloc::vec::Vec;
-use num_bigint::{BigUint, RandPrime};
-#[allow(unused_imports)]
-use num_traits::Float;
-use num_traits::Zero;
+use crypto_bigint::{BoxedUint, Odd};
+use crypto_primes::generate_prime_with_rng;
 use rand_core::CryptoRngCore;
 
 use crate::{
@@ -13,10 +11,10 @@ use crate::{
 };
 
 pub struct RsaPrivateKeyComponents {
-    pub n: BigUint,
-    pub e: BigUint,
-    pub d: BigUint,
-    pub primes: Vec<BigUint>,
+    pub n: Odd<BoxedUint>,
+    pub e: u64,
+    pub d: BoxedUint,
+    pub primes: Vec<BoxedUint>,
 }
 
 /// Generates a multi-prime RSA keypair of the given bit size, public exponent,
@@ -30,11 +28,11 @@ pub struct RsaPrivateKeyComponents {
 ///
 /// [1]: https://patents.google.com/patent/US4405829A/en
 /// [2]: http://www.cacr.math.uwaterloo.ca/techreports/2006/cacr2006-16.pdf
-pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore + ?Sized>(
+pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore>(
     rng: &mut R,
     nprimes: usize,
     bit_size: usize,
-    exp: &BigUint,
+    exp: u64,
 ) -> Result<RsaPrivateKeyComponents> {
     if nprimes < 2 {
         return Err(Error::NprimesTooSmall);
@@ -56,9 +54,9 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore + ?Sized>(
         }
     }
 
-    let mut primes = vec![BigUint::zero(); nprimes];
-    let n_final: BigUint;
-    let d_final: BigUint;
+    let mut primes = vec![BoxedUint::zero(); nprimes];
+    let n_final: Odd<BoxedUint>;
+    let d_final: BoxedUint;
 
     'next: loop {
         let mut todo = bit_size;
@@ -78,8 +76,9 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore + ?Sized>(
         }
 
         for (i, prime) in primes.iter_mut().enumerate() {
-            *prime = rng.gen_prime(todo / (nprimes - i));
-            todo -= prime.bits();
+            let bits = (todo / (nprimes - i)) as u32;
+            *prime = generate_prime_with_rng(rng, bits, bits);
+            todo -= prime.bits() as usize;
         }
 
         // Makes sure that primes is pairwise unequal.
@@ -93,7 +92,7 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore + ?Sized>(
 
         let n = compute_modulus(&primes);
 
-        if n.bits() != bit_size {
+        if n.bits() as usize != bit_size {
             // This should never happen for nprimes == 2 because
             // gen_prime should set the top two bits in each prime.
             // For nprimes > 2 we hope it does not happen often.
@@ -118,8 +117,6 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore + ?Sized>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use num_bigint::BigUint;
-    use num_traits::FromPrimitive;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 
     const EXP: u64 = 65537;
@@ -127,12 +124,11 @@ mod tests {
     #[test]
     fn test_impossible_keys() {
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let exp = BigUint::from_u64(EXP).expect("invalid static exponent");
         for i in 0..32 {
-            let _ = generate_multi_prime_key_with_exp(&mut rng, 2, i, &exp);
-            let _ = generate_multi_prime_key_with_exp(&mut rng, 3, i, &exp);
-            let _ = generate_multi_prime_key_with_exp(&mut rng, 4, i, &exp);
-            let _ = generate_multi_prime_key_with_exp(&mut rng, 5, i, &exp);
+            let _ = generate_multi_prime_key_with_exp(&mut rng, 2, i, EXP);
+            let _ = generate_multi_prime_key_with_exp(&mut rng, 3, i, EXP);
+            let _ = generate_multi_prime_key_with_exp(&mut rng, 4, i, EXP);
+            let _ = generate_multi_prime_key_with_exp(&mut rng, 5, i, EXP);
         }
     }
 
@@ -141,11 +137,10 @@ mod tests {
             #[test]
             fn $name() {
                 let mut rng = ChaCha8Rng::from_seed([42; 32]);
-                let exp = BigUint::from_u64(EXP).expect("invalid static exponent");
 
                 for _ in 0..10 {
                     let components =
-                        generate_multi_prime_key_with_exp(&mut rng, $multi, $size, &exp).unwrap();
+                        generate_multi_prime_key_with_exp(&mut rng, $multi, $size, EXP).unwrap();
                     assert_eq!(components.n.bits(), $size);
                     assert_eq!(components.primes.len(), $multi);
                 }
