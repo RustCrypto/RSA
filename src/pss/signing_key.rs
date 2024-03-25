@@ -57,12 +57,12 @@ where
 
     /// Generate a new random RSASSA-PSS signing key.
     /// Digest output size is used as a salt length.
-    pub fn random<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random<R: CryptoRngCore>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Self::random_with_salt_len(rng, bit_size, <D as Digest>::output_size())
     }
 
     /// Generate a new random RSASSA-PSS signing key with a salt of the given length.
-    pub fn random_with_salt_len<R: CryptoRngCore + ?Sized>(
+    pub fn random_with_salt_len<R: CryptoRngCore>(
         rng: &mut R,
         bit_size: usize,
         salt_len: usize,

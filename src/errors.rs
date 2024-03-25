@@ -66,6 +66,9 @@ pub enum Error {
 
     /// Invalid arguments.
     InvalidArguments,
+
+    /// Decoding error.
+    Decode(crypto_bigint::DecodeError),
 }
 
 #[cfg(feature = "std")]
@@ -95,6 +98,7 @@ impl core::fmt::Display for Error {
             Error::LabelTooLong => write!(f, "label too long"),
             Error::InvalidPadLen => write!(f, "invalid padding length"),
             Error::InvalidArguments => write!(f, "invalid arguments"),
+            Error::Decode(err) => write!(f, "{:?}", err),
         }
     }
 }
@@ -108,6 +112,11 @@ impl From<pkcs1::Error> for Error {
 impl From<pkcs8::Error> for Error {
     fn from(err: pkcs8::Error) -> Error {
         Error::Pkcs8(err)
+    }
+}
+impl From<crypto_bigint::DecodeError> for Error {
+    fn from(err: crypto_bigint::DecodeError) -> Error {
+        Error::Decode(err)
     }
 }
 

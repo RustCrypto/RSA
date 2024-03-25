@@ -5,9 +5,10 @@
 
 use crate::{
     traits::{PrivateKeyParts, PublicKeyParts},
-    BigUint, RsaPrivateKey, RsaPublicKey,
+    RsaPrivateKey, RsaPublicKey,
 };
 use core::convert::{TryFrom, TryInto};
+use crypto_bigint::{BoxedUint, NonZero, Odd};
 use pkcs8::{der::Encode, Document, EncodePrivateKey, EncodePublicKey, SecretDocument};
 use zeroize::Zeroizing;
 
@@ -35,11 +36,26 @@ impl TryFrom<pkcs8::PrivateKeyInfo<'_>> for RsaPrivateKey {
             return Err(pkcs1::Error::Version.into());
         }
 
-        let n = BigUint::from_bytes_be(pkcs1_key.modulus.as_bytes());
-        let e = BigUint::from_bytes_be(pkcs1_key.public_exponent.as_bytes());
-        let d = BigUint::from_bytes_be(pkcs1_key.private_exponent.as_bytes());
-        let prime1 = BigUint::from_bytes_be(pkcs1_key.prime1.as_bytes());
-        let prime2 = BigUint::from_bytes_be(pkcs1_key.prime2.as_bytes());
+        let key_malformed = pkcs8::Error::KeyMalformed;
+
+        let bits =
+            u32::try_from(pkcs1_key.modulus.as_bytes().len()).map_err(|_| key_malformed)? / 8;
+        let n = BoxedUint::from_be_slice(pkcs1_key.modulus.as_bytes(), bits)
+            .map_err(|_| key_malformed)?;
+        let n = Option::from(Odd::new(n)).ok_or_else(|| key_malformed)?;
+        let e = u64::from_be_bytes(
+            pkcs1_key
+                .public_exponent
+                .as_bytes()
+                .try_into()
+                .map_err(|_| key_malformed)?,
+        );
+        let d = BoxedUint::from_be_slice(pkcs1_key.private_exponent.as_bytes(), bits)
+            .map_err(|_| key_malformed)?;
+        let prime1 = BoxedUint::from_be_slice(pkcs1_key.prime1.as_bytes(), bits)
+            .map_err(|_| key_malformed)?;
+        let prime2 = BoxedUint::from_be_slice(pkcs1_key.prime2.as_bytes(), bits)
+            .map_err(|_| key_malformed)?;
         let primes = vec![prime1, prime2];
         RsaPrivateKey::from_components(n, e, d, primes).map_err(|_| pkcs8::Error::KeyMalformed)
     }
@@ -56,8 +72,19 @@ impl TryFrom<pkcs8::SubjectPublicKeyInfoRef<'_>> for RsaPublicKey {
                 .as_bytes()
                 .ok_or(pkcs8::spki::Error::KeyMalformed)?,
         )?;
-        let n = BigUint::from_bytes_be(pkcs1_key.modulus.as_bytes());
-        let e = BigUint::from_bytes_be(pkcs1_key.public_exponent.as_bytes());
+
+        let key_malformed = pkcs8::spki::Error::KeyMalformed;
+        let bits =
+            u32::try_from(pkcs1_key.modulus.as_bytes().len()).map_err(|_| key_malformed)? / 8;
+        let n = BoxedUint::from_be_slice(pkcs1_key.modulus.as_bytes(), bits)
+            .map_err(|_| key_malformed)?;
+        let e = u64::from_be_bytes(
+            pkcs1_key
+                .public_exponent
+                .as_bytes()
+                .try_into()
+                .map_err(|_| key_malformed)?,
+        );
         RsaPublicKey::new(n, e).map_err(|_| pkcs8::spki::Error::KeyMalformed)
     }
 }
@@ -69,17 +96,21 @@ impl EncodePrivateKey for RsaPrivateKey {
             return Err(pkcs1::Error::Version.into());
         }
 
-        let modulus = self.n().to_bytes_be();
-        let public_exponent = self.e().to_bytes_be();
-        let private_exponent = Zeroizing::new(self.d().to_bytes_be());
-        let prime1 = Zeroizing::new(self.primes[0].to_bytes_be());
-        let prime2 = Zeroizing::new(self.primes[1].to_bytes_be());
-        let exponent1 = Zeroizing::new((self.d() % (&self.primes[0] - 1u8)).to_bytes_be());
-        let exponent2 = Zeroizing::new((self.d() % (&self.primes[1] - 1u8)).to_bytes_be());
+        let modulus = self.n().to_be_bytes();
+        let public_exponent = self.e().to_be_bytes();
+        let private_exponent = Zeroizing::new(self.d().to_be_bytes());
+        let prime1 = Zeroizing::new(self.primes[0].to_be_bytes());
+        let prime2 = Zeroizing::new(self.primes[1].to_be_bytes());
+        let exponent1 = Zeroizing::new(
+            (self.d() % NonZero::new(&self.primes[0] - &BoxedUint::one()).unwrap()).to_be_bytes(),
+        );
+        let exponent2 = Zeroizing::new(
+            (self.d() % NonZero::new(&self.primes[1] - &BoxedUint::one()).unwrap()).to_be_bytes(),
+        );
         let coefficient = Zeroizing::new(
             self.crt_coefficient()
                 .ok_or(pkcs1::Error::Crypto)?
-                .to_bytes_be(),
+                .to_be_bytes(),
         );
 
         let private_key = pkcs1::RsaPrivateKey {
@@ -101,8 +132,8 @@ impl EncodePrivateKey for RsaPrivateKey {
 
 impl EncodePublicKey for RsaPublicKey {
     fn to_public_key_der(&self) -> pkcs8::spki::Result<Document> {
-        let modulus = self.n().to_bytes_be();
-        let public_exponent = self.e().to_bytes_be();
+        let modulus = self.n().to_be_bytes();
+        let public_exponent = self.e().to_be_bytes();
 
         let subject_public_key = pkcs1::RsaPublicKey {
             modulus: pkcs1::UintRef::new(&modulus)?,
