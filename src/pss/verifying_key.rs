@@ -4,14 +4,13 @@ use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset};
 use pkcs8::{
     spki::{der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier},
-    Document, EncodePublicKey,
+    Document, EncodePublicKey, AssociatedOid,
 };
 use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
 #[cfg(feature = "serde")]
 use {
-    pkcs8::{AssociatedOid, SubjectPublicKeyInfo},
     serdect::serde::{de, ser, Deserialize, Serialize},
-    spki::der::Decode,
+    spki::DecodePublicKey,
 };
 
 /// Verifying key for checking the validity of RSASSA-PSS signatures as
@@ -163,6 +162,17 @@ where
     }
 }
 
+impl<D> TryFrom<pkcs8::SubjectPublicKeyInfoRef<'_>> for VerifyingKey<D>
+where
+    D: Digest + AssociatedOid,
+{
+    type Error = pkcs8::spki::Error;
+
+    fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> pkcs8::spki::Result<Self> {
+        RsaPublicKey::try_from(spki).map(Self::new)
+    }
+}
+
 impl<D> PartialEq for VerifyingKey<D>
 where
     D: Digest,
@@ -181,7 +191,7 @@ where
     where
         S: serde::Serializer,
     {
-        let der = self.inner.to_public_key_der().map_err(ser::Error::custom)?;
+        let der = self.to_public_key_der().map_err(ser::Error::custom)?;
         serdect::slice::serialize_hex_lower_or_bin(&der, serializer)
     }
 }
@@ -196,10 +206,7 @@ where
         De: serde::Deserializer<'de>,
     {
         let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
-        let spki = SubjectPublicKeyInfo::from_der(&der_bytes).map_err(de::Error::custom)?;
-        RsaPublicKey::try_from(spki)
-            .map_err(de::Error::custom)
-            .map(Self::new)
+        Self::from_public_key_der(&der_bytes).map_err(de::Error::custom)
     }
 }
 

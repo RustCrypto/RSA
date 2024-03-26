@@ -13,9 +13,8 @@ use pkcs8::{
 
 #[cfg(feature = "serde")]
 use {
-    pkcs8::SubjectPublicKeyInfo,
     serdect::serde::{de, ser, Deserialize, Serialize},
-    spki::der::Decode,
+    spki::DecodePublicKey,
 };
 
 use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
@@ -229,7 +228,7 @@ where
     where
         S: serde::Serializer,
     {
-        let der = self.inner.to_public_key_der().map_err(ser::Error::custom)?;
+        let der = self.to_public_key_der().map_err(ser::Error::custom)?;
         serdect::slice::serialize_hex_lower_or_bin(&der, serializer)
     }
 }
@@ -244,8 +243,7 @@ where
         De: serde::Deserializer<'de>,
     {
         let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
-        let spki = SubjectPublicKeyInfo::from_der(&der_bytes).map_err(de::Error::custom)?;
-        Self::try_from(spki).map_err(de::Error::custom)
+        Self::from_public_key_der(&der_bytes).map_err(de::Error::custom)
     }
 }
 

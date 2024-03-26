@@ -4,7 +4,7 @@ use crate::algorithms::pad::uint_to_be_pad;
 use ::signature::SignatureEncoding;
 use alloc::{boxed::Box, string::ToString};
 #[cfg(feature = "serde")]
-use serdect::serde::{Deserialize, Serialize};
+use serdect::serde::{de, Deserialize, Serialize};
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use num_bigint::BigUint;
 use spki::{
@@ -88,7 +88,7 @@ impl Serialize for Signature {
     where
         S: serdect::serde::Serializer,
     {
-        serdect::slice::serialize_hex_lower_or_bin(&self.inner.to_bytes_be(), serializer)
+        serdect::slice::serialize_hex_lower_or_bin(&self.to_bytes(), serializer)
     }
 }
 
@@ -98,13 +98,7 @@ impl<'de> Deserialize<'de> for Signature {
     where
         D: serdect::serde::Deserializer<'de>,
     {
-        let bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
-        let inner = BigUint::from_bytes_be(&bytes);
-
-        Ok(Self {
-            inner,
-            len: bytes.len(),
-        })
+        serdect::slice::deserialize_hex_or_bin_vec(deserializer)?.as_slice().try_into().map_err(de::Error::custom)
     }
 }
 

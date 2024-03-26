@@ -7,15 +7,13 @@ use pkcs8::{
     spki::{
         der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
         SignatureAlgorithmIdentifier,
-    },
-    AssociatedOid, EncodePrivateKey, SecretDocument,
+    }, AssociatedOid, EncodePrivateKey, SecretDocument
 };
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use {
-    pkcs8::PrivateKeyInfo,
+    pkcs8::DecodePrivateKey,
     serdect::serde::{de, ser, Deserialize, Serialize},
-    spki::der::Decode,
 };
 
 use signature::{
@@ -276,7 +274,7 @@ where
     where
         S: serdect::serde::Serializer,
     {
-        let der = self.inner.to_pkcs8_der().map_err(ser::Error::custom)?;
+        let der = self.to_pkcs8_der().map_err(ser::Error::custom)?;
         serdect::slice::serialize_hex_lower_or_bin(&der.as_bytes(), serializer)
     }
 }
@@ -291,8 +289,7 @@ where
         De: serdect::serde::Deserializer<'de>,
     {
         let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
-        let pki = PrivateKeyInfo::from_der(&der_bytes).map_err(de::Error::custom)?;
-        Self::try_from(pki).map_err(de::Error::custom)
+        Self::from_pkcs8_der(&der_bytes).map_err(de::Error::custom)
     }
 }
 
