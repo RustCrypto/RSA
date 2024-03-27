@@ -1,4 +1,5 @@
 use super::{get_pss_signature_algo_id, sign_digest, Signature, VerifyingKey};
+use crate::encoding::ID_RSASSA_PSS;
 use crate::{Result, RsaPrivateKey};
 use const_oid::AssociatedOid;
 use core::marker::PhantomData;
@@ -231,6 +232,9 @@ where
     type Error = pkcs8::Error;
 
     fn try_from(private_key_info: pkcs8::PrivateKeyInfo<'_>) -> pkcs8::Result<Self> {
+        private_key_info
+            .algorithm
+            .assert_algorithm_oid(ID_RSASSA_PSS)?;
         RsaPrivateKey::try_from(private_key_info).map(Self::new)
     }
 }

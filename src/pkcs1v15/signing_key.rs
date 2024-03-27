@@ -253,6 +253,9 @@ where
     type Error = pkcs8::Error;
 
     fn try_from(private_key_info: pkcs8::PrivateKeyInfo<'_>) -> pkcs8::Result<Self> {
+        private_key_info
+            .algorithm
+            .assert_algorithm_oid(pkcs1::ALGORITHM_OID)?;
         RsaPrivateKey::try_from(private_key_info).map(Self::new)
     }
 }

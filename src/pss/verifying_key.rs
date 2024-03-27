@@ -1,10 +1,11 @@
 use super::{verify_digest, Signature};
+use crate::encoding::ID_RSASSA_PSS;
 use crate::RsaPublicKey;
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset};
 use pkcs8::{
     spki::{der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier},
-    Document, EncodePublicKey, AssociatedOid,
+    AssociatedOid, Document, EncodePublicKey,
 };
 use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
 #[cfg(feature = "serde")]
@@ -169,6 +170,15 @@ where
     type Error = pkcs8::spki::Error;
 
     fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> pkcs8::spki::Result<Self> {
+      match spki.algorithm.oid {
+            ID_RSASSA_PSS | pkcs1::ALGORITHM_OID => (),
+            _ => {
+                return Err(spki::Error::OidUnknown {
+                    oid: spki.algorithm.oid,
+                });
+            }
+        }
+
         RsaPublicKey::try_from(spki).map(Self::new)
     }
 }
