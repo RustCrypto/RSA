@@ -8,6 +8,11 @@ use pkcs8::{
     AssociatedOid, Document, EncodePublicKey,
 };
 use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
+#[cfg(feature = "serde")]
+use {
+    serdect::serde::{de, ser, Deserialize, Serialize},
+    spki::DecodePublicKey,
+};
 
 /// Verifying key for checking the validity of RSASSA-PSS signatures as
 /// described in [RFC8017 § 8.1].
@@ -165,7 +170,7 @@ where
     type Error = pkcs8::spki::Error;
 
     fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> pkcs8::spki::Result<Self> {
-        match spki.algorithm.oid {
+      match spki.algorithm.oid {
             ID_RSASSA_PSS | pkcs1::ALGORITHM_OID => (),
             _ => {
                 return Err(spki::Error::OidUnknown {
@@ -175,5 +180,65 @@ where
         }
 
         RsaPublicKey::try_from(spki).map(Self::new)
+    }
+}
+
+impl<D> PartialEq for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.inner == other.inner && self.salt_len == other.salt_len
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<D> Serialize for VerifyingKey<D>
+where
+    D: Digest,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let der = self.to_public_key_der().map_err(ser::Error::custom)?;
+        serdect::slice::serialize_hex_lower_or_bin(&der, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, D> Deserialize<'de> for VerifyingKey<D>
+where
+    D: Digest + AssociatedOid,
+{
+    fn deserialize<De>(deserializer: De) -> Result<Self, De::Error>
+    where
+        De: serde::Deserializer<'de>,
+    {
+        let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
+        Self::from_public_key_der(&der_bytes).map_err(de::Error::custom)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde() {
+        use super::*;
+        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+        use serde_test::{assert_tokens, Configure, Token};
+        use sha2::Sha256;
+
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let priv_key = crate::RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
+        let pub_key = priv_key.to_public_key();
+        let verifying_key = VerifyingKey::<Sha256>::new(pub_key);
+
+        let tokens = [
+            Token::Str("3024300d06092a864886f70d01010105000313003010020900cc6c6130e35b46bf0203010001")
+        ];
+
+        assert_tokens(&verifying_key.readable(), &tokens);
     }
 }
