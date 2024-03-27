@@ -22,7 +22,7 @@ pub use self::{
 use alloc::{boxed::Box, vec::Vec};
 use core::fmt::{self, Debug};
 
-use const_oid::{AssociatedOid, ObjectIdentifier};
+use const_oid::AssociatedOid;
 use digest::{Digest, DynDigest, FixedOutputReset};
 use num_bigint::BigUint;
 use pkcs1::RsaPssParams;
@@ -32,6 +32,7 @@ use rand_core::CryptoRngCore;
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pss::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
+use crate::encoding::ID_RSASSA_PSS;
 use crate::errors::{Error, Result};
 use crate::traits::PublicKeyParts;
 use crate::traits::SignatureScheme;
@@ -240,8 +241,6 @@ fn get_pss_signature_algo_id<D>(salt_len: u8) -> pkcs8::spki::Result<AlgorithmId
 where
     D: Digest + AssociatedOid,
 {
-    const ID_RSASSA_PSS: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.10");
-
     let pss_params = RsaPssParams::new::<D>(salt_len);
 
     Ok(AlgorithmIdentifierOwned {

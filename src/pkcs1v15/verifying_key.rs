@@ -198,6 +198,8 @@ where
     type Error = pkcs8::spki::Error;
 
     fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> pkcs8::spki::Result<Self> {
+        spki.algorithm.assert_algorithm_oid(pkcs1::ALGORITHM_OID)?;
+
         RsaPublicKey::try_from(spki).map(Self::new)
     }
 }
