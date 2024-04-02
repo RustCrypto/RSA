@@ -19,6 +19,13 @@ use crate::errors::{Error, Result};
 use crate::traits::keys::{CrtValue, PrivateKeyParts, PublicKeyParts};
 use crate::traits::{PaddingScheme, SignatureScheme};
 
+// Serde requires default upon skippin non-Option field
+// TODO: stop gap for feature serde compile
+fn default_nparams() -> BoxedMontyParams {
+    let n_odd = Odd::new(BoxedUint::one()).unwrap();
+    BoxedMontyParams::new(n_odd)
+}
+
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -31,7 +38,7 @@ pub struct RsaPublicKey {
     /// Typically 0x10001 (65537)
     e: u64,
 
-    #[cfg_attr(feature = "serde", serde(skip))]
+    #[cfg_attr(feature = "serde", serde(skip, default = "default_nparams"))]
     n_params: BoxedMontyParams,
 }
 
