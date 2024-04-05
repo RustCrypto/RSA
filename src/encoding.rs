@@ -17,7 +17,7 @@ use zeroize::Zeroizing;
 pub const ID_RSASSA_PSS: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.10");
 
 /// Verify that the `AlgorithmIdentifier` for a key is correct.
-fn verify_algorithm_id(algorithm: &pkcs8::AlgorithmIdentifierRef) -> pkcs8::spki::Result<()> {
+pub(crate) fn verify_algorithm_id(algorithm: &pkcs8::AlgorithmIdentifierRef) -> pkcs8::spki::Result<()> {
     match algorithm.oid {
         pkcs1::ALGORITHM_OID => {
             if algorithm.parameters_any()? != pkcs8::der::asn1::Null.into() {
