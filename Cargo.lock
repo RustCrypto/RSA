@@ -319,7 +319,7 @@ version = "0.7.5"
 dependencies = [
  "der",
  "pkcs8",
- "spki 0.7.3",
+ "spki 0.7.2",
 ]
 
 [[package]]
