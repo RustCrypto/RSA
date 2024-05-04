@@ -319,7 +319,7 @@ version = "0.7.5"
 dependencies = [
  "der",
  "pkcs8",
- "spki",
+ "spki 0.7.3",
 ]
 
 [[package]]
@@ -332,7 +332,7 @@ dependencies = [
  "pbkdf2",
  "scrypt",
  "sha2",
- "spki",
+ "spki 0.7.3",
 ]
 
 [[package]]
@@ -342,7 +342,7 @@ dependencies = [
  "der",
  "pkcs5",
  "rand_core",
- "spki",
+ "spki 0.7.3",
 ]
 
 [[package]]
@@ -473,7 +473,7 @@ dependencies = [
  "sha2",
  "sha3",
  "signature",
- "spki",
+ "spki 0.7.2",
  "subtle",
  "zeroize",
 ]
@@ -605,6 +605,14 @@ name = "spin"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6e63cff320ae2c57904679ba7cb63280a3dc4613885beafb148ee7bf9aa9042d"
+
+[[package]]
+name = "spki"
+version = "0.7.2"
+dependencies = [
+ "base64ct",
+ "der",
+]
 
 [[package]]
 name = "spki"
@@ -800,10 +808,6 @@ version = "0.7.3"
 [[patch.unused]]
 name = "serdect"
 version = "0.2.0"
-
-[[patch.unused]]
-name = "spki"
-version = "0.7.2"
 
 [[patch.unused]]
 name = "tai64"
