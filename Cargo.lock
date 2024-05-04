@@ -455,6 +455,7 @@ version = "0.9.6"
 dependencies = [
  "base64ct",
  "const-oid",
+ "der",
  "digest",
  "hex-literal",
  "num-bigint-dig",

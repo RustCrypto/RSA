@@ -13,6 +13,8 @@ readme = "README.md"
 rust-version = "1.65"
 
 [dependencies]
+der = { version = "0.7",  path = "./vendor/formats-der-v0.7.8/der" }
+
 num-bigint = { version = "0.8", features = ["i128", "prime", "zeroize"], default-features = false, package = "num-bigint-dig", path = "./vendor/num-bigint-0.8.2" }
 num-traits = { version= "0.2.9", default-features = false, features = ["libm"] }
 num-integer = { version = "0.1.39", default-features = false }
