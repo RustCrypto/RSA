@@ -19,7 +19,7 @@ der = { version = "0.7", features = ["oid"], path = "../der" }
 spki = { version = "0.7", path = "../spki" }
 
 # optional dependencies
-pkcs8 = { version = "0.10", optional = true, default-features = false }
+pkcs8 = { version = "0.10", optional = true, default-features = false, path = "../pkcs8" }
 
 [dev-dependencies]
 const-oid = { version = "0.9", features = ["db"] } # TODO: path = "../const-oid"
