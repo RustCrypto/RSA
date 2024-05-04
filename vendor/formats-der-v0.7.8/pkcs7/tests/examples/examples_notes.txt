@@ -1,0 +1,11 @@
+openssl genrsa -out rsa_sk.pkcs1.pem 1024
+openssl req -new -key rsa_sk.pkcs1.pem -out cert.csr
+openssl x509 -in cert.csr -out cert.pem -req -signkey rsa_sk.pkcs1.pem -days 365
+openssl pkcs12 -export -out example.pfx \
+    -name "example.org" \
+    -inkey rsa_sk.pkcs1.pem  -in cert.pem \
+    -keypbe 'PBE-SHA1-RC2-40' -passout pass:hunter42
+openssl asn1parse -i -inform DER -in example.pfx -strparse 26 \
+    -noout -out >(openssl asn1parse -i -inform DER -strparse 4 -out keyEncryptedData.bin)
+openssl asn1parse -i -inform DER -in example.pfx -strparse 26 \
+    -noout -out >(openssl asn1parse -i -inform DER -strparse 631 -out certData.bin)

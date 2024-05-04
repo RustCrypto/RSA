@@ -1,0 +1,62 @@
+[workspace]
+resolver = "2"
+members = [
+    "base16ct",
+    "base32ct",
+    "base64ct",
+    "cmpv2",
+    "cms",
+    "const-oid",
+    "crmf",
+    "der",
+    "der/derive",
+    "gss-api",
+    "pem-rfc7468",
+    "pkcs1",
+    "pkcs5",
+    "pkcs7",
+    "pkcs8",
+    "pkcs12",
+    "sec1",
+    "serdect",
+    "spki",
+    "tai64",
+    "tls_codec",
+    "tls_codec/derive",
+    "x509-tsp",
+    "x509-cert",
+    "x509-cert/test-support",
+    "x509-ocsp"
+]
+
+[profile.dev]
+opt-level = 2
+
+[patch.crates-io]
+# A global patch crates-io block is used to avoid cyclic dependencies errors
+# If we use other crates from the RustCrypto ecosystem, they may pull redundant
+# versions of dependencies.
+base16ct          = { path = "./base16ct" }
+base32ct          = { path = "./base32ct" }
+base64ct          = { path = "./base64ct" }
+cmpv2             = { path = "./cmpv2" }
+cms               = { path = "./cms" }
+const-oid         = { path = "./const-oid" }
+crmf              = { path = "./crmf" }
+der               = { path = "./der" }
+der_derive        = { path = "./der/derive" }
+pem-rfc7468       = { path = "./pem-rfc7468" }
+pkcs1             = { path = "./pkcs1" }
+pkcs5             = { path = "./pkcs5" }
+pkcs7             = { path = "./pkcs7" }
+pkcs8             = { path = "./pkcs8" }
+pkcs12            = { path = "./pkcs12" }
+sec1              = { path = "./sec1" }
+serdect           = { path = "./serdect" }
+spki              = { path = "./spki" }
+tai64             = { path = "./tai64" }
+tls_codec         = { path = "./tls_codec" }
+tls_codec_derive  = { path = "./tls_codec/derive" }
+x509-tsp               = { path = "./x509-tsp" }
+x509-cert         = { path = "./x509-cert" }
+x509-ocsp         = { path = "./x509-ocsp" }

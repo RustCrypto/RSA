@@ -1,0 +1,28 @@
+[package]
+name = "x509-ocsp"
+version = "0.2.0-pre"
+description = """
+Pure Rust implementation of the X.509 Internet Public Key Infrastructure
+Online Certificate Status Protocol - OCSP formats as described in RFC 6960
+"""
+authors = ["RustCrypto Developers"]
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/RustCrypto/formats/tree/master/x509-ocsp"
+categories = ["cryptography", "data-structures", "encoding", "no-std"]
+keywords = ["crypto", "x509"]
+readme = "README.md"
+edition = "2021"
+rust-version = "1.65"
+
+[dependencies]
+der = { version = "0.7", features = ["alloc", "derive", "oid"] }
+spki = { version = "0.7" }
+x509-cert = { version = "0.2", default-features = false }
+
+[dev-dependencies]
+const-oid = { version = "0.9", features = ["db"] } # TODO: path = "../const-oid"
+hex-literal = "0.4.1"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

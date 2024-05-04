@@ -13,18 +13,18 @@ readme = "README.md"
 rust-version = "1.65"
 
 [dependencies]
-num-bigint = { version = "0.8.2", features = ["i128", "prime", "zeroize"], default-features = false, package = "num-bigint-dig" }
+num-bigint = { version = "0.8", features = ["i128", "prime", "zeroize"], default-features = false, package = "num-bigint-dig" }
 num-traits = { version= "0.2.9", default-features = false, features = ["libm"] }
 num-integer = { version = "0.1.39", default-features = false }
 rand_core = { version = "0.6.4", default-features = false }
 const-oid = { version = "0.9", default-features = false }
 subtle = { version = "2.1.1", default-features = false }
 digest = { version = "0.10.5", default-features = false, features = ["alloc", "oid"] }
-pkcs1 = { version = "0.7.5", default-features = false, features = ["alloc", "pkcs8"] }
-pkcs8 = { version = "0.10.2", default-features = false, features = ["alloc"] }
+pkcs1 = { version = "0.7", default-features = false, features = ["alloc", "pkcs8"] }
+pkcs8 = { version = "0.10", default-features = false, features = ["alloc"] }
 signature = { version = ">2.0, <2.3", default-features = false , features = ["alloc", "digest", "rand_core"] }
-spki = { version = "0.7.3", default-features = false, features = ["alloc"] }
-zeroize = { version = "1.5", features = ["alloc"] }
+spki = { version = "0.7", default-features = false, features = ["alloc"] }
+zeroize = { version = "=1.3.0", features = ["alloc"] }
 
 # optional dependencies
 sha1 = { version = "0.10.5", optional = true, default-features = false, features = ["oid"] }
@@ -64,3 +64,34 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.dev]
 opt-level = 2
+
+[patch.crates-io]
+# A global patch crates-io block is used to avoid cyclic dependencies errors
+# If we use other crates from the RustCrypto ecosystem, they may pull redundant
+# versions of dependencies.
+base16ct          = { path = "./vendor/formats-der-v0.7.8/base16ct" }
+base32ct          = { path = "./vendor/formats-der-v0.7.8/base32ct" }
+base64ct          = { path = "./vendor/formats-der-v0.7.8/base64ct" }
+cmpv2             = { path = "./vendor/formats-der-v0.7.8/cmpv2" }
+cms               = { path = "./vendor/formats-der-v0.7.8/cms" }
+const-oid         = { path = "./vendor/formats-der-v0.7.8/const-oid" }
+crmf              = { path = "./vendor/formats-der-v0.7.8/crmf" }
+der               = { path = "./vendor/formats-der-v0.7.8/der" }
+der_derive        = { path = "./vendor/formats-der-v0.7.8/der/derive" }
+pem-rfc7468       = { path = "./vendor/formats-der-v0.7.8/pem-rfc7468" }
+pkcs1             = { path = "./vendor/formats-der-v0.7.8/pkcs1" }
+pkcs5             = { path = "./vendor/formats-der-v0.7.8/pkcs5" }
+pkcs7             = { path = "./vendor/formats-der-v0.7.8/pkcs7" }
+pkcs8             = { path = "./vendor/formats-der-v0.7.8/pkcs8" }
+pkcs12            = { path = "./vendor/formats-der-v0.7.8/pkcs12" }
+sec1              = { path = "./vendor/formats-der-v0.7.8/sec1" }
+serdect           = { path = "./vendor/formats-der-v0.7.8/serdect" }
+spki              = { path = "./vendor/formats-der-v0.7.8/spki" }
+tai64             = { path = "./vendor/formats-der-v0.7.8/tai64" }
+tls_codec         = { path = "./vendor/formats-der-v0.7.8/tls_codec" }
+tls_codec_derive  = { path = "./vendor/formats-der-v0.7.8/tls_codec/derive" }
+x509-tsp               = { path = "./vendor/formats-der-v0.7.8/x509-tsp" }
+x509-cert         = { path = "./vendor/formats-der-v0.7.8/x509-cert" }
+x509-ocsp         = { path = "./vendor/formats-der-v0.7.8/x509-ocsp" }
+
+num-bigint-dig = { path = "./vendor/num-bigint-0.8.2" }

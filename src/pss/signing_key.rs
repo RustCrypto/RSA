@@ -14,7 +14,6 @@ use rand_core::CryptoRngCore;
 use signature::{
     hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedSigner,
 };
-use zeroize::ZeroizeOnDrop;
 
 #[cfg(feature = "getrandom")]
 use {
@@ -219,4 +218,3 @@ where
     }
 }
 
-impl<D> ZeroizeOnDrop for SigningKey<D> where D: Digest {}

@@ -1,0 +1,26 @@
+[package]
+name = "pkcs7"
+version = "0.4.1"
+description = "DEPRECATED: use the `cms` crate instead"
+authors = ["RustCrypto Developers"]
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/RustCrypto/formats/tree/master/pkcs7"
+categories = ["cryptography", "data-structures", "encoding", "no-std", "parser-implementations"]
+keywords = ["crypto", "pkcs"]
+readme = "README.md"
+edition = "2021"
+rust-version = "1.65"
+
+[dependencies]
+der = { version = "0.7.6", features = ["oid"] }
+spki = { version = "0.7" }
+x509-cert = { version = "0.2", default-features = false }
+
+[dev-dependencies]
+der = { version = "0.7", features = ["oid", "pem"] }
+hex-literal = "0.4"
+x509-cert = { version = "0.2", default-features = false, features = ["pem"] }
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]

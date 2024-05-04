@@ -8,7 +8,7 @@ use num_traits::{FromPrimitive, One, ToPrimitive};
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use zeroize::Zeroize;
 
 use crate::algorithms::generate::generate_multi_prime_key_with_exp;
 use crate::algorithms::rsa::{
@@ -81,7 +81,6 @@ impl Drop for RsaPrivateKey {
     }
 }
 
-impl ZeroizeOnDrop for RsaPrivateKey {}
 
 #[derive(Debug, Clone)]
 pub(crate) struct PrecomputedValues {

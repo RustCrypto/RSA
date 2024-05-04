@@ -14,7 +14,6 @@ use rand_core::CryptoRngCore;
 use signature::{
     hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedSigner,
 };
-use zeroize::ZeroizeOnDrop;
 
 /// Signing key for producing "blinded" RSASSA-PSS signatures as described in
 /// [draft-irtf-cfrg-rsa-blind-signatures](https://datatracker.ietf.org/doc/draft-irtf-cfrg-rsa-blind-signatures/).
@@ -197,4 +196,3 @@ where
     }
 }
 
-impl<D> ZeroizeOnDrop for BlindedSigningKey<D> where D: Digest {}

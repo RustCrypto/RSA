@@ -1,0 +1,17 @@
+Object Identifiers (OID) for Certificate Transparency
+-----------------------------------------------------
+This document lists the OIDs for
+- Precertificate signed certificate timestamps extension,
+- Precertificate poison extension, and
+- Precertificate signing certificate,
+
+This file was manually created, as there exists no offical document that is easily parsable.
+RFC 6962 publishes the following OIDs:
+
+google OBJECT IDENTIFIER ::= { iso(1) org(3) dod(6) internet(1) private(4) enterprise(1) google(11129) }
+
+ct-precert-scts OBJECT IDENTIFIER ::= { google 2 4 2 }
+
+ct-precert-poison OBJECT IDENTIFIER ::= {google 2 4 3 }
+
+ct-precert-signing-cert OBJECT IDENTIFIER ::= { google 2 4 4 }

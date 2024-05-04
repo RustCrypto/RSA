@@ -6,7 +6,6 @@ use crate::{
 };
 use alloc::vec::Vec;
 use rand_core::CryptoRngCore;
-use zeroize::ZeroizeOnDrop;
 
 /// Decryption key for PKCS#1 v1.5 decryption as described in [RFC8017 § 7.2].
 ///
@@ -48,4 +47,3 @@ impl EncryptingKeypair for DecryptingKey {
     }
 }
 
-impl ZeroizeOnDrop for DecryptingKey {}

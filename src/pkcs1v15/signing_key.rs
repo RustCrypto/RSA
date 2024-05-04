@@ -14,7 +14,6 @@ use rand_core::CryptoRngCore;
 use signature::{
     hazmat::PrehashSigner, DigestSigner, Keypair, RandomizedDigestSigner, RandomizedSigner, Signer,
 };
-use zeroize::ZeroizeOnDrop;
 
 /// Signing key for `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
 ///
@@ -252,4 +251,3 @@ where
     }
 }
 
-impl<D> ZeroizeOnDrop for SigningKey<D> where D: Digest {}
