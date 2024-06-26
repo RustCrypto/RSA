@@ -21,7 +21,7 @@ jobs:
           components: clippy
       - run: cargo clippy --all -- -D warnings
 
-  rustfmt:
+  fmt:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -35,3 +35,18 @@ jobs:
 
       - name: Run cargo fmt
         run: cargo fmt --all -- --check
+
+  doc:
+    name: rustdoc
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          # We need Nightly for doc_auto_cfg
+          toolchain: nightly-2024-06-25
+      - uses: Swatinem/rust-cache@v2
+      - name: Generate Docs
+        env:
+          RUSTDOCFLAGS: "-Dwarnings --cfg docsrs"
+        run: cargo doc --no-deps --features std,pem,serde,hazmat,sha2
