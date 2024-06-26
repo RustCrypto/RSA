@@ -24,20 +24,14 @@ jobs:
   fmt:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v4
-
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
           components: rustfmt
-
-      - name: Run cargo fmt
-        run: cargo fmt --all -- --check
+      - run: cargo fmt --all -- --check
 
   doc:
-    name: rustdoc
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +40,6 @@ jobs:
           # We need Nightly for doc_auto_cfg
           toolchain: nightly-2024-06-25
       - uses: Swatinem/rust-cache@v2
-      - name: Generate Docs
-        env:
+      - env:
           RUSTDOCFLAGS: "-Dwarnings --cfg docsrs"
         run: cargo doc --no-deps --features std,pem,serde,hazmat,sha2
