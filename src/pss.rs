@@ -565,10 +565,10 @@ mod test {
 
         for test in &tests {
             let sig = signing_key
-                .sign_prehash_with_rng(&mut rng, &test)
+                .sign_prehash_with_rng(&mut rng, test)
                 .expect("failed to sign");
             verifying_key
-                .verify_prehash(&test, &sig)
+                .verify_prehash(test, &sig)
                 .expect("failed to verify");
         }
     }
@@ -584,10 +584,10 @@ mod test {
 
         for test in &tests {
             let sig = signing_key
-                .sign_prehash_with_rng(&mut rng, &test)
+                .sign_prehash_with_rng(&mut rng, test)
                 .expect("failed to sign");
             verifying_key
-                .verify_prehash(&test, &sig)
+                .verify_prehash(test, &sig)
                 .expect("failed to verify");
         }
     }
