@@ -7,7 +7,8 @@ use pkcs8::{
     spki::{
         der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
         SignatureAlgorithmIdentifier,
-    }, AssociatedOid, EncodePrivateKey, SecretDocument
+    },
+    AssociatedOid, EncodePrivateKey, SecretDocument,
 };
 use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
@@ -262,7 +263,10 @@ where
 
 impl<D> ZeroizeOnDrop for SigningKey<D> where D: Digest {}
 
-impl<D> PartialEq for SigningKey<D> where D: Digest {
+impl<D> PartialEq for SigningKey<D>
+where
+    D: Digest,
+{
     fn eq(&self, other: &Self) -> bool {
         self.inner == other.inner && self.prefix == other.prefix
     }

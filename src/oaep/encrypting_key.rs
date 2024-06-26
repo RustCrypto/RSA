@@ -102,9 +102,13 @@ mod tests {
             Token::Str("label"),
             Token::None,
             Token::Str("phantom"),
-            Token::UnitStruct { name: "PhantomData", },
+            Token::UnitStruct {
+                name: "PhantomData",
+            },
             Token::Str("mg_phantom"),
-            Token::UnitStruct { name: "PhantomData", },
+            Token::UnitStruct {
+                name: "PhantomData",
+            },
             Token::StructEnd,
         ];
         assert_tokens(&encrypting_key.readable(), &tokens);

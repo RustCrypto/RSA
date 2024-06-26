@@ -1,9 +1,9 @@
 use super::encrypt;
 use crate::{traits::RandomizedEncryptor, Result, RsaPublicKey};
 use alloc::vec::Vec;
+use rand_core::CryptoRngCore;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
-use rand_core::CryptoRngCore;
 
 /// Encryption key for PKCS#1 v1.5 encryption as described in [RFC8017 § 7.2].
 ///
@@ -45,9 +45,14 @@ mod tests {
         let encrypting_key = EncryptingKey::new(priv_key.to_public_key());
 
         let tokens = [
-            Token::Struct { name: "EncryptingKey", len: 1 },
+            Token::Struct {
+                name: "EncryptingKey",
+                len: 1,
+            },
             Token::Str("inner"),
-            Token::Str("3024300d06092a864886f70d01010105000313003010020900cc6c6130e35b46bf0203010001"),
+            Token::Str(
+                "3024300d06092a864886f70d01010105000313003010020900cc6c6130e35b46bf0203010001",
+            ),
             Token::StructEnd,
         ];
         assert_tokens(&encrypting_key.clone().readable(), &tokens);

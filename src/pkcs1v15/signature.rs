@@ -3,10 +3,10 @@
 use crate::algorithms::pad::uint_to_be_pad;
 use ::signature::SignatureEncoding;
 use alloc::{boxed::Box, string::ToString};
-#[cfg(feature = "serde")]
-use serdect::serde::{de, Deserialize, Serialize};
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use num_bigint::BigUint;
+#[cfg(feature = "serde")]
+use serdect::serde::{de, Deserialize, Serialize};
 use spki::{
     der::{asn1::BitString, Result as DerResult},
     SignatureBitStringEncoding,
@@ -98,7 +98,10 @@ impl<'de> Deserialize<'de> for Signature {
     where
         D: serdect::serde::Deserializer<'de>,
     {
-        serdect::slice::deserialize_hex_or_bin_vec(deserializer)?.as_slice().try_into().map_err(de::Error::custom)
+        serdect::slice::deserialize_hex_or_bin_vec(deserializer)?
+            .as_slice()
+            .try_into()
+            .map_err(de::Error::custom)
     }
 }
 
@@ -114,9 +117,7 @@ mod tests {
             len: 1,
         };
 
-        let tokens = [
-            Token::Str("2a"),
-        ];
+        let tokens = [Token::Str("2a")];
         assert_tokens(&signature.readable(), &tokens);
     }
 }

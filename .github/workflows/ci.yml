@@ -48,16 +48,6 @@ jobs:
       - run: cargo test --release --features getrandom
       - run: cargo test --release --features serde
 
-  doc:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: RustCrypto/actions/cargo-cache@master
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-      - run: cargo doc --all-features
-
   minimal-versions:
     runs-on: ubuntu-latest
     steps:

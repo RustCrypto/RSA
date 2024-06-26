@@ -17,8 +17,8 @@ use signature::{
 use zeroize::ZeroizeOnDrop;
 #[cfg(feature = "serde")]
 use {
-    serdect::serde::{de, ser, Deserialize, Serialize},
     pkcs8::DecodePrivateKey,
+    serdect::serde::{de, ser, Deserialize, Serialize},
 };
 /// Signing key for producing "blinded" RSASSA-PSS signatures as described in
 /// [draft-irtf-cfrg-rsa-blind-signatures](https://datatracker.ietf.org/doc/draft-irtf-cfrg-rsa-blind-signatures/).

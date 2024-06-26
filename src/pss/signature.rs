@@ -111,9 +111,7 @@ mod tests {
             len: 1,
         };
 
-        let tokens = [
-            Token::Str("2a"),
-        ];
+        let tokens = [Token::Str("2a")];
         assert_tokens(&signature.readable(), &tokens);
     }
 }
