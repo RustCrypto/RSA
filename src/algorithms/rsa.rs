@@ -46,13 +46,14 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     let mut ir = None;
 
     let n_params = priv_key.n_params();
+    let bits = d.bits_precision();
 
     let c = if let Some(ref mut rng) = rng {
         let (blinded, unblinder) = blind(rng, priv_key, &c, &n_params);
         ir = Some(unblinder);
-        Cow::Owned(blinded)
+        blinded.widen(bits)
     } else {
-        Cow::Borrowed(c)
+        c.widen(bits)
     };
 
     let has_precomputes = priv_key.dp().is_some();
@@ -77,10 +78,10 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         // precomputed: dQ = (1/e) mod (q-1) = d mod (q-1)
 
         // m1 = c^dP mod p
-        let cp = BoxedMontyForm::new(c.clone().into_owned(), p_params.clone());
+        let cp = BoxedMontyForm::new(c.clone(), p_params.clone());
         let mut m1 = cp.pow(&dp);
         // m2 = c^dQ mod q
-        let cq = BoxedMontyForm::new(c.into_owned(), q_params.clone());
+        let cq = BoxedMontyForm::new(c, q_params.clone());
         let m2 = cq.pow(&dq).retrieve();
 
         // (m1 - m2) mod p = (m1 mod p) - (m2 mod p) mod p
@@ -101,6 +102,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     match ir {
         Some(ref ir) => {
             // unblind
+            let m = m.shorten(n_params.bits_precision());
             let res = unblind(&m, ir, n_params);
             Ok(res)
         }
@@ -148,13 +150,14 @@ fn blind<R: CryptoRngCore, K: PublicKeyParts>(
     // which equals mr mod n. The factor of r can then be removed
     // by multiplying by the multiplicative inverse of r.
     debug_assert_eq!(&key.n().clone().get(), n_params.modulus());
+    let bits = key.n_bits_precision();
 
-    let mut r: BoxedUint = BoxedUint::one();
+    let mut r: BoxedUint = BoxedUint::one_with_precision(bits);
     let mut ir: Option<BoxedUint> = None;
     while ir.is_none() {
         r = BoxedUint::random_mod(rng, key.n());
         if r.is_zero().into() {
-            r = BoxedUint::one();
+            r = BoxedUint::one_with_precision(bits);
         }
 
         // r^-1 (mod n)
@@ -171,12 +174,28 @@ fn blind<R: CryptoRngCore, K: PublicKeyParts>(
         c
     };
 
-    (blinded, ir.unwrap())
+    let ir = ir.unwrap();
+    debug_assert_eq!(blinded.bits_precision(), bits);
+    debug_assert_eq!(ir.bits_precision(), bits);
+
+    (blinded, ir)
 }
 
 /// Given an m and and unblinding factor, unblind the m.
 fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: BoxedMontyParams) -> BoxedUint {
     // m * r^-1 (mod n)
+    debug_assert_eq!(
+        m.bits_precision(),
+        unblinder.bits_precision(),
+        "invalid unblinder"
+    );
+
+    debug_assert_eq!(
+        m.bits_precision(),
+        n_params.bits_precision(),
+        "invalid n_params"
+    );
+
     mul_mod_params(m, unblinder, n_params)
 }
 
@@ -271,21 +290,19 @@ pub(crate) fn compute_private_exponent_euler_totient(
     if primes.len() < 2 {
         return Err(Error::InvalidPrime);
     }
-
-    let mut totient = BoxedUint::one();
+    let bits = primes[0].bits_precision();
+    let mut totient = BoxedUint::one_with_precision(bits);
 
     for prime in primes {
         totient = totient * (prime - &BoxedUint::one());
     }
-    let totient = Odd::new(totient).unwrap();
+    let exp = BoxedUint::from(exp).widen(totient.bits_precision());
 
     // NOTE: `mod_inverse` checks if `exp` evenly divides `totient` and returns `None` if so.
     // This ensures that `exp` is not a factor of any `(prime - 1)`.
-    if let Some(d) = BoxedUint::from(exp).inv_odd_mod(&totient).into() {
-        Ok(d)
-    } else {
-        // `exp` evenly divides `totient`
-        Err(Error::InvalidPrime)
+    match exp.inv_mod(&totient).into_option() {
+        Some(res) => Ok(res),
+        None => Err(Error::InvalidPrime),
     }
 }
 

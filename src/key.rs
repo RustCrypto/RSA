@@ -376,8 +376,9 @@ impl RsaPrivateKey {
         }
 
         let d = &self.d;
-        let p = &self.primes[0];
-        let q = &self.primes[1];
+        let bits = d.bits_precision();
+        let p = self.primes[0].widen(bits);
+        let q = self.primes[1].widen(bits);
 
         // TODO: error handling
 
@@ -388,14 +389,22 @@ impl RsaPrivateKey {
 
         let x = NonZero::new(p.wrapping_sub(&BoxedUint::one())).unwrap();
         let dp = d.rem_vartime(&x);
+
         let x = NonZero::new(q.wrapping_sub(&BoxedUint::one())).unwrap();
         let dq = d.rem_vartime(&x);
+
         let qinv = BoxedMontyForm::new(q.clone(), p_params.clone());
         let qinv = qinv.invert();
         if qinv.is_none().into() {
             return Err(Error::InvalidPrime);
         }
         let qinv = qinv.unwrap();
+
+        debug_assert_eq!(dp.bits_precision(), bits);
+        debug_assert_eq!(dq.bits_precision(), bits);
+        debug_assert_eq!(qinv.bits_precision(), bits);
+        debug_assert_eq!(p_params.bits_precision(), bits);
+        debug_assert_eq!(q_params.bits_precision(), bits);
 
         self.precomputed = Some(PrecomputedValues {
             dp,

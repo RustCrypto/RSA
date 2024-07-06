@@ -116,11 +116,16 @@ impl EncodePrivateKey for RsaPrivateKey {
         let private_exponent = Zeroizing::new(self.d().to_be_bytes());
         let prime1 = Zeroizing::new(self.primes[0].to_be_bytes());
         let prime2 = Zeroizing::new(self.primes[1].to_be_bytes());
+
+        let bits = self.d().bits_precision();
+
         let exponent1 = Zeroizing::new(
-            (self.d() % NonZero::new(&self.primes[0] - &BoxedUint::one()).unwrap()).to_be_bytes(),
+            (self.d() % NonZero::new(&self.primes[0].widen(bits) - &BoxedUint::one()).unwrap())
+                .to_be_bytes(),
         );
         let exponent2 = Zeroizing::new(
-            (self.d() % NonZero::new(&self.primes[1] - &BoxedUint::one()).unwrap()).to_be_bytes(),
+            (self.d() % NonZero::new(&self.primes[1].widen(bits) - &BoxedUint::one()).unwrap())
+                .to_be_bytes(),
         );
         let coefficient = Zeroizing::new(
             self.crt_coefficient()
