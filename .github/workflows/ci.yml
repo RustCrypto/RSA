@@ -44,7 +44,7 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - uses: RustCrypto/actions/cargo-hack-install@master
-      - run: cargo hack test --release --feature-powerset --exclude-features nightly,getrandom,serde
+      - run: cargo hack test --release --feature-powerset --exclude-features getrandom,serde
       - run: cargo test --release --features getrandom
       - run: cargo test --release --features serde
 
@@ -66,5 +66,5 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2023-10-01
-      - run: cargo test --release --features nightly
+      - run: cargo test --release
       - run: cargo build --benches
