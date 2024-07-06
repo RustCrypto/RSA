@@ -140,7 +140,7 @@ impl From<&RsaPrivateKey> for RsaPublicKey {
         let n_params = PublicKeyParts::n_params(private_key);
         RsaPublicKey {
             n: n.clone(),
-            e: e.clone(),
+            e,
             n_params,
         }
     }
@@ -547,7 +547,7 @@ impl PrivateKeyParts for RsaPrivateKey {
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
 pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
-    check_public_with_max_size(&public_key.n(), public_key.e(), RsaPublicKey::MAX_SIZE)
+    check_public_with_max_size(public_key.n(), public_key.e(), RsaPublicKey::MAX_SIZE)
 }
 
 /// Check that the public key is well formed and has an exponent within acceptable bounds.

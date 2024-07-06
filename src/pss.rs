@@ -136,7 +136,7 @@ pub(crate) fn verify(
         return Err(Error::Verification);
     }
 
-    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
+    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
 
     emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits() as _)
 }
@@ -155,7 +155,7 @@ where
         return Err(Error::Verification);
     }
 
-    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
+    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
 
     emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits() as _)
 }

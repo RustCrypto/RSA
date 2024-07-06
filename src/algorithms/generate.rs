@@ -109,7 +109,7 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore>(
 
     Ok(RsaPrivateKeyComponents {
         n: n_final,
-        e: exp.clone(),
+        e: exp,
         d: d_final,
         primes,
     })

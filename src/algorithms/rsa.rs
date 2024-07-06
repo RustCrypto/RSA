@@ -48,7 +48,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     let bits = d.bits_precision();
 
     let c = if let Some(ref mut rng) = rng {
-        let (blinded, unblinder) = blind(rng, priv_key, &c, &n_params);
+        let (blinded, unblinder) = blind(rng, priv_key, c, &n_params);
         ir = Some(unblinder);
         blinded.widen(bits)
     } else {
@@ -60,7 +60,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
 
     let m = if is_multiprime || !has_precomputes {
         // c^d (mod n)
-        pow_mod_params(&c, &d, n_params.clone())
+        pow_mod_params(&c, d, n_params.clone())
     } else {
         // We have the precalculated values needed for the CRT.
 
@@ -78,10 +78,10 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
 
         // m1 = c^dP mod p
         let cp = BoxedMontyForm::new(c.clone(), p_params.clone());
-        let mut m1 = cp.pow(&dp);
+        let mut m1 = cp.pow(dp);
         // m2 = c^dQ mod q
         let cq = BoxedMontyForm::new(c, q_params.clone());
-        let m2 = cq.pow(&dq).retrieve();
+        let m2 = cq.pow(dq).retrieve();
 
         // (m1 - m2) mod p = (m1 mod p) - (m2 mod p) mod p
         let m2r = BoxedMontyForm::new(m2.clone(), p_params.clone());
@@ -200,7 +200,7 @@ fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: BoxedMontyParams) -> 
 
 /// Computes `base.pow_mod(exp, n)` with precomputed `n_params`.
 fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: BoxedMontyParams) -> BoxedUint {
-    let base = reduce(&base, n_params);
+    let base = reduce(base, n_params);
     base.pow(exp).retrieve()
 }
 

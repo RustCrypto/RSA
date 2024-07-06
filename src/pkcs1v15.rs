@@ -214,7 +214,7 @@ fn verify(pub_key: &RsaPublicKey, prefix: &[u8], hashed: &[u8], sig: &BoxedUint)
         return Err(Error::Verification);
     }
 
-    let em = uint_to_be_pad(rsa_encrypt(pub_key, &sig)?, pub_key.size())?;
+    let em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
 
     pkcs1v15_sign_unpad(prefix, hashed, &em, pub_key.size())
 }

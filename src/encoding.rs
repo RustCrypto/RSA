@@ -58,7 +58,7 @@ impl TryFrom<pkcs8::PrivateKeyInfo<'_>> for RsaPrivateKey {
 
         let n = BoxedUint::from_be_slice(pkcs1_key.modulus.as_bytes(), bits)
             .map_err(|_| key_malformed)?;
-        let n = Option::from(Odd::new(n)).ok_or_else(|| key_malformed)?;
+        let n = Option::from(Odd::new(n)).ok_or(key_malformed)?;
 
         // exponent potentially needs padding
         let mut e_slice = [0u8; 8];
