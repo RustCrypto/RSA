@@ -22,7 +22,7 @@ pkcs8 = { version = "=0.11.0-pre.0", default-features = false, features = ["allo
 signature = { version = "=2.3.0-pre.3", default-features = false , features = ["alloc", "digest", "rand_core"] }
 spki = { version = "=0.8.0-pre.0", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
-crypto-bigint = { version = "0.6.0-rc.0", features = ["zeroize", "alloc"] }
+crypto-bigint = { version = "0.6.0-rc.0", default-features = false, features = ["zeroize", "alloc"] }
 crypto-primes = { version = "0.6.0-pre.0" }
 
 # optional dependencies
@@ -50,11 +50,11 @@ name = "key"
 [features]
 default = ["std", "pem"]
 hazmat = []
-getrandom = ["rand_core/getrandom"]
+getrandom = ["rand_core/getrandom", "crypto-bigint/rand_core"]
 serde = ["dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pem = ["pkcs1/pem", "pkcs8/pem"]
 pkcs5 = ["pkcs8/encryption"]
-std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std", "signature/std"]
+std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std", "signature/std", "crypto-bigint/std"]
 
 [package.metadata.docs.rs]
 features = ["std", "pem", "serde", "hazmat", "sha2"]
