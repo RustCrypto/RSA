@@ -15,7 +15,7 @@ rust-version = "1.73"
 [dependencies]
 rand_core = { version = "0.6.4", default-features = false }
 const-oid = { version = "=0.10.0-pre.2", default-features = false }
-subtle = { version = "2.1.1", default-features = false }
+subtle = { version = "2.6.1", default-features = false }
 digest = { version = "=0.11.0-pre.8", default-features = false, features = ["alloc", "oid"] }
 pkcs1 = { version = "=0.8.0-pre.0", default-features = false, features = ["alloc", "pkcs8"] }
 pkcs8 = { version = "=0.11.0-pre.0", default-features = false, features = ["alloc"] }
