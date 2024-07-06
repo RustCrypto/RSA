@@ -20,8 +20,10 @@ pub trait PublicKeyParts {
         (self.n().bits() as usize + 7) / 8
     }
 
+    /// Returns the parameters for montgomery operations.
     fn n_params(&self) -> BoxedMontyParams;
 
+    /// Returns precision (in bits) of `n`.
     fn n_bits_precision(&self) -> u32 {
         self.n().bits_precision()
     }
@@ -47,7 +49,10 @@ pub trait PrivateKeyParts: PublicKeyParts {
     /// Returns an iterator over the CRT Values
     fn crt_values(&self) -> Option<&[CrtValue]>;
 
+    /// Returns the params for `p` if precomupted.
     fn p_params(&self) -> Option<&BoxedMontyParams>;
+
+    /// Returns the params for `q` if precomupted.
     fn q_params(&self) -> Option<&BoxedMontyParams>;
 }
 
