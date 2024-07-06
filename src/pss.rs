@@ -145,14 +145,13 @@ pub(crate) fn verify_digest<D>(
     pub_key: &RsaPublicKey,
     hashed: &[u8],
     sig: &BoxedUint,
-    sig_len: usize,
     salt_len: usize,
 ) -> Result<()>
 where
     D: Digest + FixedOutputReset,
 {
     let n = crate::traits::keys::PublicKeyParts::n(pub_key);
-    if sig >= n.as_ref() || sig_len != pub_key.size() {
+    if sig >= n.as_ref() || sig.bits_precision() != pub_key.n_bits_precision() {
         return Err(Error::Verification);
     }
 

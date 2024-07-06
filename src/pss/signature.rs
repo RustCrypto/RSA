@@ -1,8 +1,7 @@
 //! `RSASSA-PSS` signatures.
 
-use crate::algorithms::pad::uint_to_be_pad;
 use ::signature::SignatureEncoding;
-use alloc::{boxed::Box, string::ToString};
+use alloc::boxed::Box;
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use crypto_bigint::BoxedUint;
 
@@ -16,10 +15,9 @@ use spki::{
 /// `RSASSA-PSS` signatures as described in [RFC8017 § 8.1].
 ///
 /// [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature {
     pub(super) inner: BoxedUint,
-    pub(super) len: usize,
 }
 
 impl SignatureEncoding for Signature {
@@ -38,7 +36,6 @@ impl TryFrom<&[u8]> for Signature {
     fn try_from(bytes: &[u8]) -> signature::Result<Self> {
         let len = bytes.len();
         Ok(Self {
-            len,
             // TODO: how to convert the error?
             inner: BoxedUint::from_be_slice(bytes, len as u32 * 8).unwrap(),
         })
@@ -47,17 +44,7 @@ impl TryFrom<&[u8]> for Signature {
 
 impl From<Signature> for Box<[u8]> {
     fn from(signature: Signature) -> Box<[u8]> {
-        uint_to_be_pad(signature.inner, signature.len)
-            .expect("RSASSA-PKCS1-v1_5 length invariants should've been enforced")
-            .into_boxed_slice()
-    }
-}
-
-impl Debug for Signature {
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> core::result::Result<(), core::fmt::Error> {
-        fmt.debug_tuple("Signature")
-            .field(&self.to_string())
-            .finish()
+        signature.inner.to_be_bytes()
     }
 }
 
@@ -111,10 +98,9 @@ mod tests {
         use serde_test::{assert_tokens, Configure, Token};
         let signature = Signature {
             inner: BoxedUint::from(42u32),
-            len: 1,
         };
 
-        let tokens = [Token::Str("2a")];
+        let tokens = [Token::Str("000000000000002a")];
         assert_tokens(&signature.readable(), &tokens);
     }
 }

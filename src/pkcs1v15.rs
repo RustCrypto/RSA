@@ -127,7 +127,6 @@ impl SignatureScheme for Pkcs1v15Sign {
             self.prefix.as_ref(),
             hashed,
             &BoxedUint::from_be_slice(sig, sig.len() as u32 * 8)?,
-            sig.len(),
         )
     }
 }
@@ -209,15 +208,9 @@ fn sign<R: CryptoRngCore + ?Sized>(
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
 #[inline]
-fn verify(
-    pub_key: &RsaPublicKey,
-    prefix: &[u8],
-    hashed: &[u8],
-    sig: &BoxedUint,
-    sig_len: usize,
-) -> Result<()> {
+fn verify(pub_key: &RsaPublicKey, prefix: &[u8], hashed: &[u8], sig: &BoxedUint) -> Result<()> {
     let n = crate::traits::keys::PublicKeyParts::n(pub_key);
-    if sig >= n.as_ref() || sig_len != pub_key.size() {
+    if sig >= n.as_ref() || sig.bits_precision() != pub_key.n_bits_precision() {
         return Err(Error::Verification);
     }
 
