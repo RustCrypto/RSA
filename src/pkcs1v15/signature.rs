@@ -116,7 +116,7 @@ mod tests {
         use super::*;
         use serde_test::{assert_tokens, Configure, Token};
         let signature = Signature {
-            inner: BigUint::new(Vec::from([42])),
+            inner: BoxedUint::from(42u32),
             len: 1,
         };
 

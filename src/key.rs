@@ -34,7 +34,6 @@ pub struct RsaPublicKey {
     /// Typically 0x10001 (65537)
     e: u64,
 
-    #[cfg_attr(feature = "serde", serde(skip))]
     n_params: BoxedMontyParams,
 }
 
