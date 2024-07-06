@@ -4,9 +4,13 @@ use core::hash::{Hash, Hasher};
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
 use crypto_bigint::{BoxedUint, Integer, InvMod, NonZero, Odd};
 use rand_core::CryptoRngCore;
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
+#[cfg(feature = "serde")]
+use {
+    pkcs8::{DecodePrivateKey, EncodePrivateKey},
+    serdect::serde::{de, ser, Deserialize, Serialize},
+    spki::{DecodePublicKey, EncodePublicKey},
+};
 
 use crate::algorithms::generate::generate_multi_prime_key_with_exp;
 use crate::algorithms::rsa::{
@@ -21,7 +25,6 @@ use crate::traits::{PaddingScheme, SignatureScheme};
 
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RsaPublicKey {
     /// Modulus: product of prime numbers `p` and `q`
     n: NonZero<BoxedUint>,
@@ -54,7 +57,6 @@ impl Hash for RsaPublicKey {
 
 /// Represents a whole RSA key, public and private parts.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RsaPrivateKey {
     /// Public components of the private key.
     pubkey_components: RsaPublicKey,
@@ -63,7 +65,6 @@ pub struct RsaPrivateKey {
     /// Prime factors of N, contains >= 2 elements.
     pub(crate) primes: Vec<BoxedUint>,
     /// precomputed values to speed up private operations
-    #[cfg_attr(feature = "serde", serde(skip))]
     pub(crate) precomputed: Option<PrecomputedValues>,
 }
 
@@ -582,6 +583,50 @@ pub(crate) fn reduce(n: &BoxedUint, p: BoxedMontyParams) -> BoxedMontyForm {
     BoxedMontyForm::new(n_reduced, p)
 }
 
+#[cfg(feature = "serde")]
+impl Serialize for RsaPublicKey {
+    fn serialize<S>(&self, serializer: S) -> core::prelude::v1::Result<S::Ok, S::Error>
+    where
+        S: serdect::serde::Serializer,
+    {
+        let der = self.to_public_key_der().map_err(ser::Error::custom)?;
+        serdect::slice::serialize_hex_lower_or_bin(&der, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for RsaPublicKey {
+    fn deserialize<D>(deserializer: D) -> core::prelude::v1::Result<Self, D::Error>
+    where
+        D: serdect::serde::Deserializer<'de>,
+    {
+        let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
+        Self::from_public_key_der(&der_bytes).map_err(de::Error::custom)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for RsaPrivateKey {
+    fn serialize<S>(&self, serializer: S) -> core::prelude::v1::Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        let der = self.to_pkcs8_der().map_err(ser::Error::custom)?;
+        serdect::slice::serialize_hex_lower_or_bin(&der.as_bytes(), serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for RsaPrivateKey {
+    fn deserialize<D>(deserializer: D) -> core::prelude::v1::Result<Self, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
+        Self::from_pkcs8_der(&der_bytes).map_err(de::Error::custom)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -708,81 +753,106 @@ mod tests {
     #[cfg(feature = "serde")]
     fn test_serde() {
         use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
-        use serde_test::{assert_tokens, Token};
+        use serde_test::{assert_tokens, Configure, Token};
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
 
-        let priv_tokens = [
-            Token::Struct {
-                name: "RsaPrivateKey",
-                len: 3,
-            },
-            Token::Str("pubkey_components"),
-            Token::Struct {
-                name: "RsaPublicKey",
-                len: 2,
-            },
-            Token::Str("n"),
-            Token::Seq { len: Some(2) },
-            Token::U32(3814409919),
-            Token::U32(3429654832),
-            Token::SeqEnd,
-            Token::Str("e"),
-            Token::Seq { len: Some(1) },
-            Token::U32(65537),
-            Token::SeqEnd,
-            Token::StructEnd,
-            Token::Str("d"),
-            Token::Seq { len: Some(2) },
-            Token::U32(1482162201),
-            Token::U32(1675500232),
-            Token::SeqEnd,
-            Token::Str("primes"),
-            Token::Seq { len: Some(2) },
-            Token::Seq { len: Some(1) },
-            Token::U32(4133289821),
-            Token::SeqEnd,
-            Token::Seq { len: Some(1) },
-            Token::U32(3563808971),
-            Token::SeqEnd,
-            Token::SeqEnd,
-            Token::StructEnd,
-        ];
-        assert_tokens(&priv_key, &priv_tokens);
+        let priv_tokens = [Token::Str(
+            "3054020100300d06092a864886f70d01010105000440303e020100020900cc6c\
+             6130e35b46bf0203010001020863de1ac858580019020500f65cff5d020500d4\
+             6b68cb02046d9a09f102047b4e3a4f020500f45065cc",
+        )];
+        assert_tokens(&priv_key.clone().readable(), &priv_tokens);
 
-        let priv_tokens = [
-            Token::Struct {
-                name: "RsaPublicKey",
-                len: 2,
-            },
-            Token::Str("n"),
-            Token::Seq { len: Some(2) },
-            Token::U32(3814409919),
-            Token::U32(3429654832),
-            Token::SeqEnd,
-            Token::Str("e"),
-            Token::Seq { len: Some(1) },
-            Token::U32(65537),
-            Token::SeqEnd,
-            Token::StructEnd,
-        ];
-        assert_tokens(&RsaPublicKey::from(priv_key), &priv_tokens);
+        let priv_tokens = [Token::Str(
+            "3024300d06092a864886f70d01010105000313003010020900cc6c6130e35b46bf0203010001",
+        )];
+        assert_tokens(
+            &RsaPublicKey::from(priv_key.clone()).readable(),
+            &priv_tokens,
+        );
     }
 
     #[test]
     fn invalid_coeff_private_key_regression() {
         use base64ct::{Base64, Encoding};
 
-        let n = Base64::decode_vec("wC8GyQvTCZOK+iiBR5fGQCmzRCTWX9TQ3aRG5gGFk0wB6EFoLMAyEEqeG3gS8xhAm2rSWYx9kKufvNat3iWlbSRVqkcbpVAYlj2vTrpqDpJl+6u+zxFYoUEBevlJJkAhl8EuCccOA30fVpcfRvXPTtvRd3yFT9E9EwZljtgSI02w7gZwg7VIxaGeajh5Euz6ZVQZ+qNRKgXrRC7gPRqVyI6Dt0Jc+Su5KBGNn0QcPDzOahWha1ieaeMkFisZ9mdpsJoZ4tw5eicLaUomKzALHXQVt+/rcZSrCd6/7uUo11B/CYBM4UfSpwXaL88J9AE6A5++no9hmJzaF2LLp+Qwx4yY3j9TDutxSAjsraxxJOGZ3XyA9nG++Ybt3cxZ5fP7ROjxCfROBmVv5dYn0O9OBIqYeCH6QraNpZMadlLNIhyMv8Y+P3r5l/PaK4VJaEi5pPosnEPawp0W0yZDzmjk2z1LthaRx0aZVrAjlH0Rb/6goLUQ9qu1xsDtQVVpN4A89ZUmtTWORnnJr0+595eHHxssd2gpzqf4bPjNITdAEuOCCtpvyi4ls23zwuzryUYjcUOEnsXNQ+DrZpLKxdtsD/qNV/j1hfeyBoPllC3cV+6bcGOFcVGbjYqb+Kw1b0+jL69RSKQqgmS+qYqr8c48nDRxyq3QXhR8qtzUwBFSLVk=").unwrap();
+        let n = Base64::decode_vec(
+            "wC8GyQvTCZOK+iiBR5fGQCmzRCTWX9TQ3aRG5gGFk0wB6EFoLMAyEEqeG3gS8xhA\
+             m2rSWYx9kKufvNat3iWlbSRVqkcbpVAYlj2vTrpqDpJl+6u+zxFYoUEBevlJJkAh\
+             l8EuCccOA30fVpcfRvXPTtvRd3yFT9E9EwZljtgSI02w7gZwg7VIxaGeajh5Euz6\
+             ZVQZ+qNRKgXrRC7gPRqVyI6Dt0Jc+Su5KBGNn0QcPDzOahWha1ieaeMkFisZ9mdp\
+             sJoZ4tw5eicLaUomKzALHXQVt+/rcZSrCd6/7uUo11B/CYBM4UfSpwXaL88J9AE6\
+             A5++no9hmJzaF2LLp+Qwx4yY3j9TDutxSAjsraxxJOGZ3XyA9nG++Ybt3cxZ5fP7\
+             ROjxCfROBmVv5dYn0O9OBIqYeCH6QraNpZMadlLNIhyMv8Y+P3r5l/PaK4VJaEi5\
+             pPosnEPawp0W0yZDzmjk2z1LthaRx0aZVrAjlH0Rb/6goLUQ9qu1xsDtQVVpN4A8\
+             9ZUmtTWORnnJr0+595eHHxssd2gpzqf4bPjNITdAEuOCCtpvyi4ls23zwuzryUYj\
+             cUOEnsXNQ+DrZpLKxdtsD/qNV/j1hfeyBoPllC3cV+6bcGOFcVGbjYqb+Kw1b0+j\
+             L69RSKQqgmS+qYqr8c48nDRxyq3QXhR8qtzUwBFSLVk=",
+        )
+        .unwrap();
         let e = Base64::decode_vec("AQAB").unwrap();
-        let d = Base64::decode_vec("qQazSQ+FRN7nVK1bRsROMRB8AmsDwLVEHivlz1V3Td2Dr+oW3YUMgxedhztML1IdQJPq/ad6qErJ6yRFNySVIjDaxzBTOEoB1eHa1btOnBJWb8rVvvjaorixvJ6Tn3i4EuhsvVy9DoR1k4rGj3qSIiFjUVvLRDAbLyhpGgEfsr0Z577yJmTC5E8JLRMOKX8Tmxsk3jPVpsgd65Hu1s8S/ZmabwuHCf9SkdMeY/1bd/9i7BqqJeeDLE4B5x1xcC3z3scqDUTzqGO+vZPhjgprPDRlBamVwgenhr7KwCn8iaLamFinRVwOAag8BeBqOJj7lURiOsKQa9FIX1kdFUS1QMQxgtPycLjkbvCJjriqT7zWKsmJ7l8YLs6Wmm9/+QJRwNCEVdMTXKfCP1cJjudaiskEQThfUldtgu8gUDNYbQ/Filb2eKfiX4h1TiMxZqUZHVZyb9nShbQoXJ3vj/MGVF0QM8TxhXM8r2Lv9gDYU5t9nQlUMLhs0jVjai48jHABbFNyH3sEcOmJOIwJrCXw1dzG7AotwyaEVUHOmL04TffmwCFfnyrLjbFgnyOeoyIIBYjcY7QFRm/9nupXMTH5hZ2qrHfCJIp0KK4tNBdQqmnHapFl5l6Le1s4qBS5bEIzjitobLvAFm9abPlDGfxmY6mlrMK4+nytwF9Ct7wc1AE=").unwrap();
-        let primes = vec![
-            Base64::decode_vec("9kQWEAzsbzOcdPa+s5wFfw4XDd7bB1q9foZ31b1+TNjGNxbSBCFlDF1q98vwpV6nM8bWDh/wtbNoETSQDgpEnYOQ26LWEw6YY1+q1Q2GGEFceYUf+Myk8/vTc8TN6Zw0bKZBWy10Qo8h7xk4JpzuI7NcxvjJYTkS9aErFxi3vVH0aiZC0tmfaCqr8a2rJxyVwqreRpOjwAWrotMsf2wGsF4ofx5ScoFy5GB5fJkkdOrW1LyTvZAUCX3cstPr19+TNC5zZOk7WzZatnCkN5H5WzalWtZuu0oVL205KPOa3R8V2yv5e6fm0v5fTmqSuvjmaMJLXCN4QJkmIzojO99ckQ==").unwrap(),
-            Base64::decode_vec("x8exdMjVA2CiI+Thx7loHtVcevoeE2sZ7btRVAvmBqo+lkHwxb7FHRnWvuj6eJSlD2f0T50EewIhhiW3R9BmktCk7hXjbSCnC1u9Oxc1IAUm/7azRqyfCMx43XhLxpD+xkBCpWkKDLxGczsRwTuaP3lKS3bSdBrNlGmdblubvVBIq4YZ2vXVlnYtza0cS+dgCK7BGTqUsrCUd/ZbIvwcwZkZtpkhj1KQfto9X/0OMurBzAqbkeq1cyRHXHkOfN/qbUIIRqr9Ii7Eswf9Vk8xp2O1Nt8nzcYS9PFD12M5eyaeFEkEYfpNMNGuTzp/31oqVjbpoCxS6vuWAZyADxhISQ==").unwrap(),
-            Base64::decode_vec("is7d0LY4HoXszlC2NO7gejkq7XqL4p1W6hZJPYTNx+r37t1CC2n3Vvzg6kNdpRixDhIpXVTLjN9O7UO/XuqSumYKJIKoP52eb4Tg+a3hw5Iz2Zsb5lUTNSLgkQSBPAf71LHxbL82JL4g1nBUog8ae60BwnVArThKY4EwlJguGNw09BAU4lwf6csDl/nX2vfVwiAloYpeZkHL+L8m+bueGZM5KE2jEz+7ztZCI+T+E5i69rZEYDjx0lfLKlEhQlCW3HbCPELqXgNJJkRfi6MP9kXa9lSfnZmoT081RMvqonB/FUa4HOcKyCrw9XZEtnbNCIdbitfDVEX+pSSD7596wQ==").unwrap(),
-            Base64::decode_vec("GPs0injugfycacaeIP5jMa/WX55VEnKLDHom4k6WlfDF4L4gIGoJdekcPEUfxOI5faKvHyFwRP1wObkPoRBDM0qZxRfBl4zEtpvjHrd5MibSyJkM8+J0BIKk/nSjbRIGeb3hV5O56PvGB3S0dKhCUnuVObiC+ne7izplsD4OTG70l1Yud33UFntyoMxrxGYLUSqhBMmZfHquJg4NOWOzKNY/K+EcHDLj1Kjvkcgv9Vf7ocsVxvpFdD9uGPceQ6kwRDdEl6mb+6FDgWuXVyqR9+904oanEIkbJ7vfkthagLbEf57dyG6nJlqh5FBZWxGIR72YGypPuAh7qnnqXXjY2Q==").unwrap(),
-            Base64::decode_vec("CUWC+hRWOT421kwRllgVjy6FYv6jQUcgDNHeAiYZnf5HjS9iK2ki7v8G5dL/0f+Yf+NhE/4q8w4m8go51hACrVpP1p8GJDjiT09+RsOzITsHwl+ceEKoe56ZW6iDHBLlrNw5/MtcYhKpjNU9KJ2udm5J/c9iislcjgckrZG2IB8ADgXHMEByZ5DgaMl4AKZ1Gx8/q6KftTvmOT5rNTMLi76VN5KWQcDWK/DqXiOiZHM7Nr4dX4me3XeRgABJyNR8Fqxj3N1+HrYLe/zs7LOaK0++F9Ul3tLelhrhsvLxei3oCZkF9A/foD3on3luYA+1cRcxWpSY3h2J4/22+yo4+Q==").unwrap(),
+        let d = Base64::decode_vec(
+            "qQazSQ+FRN7nVK1bRsROMRB8AmsDwLVEHivlz1V3Td2Dr+oW3YUMgxedhztML1Id\
+             QJPq/ad6qErJ6yRFNySVIjDaxzBTOEoB1eHa1btOnBJWb8rVvvjaorixvJ6Tn3i4\
+             EuhsvVy9DoR1k4rGj3qSIiFjUVvLRDAbLyhpGgEfsr0Z577yJmTC5E8JLRMOKX8T\
+             mxsk3jPVpsgd65Hu1s8S/ZmabwuHCf9SkdMeY/1bd/9i7BqqJeeDLE4B5x1xcC3z\
+             3scqDUTzqGO+vZPhjgprPDRlBamVwgenhr7KwCn8iaLamFinRVwOAag8BeBqOJj7\
+             lURiOsKQa9FIX1kdFUS1QMQxgtPycLjkbvCJjriqT7zWKsmJ7l8YLs6Wmm9/+QJR\
+             wNCEVdMTXKfCP1cJjudaiskEQThfUldtgu8gUDNYbQ/Filb2eKfiX4h1TiMxZqUZ\
+             HVZyb9nShbQoXJ3vj/MGVF0QM8TxhXM8r2Lv9gDYU5t9nQlUMLhs0jVjai48jHAB\
+             bFNyH3sEcOmJOIwJrCXw1dzG7AotwyaEVUHOmL04TffmwCFfnyrLjbFgnyOeoyII\
+             BYjcY7QFRm/9nupXMTH5hZ2qrHfCJIp0KK4tNBdQqmnHapFl5l6Le1s4qBS5bEIz\
+             jitobLvAFm9abPlDGfxmY6mlrMK4+nytwF9Ct7wc1AE=",
+        )
+        .unwrap();
+        let primes = [
+            Base64::decode_vec(
+                "9kQWEAzsbzOcdPa+s5wFfw4XDd7bB1q9foZ31b1+TNjGNxbSBCFlDF1q98vwpV6n\
+                 M8bWDh/wtbNoETSQDgpEnYOQ26LWEw6YY1+q1Q2GGEFceYUf+Myk8/vTc8TN6Zw0\
+                 bKZBWy10Qo8h7xk4JpzuI7NcxvjJYTkS9aErFxi3vVH0aiZC0tmfaCqr8a2rJxyV\
+                 wqreRpOjwAWrotMsf2wGsF4ofx5ScoFy5GB5fJkkdOrW1LyTvZAUCX3cstPr19+T\
+                 NC5zZOk7WzZatnCkN5H5WzalWtZuu0oVL205KPOa3R8V2yv5e6fm0v5fTmqSuvjm\
+                 aMJLXCN4QJkmIzojO99ckQ==",
+            )
+            .unwrap(),
+            Base64::decode_vec(
+                "x8exdMjVA2CiI+Thx7loHtVcevoeE2sZ7btRVAvmBqo+lkHwxb7FHRnWvuj6eJSl\
+                 D2f0T50EewIhhiW3R9BmktCk7hXjbSCnC1u9Oxc1IAUm/7azRqyfCMx43XhLxpD+\
+                 xkBCpWkKDLxGczsRwTuaP3lKS3bSdBrNlGmdblubvVBIq4YZ2vXVlnYtza0cS+dg\
+                 CK7BGTqUsrCUd/ZbIvwcwZkZtpkhj1KQfto9X/0OMurBzAqbkeq1cyRHXHkOfN/q\
+                 bUIIRqr9Ii7Eswf9Vk8xp2O1Nt8nzcYS9PFD12M5eyaeFEkEYfpNMNGuTzp/31oq\
+                 VjbpoCxS6vuWAZyADxhISQ==",
+            )
+            .unwrap(),
+            Base64::decode_vec(
+                "is7d0LY4HoXszlC2NO7gejkq7XqL4p1W6hZJPYTNx+r37t1CC2n3Vvzg6kNdpRix\
+                 DhIpXVTLjN9O7UO/XuqSumYKJIKoP52eb4Tg+a3hw5Iz2Zsb5lUTNSLgkQSBPAf7\
+                 1LHxbL82JL4g1nBUog8ae60BwnVArThKY4EwlJguGNw09BAU4lwf6csDl/nX2vfV\
+                 wiAloYpeZkHL+L8m+bueGZM5KE2jEz+7ztZCI+T+E5i69rZEYDjx0lfLKlEhQlCW\
+                 3HbCPELqXgNJJkRfi6MP9kXa9lSfnZmoT081RMvqonB/FUa4HOcKyCrw9XZEtnbN\
+                 CIdbitfDVEX+pSSD7596wQ==",
+            )
+            .unwrap(),
+            Base64::decode_vec(
+                "GPs0injugfycacaeIP5jMa/WX55VEnKLDHom4k6WlfDF4L4gIGoJdekcPEUfxOI5\
+                 faKvHyFwRP1wObkPoRBDM0qZxRfBl4zEtpvjHrd5MibSyJkM8+J0BIKk/nSjbRIG\
+                 eb3hV5O56PvGB3S0dKhCUnuVObiC+ne7izplsD4OTG70l1Yud33UFntyoMxrxGYL\
+                 USqhBMmZfHquJg4NOWOzKNY/K+EcHDLj1Kjvkcgv9Vf7ocsVxvpFdD9uGPceQ6kw\
+                 RDdEl6mb+6FDgWuXVyqR9+904oanEIkbJ7vfkthagLbEf57dyG6nJlqh5FBZWxGI\
+                 R72YGypPuAh7qnnqXXjY2Q==",
+            )
+            .unwrap(),
+            Base64::decode_vec(
+                "CUWC+hRWOT421kwRllgVjy6FYv6jQUcgDNHeAiYZnf5HjS9iK2ki7v8G5dL/0f+Y\
+                 f+NhE/4q8w4m8go51hACrVpP1p8GJDjiT09+RsOzITsHwl+ceEKoe56ZW6iDHBLl\
+                 rNw5/MtcYhKpjNU9KJ2udm5J/c9iislcjgckrZG2IB8ADgXHMEByZ5DgaMl4AKZ1\
+                 Gx8/q6KftTvmOT5rNTMLi76VN5KWQcDWK/DqXiOiZHM7Nr4dX4me3XeRgABJyNR8\
+                 Fqxj3N1+HrYLe/zs7LOaK0++F9Ul3tLelhrhsvLxei3oCZkF9A/foD3on3luYA+1\
+                 cRcxWpSY3h2J4/22+yo4+Q==",
+            )
+            .unwrap(),
         ];
 
         let mut e_raw = [0u8; 8];

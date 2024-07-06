@@ -23,7 +23,7 @@ use alloc::{boxed::Box, vec::Vec};
 use core::fmt::{self, Debug};
 use crypto_bigint::BoxedUint;
 
-use const_oid::{AssociatedOid, ObjectIdentifier};
+use const_oid::AssociatedOid;
 use digest::{Digest, DynDigest, FixedOutputReset};
 use pkcs1::RsaPssParams;
 use pkcs8::spki::{der::Any, AlgorithmIdentifierOwned};
@@ -32,6 +32,7 @@ use rand_core::CryptoRngCore;
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pss::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
+use crate::encoding::ID_RSASSA_PSS;
 use crate::errors::{Error, Result};
 use crate::traits::PublicKeyParts;
 use crate::traits::SignatureScheme;
@@ -249,8 +250,6 @@ fn get_pss_signature_algo_id<D>(salt_len: u8) -> pkcs8::spki::Result<AlgorithmId
 where
     D: Digest + AssociatedOid,
 {
-    const ID_RSASSA_PSS: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.10");
-
     let pss_params = RsaPssParams::new::<D>(salt_len);
 
     Ok(AlgorithmIdentifierOwned {
@@ -292,7 +291,8 @@ mod test {
                 BoxedUint::from_be_hex("98920366548084643601728869055592650835572950932266967461790948584315647051443",bits).unwrap(),
                 BoxedUint::from_be_hex("94560208308847015747498523884063394671606671904944666360068158221458669711639", bits).unwrap()
             ],
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     #[test]
@@ -575,10 +575,10 @@ mod test {
 
         for test in &tests {
             let sig = signing_key
-                .sign_prehash_with_rng(&mut rng, &test)
+                .sign_prehash_with_rng(&mut rng, test)
                 .expect("failed to sign");
             verifying_key
-                .verify_prehash(&test, &sig)
+                .verify_prehash(test, &sig)
                 .expect("failed to verify");
         }
     }
@@ -594,10 +594,10 @@ mod test {
 
         for test in &tests {
             let sig = signing_key
-                .sign_prehash_with_rng(&mut rng, &test)
+                .sign_prehash_with_rng(&mut rng, test)
                 .expect("failed to sign");
             verifying_key
-                .verify_prehash(&test, &sig)
+                .verify_prehash(test, &sig)
                 .expect("failed to verify");
         }
     }
