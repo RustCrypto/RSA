@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::hash::{Hash, Hasher};
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
-use crypto_bigint::{BoxedUint, Integer, InvMod, NonZero, Odd};
+use crypto_bigint::{BoxedUint, Integer, NonZero, Odd};
 use rand_core::CryptoRngCore;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 #[cfg(feature = "serde")]

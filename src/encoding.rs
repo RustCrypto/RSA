@@ -54,25 +54,27 @@ impl TryFrom<pkcs8::PrivateKeyInfo<'_>> for RsaPrivateKey {
         let key_malformed = pkcs8::Error::KeyMalformed;
 
         let bits =
-            u32::try_from(pkcs1_key.modulus.as_bytes().len()).map_err(|_| key_malformed)? / 8;
+            u32::try_from(pkcs1_key.modulus.as_bytes().len()).map_err(|_| key_malformed)? * 8;
+
         let n = BoxedUint::from_be_slice(pkcs1_key.modulus.as_bytes(), bits)
             .map_err(|_| key_malformed)?;
         let n = Option::from(Odd::new(n)).ok_or_else(|| key_malformed)?;
-        let e = u64::from_be_bytes(
-            pkcs1_key
-                .public_exponent
-                .as_bytes()
-                .try_into()
-                .map_err(|_| key_malformed)?,
-        );
+
+        // exponent potentially needs padding
+        let mut e_slice = [0u8; 8];
+        let raw_e_slice = pkcs1_key.public_exponent.as_bytes();
+        e_slice[8 - raw_e_slice.len()..].copy_from_slice(raw_e_slice);
+        let e = u64::from_be_bytes(e_slice);
         let d = BoxedUint::from_be_slice(pkcs1_key.private_exponent.as_bytes(), bits)
             .map_err(|_| key_malformed)?;
+
         let prime1 = BoxedUint::from_be_slice(pkcs1_key.prime1.as_bytes(), bits)
             .map_err(|_| key_malformed)?;
         let prime2 = BoxedUint::from_be_slice(pkcs1_key.prime2.as_bytes(), bits)
             .map_err(|_| key_malformed)?;
         let primes = vec![prime1, prime2];
-        RsaPrivateKey::from_components(n, e, d, primes).map_err(|_| pkcs8::Error::KeyMalformed)
+
+        RsaPrivateKey::from_components(n, e, d, primes).map_err(|_| key_malformed)
     }
 }
 

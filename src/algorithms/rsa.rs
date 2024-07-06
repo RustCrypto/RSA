@@ -1,8 +1,7 @@
 //! Generic RSA implementation
 
-use alloc::borrow::Cow;
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
-use crypto_bigint::{BoxedUint, Gcd, InvMod, NonZero, Odd, RandomMod, Wrapping};
+use crypto_bigint::{BoxedUint, Gcd, NonZero, Odd, RandomMod, Wrapping};
 use rand_core::CryptoRngCore;
 use zeroize::Zeroize;
 
@@ -323,9 +322,10 @@ pub(crate) fn compute_private_exponent_carmicheal(
     let p1 = p - &BoxedUint::one();
     let q1 = q - &BoxedUint::one();
 
-    let lcm = p1; // TODO: p1.lcm(&q1);
-    let lcm = Odd::new(lcm).unwrap();
-    if let Some(d) = BoxedUint::from(exp).inv_odd_mod(&lcm).into() {
+    // LCM inlined
+    let gcd = p1.gcd(&q1).unwrap();
+    let lcm = p1 / NonZero::new(gcd).unwrap() * &q1;
+    if let Some(d) = BoxedUint::from(exp).inv_mod(&lcm).into() {
         Ok(d)
     } else {
         // `exp` evenly divides `lcm`
