@@ -240,8 +240,6 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
     mgf_digest: &mut dyn DynDigest,
     label: Option<String>,
 ) -> Result<Vec<u8>> {
-    key::check_public(priv_key)?;
-
     if ciphertext.len() != priv_key.size() {
         return Err(Error::Decryption);
     }
