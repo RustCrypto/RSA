@@ -1,10 +1,10 @@
 //! `RSASSA-PKCS1-v1_5` signatures.
 
-use crate::algorithms::pad::uint_to_be_pad;
 use ::signature::SignatureEncoding;
-use alloc::{boxed::Box, string::ToString};
+use alloc::boxed::Box;
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
-use num_bigint::BigUint;
+use crypto_bigint::BoxedUint;
+
 #[cfg(feature = "serde")]
 use serdect::serde::{de, Deserialize, Serialize};
 use spki::{
@@ -15,10 +15,9 @@ use spki::{
 /// `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
 ///
 /// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature {
-    pub(super) inner: BigUint,
-    pub(super) len: usize,
+    pub(super) inner: BoxedUint,
 }
 
 impl SignatureEncoding for Signature {
@@ -35,26 +34,17 @@ impl TryFrom<&[u8]> for Signature {
     type Error = signature::Error;
 
     fn try_from(bytes: &[u8]) -> signature::Result<Self> {
+        let len = bytes.len();
         Ok(Self {
-            inner: BigUint::from_bytes_be(bytes),
-            len: bytes.len(),
+            // TODO: how to convert error?
+            inner: BoxedUint::from_be_slice(bytes, len as u32 * 8).unwrap(),
         })
     }
 }
 
 impl From<Signature> for Box<[u8]> {
     fn from(signature: Signature) -> Box<[u8]> {
-        uint_to_be_pad(signature.inner, signature.len)
-            .expect("RSASSA-PKCS1-v1_5 length invariants should've been enforced")
-            .into_boxed_slice()
-    }
-}
-
-impl Debug for Signature {
-    fn fmt(&self, fmt: &mut Formatter<'_>) -> core::result::Result<(), core::fmt::Error> {
-        fmt.debug_tuple("Signature")
-            .field(&self.to_string())
-            .finish()
+        signature.inner.to_be_bytes()
     }
 }
 
@@ -113,11 +103,10 @@ mod tests {
         use super::*;
         use serde_test::{assert_tokens, Configure, Token};
         let signature = Signature {
-            inner: BigUint::new(Vec::from([42])),
-            len: 1,
+            inner: BoxedUint::from(42u32),
         };
 
-        let tokens = [Token::Str("2a")];
+        let tokens = [Token::Str("000000000000002a")];
         assert_tokens(&signature.readable(), &tokens);
     }
 }
