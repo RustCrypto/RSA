@@ -262,8 +262,8 @@ mod test {
     use crate::pss::{BlindedSigningKey, Pss, Signature, SigningKey, VerifyingKey};
     use crate::{RsaPrivateKey, RsaPublicKey};
 
-    use crypto_bigint::{BoxedUint, Odd};
     use hex_literal::hex;
+    use pkcs1::DecodeRsaPrivateKey;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
     use sha1::{Digest, Sha1};
     use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
@@ -281,20 +281,18 @@ mod test {
         // tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         // -----END RSA PRIVATE KEY-----
 
-        let n= BoxedUint::from_be_hex("0000009353930466774385905609975137998169297361893554149986716853295022578535724979677252958524466350471210367835187480748268864277464700638583474144061408845077", 640).unwrap();
-        let d= BoxedUint::from_be_hex("0000007266398431328116344057699379749222532279343923819063639497049039389899328538543087657733766554155839834519529439851673014800261285757759040931985506583861", 640).unwrap();
-        let p = BoxedUint::from_be_hex(
-            "00098920366548084643601728869055592650835572950932266967461790948584315647051443",
-            320,
-        )
-        .unwrap();
-        let q = BoxedUint::from_be_hex(
-            "00094560208308847015747498523884063394671606671904944666360068158221458669711639",
-            320,
-        )
-        .unwrap();
+        let pem = r#"
+-----BEGIN RSA PRIVATE KEY-----
+MIIBOgIBAAJBALKZD0nEffqM1ACuak0bijtqE2QrI/KLADv7l3kK3ppMyCuLKoF0
+fd7Ai2KW5ToIwzFofvJcS/STa6HA5gQenRUCAwEAAQJBAIq9amn00aS0h/CrjXqu
+/ThglAXJmZhOMPVn4eiu7/ROixi9sex436MaVeMqSNf7Ex9a8fRNfWss7Sqd9eWu
+RTUCIQDasvGASLqmjeffBNLTXV2A5g4t+kLVCpsEIZAycV5GswIhANEPLmax0ME/
+EO+ZJ79TJKN5yiGBRsv5yvx5UiHxajEXAiAhAol5N4EUyq6I9w1rYdhPMGpLfk7A
+IU2snfRJ6Nq2CQIgFrPsWRCkV+gOYcajD17rEqmuLrdIRexpg8N1DOSXoJ8CIGlS
+tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
+-----END RSA PRIVATE KEY-----"#;
 
-        RsaPrivateKey::from_components(Odd::new(n).unwrap(), 65537, d, vec![p, q]).unwrap()
+        RsaPrivateKey::from_pkcs1_pem(pem).unwrap()
     }
 
     #[test]
@@ -324,6 +322,7 @@ mod test {
         for (text, sig, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
             let result = pub_key.verify(Pss::new::<Sha1>(), &digest, sig);
+
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
