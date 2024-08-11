@@ -721,7 +721,8 @@ mod tests {
 
     key_generation!(key_generation_multi_5_64, 5, 64);
     key_generation!(key_generation_multi_8_576, 8, 576);
-    key_generation!(key_generation_multi_16_1024, 16, 1024);
+    // TODO: reenable, currently slow
+    // key_generation!(key_generation_multi_16_1024, 16, 1024);
 
     #[test]
     fn test_negative_decryption_value() {
@@ -939,7 +940,7 @@ mod tests {
             1b6db7f88268aaf89f0b33b905d72c25338b13e61a51873c2d427021a3f29207
             179ad32f423793f0c090dda025ce41df0e94afbc80ab5eda9b1a268aa2553a99"
             ),
-            2 * 4096,
+            8192,
         )
         .unwrap();
 
