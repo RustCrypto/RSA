@@ -865,17 +865,14 @@ mod tests {
         e_raw[..e.len()].copy_from_slice(&e);
         let e = u64::from_be_bytes(e_raw);
 
-        let bits = 512;
-        RsaPrivateKey::from_components(
-            Odd::new(BoxedUint::from_be_slice(&n, bits).unwrap()).unwrap(),
-            e,
-            BoxedUint::from_be_slice(&d, bits).unwrap(),
-            primes
-                .iter()
-                .map(|p| BoxedUint::from_be_slice(p, bits).unwrap())
-                .collect(),
-        )
-        .unwrap();
+        let bits = 4096;
+        let n = Odd::new(BoxedUint::from_be_slice(&n, bits).unwrap()).unwrap();
+        let d = BoxedUint::from_be_slice(&d, bits).unwrap();
+        let primes = primes
+            .iter()
+            .map(|p| BoxedUint::from_be_slice(p, bits / 2).unwrap())
+            .collect();
+        RsaPrivateKey::from_components(n, e, d, primes).unwrap();
     }
 
     #[test]
@@ -942,7 +939,7 @@ mod tests {
             1b6db7f88268aaf89f0b33b905d72c25338b13e61a51873c2d427021a3f29207
             179ad32f423793f0c090dda025ce41df0e94afbc80ab5eda9b1a268aa2553a99"
             ),
-            4096,
+            2 * 4096,
         )
         .unwrap();
 

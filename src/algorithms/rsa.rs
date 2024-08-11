@@ -221,33 +221,41 @@ pub fn recover_primes(
     d: &BoxedUint,
 ) -> Result<(BoxedUint, BoxedUint)> {
     // Check precondition
-    if e <= 2u64.pow(16) || e >= 2u64.pow(256) {
+
+    // Note: because e is at most u64::MAX, it is already
+    // known to be < 2**256
+    if e <= 2u64.pow(16) {
         return Err(Error::InvalidArguments);
     }
 
     // 1. Let a = (de – 1) × GCD(n – 1, de – 1).
-    let one = BoxedUint::one();
-    let e = BoxedUint::from(e);
+    let bits = d.bits_precision() * 2;
+    let one = BoxedUint::one().widen(bits);
+    let e = BoxedUint::from(e).widen(bits);
+    let d = d.widen(bits);
+    let n = n.as_ref().widen(bits);
 
-    let a1 = d * &e - &one;
-    let a2 = (n.as_ref() - &one).gcd(&(d * e - &one)).unwrap();
+    let a1 = &d * &e - &one;
+    let a2 = (&n - &one).gcd(&a1);
     let a = a1 * a2;
+    let n = n.widen(a.bits_precision());
 
     // 2. Let m = floor(a /n) and r = a – m n, so that a = m n + r and 0 ≤ r < n.
-    let m = &a / n;
-    let r = a - &m * n.as_ref();
+    let m = &a / NonZero::new(n.clone()).expect("checked");
+    let r = a - &m * &n;
 
     // 3. Let b = ( (n – r)/(m + 1) ) + 1; if b is not an integer or b^2 ≤ 4n, then output an error indicator,
     //    and exit without further processing.
-    let modulus_check = (n.as_ref() - &r) % NonZero::new(&m + &one).unwrap();
+    let modulus_check = (&n - &r) % NonZero::new(&m + &one).unwrap();
     if (!modulus_check.is_zero()).into() {
         return Err(Error::InvalidArguments);
     }
-    let b = (n.as_ref() - &r) / NonZero::new((&m + &one) + one).unwrap();
+    let b = ((&n - &r) / NonZero::new(&m + &one).unwrap()) + one;
 
     let four = BoxedUint::from(4u32);
-    let four_n = n.as_ref() * four;
+    let four_n = &n * four;
     let b_squared = b.square();
+
     if b_squared <= four_n {
         return Err(Error::InvalidArguments);
     }
@@ -263,7 +271,8 @@ pub fn recover_primes(
         return Err(Error::InvalidArguments);
     }
 
-    let two = NonZero::new(BoxedUint::from(2u64)).unwrap();
+    let bits = std::cmp::max(b.bits_precision(), y.bits_precision());
+    let two = NonZero::new(BoxedUint::from(2u64)).unwrap().widen(bits);
     let p = (&b + &y) / &two;
     let q = (b - y) / two;
 
@@ -323,9 +332,10 @@ pub(crate) fn compute_private_exponent_carmicheal(
     let q1 = q - &BoxedUint::one();
 
     // LCM inlined
-    let gcd = p1.gcd(&q1).unwrap();
+    let gcd = p1.gcd(&q1);
     let lcm = p1 / NonZero::new(gcd).unwrap() * &q1;
-    if let Some(d) = BoxedUint::from(exp).inv_mod(&lcm).into() {
+    let exp = BoxedUint::from(exp).widen(lcm.bits_precision());
+    if let Some(d) = exp.inv_mod(&lcm).into() {
         Ok(d)
     } else {
         // `exp` evenly divides `lcm`
@@ -339,13 +349,13 @@ mod tests {
 
     #[test]
     fn recover_primes_works() {
-        let bits = 512;
+        let bits = 2048;
 
-        let n = BoxedUint::from_be_hex("00d397b84d98a4c26138ed1b695a8106ead91d553bf06041b62d3fdc50a041e222b8f4529689c1b82c5e71554f5dd69fa2f4b6158cf0dbeb57811a0fc327e1f28e74fe74d3bc166c1eabdc1b8b57b934ca8be5b00b4f29975bcc99acaf415b59bb28a6782bb41a2c3c2976b3c18dbadef62f00c6bb226640095096c0cc60d22fe7ef987d75c6a81b10d96bf292028af110dc7cc1bbc43d22adab379a0cd5d8078cc780ff5cd6209dea34c922cf784f7717e428d75b5aec8ff30e5f0141510766e2e0ab8d473c84e8710b2b98227c3db095337ad3452f19e2b9bfbccdd8148abf6776fa552775e6e75956e45229ae5a9c46949bab1e622f0e48f56524a84ed3483b", bits).unwrap();
+        let n = BoxedUint::from_be_hex("d397b84d98a4c26138ed1b695a8106ead91d553bf06041b62d3fdc50a041e222b8f4529689c1b82c5e71554f5dd69fa2f4b6158cf0dbeb57811a0fc327e1f28e74fe74d3bc166c1eabdc1b8b57b934ca8be5b00b4f29975bcc99acaf415b59bb28a6782bb41a2c3c2976b3c18dbadef62f00c6bb226640095096c0cc60d22fe7ef987d75c6a81b10d96bf292028af110dc7cc1bbc43d22adab379a0cd5d8078cc780ff5cd6209dea34c922cf784f7717e428d75b5aec8ff30e5f0141510766e2e0ab8d473c84e8710b2b98227c3db095337ad3452f19e2b9bfbccdd8148abf6776fa552775e6e75956e45229ae5a9c46949bab1e622f0e48f56524a84ed3483b", bits).unwrap();
         let e = 65537;
-        let d = BoxedUint::from_be_hex("00c4e70c689162c94c660828191b52b4d8392115df486a9adbe831e458d73958320dc1b755456e93701e9702d76fb0b92f90e01d1fe248153281fe79aa9763a92fae69d8d7ecd144de29fa135bd14f9573e349e45031e3b76982f583003826c552e89a397c1a06bd2163488630d92e8c2bb643d7abef700da95d685c941489a46f54b5316f62b5d2c3a7f1bbd134cb37353a44683fdc9d95d36458de22f6c44057fe74a0a436c4308f73f4da42f35c47ac16a7138d483afc91e41dc3a1127382e0c0f5119b0221b4fc639d6b9c38177a6de9b526ebd88c38d7982c07f98a0efd877d508aae275b946915c02e2e1106d175d74ec6777f5e80d12c053d9c7be1e341", bits).unwrap();
-        let p = BoxedUint::from_be_hex("00f827bbf3a41877c7cc59aebf42ed4b29c32defcb8ed96863d5b090a05a8930dd624a21c9dcf9838568fdfa0df65b8462a5f2ac913d6c56f975532bd8e78fb07bd405ca99a484bcf59f019bbddcb3933f2bce706300b4f7b110120c5df9018159067c35da3061a56c8635a52b54273b31271b4311f0795df6021e6355e1a42e61", bits).unwrap();
-        let q = BoxedUint::from_be_hex("00da4817ce0089dd36f2ade6a3ff410c73ec34bf1b4f6bda38431bfede11cef1f7f6efa70e5f8063a3b1f6e17296ffb15feefa0912a0325b8d1fd65a559e717b5b961ec345072e0ec5203d03441d29af4d64054a04507410cf1da78e7b6119d909ec66e6ad625bf995b279a4b3c5be7d895cd7c5b9c4c497fde730916fcdb4e41b", bits).unwrap();
+        let d = BoxedUint::from_be_hex("c4e70c689162c94c660828191b52b4d8392115df486a9adbe831e458d73958320dc1b755456e93701e9702d76fb0b92f90e01d1fe248153281fe79aa9763a92fae69d8d7ecd144de29fa135bd14f9573e349e45031e3b76982f583003826c552e89a397c1a06bd2163488630d92e8c2bb643d7abef700da95d685c941489a46f54b5316f62b5d2c3a7f1bbd134cb37353a44683fdc9d95d36458de22f6c44057fe74a0a436c4308f73f4da42f35c47ac16a7138d483afc91e41dc3a1127382e0c0f5119b0221b4fc639d6b9c38177a6de9b526ebd88c38d7982c07f98a0efd877d508aae275b946915c02e2e1106d175d74ec6777f5e80d12c053d9c7be1e341", bits).unwrap();
+        let p = BoxedUint::from_be_hex("f827bbf3a41877c7cc59aebf42ed4b29c32defcb8ed96863d5b090a05a8930dd624a21c9dcf9838568fdfa0df65b8462a5f2ac913d6c56f975532bd8e78fb07bd405ca99a484bcf59f019bbddcb3933f2bce706300b4f7b110120c5df9018159067c35da3061a56c8635a52b54273b31271b4311f0795df6021e6355e1a42e61", bits / 2).unwrap();
+        let q = BoxedUint::from_be_hex("da4817ce0089dd36f2ade6a3ff410c73ec34bf1b4f6bda38431bfede11cef1f7f6efa70e5f8063a3b1f6e17296ffb15feefa0912a0325b8d1fd65a559e717b5b961ec345072e0ec5203d03441d29af4d64054a04507410cf1da78e7b6119d909ec66e6ad625bf995b279a4b3c5be7d895cd7c5b9c4c497fde730916fcdb4e41b", bits / 2).unwrap();
 
         let (mut p1, mut q1) = recover_primes(&NonZero::new(n).unwrap(), e, &d).unwrap();
 
