@@ -272,7 +272,7 @@ pub fn recover_primes(
         return Err(Error::InvalidArguments);
     }
 
-    let bits = std::cmp::max(b.bits_precision(), y.bits_precision());
+    let bits = core::cmp::max(b.bits_precision(), y.bits_precision());
     let two = NonZero::new(BoxedUint::from(2u64)).unwrap().widen(bits);
     let p = (&b + &y) / &two;
     let q = (b - y) / two;
