@@ -98,10 +98,11 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         m.0
     };
 
+    // Ensure output precision matches input precision
+    let m = m.shorten(n_params.bits_precision());
     match ir {
         Some(ref ir) => {
             // unblind
-            let m = m.shorten(n_params.bits_precision());
             let res = unblind(&m, ir, n_params);
             Ok(res)
         }
