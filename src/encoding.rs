@@ -9,7 +9,8 @@ use crate::{
 };
 use core::convert::{TryFrom, TryInto};
 use pkcs8::{
-    der::Encode, Document, EncodePrivateKey, EncodePublicKey, ObjectIdentifier, SecretDocument,
+    der::{asn1::OctetStringRef, Encode},
+    Document, EncodePrivateKey, EncodePublicKey, ObjectIdentifier, SecretDocument,
 };
 use zeroize::Zeroizing;
 
@@ -37,10 +38,10 @@ pub(crate) fn verify_algorithm_id(
     Ok(())
 }
 
-impl TryFrom<pkcs8::PrivateKeyInfo<'_>> for RsaPrivateKey {
+impl TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for RsaPrivateKey {
     type Error = pkcs8::Error;
 
-    fn try_from(private_key_info: pkcs8::PrivateKeyInfo<'_>) -> pkcs8::Result<Self> {
+    fn try_from(private_key_info: pkcs8::PrivateKeyInfoRef<'_>) -> pkcs8::Result<Self> {
         verify_algorithm_id(&private_key_info.algorithm)?;
 
         let pkcs1_key = pkcs1::RsaPrivateKey::try_from(private_key_info.private_key)?;
@@ -110,7 +111,11 @@ impl EncodePrivateKey for RsaPrivateKey {
         }
         .to_der()?;
 
-        pkcs8::PrivateKeyInfo::new(pkcs1::ALGORITHM_ID, private_key.as_ref()).try_into()
+        pkcs8::PrivateKeyInfoRef::new(
+            pkcs1::ALGORITHM_ID,
+            OctetStringRef::new(private_key.as_ref())?,
+        )
+        .try_into()
     }
 }
 

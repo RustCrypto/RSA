@@ -65,3 +65,7 @@ rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.dev]
 opt-level = 2
+
+[patch.crates-io]
+pkcs1 = { git = "https://github.com/RustCrypto/formats.git" }
+pkcs8 = { git = "https://github.com/RustCrypto/formats.git" }
