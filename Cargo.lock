@@ -371,8 +371,7 @@ dependencies = [
 [[package]]
 name = "pkcs1"
 version = "0.8.0-rc.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d2f4c73d459a85331915baebd5082dce5ee8ef16fd9a1ca75559ac91e66a9ee"
+source = "git+https://github.com/RustCrypto/formats.git#3fb883b2f445e74f38f51fef63a347ecfe69f623"
 dependencies = [
  "der",
  "pkcs8",
@@ -399,8 +398,7 @@ dependencies = [
 [[package]]
 name = "pkcs8"
 version = "0.11.0-rc.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "66180445f1dce533620a7743467ef85fe1c5e80cdaf7c7053609d7a2fbcdae20"
+source = "git+https://github.com/RustCrypto/formats.git#3fb883b2f445e74f38f51fef63a347ecfe69f623"
 dependencies = [
  "der",
  "pkcs5",
