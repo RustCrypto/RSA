@@ -51,7 +51,7 @@ fn decode_rsa2048_priv_der() {
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa2048-priv.pem
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "B6C42C515F10A6AAF282C63EDBE24243A170F3FA2633BD4833637F47CA4F6F36"
             "E03A5D29EFC3191AC80F390D874B39E30F414FCEC1FCA0ED81E547EDC2CD382C"
@@ -63,9 +63,9 @@ fn decode_rsa2048_priv_der() {
             "90B44E3E095FA37058EA25B13F5E295CBEAC6DE838AB8C50AF61E298975B872F"
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
     assert_eq!(
-        &key.d().to_bytes_be(),
+        &key.d().to_be_bytes()[..],
         &hex!(
             "7ECC8362C0EDB0741164215E22F74AB9D91BA06900700CF63690E5114D8EE6BD"
             "CFBB2E3F9614692A677A083F168A5E52E5968E6407B9D97C6E0E4064F82DA0B7"
@@ -78,7 +78,7 @@ fn decode_rsa2048_priv_der() {
         )
     );
     assert_eq!(
-        &key.primes()[0].to_bytes_be(),
+        &key.primes()[0].to_be_bytes()[..],
         &hex!(
             "DCC061242D4E92AFAEE72AC513CA65B9F77036F9BD7E0E6E61461A7EF7654225"
             "EC153C7E5C31A6157A6E5A13FF6E178E8758C1CB33D9D6BBE3179EF18998E422"
@@ -87,7 +87,7 @@ fn decode_rsa2048_priv_der() {
         )
     );
     assert_eq!(
-        &key.primes()[1].to_bytes_be(),
+        &key.primes()[1].to_be_bytes()[..],
         &hex!(
             "D3F314757E40E954836F92BE24236AF2F0DA04A34653C180AF67E960086D93FD"
             "E65CB23EFD9D09374762F5981E361849AF68CDD75394FF6A4E06EB69B209E422"
@@ -104,7 +104,7 @@ fn decode_rsa4096_priv_der() {
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa4096-priv.pem
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "A7A74572811EA2617E49E85BD730DDE30F103F7D88EE3F765E540D3DD993BBB0"
             "BA140002859D0B40897436637F58B828EA74DF8321634077F99D4AA2D54CA375"
@@ -124,9 +124,9 @@ fn decode_rsa4096_priv_der() {
             "F319956F4DE3AAD00EFB9A147D66B3AC1A01D35B2CFB48D400B0E7A80DC97551"
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
     assert_eq!(
-        &key.d().to_bytes_be(),
+        &key.d().to_be_bytes()[..],
         &hex!(
             "9FE3097B2322B90FAB6606C017A095EBE640C39C100BCEE02F238FA14DAFF38E"
             "9E57568F1127ED4436126B904631B127EC395BB3EE127EB82C88D2562A7FB55F"
@@ -147,7 +147,7 @@ fn decode_rsa4096_priv_der() {
         )
     );
     assert_eq!(
-        &key.primes()[0].to_bytes_be(),
+        &key.primes()[0].to_be_bytes()[..],
         &hex!(
             "D0213A79425B665B719118448893EC3275600F63DBF85B77F4E8E99EF302F6E8"
             "2596048F6DCA772DE6BBF1124DB84B0AFE61B03A8604AB0079ED53F3304797AD"
@@ -160,7 +160,7 @@ fn decode_rsa4096_priv_der() {
         )
     );
     assert_eq!(
-        &key.primes()[1].to_bytes_be(),
+        &key.primes()[1].to_be_bytes()[..],
         &hex!(
             "CE36C6810522ABE5D6465F36EB137DA3B9EA4A5F1D27C6614729EB8E5E2E5CB8"
             "8E3EF1A473A21944B66557B3DC2CE462E4BF3446CB4990037E5672B1705CBAE8"
@@ -181,7 +181,7 @@ fn decode_rsa2048_pub_der() {
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa2048-pub.pem
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "B6C42C515F10A6AAF282C63EDBE24243A170F3FA2633BD4833637F47CA4F6F36"
             "E03A5D29EFC3191AC80F390D874B39E30F414FCEC1FCA0ED81E547EDC2CD382C"
@@ -194,7 +194,7 @@ fn decode_rsa2048_pub_der() {
 
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
 }
 
 #[test]
@@ -204,7 +204,7 @@ fn decode_rsa4096_pub_der() {
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa4096-pub.pem
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "A7A74572811EA2617E49E85BD730DDE30F103F7D88EE3F765E540D3DD993BBB0"
             "BA140002859D0B40897436637F58B828EA74DF8321634077F99D4AA2D54CA375"
@@ -224,7 +224,7 @@ fn decode_rsa4096_pub_der() {
             "F319956F4DE3AAD00EFB9A147D66B3AC1A01D35B2CFB48D400B0E7A80DC97551"
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
 }
 
 #[test]
@@ -263,7 +263,7 @@ fn decode_rsa2048_priv_pem() {
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa2048-priv.pem
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "B6C42C515F10A6AAF282C63EDBE24243A170F3FA2633BD4833637F47CA4F6F36"
             "E03A5D29EFC3191AC80F390D874B39E30F414FCEC1FCA0ED81E547EDC2CD382C"
@@ -275,9 +275,9 @@ fn decode_rsa2048_priv_pem() {
             "90B44E3E095FA37058EA25B13F5E295CBEAC6DE838AB8C50AF61E298975B872F"
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
     assert_eq!(
-        &key.d().to_bytes_be(),
+        &key.d().to_be_bytes()[..],
         &hex!(
             "7ECC8362C0EDB0741164215E22F74AB9D91BA06900700CF63690E5114D8EE6BD"
             "CFBB2E3F9614692A677A083F168A5E52E5968E6407B9D97C6E0E4064F82DA0B7"
@@ -290,7 +290,7 @@ fn decode_rsa2048_priv_pem() {
         )
     );
     assert_eq!(
-        &key.primes()[0].to_bytes_be(),
+        &key.primes()[0].to_be_bytes()[..],
         &hex!(
             "DCC061242D4E92AFAEE72AC513CA65B9F77036F9BD7E0E6E61461A7EF7654225"
             "EC153C7E5C31A6157A6E5A13FF6E178E8758C1CB33D9D6BBE3179EF18998E422"
@@ -300,7 +300,7 @@ fn decode_rsa2048_priv_pem() {
         )
     );
     assert_eq!(
-        &key.primes()[1].to_bytes_be(),
+        &key.primes()[1].to_be_bytes()[..],
         &hex!(
             "D3F314757E40E954836F92BE24236AF2F0DA04A34653C180AF67E960086D93FD"
             "E65CB23EFD9D09374762F5981E361849AF68CDD75394FF6A4E06EB69B209E422"
@@ -319,7 +319,7 @@ fn decode_rsa4096_priv_pem() {
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa4096-priv.pem
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "A7A74572811EA2617E49E85BD730DDE30F103F7D88EE3F765E540D3DD993BBB0"
             "BA140002859D0B40897436637F58B828EA74DF8321634077F99D4AA2D54CA375"
@@ -340,9 +340,9 @@ fn decode_rsa4096_priv_pem() {
 
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
     assert_eq!(
-        &key.d().to_bytes_be(),
+        &key.d().to_be_bytes()[..],
         &hex!(
             "9FE3097B2322B90FAB6606C017A095EBE640C39C100BCEE02F238FA14DAFF38E"
             "9E57568F1127ED4436126B904631B127EC395BB3EE127EB82C88D2562A7FB55F"
@@ -363,7 +363,7 @@ fn decode_rsa4096_priv_pem() {
         )
     );
     assert_eq!(
-        &key.primes()[0].to_bytes_be(),
+        &key.primes()[0].to_be_bytes()[..],
         &hex!(
             "D0213A79425B665B719118448893EC3275600F63DBF85B77F4E8E99EF302F6E8"
             "2596048F6DCA772DE6BBF1124DB84B0AFE61B03A8604AB0079ED53F3304797AD"
@@ -376,7 +376,7 @@ fn decode_rsa4096_priv_pem() {
         )
     );
     assert_eq!(
-        &key.primes()[1].to_bytes_be(),
+        &key.primes()[1].to_be_bytes()[..],
         &hex!(
             "CE36C6810522ABE5D6465F36EB137DA3B9EA4A5F1D27C6614729EB8E5E2E5CB8"
             "8E3EF1A473A21944B66557B3DC2CE462E4BF3446CB4990037E5672B1705CBAE8"
@@ -398,7 +398,7 @@ fn decode_rsa2048_pub_pem() {
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa2048-pub.pem
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "B6C42C515F10A6AAF282C63EDBE24243A170F3FA2633BD4833637F47CA4F6F36"
             "E03A5D29EFC3191AC80F390D874B39E30F414FCEC1FCA0ED81E547EDC2CD382C"
@@ -410,7 +410,7 @@ fn decode_rsa2048_pub_pem() {
             "90B44E3E095FA37058EA25B13F5E295CBEAC6DE838AB8C50AF61E298975B872F"
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
 }
 
 #[test]
@@ -421,7 +421,7 @@ fn decode_rsa4096_pub_pem() {
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa4096-pub.pem
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "A7A74572811EA2617E49E85BD730DDE30F103F7D88EE3F765E540D3DD993BBB0"
             "BA140002859D0B40897436637F58B828EA74DF8321634077F99D4AA2D54CA375"
@@ -441,7 +441,7 @@ fn decode_rsa4096_pub_pem() {
             "F319956F4DE3AAD00EFB9A147D66B3AC1A01D35B2CFB48D400B0E7A80DC97551"
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
 }
 
 #[test]

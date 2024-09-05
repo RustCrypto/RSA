@@ -39,7 +39,7 @@ fn decode_rsa2048_priv_der() {
 
     // Note: matches PKCS#1 test vectors
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "B6C42C515F10A6AAF282C63EDBE24243A170F3FA2633BD4833637F47CA4F6F36"
             "E03A5D29EFC3191AC80F390D874B39E30F414FCEC1FCA0ED81E547EDC2CD382C"
@@ -51,9 +51,9 @@ fn decode_rsa2048_priv_der() {
             "90B44E3E095FA37058EA25B13F5E295CBEAC6DE838AB8C50AF61E298975B872F"
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
     assert_eq!(
-        &key.d().to_bytes_be(),
+        &key.d().to_be_bytes()[..],
         &hex!(
             "7ECC8362C0EDB0741164215E22F74AB9D91BA06900700CF63690E5114D8EE6BD"
             "CFBB2E3F9614692A677A083F168A5E52E5968E6407B9D97C6E0E4064F82DA0B7"
@@ -66,7 +66,7 @@ fn decode_rsa2048_priv_der() {
         )
     );
     assert_eq!(
-        &key.primes()[0].to_bytes_be(),
+        &key.primes()[0].to_be_bytes()[..],
         &hex!(
             "DCC061242D4E92AFAEE72AC513CA65B9F77036F9BD7E0E6E61461A7EF7654225"
             "EC153C7E5C31A6157A6E5A13FF6E178E8758C1CB33D9D6BBE3179EF18998E422"
@@ -75,7 +75,7 @@ fn decode_rsa2048_priv_der() {
         )
     );
     assert_eq!(
-        &key.primes()[1].to_bytes_be(),
+        &key.primes()[1].to_be_bytes()[..],
         &hex!(
             "D3F314757E40E954836F92BE24236AF2F0DA04A34653C180AF67E960086D93FD"
             "E65CB23EFD9D09374762F5981E361849AF68CDD75394FF6A4E06EB69B209E422"
@@ -93,7 +93,7 @@ fn decode_rsa2048_pub_der() {
 
     // Note: matches PKCS#1 test vectors
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "B6C42C515F10A6AAF282C63EDBE24243A170F3FA2633BD4833637F47CA4F6F36"
             "E03A5D29EFC3191AC80F390D874B39E30F414FCEC1FCA0ED81E547EDC2CD382C"
@@ -105,7 +105,7 @@ fn decode_rsa2048_pub_der() {
             "90B44E3E095FA37058EA25B13F5E295CBEAC6DE838AB8C50AF61E298975B872F"
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
 
     let _ = pkcs1v15::VerifyingKey::<Sha256>::from_public_key_der(RSA_2048_PUB_DER).unwrap();
 }
@@ -115,7 +115,7 @@ fn decode_rsa2048_pss_priv_der() {
     let key = RsaPrivateKey::from_pkcs8_der(RSA_2048_PSS_PRIV_DER).unwrap();
 
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "AF8B669B7AF6D1677F3DBAAF3F5B36F9012DBE9B91695F18AB8D208D447CCB64"
             "63C5AE9DA46D865C76CF7EF32CF1CB7E2E1D461F8E71DBC470DD1CB9DE69BEA0"
@@ -128,9 +128,9 @@ fn decode_rsa2048_pss_priv_der() {
 
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
     assert_eq!(
-        &key.d().to_bytes_be(),
+        &key.d().to_be_bytes()[..],
         &hex!(
             "9407C8A9FA426289954A17C02A7C1FDA50FD234C0A8E41EC0AD64289FE24025C"
             "10AAA5BA37EB482F76DD391F9559FD10D590480EDA4EF7552B1BBA5A9ECCAB3C"
@@ -143,7 +143,7 @@ fn decode_rsa2048_pss_priv_der() {
         )
     );
     assert_eq!(
-        &key.primes()[0].to_bytes_be(),
+        &key.primes()[0].to_be_bytes()[..],
         &hex!(
             "E55FBA212239C846821579BE7E4D44336C700167A478F542032BEBF506D39453"
             "82670B7D5B08D48E1B4A46EB22E54ABE21867FB6AD96444E00B386FF14710CB6"
@@ -153,7 +153,7 @@ fn decode_rsa2048_pss_priv_der() {
         )
     );
     assert_eq!(
-        &key.primes()[1].to_bytes_be(),
+        &key.primes()[1].to_be_bytes()[..],
         &hex!(
             "C3EC0875ED7B5B96340A9869DD9674B8CF0E52AD4092B57620A6AEA981DA0F10"
             "13DF610CE1C8B630C111DA7214128E20FF8DA55B4CD8A2E145A8E370BF4F87C8"
@@ -170,7 +170,7 @@ fn decode_rsa2048_pss_pub_der() {
     let key = RsaPublicKey::from_public_key_der(RSA_2048_PSS_PUB_DER).unwrap();
 
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "AF8B669B7AF6D1677F3DBAAF3F5B36F9012DBE9B91695F18AB8D208D447CCB64"
             "63C5AE9DA46D865C76CF7EF32CF1CB7E2E1D461F8E71DBC470DD1CB9DE69BEA0"
@@ -182,7 +182,7 @@ fn decode_rsa2048_pss_pub_der() {
             "D502F266FB17433A9F4B08D08DE3C576A670CE90557AF94F67579A3273A5C8DB"
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
 
     let _ = pss::VerifyingKey::<Sha256>::from_public_key_der(RSA_2048_PSS_PUB_DER).unwrap();
 }
@@ -217,7 +217,7 @@ fn decode_rsa2048_priv_pem() {
 
     // Note: matches PKCS#1 test vectors
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "B6C42C515F10A6AAF282C63EDBE24243A170F3FA2633BD4833637F47CA4F6F36"
             "E03A5D29EFC3191AC80F390D874B39E30F414FCEC1FCA0ED81E547EDC2CD382C"
@@ -229,9 +229,9 @@ fn decode_rsa2048_priv_pem() {
             "90B44E3E095FA37058EA25B13F5E295CBEAC6DE838AB8C50AF61E298975B872F"
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
     assert_eq!(
-        &key.d().to_bytes_be(),
+        &key.d().to_be_bytes()[..],
         &hex!(
             "7ECC8362C0EDB0741164215E22F74AB9D91BA06900700CF63690E5114D8EE6BD"
             "CFBB2E3F9614692A677A083F168A5E52E5968E6407B9D97C6E0E4064F82DA0B7"
@@ -244,7 +244,7 @@ fn decode_rsa2048_priv_pem() {
         )
     );
     assert_eq!(
-        &key.primes()[0].to_bytes_be(),
+        &key.primes()[0].to_be_bytes()[..],
         &hex!(
             "DCC061242D4E92AFAEE72AC513CA65B9F77036F9BD7E0E6E61461A7EF7654225"
             "EC153C7E5C31A6157A6E5A13FF6E178E8758C1CB33D9D6BBE3179EF18998E422"
@@ -253,7 +253,7 @@ fn decode_rsa2048_priv_pem() {
         )
     );
     assert_eq!(
-        &key.primes()[1].to_bytes_be(),
+        &key.primes()[1].to_be_bytes()[..],
         &hex!(
             "D3F314757E40E954836F92BE24236AF2F0DA04A34653C180AF67E960086D93FD"
             "E65CB23EFD9D09374762F5981E361849AF68CDD75394FF6A4E06EB69B209E422"
@@ -272,7 +272,7 @@ fn decode_rsa2048_pub_pem() {
 
     // Note: matches PKCS#1 test vectors
     assert_eq!(
-        &key.n().to_bytes_be(),
+        &key.n().to_be_bytes()[..],
         &hex!(
             "B6C42C515F10A6AAF282C63EDBE24243A170F3FA2633BD4833637F47CA4F6F36"
             "E03A5D29EFC3191AC80F390D874B39E30F414FCEC1FCA0ED81E547EDC2CD382C"
@@ -284,7 +284,7 @@ fn decode_rsa2048_pub_pem() {
             "90B44E3E095FA37058EA25B13F5E295CBEAC6DE838AB8C50AF61E298975B872F"
         )
     );
-    assert_eq!(&key.e().to_bytes_be(), &hex!("010001"));
+    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
 
     let _ = pkcs1v15::VerifyingKey::<Sha256>::from_public_key_pem(RSA_2048_PUB_PEM).unwrap();
 }
