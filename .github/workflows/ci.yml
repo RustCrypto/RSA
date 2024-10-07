@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         rust:
-          - 1.72.0 # MSRV
+          - 1.81.0 # MSRV
           - stable
         target:
           - thumbv7em-none-eabi
@@ -35,7 +35,7 @@ jobs:
     strategy:
       matrix:
         rust:
-          - 1.72.0 # MSRV
+          - 1.81.0 # MSRV
           - stable
     steps:
       - uses: actions/checkout@v4
@@ -65,6 +65,6 @@ jobs:
       - uses: RustCrypto/actions/cargo-cache@master
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2023-10-01
+          toolchain: nightly-2024-10-06
       - run: cargo test --release --features nightly
       - run: cargo build --benches
