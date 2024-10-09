@@ -508,6 +508,8 @@ fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize)
     if public_key.n().bits() > max_size {
         return Err(Error::ModulusTooLarge);
     }
+    #[cfg(feature = "uncheck_modulus_size")]
+    let _unused = max_size;
 
     let e = public_key
         .e()
