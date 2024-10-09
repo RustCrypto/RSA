@@ -504,9 +504,12 @@ pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
 fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize) -> Result<()> {
+    #[cfg(not(feature = "uncheck_modulus_size"))]
     if public_key.n().bits() > max_size {
         return Err(Error::ModulusTooLarge);
     }
+    #[cfg(feature = "uncheck_modulus_size")]
+    let _unused = max_size;
 
     let e = public_key
         .e()
