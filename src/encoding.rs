@@ -8,24 +8,40 @@ use crate::{
     BigUint, RsaPrivateKey, RsaPublicKey,
 };
 use core::convert::{TryFrom, TryInto};
-use pkcs8::{der::Encode, Document, EncodePrivateKey, EncodePublicKey, SecretDocument};
+use pkcs8::{
+    der::{asn1::OctetStringRef, Encode},
+    Document, EncodePrivateKey, EncodePublicKey, ObjectIdentifier, SecretDocument,
+};
 use zeroize::Zeroizing;
 
-/// Verify that the `AlgorithmIdentifier` for a key is correct.
-fn verify_algorithm_id(algorithm: &pkcs8::AlgorithmIdentifierRef) -> pkcs8::spki::Result<()> {
-    algorithm.assert_algorithm_oid(pkcs1::ALGORITHM_OID)?;
+/// ObjectID for the RSA PSS keys
+pub const ID_RSASSA_PSS: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.10");
 
-    if algorithm.parameters_any()? != pkcs8::der::asn1::Null.into() {
-        return Err(pkcs8::spki::Error::KeyMalformed);
-    }
+/// Verify that the `AlgorithmIdentifier` for a key is correct.
+pub(crate) fn verify_algorithm_id(
+    algorithm: &pkcs8::AlgorithmIdentifierRef,
+) -> pkcs8::spki::Result<()> {
+    match algorithm.oid {
+        pkcs1::ALGORITHM_OID => {
+            if algorithm.parameters_any()? != pkcs8::der::asn1::Null.into() {
+                return Err(pkcs8::spki::Error::KeyMalformed);
+            }
+        }
+        ID_RSASSA_PSS => {
+            if algorithm.parameters.is_some() {
+                return Err(pkcs8::spki::Error::KeyMalformed);
+            }
+        }
+        _ => return Err(pkcs8::spki::Error::OidUnknown { oid: algorithm.oid }),
+    };
 
     Ok(())
 }
 
-impl TryFrom<pkcs8::PrivateKeyInfo<'_>> for RsaPrivateKey {
+impl TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for RsaPrivateKey {
     type Error = pkcs8::Error;
 
-    fn try_from(private_key_info: pkcs8::PrivateKeyInfo<'_>) -> pkcs8::Result<Self> {
+    fn try_from(private_key_info: pkcs8::PrivateKeyInfoRef<'_>) -> pkcs8::Result<Self> {
         verify_algorithm_id(&private_key_info.algorithm)?;
 
         let pkcs1_key = pkcs1::RsaPrivateKey::try_from(private_key_info.private_key)?;
@@ -95,7 +111,11 @@ impl EncodePrivateKey for RsaPrivateKey {
         }
         .to_der()?;
 
-        pkcs8::PrivateKeyInfo::new(pkcs1::ALGORITHM_ID, private_key.as_ref()).try_into()
+        pkcs8::PrivateKeyInfoRef::new(
+            pkcs1::ALGORITHM_ID,
+            OctetStringRef::new(private_key.as_ref())?,
+        )
+        .try_into()
     }
 }
 

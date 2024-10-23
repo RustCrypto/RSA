@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         rust:
-          - 1.65.0 # MSRV
+          - 1.81.0 # MSRV
           - stable
         target:
           - thumbv7em-none-eabi
@@ -35,7 +35,7 @@ jobs:
     strategy:
       matrix:
         rust:
-          - 1.65.0 # MSRV
+          - 1.81.0 # MSRV
           - stable
     steps:
       - uses: actions/checkout@v4
@@ -47,16 +47,6 @@ jobs:
       - run: cargo hack test --release --feature-powerset --exclude-features nightly,getrandom,serde
       - run: cargo test --release --features getrandom
       - run: cargo test --release --features serde
-
-  doc:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: RustCrypto/actions/cargo-cache@master
-      - uses: dtolnay/rust-toolchain@master
-        with:
-          toolchain: stable
-      - run: cargo doc --all-features
 
   minimal-versions:
     runs-on: ubuntu-latest
@@ -75,6 +65,6 @@ jobs:
       - uses: RustCrypto/actions/cargo-cache@master
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2023-10-01
+          toolchain: nightly-2024-10-06
       - run: cargo test --release --features nightly
       - run: cargo build --benches

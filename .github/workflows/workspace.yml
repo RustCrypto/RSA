@@ -1,0 +1,47 @@
+name: Workspace
+
+on:
+  pull_request:
+    paths-ignore:
+      - README.md
+  push:
+    branches: master
+    paths-ignore:
+      - README.md
+
+jobs:
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: RustCrypto/actions/cargo-cache@master
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.81.0
+          components: clippy
+      - run: cargo clippy --all -- -D warnings
+
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: RustCrypto/actions/cargo-cache@master
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+          components: rustfmt
+      - run: cargo fmt --all -- --check
+
+  doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: RustCrypto/actions/cargo-cache@master
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          # We need Nightly for doc_auto_cfg
+          toolchain: nightly-2024-06-25
+      - uses: Swatinem/rust-cache@v2
+      - env:
+          RUSTDOCFLAGS: "-Dwarnings --cfg docsrs"
+        run: cargo doc --no-deps --features std,pem,serde,hazmat,sha2

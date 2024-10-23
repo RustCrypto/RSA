@@ -1,17 +1,16 @@
-pub use ::signature::{
-    hazmat::{PrehashSigner, PrehashVerifier},
-    DigestSigner, DigestVerifier, Error, Keypair, RandomizedDigestSigner, RandomizedSigner, Result,
-    SignatureEncoding, Signer, Verifier,
-};
+//! `RSASSA-PKCS1-v1_5` signatures.
+
+use crate::algorithms::pad::uint_to_be_pad;
+use ::signature::SignatureEncoding;
+use alloc::{boxed::Box, string::ToString};
+use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
+use num_bigint::BigUint;
+#[cfg(feature = "serde")]
+use serdect::serde::{de, Deserialize, Serialize};
 use spki::{
     der::{asn1::BitString, Result as DerResult},
     SignatureBitStringEncoding,
 };
-
-use crate::algorithms::pad::uint_to_be_pad;
-use alloc::{boxed::Box, string::ToString};
-use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
-use num_bigint::BigUint;
 
 /// `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
 ///
@@ -80,5 +79,45 @@ impl UpperHex for Signature {
 impl Display for Signature {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         write!(f, "{:X}", self)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl Serialize for Signature {
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    where
+        S: serdect::serde::Serializer,
+    {
+        serdect::slice::serialize_hex_lower_or_bin(&self.to_bytes(), serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> Deserialize<'de> for Signature {
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    where
+        D: serdect::serde::Deserializer<'de>,
+    {
+        serdect::slice::deserialize_hex_or_bin_vec(deserializer)?
+            .as_slice()
+            .try_into()
+            .map_err(de::Error::custom)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    #[cfg(feature = "serde")]
+    fn test_serde() {
+        use super::*;
+        use serde_test::{assert_tokens, Configure, Token};
+        let signature = Signature {
+            inner: BigUint::new(Vec::from([42])),
+            len: 1,
+        };
+
+        let tokens = [Token::Str("2a")];
+        assert_tokens(&signature.readable(), &tokens);
     }
 }

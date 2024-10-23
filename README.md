@@ -81,7 +81,7 @@ You can follow our work on mitigating this issue in [#390].
 
 ## Minimum Supported Rust Version (MSRV)
 
-All crates in this repository support Rust 1.65 or higher.
+This crate supports Rust 1.72 or higher.
 
 In the future MSRV can be changed, but it will be done with a minor version bump.
 
@@ -102,13 +102,13 @@ dual licensed as above, without any additional terms or conditions.
 
 [//]: # (badges)
 
-[crate-image]: https://buildstats.info/crate/rsa
+[crate-image]: https://img.shields.io/crates/v/rsa
 [crate-link]: https://crates.io/crates/rsa
 [doc-image]: https://docs.rs/rsa/badge.svg
 [doc-link]: https://docs.rs/rsa
 [build-image]: https://github.com/rustcrypto/RSA/workflows/CI/badge.svg
 [build-link]: https://github.com/RustCrypto/RSA/actions?query=workflow%3ACI+branch%3Amaster
-[msrv-image]: https://img.shields.io/badge/rustc-1.65+-blue.svg
+[msrv-image]: https://img.shields.io/badge/rustc-1.72+-blue.svg
 [chat-image]: https://img.shields.io/badge/zulip-join_chat-blue.svg
 [chat-link]: https://rustcrypto.zulipchat.com/#narrow/stream/260047-RSA
 [deps-image]: https://deps.rs/repo/github/RustCrypto/RSA/status.svg
@@ -117,7 +117,7 @@ dual licensed as above, without any additional terms or conditions.
 [//]: # (links)
 
 [RustCrypto]: https://github.com/RustCrypto/
-[audit]: https://www.opentech.fund/results/security-safety-audits/deltachat/
+[audit]: https://public.opentech.fund/documents/1907_OTF_DeltaChat_RPGP_RustRSA_GB_Report_v1.pdf
 [open security issues]: https://github.com/RustCrypto/RSA/issues?q=is%3Aissue+is%3Aopen+label%3Asecurity
 [modular exponentiation is not constant time]: https://github.com/RustCrypto/RSA/issues/19
 [random blinding]: https://en.wikipedia.org/wiki/Blinding_(cryptography)

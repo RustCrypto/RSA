@@ -22,7 +22,7 @@ pub use self::{
 use alloc::{boxed::Box, vec::Vec};
 use core::fmt::{self, Debug};
 
-use const_oid::{AssociatedOid, ObjectIdentifier};
+use const_oid::AssociatedOid;
 use digest::{Digest, DynDigest, FixedOutputReset};
 use num_bigint::BigUint;
 use pkcs1::RsaPssParams;
@@ -32,6 +32,7 @@ use rand_core::CryptoRngCore;
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pss::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
+use crate::encoding::ID_RSASSA_PSS;
 use crate::errors::{Error, Result};
 use crate::traits::PublicKeyParts;
 use crate::traits::SignatureScheme;
@@ -240,8 +241,6 @@ fn get_pss_signature_algo_id<D>(salt_len: u8) -> pkcs8::spki::Result<AlgorithmId
 where
     D: Digest + AssociatedOid,
 {
-    const ID_RSASSA_PSS: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.10");
-
     let pss_params = RsaPssParams::new::<D>(salt_len);
 
     Ok(AlgorithmIdentifierOwned {
@@ -276,14 +275,35 @@ mod test {
         // -----END RSA PRIVATE KEY-----
 
         RsaPrivateKey::from_components(
-            BigUint::from_str_radix("9353930466774385905609975137998169297361893554149986716853295022578535724979677252958524466350471210367835187480748268864277464700638583474144061408845077", 10).unwrap(),
+            BigUint::from_str_radix(
+                "9353930466774385905609975137998169297361893554149986716853295022\
+                 5785357249796772529585244663504712103678351874807482688642774647\
+                 00638583474144061408845077",
+                10,
+            )
+            .unwrap(),
             BigUint::from_u64(65537).unwrap(),
-            BigUint::from_str_radix("7266398431328116344057699379749222532279343923819063639497049039389899328538543087657733766554155839834519529439851673014800261285757759040931985506583861", 10).unwrap(),
+            BigUint::from_str_radix(
+                "7266398431328116344057699379749222532279343923819063639497049039\
+                 3898993285385430876577337665541558398345195294398516730148002612\
+                 85757759040931985506583861",
+                10,
+            )
+            .unwrap(),
             vec![
-                BigUint::from_str_radix("98920366548084643601728869055592650835572950932266967461790948584315647051443",10).unwrap(),
-                BigUint::from_str_radix("94560208308847015747498523884063394671606671904944666360068158221458669711639", 10).unwrap()
+                BigUint::from_str_radix(
+                    "98920366548084643601728869055592650835572950932266967461790948584315647051443",
+                    10,
+                )
+                .unwrap(),
+                BigUint::from_str_radix(
+                    "94560208308847015747498523884063394671606671904944666360068158221458669711639",
+                    10,
+                )
+                .unwrap(),
             ],
-        ).unwrap()
+        )
+        .unwrap()
     }
 
     #[test]
@@ -566,10 +586,10 @@ mod test {
 
         for test in &tests {
             let sig = signing_key
-                .sign_prehash_with_rng(&mut rng, &test)
+                .sign_prehash_with_rng(&mut rng, test)
                 .expect("failed to sign");
             verifying_key
-                .verify_prehash(&test, &sig)
+                .verify_prehash(test, &sig)
                 .expect("failed to verify");
         }
     }
@@ -585,10 +605,10 @@ mod test {
 
         for test in &tests {
             let sig = signing_key
-                .sign_prehash_with_rng(&mut rng, &test)
+                .sign_prehash_with_rng(&mut rng, test)
                 .expect("failed to sign");
             verifying_key
-                .verify_prehash(&test, &sig)
+                .verify_prehash(test, &sig)
                 .expect("failed to verify");
         }
     }
