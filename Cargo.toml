@@ -23,7 +23,7 @@ digest = { version = "=0.11.0-pre.9", default-features = false, features = ["all
 pkcs1 = { version = "0.8.0-rc.0", default-features = false, features = ["alloc", "pkcs8"] }
 pkcs8 = { version = "0.11.0-rc.0", default-features = false, features = ["alloc"] }
 signature = { version = "=2.3.0-pre.4", default-features = false, features = ["alloc", "digest", "rand_core"] }
-spki = { version = "0.8.0-rc.0", default-features = false, features = ["alloc"] }
+spki = { version = "0.8.0-rc.1", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
 
 # optional dependencies
