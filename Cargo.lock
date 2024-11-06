@@ -141,13 +141,13 @@ dependencies = [
 
 [[package]]
 name = "crypto-bigint"
-version = "0.6.0-rc.2"
+version = "0.6.0-rc.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e43027691f1c055da3da4f7d96af09fcec420d435d5616e51f29afd0811c56a7"
+checksum = "d748d1f5b807ee6d0df5a548d0130417295c3aaed1dcbbb3d6a2e7106e11fcca"
 dependencies = [
  "num-traits",
  "rand_core",
- "serdect",
+ "serdect 0.3.0-rc.0",
  "subtle",
  "zeroize",
 ]
@@ -165,9 +165,9 @@ dependencies = [
 
 [[package]]
 name = "crypto-primes"
-version = "0.6.0-pre.0"
+version = "0.6.0-pre.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31bb1382ea4ef18b2da595f36ca284c7b6366d22264ac02f8baee109361cd6b0"
+checksum = "d9fad3f7645c77d3e0269f3e74a8dd25746de992b16bcecbb316059836e0b366"
 dependencies = [
  "crypto-bigint",
  "rand_core",
@@ -523,7 +523,7 @@ dependencies = [
  "rand_xorshift",
  "serde",
  "serde_test",
- "serdect",
+ "serdect 0.2.0",
  "sha1",
  "sha2",
  "sha3",
@@ -613,6 +613,16 @@ name = "serdect"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
+dependencies = [
+ "base16ct",
+ "serde",
+]
+
+[[package]]
+name = "serdect"
+version = "0.3.0-rc.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2a504c8ee181e3e594d84052f983d60afe023f4d94d050900be18062bbbf7b58"
 dependencies = [
  "base16ct",
  "serde",

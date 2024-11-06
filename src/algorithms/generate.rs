@@ -77,8 +77,7 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore>(
 
         for (i, prime) in primes.iter_mut().enumerate() {
             let bits = (todo / (nprimes - i)) as u32;
-            let bits_precision = BoxedUint::zero_with_precision(bits).bits_precision();
-            *prime = generate_prime_with_rng(rng, bits, bits_precision);
+            *prime = generate_prime_with_rng(rng, bits);
             todo -= prime.bits() as usize;
         }
 
