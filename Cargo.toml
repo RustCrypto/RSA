@@ -1,6 +1,6 @@
 [package]
 name = "rsa"
-version = "0.10.0-pre.2"
+version = "0.10.0-pre.3"
 authors = ["RustCrypto Developers", "dignifiedquire <dignifiedquire@gmail.com>"]
 edition = "2021"
 description = "Pure Rust RSA implementation"
@@ -10,17 +10,17 @@ repository = "https://github.com/RustCrypto/RSA"
 keywords = ["rsa", "encryption", "security", "crypto"]
 categories = ["cryptography"]
 readme = "README.md"
-rust-version = "1.73"
+rust-version = "1.81"
 
 [dependencies]
 rand_core = { version = "0.6.4", default-features = false }
 const-oid = { version = "=0.10.0-rc.0", default-features = false }
 subtle = { version = "2.6.1", default-features = false }
 digest = { version = "=0.11.0-pre.9", default-features = false, features = ["alloc", "oid"] }
-pkcs1 = { version = "=0.8.0-rc.0", default-features = false, features = ["alloc", "pkcs8"] }
-pkcs8 = { version = "=0.11.0-rc.0", default-features = false, features = ["alloc"] }
-signature = { version = "=2.3.0-pre.4", default-features = false , features = ["alloc", "digest", "rand_core"] }
-spki = { version = "=0.8.0-rc.0", default-features = false, features = ["alloc"] }
+pkcs1 = { version = "0.8.0-rc.0", default-features = false, features = ["alloc", "pkcs8"] }
+pkcs8 = { version = "0.11.0-rc.0", default-features = false, features = ["alloc"] }
+signature = { version = "=2.3.0-pre.4", default-features = false, features = ["alloc", "digest", "rand_core"] }
+spki = { version = "0.8.0-rc.1", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
 crypto-bigint = { version = "0.6.0-rc.2", default-features = false, features = ["zeroize", "alloc"] }
 crypto-primes = { version = "0.6.0-pre.0" }
@@ -67,5 +67,8 @@ opt-level = 2
 debug = true
 
 [patch.crates-io]
+pkcs1 = { git = "https://github.com/RustCrypto/formats.git" }
+pkcs8 = { git = "https://github.com/RustCrypto/formats.git" }
+
 # crypto-bigint = { git = "https://github.com/RustCrypto/crypto-bigint", branch = "master" }
 # crypto-bigint = { path = "../rustcrypto/crypto-bigint" }

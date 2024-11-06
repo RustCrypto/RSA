@@ -46,6 +46,11 @@ where
             phantom: Default::default(),
         }
     }
+
+    /// Return specified salt length for this key
+    pub fn salt_len(&self) -> usize {
+        self.salt_len
+    }
 }
 
 //

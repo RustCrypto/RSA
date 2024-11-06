@@ -225,13 +225,13 @@ where
     }
 }
 
-impl<D> TryFrom<pkcs8::PrivateKeyInfo<'_>> for SigningKey<D>
+impl<D> TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for SigningKey<D>
 where
     D: Digest + AssociatedOid,
 {
     type Error = pkcs8::Error;
 
-    fn try_from(private_key_info: pkcs8::PrivateKeyInfo<'_>) -> pkcs8::Result<Self> {
+    fn try_from(private_key_info: pkcs8::PrivateKeyInfoRef<'_>) -> pkcs8::Result<Self> {
         verify_algorithm_id(&private_key_info.algorithm)?;
         RsaPrivateKey::try_from(private_key_info).map(Self::new)
     }
