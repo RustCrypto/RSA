@@ -17,7 +17,7 @@ use crate::traits::keys::{PrivateKeyParts, PublicKeyParts};
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
 pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BoxedUint) -> Result<BoxedUint> {
-    let res = pow_mod_params(m, &BoxedUint::from(key.e()), key.n_params());
+    let res = pow_mod_params(m, key.e(), key.n_params());
     Ok(res)
 }
 
@@ -166,7 +166,7 @@ fn blind<R: CryptoRngCore, K: PublicKeyParts>(
 
     let blinded = {
         // r^e (mod n)
-        let mut rpowe = pow_mod_params(&r, &BoxedUint::from(key.e()), n_params.clone());
+        let mut rpowe = pow_mod_params(&r, &key.e(), n_params.clone());
         // c * r^e (mod n)
         let c = mul_mod_params(c, &rpowe, n_params.clone());
         rpowe.zeroize();
@@ -218,21 +218,21 @@ fn mul_mod_params(lhs: &BoxedUint, rhs: &BoxedUint, n_params: BoxedMontyParams) 
 /// [NIST 800-56B Appendix C.2](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf).
 pub fn recover_primes(
     n: &NonZero<BoxedUint>,
-    e: u64,
+    e: &BoxedUint,
     d: &BoxedUint,
 ) -> Result<(BoxedUint, BoxedUint)> {
     // Check precondition
 
     // Note: because e is at most u64::MAX, it is already
     // known to be < 2**256
-    if e <= 2u64.pow(16) {
+    if e <= &BoxedUint::from(2u64.pow(16)) {
         return Err(Error::InvalidArguments);
     }
 
     // 1. Let a = (de – 1) × GCD(n – 1, de – 1).
     let bits = d.bits_precision() * 2;
     let one = BoxedUint::one().widen(bits);
-    let e = BoxedUint::from(e).widen(bits);
+    let e = e.widen(bits);
     let d = d.widen(bits);
     let n = n.as_ref().widen(bits);
 
@@ -294,7 +294,7 @@ pub(crate) fn compute_modulus(primes: &[BoxedUint]) -> Odd<BoxedUint> {
 #[inline]
 pub(crate) fn compute_private_exponent_euler_totient(
     primes: &[BoxedUint],
-    exp: u64,
+    exp: &BoxedUint,
 ) -> Result<BoxedUint> {
     if primes.len() < 2 {
         return Err(Error::InvalidPrime);
@@ -305,7 +305,7 @@ pub(crate) fn compute_private_exponent_euler_totient(
     for prime in primes {
         totient = totient * (prime - &BoxedUint::one());
     }
-    let exp = BoxedUint::from(exp).widen(totient.bits_precision());
+    let exp = exp.widen(totient.bits_precision());
 
     // NOTE: `mod_inverse` checks if `exp` evenly divides `totient` and returns `None` if so.
     // This ensures that `exp` is not a factor of any `(prime - 1)`.
@@ -327,7 +327,7 @@ pub(crate) fn compute_private_exponent_euler_totient(
 pub(crate) fn compute_private_exponent_carmicheal(
     p: &BoxedUint,
     q: &BoxedUint,
-    exp: u64,
+    exp: &BoxedUint,
 ) -> Result<BoxedUint> {
     let p1 = p - &BoxedUint::one();
     let q1 = q - &BoxedUint::one();
@@ -335,7 +335,7 @@ pub(crate) fn compute_private_exponent_carmicheal(
     // LCM inlined
     let gcd = p1.gcd(&q1);
     let lcm = p1 / NonZero::new(gcd).unwrap() * &q1;
-    let exp = BoxedUint::from(exp).widen(lcm.bits_precision());
+    let exp = exp.widen(lcm.bits_precision());
     if let Some(d) = exp.inv_mod(&lcm).into() {
         Ok(d)
     } else {
@@ -353,12 +353,12 @@ mod tests {
         let bits = 2048;
 
         let n = BoxedUint::from_be_hex("d397b84d98a4c26138ed1b695a8106ead91d553bf06041b62d3fdc50a041e222b8f4529689c1b82c5e71554f5dd69fa2f4b6158cf0dbeb57811a0fc327e1f28e74fe74d3bc166c1eabdc1b8b57b934ca8be5b00b4f29975bcc99acaf415b59bb28a6782bb41a2c3c2976b3c18dbadef62f00c6bb226640095096c0cc60d22fe7ef987d75c6a81b10d96bf292028af110dc7cc1bbc43d22adab379a0cd5d8078cc780ff5cd6209dea34c922cf784f7717e428d75b5aec8ff30e5f0141510766e2e0ab8d473c84e8710b2b98227c3db095337ad3452f19e2b9bfbccdd8148abf6776fa552775e6e75956e45229ae5a9c46949bab1e622f0e48f56524a84ed3483b", bits).unwrap();
-        let e = 65537;
+        let e = BoxedUint::from(65_537u64);
         let d = BoxedUint::from_be_hex("c4e70c689162c94c660828191b52b4d8392115df486a9adbe831e458d73958320dc1b755456e93701e9702d76fb0b92f90e01d1fe248153281fe79aa9763a92fae69d8d7ecd144de29fa135bd14f9573e349e45031e3b76982f583003826c552e89a397c1a06bd2163488630d92e8c2bb643d7abef700da95d685c941489a46f54b5316f62b5d2c3a7f1bbd134cb37353a44683fdc9d95d36458de22f6c44057fe74a0a436c4308f73f4da42f35c47ac16a7138d483afc91e41dc3a1127382e0c0f5119b0221b4fc639d6b9c38177a6de9b526ebd88c38d7982c07f98a0efd877d508aae275b946915c02e2e1106d175d74ec6777f5e80d12c053d9c7be1e341", bits).unwrap();
         let p = BoxedUint::from_be_hex("f827bbf3a41877c7cc59aebf42ed4b29c32defcb8ed96863d5b090a05a8930dd624a21c9dcf9838568fdfa0df65b8462a5f2ac913d6c56f975532bd8e78fb07bd405ca99a484bcf59f019bbddcb3933f2bce706300b4f7b110120c5df9018159067c35da3061a56c8635a52b54273b31271b4311f0795df6021e6355e1a42e61", bits / 2).unwrap();
         let q = BoxedUint::from_be_hex("da4817ce0089dd36f2ade6a3ff410c73ec34bf1b4f6bda38431bfede11cef1f7f6efa70e5f8063a3b1f6e17296ffb15feefa0912a0325b8d1fd65a559e717b5b961ec345072e0ec5203d03441d29af4d64054a04507410cf1da78e7b6119d909ec66e6ad625bf995b279a4b3c5be7d895cd7c5b9c4c497fde730916fcdb4e41b", bits / 2).unwrap();
 
-        let (mut p1, mut q1) = recover_primes(&NonZero::new(n).unwrap(), e, &d).unwrap();
+        let (mut p1, mut q1) = recover_primes(&NonZero::new(n).unwrap(), &e, &d).unwrap();
 
         if p1 < q1 {
             std::mem::swap(&mut p1, &mut q1);

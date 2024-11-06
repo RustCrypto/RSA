@@ -12,7 +12,7 @@ pub trait PublicKeyParts {
     fn n(&self) -> &NonZero<BoxedUint>;
 
     /// Returns the public exponent of the key.
-    fn e(&self) -> u64;
+    fn e(&self) -> &BoxedUint;
 
     /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
     /// or by this public key will have the same size.

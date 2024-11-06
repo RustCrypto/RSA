@@ -61,11 +61,12 @@ impl TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for RsaPrivateKey {
             .map_err(|_| key_malformed)?;
         let n = Option::from(Odd::new(n)).ok_or(key_malformed)?;
 
-        // exponent potentially needs padding
-        let mut e_slice = [0u8; 8];
-        let raw_e_slice = pkcs1_key.public_exponent.as_bytes();
-        e_slice[8 - raw_e_slice.len()..].copy_from_slice(raw_e_slice);
-        let e = u64::from_be_bytes(e_slice);
+        let bits_e = u32::try_from(pkcs1_key.public_exponent.as_bytes().len())
+            .map_err(|_| key_malformed)?
+            * 8;
+        let e = BoxedUint::from_be_slice(pkcs1_key.public_exponent.as_bytes(), bits_e)
+            .map_err(|_| key_malformed)?;
+        let e = Option::from(e).ok_or(key_malformed)?;
 
         let d = BoxedUint::from_be_slice(pkcs1_key.private_exponent.as_bytes(), bits)
             .map_err(|_| key_malformed)?;
@@ -98,11 +99,11 @@ impl TryFrom<pkcs8::SubjectPublicKeyInfoRef<'_>> for RsaPublicKey {
         let n = BoxedUint::from_be_slice(pkcs1_key.modulus.as_bytes(), bits)
             .map_err(|_| key_malformed)?;
 
-        // exponent potentially needs padding
-        let mut e_slice = [0u8; 8];
-        let raw_e_slice = pkcs1_key.public_exponent.as_bytes();
-        e_slice[8 - raw_e_slice.len()..].copy_from_slice(raw_e_slice);
-        let e = u64::from_be_bytes(e_slice);
+        let bits_e = u32::try_from(pkcs1_key.public_exponent.as_bytes().len())
+            .map_err(|_| key_malformed)?
+            * 8;
+        let e = BoxedUint::from_be_slice(pkcs1_key.public_exponent.as_bytes(), bits_e)
+            .map_err(|_| key_malformed)?;
 
         RsaPublicKey::new(n, e).map_err(|_| pkcs8::spki::Error::KeyMalformed)
     }

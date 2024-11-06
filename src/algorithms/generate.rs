@@ -12,7 +12,7 @@ use crate::{
 
 pub struct RsaPrivateKeyComponents {
     pub n: Odd<BoxedUint>,
-    pub e: u64,
+    pub e: BoxedUint,
     pub d: BoxedUint,
     pub primes: Vec<BoxedUint>,
 }
@@ -32,7 +32,7 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore>(
     rng: &mut R,
     nprimes: usize,
     bit_size: usize,
-    exp: u64,
+    exp: BoxedUint,
 ) -> Result<RsaPrivateKeyComponents> {
     if nprimes < 2 {
         return Err(Error::NprimesTooSmall);
@@ -100,7 +100,7 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore>(
             continue 'next;
         }
 
-        if let Ok(d) = compute_private_exponent_euler_totient(&primes, exp) {
+        if let Ok(d) = compute_private_exponent_euler_totient(&primes, &exp) {
             n_final = n;
             d_final = d;
             break;
@@ -125,11 +125,13 @@ mod tests {
     #[test]
     fn test_impossible_keys() {
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let exp = BoxedUint::from(EXP);
+
         for i in 0..32 {
-            let _ = generate_multi_prime_key_with_exp(&mut rng, 2, i, EXP);
-            let _ = generate_multi_prime_key_with_exp(&mut rng, 3, i, EXP);
-            let _ = generate_multi_prime_key_with_exp(&mut rng, 4, i, EXP);
-            let _ = generate_multi_prime_key_with_exp(&mut rng, 5, i, EXP);
+            let _ = generate_multi_prime_key_with_exp(&mut rng, 2, i, exp.clone());
+            let _ = generate_multi_prime_key_with_exp(&mut rng, 3, i, exp.clone());
+            let _ = generate_multi_prime_key_with_exp(&mut rng, 4, i, exp.clone());
+            let _ = generate_multi_prime_key_with_exp(&mut rng, 5, i, exp.clone());
         }
     }
 
@@ -138,10 +140,11 @@ mod tests {
             #[test]
             fn $name() {
                 let mut rng = ChaCha8Rng::from_seed([42; 32]);
-
+                let exp = BoxedUint::from(EXP);
                 for _ in 0..10 {
                     let components =
-                        generate_multi_prime_key_with_exp(&mut rng, $multi, $size, EXP).unwrap();
+                        generate_multi_prime_key_with_exp(&mut rng, $multi, $size, exp.clone())
+                            .unwrap();
                     assert_eq!(components.n.bits(), $size);
                     assert_eq!(components.primes.len(), $multi);
                 }
