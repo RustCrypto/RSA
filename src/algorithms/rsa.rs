@@ -19,6 +19,15 @@ use crate::traits::{PrivateKeyParts, PublicKeyParts};
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
 pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> Result<BigUint> {
+    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    {
+        // If we're in the RISC Zero zkVM, try to use its RSA accelerator circuit
+        if *key.e() == BigUint::new(vec![65537]) {
+            return Ok(risc0_circuit_bigint::rsa::modpow_65537(m, key.n())
+                .expect("Unexpected failure to run RSA accelerator"));
+        }
+        // Fall through when the exponent does not match the accelerator
+    }
     Ok(m.modpow(key.e(), key.n()))
 }
 

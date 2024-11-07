@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 pub use ::signature::{
     hazmat::{PrehashSigner, PrehashVerifier},
     DigestSigner, DigestVerifier, Error, Keypair, RandomizedDigestSigner, RandomizedSigner, Result,
