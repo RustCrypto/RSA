@@ -11,56 +11,6 @@ use zeroize::{Zeroize, Zeroizing};
 use crate::errors::{Error, Result};
 use crate::traits::{PrivateKeyParts, PublicKeyParts};
 
-// The number of 32-bit words per element in the risc0 RSA syscalls
-// Must match risc0_zkvm_platform::syscall::rsa::WIDTH_WORDS
-#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-const WIDTH_WORDS: usize = 96;
-
-#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-extern "C" {
-    fn modpow_65537(
-        recv_buf: *mut [u32; WIDTH_WORDS],
-        in_base: *const [u32; WIDTH_WORDS],
-        in_modulus: *const [u32; WIDTH_WORDS],
-    );
-}
-
-#[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
-/// Provides acceleration for ModPow (exponent 65537) in the RISC Zero zkVM
-///
-/// Note that to use this, a dependency on `risc0-circuit-bigint` must be added
-/// to the RISC Zero zkVM guest code calling this even if it is not otherwise
-/// necessary.
-fn risc0_modpow_65537(base: &BigUint, modulus: &BigUint) -> BigUint {
-    // Ensure inputs fill an even number of words
-    let mut base = base.to_bytes_le();
-    if base.len() % 4 != 0 {
-        base.resize(base.len() + (4 - (base.len() % 4)), 0);
-    }
-    let mut modulus = modulus.to_bytes_le();
-    if modulus.len() % 4 != 0 {
-        modulus.resize(modulus.len() + (4 - (modulus.len() % 4)), 0);
-    }
-    let base: [u32; WIDTH_WORDS] = base
-        .chunks(4)
-        .map(|word| u32::from_le_bytes(word.try_into().unwrap()))
-        .collect::<Vec<u32>>()
-        .try_into()
-        .unwrap();
-    let modulus: [u32; WIDTH_WORDS] = modulus
-        .chunks(4)
-        .map(|word| u32::from_le_bytes(word.try_into().unwrap()))
-        .collect::<Vec<u32>>()
-        .try_into()
-        .unwrap();
-    let mut result = [0u32; WIDTH_WORDS];
-    // Safety: Parameters are dereferenceable & aligned
-    unsafe {
-        modpow_65537(&mut result, &base, &modulus);
-    }
-    return BigUint::from_slice(&result);
-}
-
 /// ⚠️ Raw RSA encryption of m with the public key. No padding is performed.
 ///
 /// # ☢️️ WARNING: HAZARDOUS API ☢️
@@ -69,11 +19,11 @@ fn risc0_modpow_65537(base: &BigUint, modulus: &BigUint) -> BigUint {
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
 pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BigUint) -> Result<BigUint> {
-    #[cfg(all(target_os = "zkvm", target_arch = "riscv32"))]
+    #[cfg(target_os = "zkvm")]
     {
-        // If we're in the RISC Zero zkVM, try to use its RSA accelerator circuit
+        // If we're in the RISC Zero zkVM, try to use an accelerated version.
         if *key.e() == BigUint::new(vec![65537]) {
-            return Ok(risc0_modpow_65537(m, key.n()));
+            return Ok(risc0_bigint2::rsa::modpow_65537(m, key.n()));
         }
         // Fall through when the exponent does not match the accelerator
     }
