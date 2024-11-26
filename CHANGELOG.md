@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.7 (2024-11-26)
+### Fixed
+- always validate keys in from_components
+- do not crash when handling tiny keys in PKCS1v15
+
 ## 0.9.6 (2023-12-01)
 ### Added
 - expose a `pss::get_default_pss_signature_algo_id` helper ([#393])
