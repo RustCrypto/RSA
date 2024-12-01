@@ -54,14 +54,17 @@ impl Oaep {
     /// ```
     /// use sha1::Sha1;
     /// use sha2::Sha256;
-    /// use rsa::{BigUint, RsaPublicKey, Oaep, };
+    /// use rsa::{RsaPublicKey, Oaep};
     /// use base64ct::{Base64, Encoding};
+    /// use crypto_bigint::BoxedUint;
     ///
-    /// let n = Base64::decode_vec("ALHgDoZmBQIx+jTmgeeHW6KsPOrj11f6CvWsiRleJlQpW77AwSZhd21ZDmlTKfaIHBSUxRUsuYNh7E2SHx8rkFVCQA2/gXkZ5GK2IUbzSTio9qXA25MWHvVxjMfKSL8ZAxZyKbrG94FLLszFAFOaiLLY8ECs7g+dXOriYtBwLUJK+lppbd+El+8ZA/zH0bk7vbqph5pIoiWggxwdq3mEz4LnrUln7r6dagSQzYErKewY8GADVpXcq5mfHC1xF2DFBub7bFjMVM5fHq7RK+pG5xjNDiYITbhLYrbVv3X0z75OvN0dY49ITWjM7xyvMWJXVJS7sJlgmCCL6RwWgP8PhcE=").unwrap();
-    /// let e = Base64::decode_vec("AQAB").unwrap();
+    /// let n_bytes = Base64::decode_vec("seAOhmYFAjH6NOaB54dboqw86uPXV/oK9ayJGV4mVClbvsDBJmF3bVkOaVMp9ogcFJTFFSy5g2HsTZIfHyuQVUJADb+BeRnkYrYhRvNJOKj2pcDbkxYe9XGMx8pIvxkDFnIpusb3gUsuzMUAU5qIstjwQKzuD51c6uJi0HAtQkr6Wmlt34SX7xkD/MfRuTu9uqmHmkiiJaCDHB2reYTPguetSWfuvp1qBJDNgSsp7BjwYANWldyrmZ8cLXEXYMUG5vtsWMxUzl8ertEr6kbnGM0OJghNuEtittW/dfTPvk683R1jj0hNaMzvHK8xYldUlLuwmWCYIIvpHBaA/w+FwQ==").unwrap();
+    /// let e_bytes = Base64::decode_vec("AQAB").unwrap();
+    /// let n = BoxedUint::from_be_slice(&n_bytes, 2048).unwrap();
+    /// let e = BoxedUint::from_be_slice(&e_bytes, 32).unwrap();
     ///
     /// let mut rng = rand::thread_rng();
-    /// let key = RsaPublicKey::new(BigUint::from_bytes_be(&n), BigUint::from_bytes_be(&e)).unwrap();
+    /// let key = RsaPublicKey::new(n, e).unwrap();
     /// let padding = Oaep::new::<Sha256>();
     /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();
     /// ```
@@ -91,14 +94,17 @@ impl Oaep {
     /// ```
     /// use sha1::Sha1;
     /// use sha2::Sha256;
-    /// use rsa::{BigUint, RsaPublicKey, Oaep, };
+    /// use rsa::{RsaPublicKey, Oaep};
     /// use base64ct::{Base64, Encoding};
+    /// use crypto_bigint::BoxedUint;
     ///
-    /// let n = Base64::decode_vec("ALHgDoZmBQIx+jTmgeeHW6KsPOrj11f6CvWsiRleJlQpW77AwSZhd21ZDmlTKfaIHBSUxRUsuYNh7E2SHx8rkFVCQA2/gXkZ5GK2IUbzSTio9qXA25MWHvVxjMfKSL8ZAxZyKbrG94FLLszFAFOaiLLY8ECs7g+dXOriYtBwLUJK+lppbd+El+8ZA/zH0bk7vbqph5pIoiWggxwdq3mEz4LnrUln7r6dagSQzYErKewY8GADVpXcq5mfHC1xF2DFBub7bFjMVM5fHq7RK+pG5xjNDiYITbhLYrbVv3X0z75OvN0dY49ITWjM7xyvMWJXVJS7sJlgmCCL6RwWgP8PhcE=").unwrap();
-    /// let e = Base64::decode_vec("AQAB").unwrap();
+    /// let n_bytes = Base64::decode_vec("seAOhmYFAjH6NOaB54dboqw86uPXV/oK9ayJGV4mVClbvsDBJmF3bVkOaVMp9ogcFJTFFSy5g2HsTZIfHyuQVUJADb+BeRnkYrYhRvNJOKj2pcDbkxYe9XGMx8pIvxkDFnIpusb3gUsuzMUAU5qIstjwQKzuD51c6uJi0HAtQkr6Wmlt34SX7xkD/MfRuTu9uqmHmkiiJaCDHB2reYTPguetSWfuvp1qBJDNgSsp7BjwYANWldyrmZ8cLXEXYMUG5vtsWMxUzl8ertEr6kbnGM0OJghNuEtittW/dfTPvk683R1jj0hNaMzvHK8xYldUlLuwmWCYIIvpHBaA/w+FwQ==").unwrap();
+    /// let e_bytes = Base64::decode_vec("AQAB").unwrap();
+    /// let n = BoxedUint::from_be_slice(&n_bytes, 2048).unwrap();
+    /// let e = BoxedUint::from_be_slice(&e_bytes, 32).unwrap();
     ///
     /// let mut rng = rand::thread_rng();
-    /// let key = RsaPublicKey::new(BigUint::from_bytes_be(&n), BigUint::from_bytes_be(&e)).unwrap();
+    /// let key = RsaPublicKey::new(n, e).unwrap();
     /// let padding = Oaep::new_with_mgf_hash::<Sha256, Sha1>();
     /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();
     /// ```
