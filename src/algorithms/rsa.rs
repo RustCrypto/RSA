@@ -166,7 +166,7 @@ fn blind<R: CryptoRngCore, K: PublicKeyParts>(
 
     let blinded = {
         // r^e (mod n)
-        let mut rpowe = pow_mod_params(&r, &key.e(), n_params.clone());
+        let mut rpowe = pow_mod_params(&r, key.e(), n_params.clone());
         // c * r^e (mod n)
         let c = mul_mod_params(c, &rpowe, n_params.clone());
         rpowe.zeroize();
