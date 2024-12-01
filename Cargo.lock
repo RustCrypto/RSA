@@ -514,6 +514,7 @@ dependencies = [
  "crypto-primes",
  "digest",
  "hex-literal",
+ "libm",
  "pkcs1",
  "pkcs8",
  "proptest",

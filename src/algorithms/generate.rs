@@ -42,7 +42,10 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore>(
         let prime_limit = (1u64 << (bit_size / nprimes) as u64) as f64;
 
         // pi aproximates the number of primes less than prime_limit
+        #[cfg(feature = "std")]
         let mut pi = prime_limit / (prime_limit.ln() - 1f64);
+        #[cfg(not(feature = "std"))]
+        let mut pi = prime_limit / (libm::logf(prime_limit as f32) as f64 - 1f64);
         // Generated primes start with 0b11, so we can only use a quarter of them.
         pi /= 4f64;
         // Use a factor of two to ensure that key generation terminates in a
