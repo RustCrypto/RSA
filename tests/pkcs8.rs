@@ -1,5 +1,20 @@
 //! PKCS#8 encoding tests
 
+use crypto_bigint::BoxedUint;
+use hex_literal::hex;
+use rsa::{
+    pkcs1v15,
+    pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
+    pss,
+    traits::{PrivateKeyParts, PublicKeyParts},
+    RsaPrivateKey, RsaPublicKey,
+};
+use sha2::Sha256;
+use subtle::ConstantTimeEq;
+
+#[cfg(feature = "pem")]
+use rsa::pkcs8::LineEnding;
+
 /// RSA-2048 PKCS#8 private key encoded as ASN.1 DER
 const RSA_2048_PRIV_DER: &[u8] = include_bytes!("examples/pkcs8/rsa2048-priv.der");
 
@@ -19,24 +34,6 @@ const RSA_2048_PSS_PRIV_DER: &[u8] = include_bytes!("examples/pkcs8/rsa2048-rfc9
 
 /// RSA-2048 PSS PKCS#8 public key encoded as DER
 const RSA_2048_PSS_PUB_DER: &[u8] = include_bytes!("examples/pkcs8/rsa2048-rfc9421-pub.der");
-
-use hex_literal::hex;
-use rsa::{
-    pkcs1v15,
-    pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
-    pss,
-    traits::{PrivateKeyParts, PublicKeyParts},
-    RsaPrivateKey, RsaPublicKey,
-};
-use sha2::Sha256;
-
-#[cfg(feature = "pem")]
-use rsa::pkcs8::LineEnding;
-
-#[cfg(test)]
-use crypto_bigint::BoxedUint;
-#[cfg(test)]
-use subtle::ConstantTimeEq;
 
 #[test]
 fn decode_rsa2048_priv_der() {

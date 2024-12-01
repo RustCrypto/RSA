@@ -1,11 +1,13 @@
 //! PKCS#1 encoding tests
 
+use crypto_bigint::BoxedUint;
 use hex_literal::hex;
 use rsa::{
     pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},
     traits::{PrivateKeyParts, PublicKeyParts},
     RsaPrivateKey, RsaPublicKey,
 };
+use subtle::ConstantTimeEq;
 
 #[cfg(feature = "pem")]
 use rsa::pkcs1::LineEnding;
@@ -43,11 +45,6 @@ const RSA_2048_PUB_PEM: &str = include_str!("examples/pkcs1/rsa2048-pub.pem");
 /// RSA-4096 PKCS#1 public key encoded as PEM
 #[cfg(feature = "pem")]
 const RSA_4096_PUB_PEM: &str = include_str!("examples/pkcs1/rsa4096-pub.pem");
-
-#[cfg(test)]
-use crypto_bigint::BoxedUint;
-#[cfg(test)]
-use subtle::ConstantTimeEq;
 
 #[test]
 fn decode_rsa2048_priv_der() {

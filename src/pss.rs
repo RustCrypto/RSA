@@ -257,7 +257,7 @@ where
     })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "pem"))]
 mod test {
     use crate::pss::{BlindedSigningKey, Pss, Signature, SigningKey, VerifyingKey};
     use crate::{RsaPrivateKey, RsaPublicKey};
