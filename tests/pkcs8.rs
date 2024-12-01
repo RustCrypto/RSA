@@ -33,6 +33,11 @@ use sha2::Sha256;
 #[cfg(feature = "pem")]
 use rsa::pkcs8::LineEnding;
 
+#[cfg(test)]
+use crypto_bigint::BoxedUint;
+#[cfg(test)]
+use subtle::ConstantTimeEq;
+
 #[test]
 fn decode_rsa2048_priv_der() {
     let key = RsaPrivateKey::from_pkcs8_der(RSA_2048_PRIV_DER).unwrap();
@@ -51,7 +56,8 @@ fn decode_rsa2048_priv_der() {
             "90B44E3E095FA37058EA25B13F5E295CBEAC6DE838AB8C50AF61E298975B872F"
         )
     );
-    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
+    let expected_e = BoxedUint::from_be_slice(&hex!("010001"), 32).unwrap();
+    assert!(bool::from(key.e().ct_eq(&expected_e)));
     assert_eq!(
         &key.d().to_be_bytes()[..],
         &hex!(
@@ -65,24 +71,21 @@ fn decode_rsa2048_priv_der() {
             "ABEB359CA2025268D004F9D66EB3D6F7ADC1139BAD40F16DDE639E11647376C1"
         )
     );
-    assert_eq!(
-        &key.primes()[0].to_be_bytes()[..],
-        &hex!(
-            "DCC061242D4E92AFAEE72AC513CA65B9F77036F9BD7E0E6E61461A7EF7654225"
-            "EC153C7E5C31A6157A6E5A13FF6E178E8758C1CB33D9D6BBE3179EF18998E422"
-            "ECDCBED78F4ECFDBE5F4FCD8AEC2C9D0DC86473CA9BD16D9D238D21FB5DDEFBE"
-            "B143CA61D0BD6AA8D91F33A097790E9640DBC91085DC5F26343BA3138F6B2D67"
-        )
-    );
-    assert_eq!(
-        &key.primes()[1].to_be_bytes()[..],
-        &hex!(
-            "D3F314757E40E954836F92BE24236AF2F0DA04A34653C180AF67E960086D93FD"
-            "E65CB23EFD9D09374762F5981E361849AF68CDD75394FF6A4E06EB69B209E422"
-            "8DB2DFA70E40F7F9750A528176647B788D0E5777A2CB8B22E3CD267FF70B4F3B"
-            "02D3AAFB0E18C590A564B03188B0AA5FC48156B07622214243BD1227EFA7F2F9"
-        )
-    );
+    let expected_prime = BoxedUint::from_be_slice(&hex!(
+        "DCC061242D4E92AFAEE72AC513CA65B9F77036F9BD7E0E6E61461A7EF7654225"
+        "EC153C7E5C31A6157A6E5A13FF6E178E8758C1CB33D9D6BBE3179EF18998E422"
+        "ECDCBED78F4ECFDBE5F4FCD8AEC2C9D0DC86473CA9BD16D9D238D21FB5DDEFBE"
+        "B143CA61D0BD6AA8D91F33A097790E9640DBC91085DC5F26343BA3138F6B2D67"
+    ), 1024).unwrap();
+    assert!(bool::from(key.primes()[0].ct_eq(&expected_prime)));
+
+    let expected_prime = BoxedUint::from_be_slice(&hex!(
+        "D3F314757E40E954836F92BE24236AF2F0DA04A34653C180AF67E960086D93FD"
+        "E65CB23EFD9D09374762F5981E361849AF68CDD75394FF6A4E06EB69B209E422"
+        "8DB2DFA70E40F7F9750A528176647B788D0E5777A2CB8B22E3CD267FF70B4F3B"
+        "02D3AAFB0E18C590A564B03188B0AA5FC48156B07622214243BD1227EFA7F2F9"
+    ), 1024).unwrap();
+    assert!(bool::from(key.primes()[1].ct_eq(&expected_prime)));
 
     let _ = pkcs1v15::SigningKey::<Sha256>::from_pkcs8_der(RSA_2048_PRIV_DER).unwrap();
 }
@@ -105,7 +108,8 @@ fn decode_rsa2048_pub_der() {
             "90B44E3E095FA37058EA25B13F5E295CBEAC6DE838AB8C50AF61E298975B872F"
         )
     );
-    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
+    let expected_e = BoxedUint::from_be_slice(&hex!("010001"), 128).unwrap();
+    assert!(bool::from(key.e().ct_eq(&expected_e)));
 
     let _ = pkcs1v15::VerifyingKey::<Sha256>::from_public_key_der(RSA_2048_PUB_DER).unwrap();
 }
@@ -128,7 +132,8 @@ fn decode_rsa2048_pss_priv_der() {
 
         )
     );
-    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
+    let expected_e = BoxedUint::from_be_slice(&hex!("010001"), 128).unwrap();
+    assert!(bool::from(key.e().ct_eq(&expected_e)));
     assert_eq!(
         &key.d().to_be_bytes()[..],
         &hex!(
@@ -142,25 +147,21 @@ fn decode_rsa2048_pss_priv_der() {
             "3783DA6236A07A0F332003D30748EC1C12556D7CA7587E8E07DCE1D95EC4A611"
         )
     );
-    assert_eq!(
-        &key.primes()[0].to_be_bytes()[..],
-        &hex!(
-            "E55FBA212239C846821579BE7E4D44336C700167A478F542032BEBF506D39453"
-            "82670B7D5B08D48E1B4A46EB22E54ABE21867FB6AD96444E00B386FF14710CB6"
-            "9D80111E3721CBE65CFA8A141A1492D5434BB7538481EBB27462D54EDD1EA55D"
-            "C2230431EE63C4A3609EC28BA67ABEE0DCA1A12E8E796BB5485A331BD27DC509"
+    let expected_prime = BoxedUint::from_be_slice(&hex!(
+        "E55FBA212239C846821579BE7E4D44336C700167A478F542032BEBF506D39453"
+        "82670B7D5B08D48E1B4A46EB22E54ABE21867FB6AD96444E00B386FF14710CB6"
+        "9D80111E3721CBE65CFA8A141A1492D5434BB7538481EBB27462D54EDD1EA55D"
+        "C2230431EE63C4A3609EC28BA67ABEE0DCA1A12E8E796BB5485A331BD27DC509"
+    ), 1024).unwrap();
+    assert!(bool::from(key.primes()[0].ct_eq(&expected_prime)));
 
-        )
-    );
-    assert_eq!(
-        &key.primes()[1].to_be_bytes()[..],
-        &hex!(
-            "C3EC0875ED7B5B96340A9869DD9674B8CF0E52AD4092B57620A6AEA981DA0F10"
-            "13DF610CE1C8B630C111DA7214128E20FF8DA55B4CD8A2E145A8E370BF4F87C8"
-            "EB203E9752A8A442E562E09F455769B8DA35CCBA2A134F5DE274020B6A7620F0"
-            "3DE276FCBFDE2B0356438DD17DD40152AB80C1277B4849A643CB158AA07ADBC3"
-        )
-    );
+    let expected_prime = BoxedUint::from_be_slice(&hex!(
+        "C3EC0875ED7B5B96340A9869DD9674B8CF0E52AD4092B57620A6AEA981DA0F10"
+        "13DF610CE1C8B630C111DA7214128E20FF8DA55B4CD8A2E145A8E370BF4F87C8"
+        "EB203E9752A8A442E562E09F455769B8DA35CCBA2A134F5DE274020B6A7620F0"
+        "3DE276FCBFDE2B0356438DD17DD40152AB80C1277B4849A643CB158AA07ADBC3"
+    ), 1024).unwrap();
+    assert!(bool::from(key.primes()[1].ct_eq(&expected_prime)));
 
     let _ = pss::SigningKey::<Sha256>::from_pkcs8_der(RSA_2048_PSS_PRIV_DER).unwrap();
 }
@@ -182,7 +183,8 @@ fn decode_rsa2048_pss_pub_der() {
             "D502F266FB17433A9F4B08D08DE3C576A670CE90557AF94F67579A3273A5C8DB"
         )
     );
-    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
+    let expected_e = BoxedUint::from_be_slice(&hex!("010001"), 128).unwrap();
+    assert!(bool::from(key.e().ct_eq(&expected_e)));
 
     let _ = pss::VerifyingKey::<Sha256>::from_public_key_der(RSA_2048_PSS_PUB_DER).unwrap();
 }
@@ -229,7 +231,8 @@ fn decode_rsa2048_priv_pem() {
             "90B44E3E095FA37058EA25B13F5E295CBEAC6DE838AB8C50AF61E298975B872F"
         )
     );
-    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
+    let expected_e = BoxedUint::from_be_slice(&hex!("010001"), 128).unwrap();
+    assert!(bool::from(key.e().ct_eq(&expected_e)));
     assert_eq!(
         &key.d().to_be_bytes()[..],
         &hex!(
@@ -243,24 +246,21 @@ fn decode_rsa2048_priv_pem() {
             "ABEB359CA2025268D004F9D66EB3D6F7ADC1139BAD40F16DDE639E11647376C1"
         )
     );
-    assert_eq!(
-        &key.primes()[0].to_be_bytes()[..],
-        &hex!(
-            "DCC061242D4E92AFAEE72AC513CA65B9F77036F9BD7E0E6E61461A7EF7654225"
-            "EC153C7E5C31A6157A6E5A13FF6E178E8758C1CB33D9D6BBE3179EF18998E422"
-            "ECDCBED78F4ECFDBE5F4FCD8AEC2C9D0DC86473CA9BD16D9D238D21FB5DDEFBE"
-            "B143CA61D0BD6AA8D91F33A097790E9640DBC91085DC5F26343BA3138F6B2D67"
-        )
-    );
-    assert_eq!(
-        &key.primes()[1].to_be_bytes()[..],
-        &hex!(
-            "D3F314757E40E954836F92BE24236AF2F0DA04A34653C180AF67E960086D93FD"
-            "E65CB23EFD9D09374762F5981E361849AF68CDD75394FF6A4E06EB69B209E422"
-            "8DB2DFA70E40F7F9750A528176647B788D0E5777A2CB8B22E3CD267FF70B4F3B"
-            "02D3AAFB0E18C590A564B03188B0AA5FC48156B07622214243BD1227EFA7F2F9"
-        )
-    );
+    let expected_prime = BoxedUint::from_be_slice(&hex!(
+        "DCC061242D4E92AFAEE72AC513CA65B9F77036F9BD7E0E6E61461A7EF7654225"
+        "EC153C7E5C31A6157A6E5A13FF6E178E8758C1CB33D9D6BBE3179EF18998E422"
+        "ECDCBED78F4ECFDBE5F4FCD8AEC2C9D0DC86473CA9BD16D9D238D21FB5DDEFBE"
+        "B143CA61D0BD6AA8D91F33A097790E9640DBC91085DC5F26343BA3138F6B2D67"
+    ), 1024).unwrap();
+    assert!(bool::from(key.primes()[0].ct_eq(&expected_prime)));
+
+    let expected_prime = BoxedUint::from_be_slice(&hex!(
+        "D3F314757E40E954836F92BE24236AF2F0DA04A34653C180AF67E960086D93FD"
+        "E65CB23EFD9D09374762F5981E361849AF68CDD75394FF6A4E06EB69B209E422"
+        "8DB2DFA70E40F7F9750A528176647B788D0E5777A2CB8B22E3CD267FF70B4F3B"
+        "02D3AAFB0E18C590A564B03188B0AA5FC48156B07622214243BD1227EFA7F2F9"
+    ), 1024).unwrap();
+    assert!(bool::from(key.primes()[1].ct_eq(&expected_prime)));
 
     let _ = pkcs1v15::SigningKey::<Sha256>::from_pkcs8_pem(RSA_2048_PRIV_PEM).unwrap();
 }
@@ -284,7 +284,8 @@ fn decode_rsa2048_pub_pem() {
             "90B44E3E095FA37058EA25B13F5E295CBEAC6DE838AB8C50AF61E298975B872F"
         )
     );
-    assert_eq!(&key.e().to_be_bytes()[..], &hex!("010001"));
+    let expected_e = BoxedUint::from_be_slice(&hex!("010001"), 128).unwrap();
+    assert!(bool::from(key.e().ct_eq(&expected_e)));
 
     let _ = pkcs1v15::VerifyingKey::<Sha256>::from_public_key_pem(RSA_2048_PUB_PEM).unwrap();
 }
