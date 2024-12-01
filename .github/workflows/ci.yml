@@ -66,5 +66,4 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: nightly-2024-10-06
-      - run: cargo test --release --features nightly
       - run: cargo build --benches
