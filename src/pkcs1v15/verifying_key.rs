@@ -85,7 +85,6 @@ where
             &self.prefix,
             &digest.finalize(),
             &signature.inner,
-            signature.len,
         )
         .map_err(|e| e.into())
     }
@@ -96,14 +95,7 @@ where
     D: Digest,
 {
     fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify(
-            &self.inner,
-            &self.prefix,
-            prehash,
-            &signature.inner,
-            signature.len,
-        )
-        .map_err(|e| e.into())
+        verify(&self.inner, &self.prefix, prehash, &signature.inner).map_err(|e| e.into())
     }
 }
 
@@ -117,7 +109,6 @@ where
             &self.prefix.clone(),
             &D::digest(msg),
             &signature.inner,
-            signature.len,
         )
         .map_err(|e| e.into())
     }
@@ -265,7 +256,7 @@ mod tests {
         let verifying_key = VerifyingKey::<Sha256>::new(pub_key);
 
         let tokens = [Token::Str(
-            "3024300d06092a864886f70d01010105000313003010020900cc6c6130e35b46bf0203010001",
+            "3024300d06092a864886f70d01010105000313003010020900aaadacc31e2e51190203010001",
         )];
 
         assert_tokens(&verifying_key.readable(), &tokens);

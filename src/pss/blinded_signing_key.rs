@@ -56,13 +56,13 @@ where
     /// Create a new random RSASSA-PSS signing key which produces "blinded"
     /// signatures.
     /// Digest output size is used as a salt length.
-    pub fn random<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random<R: CryptoRngCore>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Self::random_with_salt_len(rng, bit_size, <D as Digest>::output_size())
     }
 
     /// Create a new random RSASSA-PSS signing key which produces "blinded"
     /// signatures with a salt of the given length.
-    pub fn random_with_salt_len<R: CryptoRngCore + ?Sized>(
+    pub fn random_with_salt_len<R: CryptoRngCore>(
         rng: &mut R,
         bit_size: usize,
         salt_len: usize,
@@ -267,7 +267,7 @@ mod tests {
         );
 
         let tokens = [
-            Token::Str("3054020100300d06092a864886f70d01010105000440303e020100020900cc6c6130e35b46bf0203010001020863de1ac858580019020500f65cff5d020500d46b68cb02046d9a09f102047b4e3a4f020500f45065cc")
+            Token::Str("3054020100300d06092a864886f70d01010105000440303e020100020900aaadacc31e2e5119020301000102087e1710295cb2ba81020500b21fdf97020500f54c6acf02040b862461020463ed8f8d0205008bb00f5f")
         ];
         assert_tokens(&signing_key.readable(), &tokens);
     }

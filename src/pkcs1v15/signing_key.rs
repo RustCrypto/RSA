@@ -49,7 +49,7 @@ where
     }
 
     /// Generate a new signing key with a prefix for the digest `D`.
-    pub fn random<R: CryptoRngCore + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random<R: CryptoRngCore>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
             prefix: pkcs1v15_generate_prefix::<D>(),
@@ -65,10 +65,7 @@ where
 
     /// Generate a new signing key with a prefix for the digest `D`.
     #[deprecated(since = "0.9.0", note = "use SigningKey::random instead")]
-    pub fn random_with_prefix<R: CryptoRngCore + ?Sized>(
-        rng: &mut R,
-        bit_size: usize,
-    ) -> Result<Self> {
+    pub fn random_with_prefix<R: CryptoRngCore>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Self::random(rng, bit_size)
     }
 }
@@ -91,10 +88,7 @@ where
     }
 
     /// Generate a new signing key with an empty prefix.
-    pub fn random_unprefixed<R: CryptoRngCore + ?Sized>(
-        rng: &mut R,
-        bit_size: usize,
-    ) -> Result<Self> {
+    pub fn random_unprefixed<R: CryptoRngCore>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
             prefix: Vec::new(),
@@ -315,7 +309,7 @@ mod tests {
         let signing_key = SigningKey::<Sha256>::new(priv_key);
 
         let tokens = [
-            Token::Str("3054020100300d06092a864886f70d01010105000440303e020100020900cc6c6130e35b46bf0203010001020863de1ac858580019020500f65cff5d020500d46b68cb02046d9a09f102047b4e3a4f020500f45065cc")
+            Token::Str("3054020100300d06092a864886f70d01010105000440303e020100020900aaadacc31e2e5119020301000102087e1710295cb2ba81020500b21fdf97020500f54c6acf02040b862461020463ed8f8d0205008bb00f5f")
         ];
 
         assert_tokens(&signing_key.readable(), &tokens);

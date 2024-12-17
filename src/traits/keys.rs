@@ -1,53 +1,70 @@
 //! Traits related to the key components
 
-use num_bigint::{BigInt, BigUint};
+use crypto_bigint::{
+    modular::{BoxedMontyForm, BoxedMontyParams},
+    BoxedUint, NonZero,
+};
 use zeroize::Zeroize;
 
 /// Components of an RSA public key.
 pub trait PublicKeyParts {
     /// Returns the modulus of the key.
-    fn n(&self) -> &BigUint;
+    fn n(&self) -> &NonZero<BoxedUint>;
 
     /// Returns the public exponent of the key.
-    fn e(&self) -> &BigUint;
+    fn e(&self) -> &BoxedUint;
 
     /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
     /// or by this public key will have the same size.
     fn size(&self) -> usize {
-        (self.n().bits() + 7) / 8
+        (self.n().bits() as usize + 7) / 8
+    }
+
+    /// Returns the parameters for montgomery operations.
+    fn n_params(&self) -> &BoxedMontyParams;
+
+    /// Returns precision (in bits) of `n`.
+    fn n_bits_precision(&self) -> u32 {
+        self.n().bits_precision()
     }
 }
 
 /// Components of an RSA private key.
 pub trait PrivateKeyParts: PublicKeyParts {
     /// Returns the private exponent of the key.
-    fn d(&self) -> &BigUint;
+    fn d(&self) -> &BoxedUint;
 
     /// Returns the prime factors.
-    fn primes(&self) -> &[BigUint];
+    fn primes(&self) -> &[BoxedUint];
 
     /// Returns the precomputed dp value, D mod (P-1)
-    fn dp(&self) -> Option<&BigUint>;
+    fn dp(&self) -> Option<&BoxedUint>;
 
     /// Returns the precomputed dq value, D mod (Q-1)
-    fn dq(&self) -> Option<&BigUint>;
+    fn dq(&self) -> Option<&BoxedUint>;
 
     /// Returns the precomputed qinv value, Q^-1 mod P
-    fn qinv(&self) -> Option<&BigInt>;
+    fn qinv(&self) -> Option<&BoxedMontyForm>;
 
     /// Returns an iterator over the CRT Values
     fn crt_values(&self) -> Option<&[CrtValue]>;
+
+    /// Returns the params for `p` if precomupted.
+    fn p_params(&self) -> Option<&BoxedMontyParams>;
+
+    /// Returns the params for `q` if precomupted.
+    fn q_params(&self) -> Option<&BoxedMontyParams>;
 }
 
 /// Contains the precomputed Chinese remainder theorem values.
 #[derive(Debug, Clone)]
 pub struct CrtValue {
     /// D mod (prime - 1)
-    pub(crate) exp: BigInt,
+    pub(crate) exp: BoxedUint,
     /// R·Coeff ≡ 1 mod Prime.
-    pub(crate) coeff: BigInt,
+    pub(crate) coeff: BoxedUint,
     /// product of primes prior to this (inc p and q)
-    pub(crate) r: BigInt,
+    pub(crate) r: BoxedUint,
 }
 
 impl Zeroize for CrtValue {
