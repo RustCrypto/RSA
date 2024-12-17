@@ -58,6 +58,7 @@ pem = ["pkcs1/pem", "pkcs8/pem"]
 pkcs5 = ["pkcs8/encryption"]
 u64_digit = ["num-bigint/u64_digit"]
 std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std", "signature/std"]
+uncheck_modulus_size = []
 
 [package.metadata.docs.rs]
 features = ["std", "pem", "serde", "hazmat", "sha2"]
