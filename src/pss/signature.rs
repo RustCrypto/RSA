@@ -35,8 +35,13 @@ impl TryFrom<&[u8]> for Signature {
 
     fn try_from(bytes: &[u8]) -> signature::Result<Self> {
         let len = bytes.len();
-        let inner = BoxedUint::from_be_slice(bytes, len as u32 * 8)
+        let inner = BoxedUint::from_be_slice(bytes, len as u32 * 8);
+
+        #[cfg(feature = "std")]
+        let inner = inner
             .map_err(|e| Box::new(e) as Box<dyn core::error::Error + Send + Sync + 'static>)?;
+        #[cfg(not(feature = "std"))]
+        let inner = inner.map_err(|_| signature::Error::new())?;
 
         Ok(Self { inner })
     }
