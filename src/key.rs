@@ -31,13 +31,14 @@ pub struct RsaPublicKey {
     /// Public exponent: power to which a plaintext message is raised in
     /// order to encrypt it.
     ///
-    /// Typically 0x10001 (65537)
+    /// Typically `0x10001` (`65537`)
     e: BoxedUint,
 
     n_params: BoxedMontyParams,
 }
 
 impl Eq for RsaPublicKey {}
+
 impl PartialEq for RsaPublicKey {
     #[inline]
     fn eq(&self, other: &RsaPublicKey) -> bool {
@@ -63,7 +64,7 @@ pub struct RsaPrivateKey {
     pub(crate) d: BoxedUint,
     /// Prime factors of N, contains >= 2 elements.
     pub(crate) primes: Vec<BoxedUint>,
-    /// precomputed values to speed up private operations
+    /// Precomputed values to speed up private operations
     pub(crate) precomputed: Option<PrecomputedValues>,
 }
 
@@ -110,14 +111,21 @@ pub(crate) struct PrecomputedValues {
     /// Q^-1 mod P
     pub(crate) qinv: BoxedMontyForm,
 
+    /// Montgomery params for `p`
     pub(crate) p_params: BoxedMontyParams,
+    /// Montgomery params for `q`
     pub(crate) q_params: BoxedMontyParams,
 }
+
+impl ZeroizeOnDrop for PrecomputedValues {}
 
 impl Zeroize for PrecomputedValues {
     fn zeroize(&mut self) {
         self.dp.zeroize();
         self.dq.zeroize();
+        // TODO: once these have landed in crypto-bigint
+        // self.p_params.zeroize();
+        // self.q_params.zeroize();
     }
 }
 
@@ -141,7 +149,7 @@ impl From<&RsaPrivateKey> for RsaPublicKey {
         RsaPublicKey {
             n: n.clone(),
             e: e.clone(),
-            n_params,
+            n_params: n_params.clone(),
         }
     }
 }
@@ -155,8 +163,8 @@ impl PublicKeyParts for RsaPublicKey {
         &self.e
     }
 
-    fn n_params(&self) -> BoxedMontyParams {
-        self.n_params.clone()
+    fn n_params(&self) -> &BoxedMontyParams {
+        &self.n_params
     }
 }
 
@@ -204,7 +212,9 @@ impl RsaPublicKey {
     pub fn new_with_max_size(n: BoxedUint, e: BoxedUint, max_size: usize) -> Result<Self> {
         check_public_with_max_size(&n, &e, max_size)?;
 
-        let n_odd = Odd::new(n.clone()).unwrap();
+        let n_odd = Odd::new(n.clone())
+            .into_option()
+            .ok_or(Error::InvalidModulus)?;
         let n_params = BoxedMontyParams::new(n_odd);
         let n = NonZero::new(n).expect("checked above");
 
@@ -218,9 +228,9 @@ impl RsaPublicKey {
     /// Most applications should use [`RsaPublicKey::new`] or
     /// [`RsaPublicKey::new_with_max_size`] instead.
     pub fn new_unchecked(n: BoxedUint, e: BoxedUint) -> Self {
-        let n_odd = Odd::new(n.clone()).unwrap();
+        let n_odd = Odd::new(n.clone()).expect("n must be odd");
         let n_params = BoxedMontyParams::new(n_odd);
-        let n = NonZero::new(n).unwrap();
+        let n = NonZero::new(n).expect("odd numbers are non zero");
 
         Self { n, e, n_params }
     }
@@ -235,8 +245,8 @@ impl PublicKeyParts for RsaPrivateKey {
         &self.pubkey_components.e
     }
 
-    fn n_params(&self) -> BoxedMontyParams {
-        self.pubkey_components.n_params.clone()
+    fn n_params(&self) -> &BoxedMontyParams {
+        &self.pubkey_components.n_params
     }
 }
 
@@ -282,17 +292,20 @@ impl RsaPrivateKey {
         mut primes: Vec<BoxedUint>,
     ) -> Result<RsaPrivateKey> {
         let n_params = BoxedMontyParams::new(n.clone());
-        let n_c = NonZero::new(n.as_ref().clone()).unwrap();
+        let n_c = NonZero::new(n.get())
+            .into_option()
+            .ok_or(Error::InvalidModulus)?;
 
-        if primes.len() < 2 {
-            if !primes.is_empty() {
-                return Err(Error::NprimesTooSmall);
+        match primes.len() {
+            0 => {
+                // Recover `p` and `q` from `d`.
+                // See method in Appendix C.2: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf
+                let (p, q) = recover_primes(&n_c, &e, &d)?;
+                primes.push(p);
+                primes.push(q);
             }
-            // Recover `p` and `q` from `d`.
-            // See method in Appendix C.2: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf
-            let (p, q) = recover_primes(&n_c, &e, &d)?;
-            primes.push(p);
-            primes.push(q);
+            1 => return Err(Error::NprimesTooSmall),
+            _ => {}
         }
 
         let mut k = RsaPrivateKey {
@@ -309,8 +322,8 @@ impl RsaPrivateKey {
         // Alaways validate the key, to ensure precompute can't fail
         k.validate()?;
 
-        // precompute when possible, ignore error otherwise.
-        let _ = k.precompute();
+        // Precompute when possible, ignore error otherwise.
+        k.precompute().ok();
 
         Ok(k)
     }
@@ -330,10 +343,11 @@ impl RsaPrivateKey {
             return Err(Error::InvalidPrime);
         }
 
-        let n = compute_modulus(&[p.clone(), q.clone()]);
         let d = compute_private_exponent_carmicheal(&p, &q, &public_exponent)?;
+        let primes = vec![p, q];
+        let n = compute_modulus(&primes);
 
-        Self::from_components(n, public_exponent, d, vec![p, q])
+        Self::from_components(n, public_exponent, d, primes)
     }
 
     /// Constructs an RSA key pair from its primes.
@@ -347,7 +361,7 @@ impl RsaPrivateKey {
             return Err(Error::NprimesTooSmall);
         }
 
-        // Makes sure that primes is pairwise unequal.
+        // Makes sure that the primes are pairwise unequal.
         for (i, prime1) in primes.iter().enumerate() {
             for prime2 in primes.iter().take(i) {
                 if prime1 == prime2 {
@@ -381,25 +395,27 @@ impl RsaPrivateKey {
         let p = self.primes[0].widen(bits);
         let q = self.primes[1].widen(bits);
 
-        // TODO: error handling
-
-        let p_odd = Odd::new(p.clone()).unwrap();
+        let p_odd = Odd::new(p.clone())
+            .into_option()
+            .ok_or(Error::InvalidPrime)?;
         let p_params = BoxedMontyParams::new(p_odd);
-        let q_odd = Odd::new(q.clone()).unwrap();
+        let q_odd = Odd::new(q.clone())
+            .into_option()
+            .ok_or(Error::InvalidPrime)?;
         let q_params = BoxedMontyParams::new(q_odd);
 
-        let x = NonZero::new(p.wrapping_sub(&BoxedUint::one())).unwrap();
+        let x = NonZero::new(p.wrapping_sub(&BoxedUint::one()))
+            .into_option()
+            .ok_or(Error::InvalidPrime)?;
         let dp = d.rem_vartime(&x);
 
-        let x = NonZero::new(q.wrapping_sub(&BoxedUint::one())).unwrap();
+        let x = NonZero::new(q.wrapping_sub(&BoxedUint::one()))
+            .into_option()
+            .ok_or(Error::InvalidPrime)?;
         let dq = d.rem_vartime(&x);
 
         let qinv = BoxedMontyForm::new(q.clone(), p_params.clone());
-        let qinv = qinv.invert();
-        if qinv.is_none().into() {
-            return Err(Error::InvalidPrime);
-        }
-        let qinv = qinv.unwrap();
+        let qinv = qinv.invert().into_option().ok_or(Error::InvalidPrime)?;
 
         debug_assert_eq!(dp.bits_precision(), bits);
         debug_assert_eq!(dq.bits_precision(), bits);
@@ -438,9 +454,10 @@ impl RsaPrivateKey {
 
         // Check that Πprimes == n.
         let mut m = BoxedUint::one_with_precision(self.pubkey_components.n.bits_precision());
+        let one = BoxedUint::one();
         for prime in &self.primes {
             // Any primes ≤ 1 will cause divide-by-zero panics later.
-            if prime < &BoxedUint::one() {
+            if prime < &one {
                 return Err(Error::InvalidPrime);
             }
             m = m.wrapping_mul(prime);
@@ -577,9 +594,9 @@ fn check_public_with_max_size(n: &BoxedUint, e: &BoxedUint, max_size: usize) -> 
     Ok(())
 }
 
-pub(crate) fn reduce(n: &BoxedUint, p: BoxedMontyParams) -> BoxedMontyForm {
+pub(crate) fn reduce(n: &BoxedUint, p: &BoxedMontyParams) -> BoxedMontyForm {
     let bits_precision = p.modulus().bits_precision();
-    let modulus = NonZero::new(p.modulus().as_ref().clone()).unwrap();
+    let modulus = p.modulus().as_nz_ref().clone();
 
     let n = match n.bits_precision().cmp(&bits_precision) {
         Ordering::Less => n.widen(bits_precision),
@@ -588,7 +605,7 @@ pub(crate) fn reduce(n: &BoxedUint, p: BoxedMontyParams) -> BoxedMontyForm {
     };
 
     let n_reduced = n.rem_vartime(&modulus).widen(p.bits_precision());
-    BoxedMontyForm::new(n_reduced, p)
+    BoxedMontyForm::new(n_reduced, p.clone())
 }
 
 #[cfg(feature = "serde")]

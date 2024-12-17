@@ -48,7 +48,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     let bits = d.bits_precision();
 
     let c = if let Some(ref mut rng) = rng {
-        let (blinded, unblinder) = blind(rng, priv_key, c, &n_params);
+        let (blinded, unblinder) = blind(rng, priv_key, c, n_params);
         ir = Some(unblinder);
         blinded.widen(bits)
     } else {
@@ -60,15 +60,15 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
 
     let m = if is_multiprime || !has_precomputes {
         // c^d (mod n)
-        pow_mod_params(&c, d, n_params.clone())
+        pow_mod_params(&c, d, n_params)
     } else {
         // We have the precalculated values needed for the CRT.
 
-        let dp = priv_key.dp().unwrap();
-        let dq = priv_key.dq().unwrap();
-        let qinv = priv_key.qinv().unwrap();
-        let p_params = priv_key.p_params().unwrap();
-        let q_params = priv_key.q_params().unwrap();
+        let dp = priv_key.dp().expect("precomputed");
+        let dq = priv_key.dq().expect("precomputed");
+        let qinv = priv_key.qinv().expect("precomputed");
+        let p_params = priv_key.p_params().expect("precomputed");
+        let q_params = priv_key.q_params().expect("precomputed");
 
         let _p = &priv_key.primes()[0];
         let q = &priv_key.primes()[1];
@@ -166,15 +166,15 @@ fn blind<R: CryptoRngCore, K: PublicKeyParts>(
 
     let blinded = {
         // r^e (mod n)
-        let mut rpowe = pow_mod_params(&r, key.e(), n_params.clone());
+        let mut rpowe = pow_mod_params(&r, key.e(), n_params);
         // c * r^e (mod n)
-        let c = mul_mod_params(c, &rpowe, n_params.clone());
+        let c = mul_mod_params(c, &rpowe, n_params);
         rpowe.zeroize();
 
         c
     };
 
-    let ir = ir.unwrap();
+    let ir = ir.expect("loop exited");
     debug_assert_eq!(blinded.bits_precision(), bits);
     debug_assert_eq!(ir.bits_precision(), bits);
 
@@ -182,7 +182,7 @@ fn blind<R: CryptoRngCore, K: PublicKeyParts>(
 }
 
 /// Given an m and and unblinding factor, unblind the m.
-fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: BoxedMontyParams) -> BoxedUint {
+fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: &BoxedMontyParams) -> BoxedUint {
     // m * r^-1 (mod n)
     debug_assert_eq!(
         m.bits_precision(),
@@ -200,16 +200,16 @@ fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: BoxedMontyParams) -> 
 }
 
 /// Computes `base.pow_mod(exp, n)` with precomputed `n_params`.
-fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: BoxedMontyParams) -> BoxedUint {
+fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: &BoxedMontyParams) -> BoxedUint {
     let base = reduce(base, n_params);
     base.pow(exp).retrieve()
 }
 
 /// Computes `lhs.mul_mod(rhs, n)` with precomputed `n_params`.
-fn mul_mod_params(lhs: &BoxedUint, rhs: &BoxedUint, n_params: BoxedMontyParams) -> BoxedUint {
+fn mul_mod_params(lhs: &BoxedUint, rhs: &BoxedUint, n_params: &BoxedMontyParams) -> BoxedUint {
     // TODO: nicer api in crypto-bigint?
     let lhs = BoxedMontyForm::new(lhs.clone(), n_params.clone());
-    let rhs = BoxedMontyForm::new(rhs.clone(), n_params);
+    let rhs = BoxedMontyForm::new(rhs.clone(), n_params.clone());
     (lhs * rhs).retrieve()
 }
 
@@ -247,11 +247,11 @@ pub fn recover_primes(
 
     // 3. Let b = ( (n – r)/(m + 1) ) + 1; if b is not an integer or b^2 ≤ 4n, then output an error indicator,
     //    and exit without further processing.
-    let modulus_check = (&n - &r) % NonZero::new(&m + &one).unwrap();
+    let modulus_check = (&n - &r) % NonZero::new(&m + &one).expect("adding 1");
     if (!modulus_check.is_zero()).into() {
         return Err(Error::InvalidArguments);
     }
-    let b = ((&n - &r) / NonZero::new(&m + &one).unwrap()) + one;
+    let b = ((&n - &r) / NonZero::new(&m + &one).expect("adding one")) + one;
 
     let four = BoxedUint::from(4u32);
     let four_n = &n * four;
@@ -273,7 +273,9 @@ pub fn recover_primes(
     }
 
     let bits = core::cmp::max(b.bits_precision(), y.bits_precision());
-    let two = NonZero::new(BoxedUint::from(2u64)).unwrap().widen(bits);
+    let two = NonZero::new(BoxedUint::from(2u64))
+        .expect("2 is non zero")
+        .widen(bits);
     let p = (&b + &y) / &two;
     let q = (b - y) / two;
 
@@ -282,11 +284,12 @@ pub fn recover_primes(
 
 /// Compute the modulus of a key from its primes.
 pub(crate) fn compute_modulus(primes: &[BoxedUint]) -> Odd<BoxedUint> {
-    let mut out = primes[0].clone();
-    for p in &primes[1..] {
+    let mut primes = primes.iter();
+    let mut out = primes.next().expect("must at least be one prime").clone();
+    for p in primes {
         out = out * p;
     }
-    Odd::new(out).unwrap()
+    Odd::new(out).expect("modulus must be odd")
 }
 
 /// Compute the private exponent from its primes (p and q) and public exponent
@@ -329,12 +332,13 @@ pub(crate) fn compute_private_exponent_carmicheal(
     q: &BoxedUint,
     exp: &BoxedUint,
 ) -> Result<BoxedUint> {
-    let p1 = p - &BoxedUint::one();
-    let q1 = q - &BoxedUint::one();
+    let one = BoxedUint::one();
+    let p1 = p - &one;
+    let q1 = q - &one;
 
     // LCM inlined
     let gcd = p1.gcd(&q1);
-    let lcm = p1 / NonZero::new(gcd).unwrap() * &q1;
+    let lcm = p1 / NonZero::new(gcd).expect("gcd is non zero") * &q1;
     let exp = exp.widen(lcm.bits_precision());
     if let Some(d) = exp.inv_mod(&lcm).into() {
         Ok(d)

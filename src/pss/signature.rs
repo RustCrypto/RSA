@@ -35,10 +35,10 @@ impl TryFrom<&[u8]> for Signature {
 
     fn try_from(bytes: &[u8]) -> signature::Result<Self> {
         let len = bytes.len();
-        Ok(Self {
-            // TODO: how to convert the error?
-            inner: BoxedUint::from_be_slice(bytes, len as u32 * 8).unwrap(),
-        })
+        let inner = BoxedUint::from_be_slice(bytes, len as u32 * 8)
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync + 'static>)?;
+
+        Ok(Self { inner })
     }
 }
 

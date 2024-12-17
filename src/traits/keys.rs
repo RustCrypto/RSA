@@ -21,7 +21,7 @@ pub trait PublicKeyParts {
     }
 
     /// Returns the parameters for montgomery operations.
-    fn n_params(&self) -> BoxedMontyParams;
+    fn n_params(&self) -> &BoxedMontyParams;
 
     /// Returns precision (in bits) of `n`.
     fn n_bits_precision(&self) -> u32 {
