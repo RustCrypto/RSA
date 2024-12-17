@@ -284,8 +284,6 @@ impl RsaPrivateKey {
         let n_params = BoxedMontyParams::new(n.clone());
         let n_c = NonZero::new(n.as_ref().clone()).unwrap();
 
-        let mut should_validate = false;
-
         if primes.len() < 2 {
             if !primes.is_empty() {
                 return Err(Error::NprimesTooSmall);
@@ -295,7 +293,6 @@ impl RsaPrivateKey {
             let (p, q) = recover_primes(&n_c, &e, &d)?;
             primes.push(p);
             primes.push(q);
-            should_validate = true;
         }
 
         let mut k = RsaPrivateKey {
@@ -309,10 +306,8 @@ impl RsaPrivateKey {
             precomputed: None,
         };
 
-        // Validate the key if we had to recover the primes.
-        if should_validate {
-            k.validate()?;
-        }
+        // Alaways validate the key, to ensure precompute can't fail
+        k.validate()?;
 
         // precompute when possible, ignore error otherwise.
         let _ = k.precompute();
@@ -877,7 +872,8 @@ mod tests {
             .iter()
             .map(|p| BoxedUint::from_be_slice(p, bits / 2).unwrap())
             .collect();
-        RsaPrivateKey::from_components(n, e, d, primes).unwrap();
+        let res = RsaPrivateKey::from_components(n, e, d, primes);
+        assert_eq!(res, Err(Error::InvalidModulus));
     }
 
     #[test]
