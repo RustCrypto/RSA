@@ -42,10 +42,7 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore>(
         let prime_limit = (1u64 << (bit_size / nprimes) as u64) as f64;
 
         // pi aproximates the number of primes less than prime_limit
-        #[cfg(feature = "std")]
-        let mut pi = prime_limit / (prime_limit.ln() - 1f64);
-        #[cfg(not(feature = "std"))]
-        let mut pi = prime_limit / (libm::logf(prime_limit as f32) as f64 - 1f64);
+        let mut pi = prime_limit / (logf(prime_limit) - 1f64);
         // Generated primes start with 0b11, so we can only use a quarter of them.
         pi /= 4f64;
         // Use a factor of two to ensure that key generation terminates in a
@@ -97,7 +94,7 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore>(
 
         if n.bits() as usize != bit_size {
             // This should never happen for nprimes == 2 because
-            // gen_prime should set the top two bits in each prime.
+            // generate_prime_with_rng should set the top two bits in each prime.
             // For nprimes > 2 we hope it does not happen often.
             continue 'next;
         }
@@ -115,6 +112,18 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore>(
         d: d_final,
         primes,
     })
+}
+
+/// Natural logrithm for `f64`.
+#[cfg(feature = "std")]
+fn logf(val: f64) -> f64 {
+    val.ln()
+}
+
+/// Natural logrithm for `f64`.
+#[cfg(not(feature = "std"))]
+fn logf(val: f64) -> f64 {
+    libm::logf(val as f32) as f64
 }
 
 #[cfg(test)]

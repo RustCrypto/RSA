@@ -55,47 +55,49 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
         c.widen(bits)
     };
 
-    let has_precomputes = priv_key.dp().is_some();
     let is_multiprime = priv_key.primes().len() > 2;
 
-    let m = if is_multiprime || !has_precomputes {
-        // c^d (mod n)
-        pow_mod_params(&c, d, n_params)
-    } else {
-        // We have the precalculated values needed for the CRT.
+    let m = match (
+        priv_key.dp(),
+        priv_key.dq(),
+        priv_key.qinv(),
+        priv_key.p_params(),
+        priv_key.q_params(),
+    ) {
+        (Some(dp), Some(dq), Some(qinv), Some(p_params), Some(q_params)) if !is_multiprime => {
+            // We have the precalculated values needed for the CRT.
 
-        let dp = priv_key.dp().expect("precomputed");
-        let dq = priv_key.dq().expect("precomputed");
-        let qinv = priv_key.qinv().expect("precomputed");
-        let p_params = priv_key.p_params().expect("precomputed");
-        let q_params = priv_key.q_params().expect("precomputed");
+            let _p = &priv_key.primes()[0];
+            let q = &priv_key.primes()[1];
 
-        let _p = &priv_key.primes()[0];
-        let q = &priv_key.primes()[1];
+            // precomputed: dP = (1/e) mod (p-1) = d mod (p-1)
+            // precomputed: dQ = (1/e) mod (q-1) = d mod (q-1)
 
-        // precomputed: dP = (1/e) mod (p-1) = d mod (p-1)
-        // precomputed: dQ = (1/e) mod (q-1) = d mod (q-1)
+            // m1 = c^dP mod p
+            let cp = BoxedMontyForm::new(c.clone(), p_params.clone());
+            let mut m1 = cp.pow(dp);
+            // m2 = c^dQ mod q
+            let cq = BoxedMontyForm::new(c, q_params.clone());
+            let m2 = cq.pow(dq).retrieve();
 
-        // m1 = c^dP mod p
-        let cp = BoxedMontyForm::new(c.clone(), p_params.clone());
-        let mut m1 = cp.pow(dp);
-        // m2 = c^dQ mod q
-        let cq = BoxedMontyForm::new(c, q_params.clone());
-        let m2 = cq.pow(dq).retrieve();
+            // (m1 - m2) mod p = (m1 mod p) - (m2 mod p) mod p
+            let m2r = BoxedMontyForm::new(m2.clone(), p_params.clone());
+            m1 -= &m2r;
 
-        // (m1 - m2) mod p = (m1 mod p) - (m2 mod p) mod p
-        let m2r = BoxedMontyForm::new(m2.clone(), p_params.clone());
-        m1 -= &m2r;
+            // precomputed: qInv = (1/q) mod p
 
-        // precomputed: qInv = (1/q) mod p
+            // h = qInv.(m1 - m2) mod p
+            let mut m: Wrapping<BoxedUint> = Wrapping(qinv.mul(&m1).retrieve());
 
-        // h = qInv.(m1 - m2) mod p
-        let mut m: Wrapping<BoxedUint> = Wrapping(qinv.mul(&m1).retrieve());
-
-        // m = m2 + h.q
-        m *= Wrapping(q.clone());
-        m += Wrapping(m2);
-        m.0
+            // m = m2 + h.q
+            m *= Wrapping(q.clone());
+            m += Wrapping(m2);
+            m.0
+        }
+        _ => {
+            // c^d (mod n)
+            pow_mod_params(&c, d, n_params)
+        }
     };
 
     // Ensure output precision matches input precision

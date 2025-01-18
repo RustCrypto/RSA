@@ -39,10 +39,15 @@ pub(crate) fn verify_algorithm_id(
     Ok(())
 }
 
+fn uint_from_slice(data: &[u8], bits: u32) -> pkcs8::Result<BoxedUint> {
+    BoxedUint::from_be_slice(data, bits).map_err(|_| pkcs8::Error::KeyMalformed)
+}
+
 impl TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for RsaPrivateKey {
     type Error = pkcs8::Error;
 
     fn try_from(private_key_info: pkcs8::PrivateKeyInfoRef<'_>) -> pkcs8::Result<Self> {
+        use pkcs8::Error::KeyMalformed;
         verify_algorithm_id(&private_key_info.algorithm)?;
 
         let pkcs1_key = pkcs1::RsaPrivateKey::try_from(private_key_info.private_key)?;
@@ -52,32 +57,23 @@ impl TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for RsaPrivateKey {
             return Err(pkcs1::Error::Version.into());
         }
 
-        let key_malformed = pkcs8::Error::KeyMalformed;
+        let bits = u32::try_from(pkcs1_key.modulus.as_bytes().len()).map_err(|_| KeyMalformed)? * 8;
 
-        let bits =
-            u32::try_from(pkcs1_key.modulus.as_bytes().len()).map_err(|_| key_malformed)? * 8;
-
-        let n = BoxedUint::from_be_slice(pkcs1_key.modulus.as_bytes(), bits)
-            .map_err(|_| key_malformed)?;
-        let n = Option::from(Odd::new(n)).ok_or(key_malformed)?;
+        let n = uint_from_slice(pkcs1_key.modulus.as_bytes(), bits)?;
+        let n = Option::from(Odd::new(n)).ok_or(KeyMalformed)?;
 
         let bits_e = u32::try_from(pkcs1_key.public_exponent.as_bytes().len())
-            .map_err(|_| key_malformed)?
+            .map_err(|_| KeyMalformed)?
             * 8;
-        let e = BoxedUint::from_be_slice(pkcs1_key.public_exponent.as_bytes(), bits_e)
-            .map_err(|_| key_malformed)?;
-        let e = Option::from(e).ok_or(key_malformed)?;
+        let e = uint_from_slice(pkcs1_key.public_exponent.as_bytes(), bits_e)?;
+        let e = Option::from(e).ok_or(KeyMalformed)?;
 
-        let d = BoxedUint::from_be_slice(pkcs1_key.private_exponent.as_bytes(), bits)
-            .map_err(|_| key_malformed)?;
-
-        let prime1 = BoxedUint::from_be_slice(pkcs1_key.prime1.as_bytes(), bits)
-            .map_err(|_| key_malformed)?;
-        let prime2 = BoxedUint::from_be_slice(pkcs1_key.prime2.as_bytes(), bits)
-            .map_err(|_| key_malformed)?;
+        let d = uint_from_slice(pkcs1_key.private_exponent.as_bytes(), bits)?;
+        let prime1 = uint_from_slice(pkcs1_key.prime1.as_bytes(), bits)?;
+        let prime2 = uint_from_slice(pkcs1_key.prime2.as_bytes(), bits)?;
         let primes = vec![prime1, prime2];
 
-        RsaPrivateKey::from_components(n, e, d, primes).map_err(|_| key_malformed)
+        RsaPrivateKey::from_components(n, e, d, primes).map_err(|_| KeyMalformed)
     }
 }
 
@@ -85,27 +81,22 @@ impl TryFrom<pkcs8::SubjectPublicKeyInfoRef<'_>> for RsaPublicKey {
     type Error = pkcs8::spki::Error;
 
     fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> pkcs8::spki::Result<Self> {
+        use pkcs8::spki::Error::KeyMalformed;
+
         verify_algorithm_id(&spki.algorithm)?;
 
-        let pkcs1_key = pkcs1::RsaPublicKey::try_from(
-            spki.subject_public_key
-                .as_bytes()
-                .ok_or(pkcs8::spki::Error::KeyMalformed)?,
-        )?;
+        let pkcs1_key =
+            pkcs1::RsaPublicKey::try_from(spki.subject_public_key.as_bytes().ok_or(KeyMalformed)?)?;
 
-        let key_malformed = pkcs8::spki::Error::KeyMalformed;
-        let bits =
-            u32::try_from(pkcs1_key.modulus.as_bytes().len()).map_err(|_| key_malformed)? * 8;
-        let n = BoxedUint::from_be_slice(pkcs1_key.modulus.as_bytes(), bits)
-            .map_err(|_| key_malformed)?;
+        let bits = u32::try_from(pkcs1_key.modulus.as_bytes().len()).map_err(|_| KeyMalformed)? * 8;
+        let n = uint_from_slice(pkcs1_key.modulus.as_bytes(), bits)?;
 
         let bits_e = u32::try_from(pkcs1_key.public_exponent.as_bytes().len())
-            .map_err(|_| key_malformed)?
+            .map_err(|_| KeyMalformed)?
             * 8;
-        let e = BoxedUint::from_be_slice(pkcs1_key.public_exponent.as_bytes(), bits_e)
-            .map_err(|_| key_malformed)?;
+        let e = uint_from_slice(pkcs1_key.public_exponent.as_bytes(), bits_e)?;
 
-        RsaPublicKey::new(n, e).map_err(|_| pkcs8::spki::Error::KeyMalformed)
+        RsaPublicKey::new(n, e).map_err(|_| KeyMalformed)
     }
 }
 

@@ -223,6 +223,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+pub use crypto_bigint::BoxedUint;
 pub use rand_core;
 pub use signature;
 
