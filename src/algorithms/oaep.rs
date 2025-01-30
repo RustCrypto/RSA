@@ -1,6 +1,6 @@
 //! Encryption and Decryption using [OAEP padding](https://datatracker.ietf.org/doc/html/rfc8017#section-7.1).
 //!
-use alloc::string::String;
+use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 use digest::{Digest, DynDigest, FixedOutputReset};
@@ -62,7 +62,7 @@ pub(crate) fn oaep_encrypt<R: CryptoRngCore + ?Sized>(
     msg: &[u8],
     digest: &mut dyn DynDigest,
     mgf_digest: &mut dyn DynDigest,
-    label: Option<String>,
+    label: Option<Box<[u8]>>,
     k: usize,
 ) -> Result<Zeroizing<Vec<u8>>> {
     let h_size = digest.output_size();
@@ -72,7 +72,7 @@ pub(crate) fn oaep_encrypt<R: CryptoRngCore + ?Sized>(
         return Err(Error::LabelTooLong);
     }
 
-    digest.update(label.as_bytes());
+    digest.update(&label);
     let p_hash = digest.finalize_reset();
 
     encrypt_internal(rng, msg, &p_hash, h_size, k, |seed, db| {
@@ -96,7 +96,7 @@ pub(crate) fn oaep_encrypt_digest<
 >(
     rng: &mut R,
     msg: &[u8],
-    label: Option<String>,
+    label: Option<Box<[u8]>>,
     k: usize,
 ) -> Result<Zeroizing<Vec<u8>>> {
     let h_size = <D as Digest>::output_size();
@@ -106,7 +106,7 @@ pub(crate) fn oaep_encrypt_digest<
         return Err(Error::LabelTooLong);
     }
 
-    let p_hash = D::digest(label.as_bytes());
+    let p_hash = D::digest(&label);
 
     encrypt_internal(rng, msg, &p_hash, h_size, k, |seed, db| {
         let mut mgf_digest = MGD::new();
@@ -130,7 +130,7 @@ pub(crate) fn oaep_decrypt(
     em: &mut [u8],
     digest: &mut dyn DynDigest,
     mgf_digest: &mut dyn DynDigest,
-    label: Option<String>,
+    label: Option<Box<[u8]>>,
     k: usize,
 ) -> Result<Vec<u8>> {
     let h_size = digest.output_size();
@@ -140,7 +140,7 @@ pub(crate) fn oaep_decrypt(
         return Err(Error::Decryption);
     }
 
-    digest.update(label.as_bytes());
+    digest.update(&label);
 
     let expected_p_hash = digest.finalize_reset();
 
@@ -170,7 +170,7 @@ pub(crate) fn oaep_decrypt(
 #[inline]
 pub(crate) fn oaep_decrypt_digest<D: Digest, MGD: Digest + FixedOutputReset>(
     em: &mut [u8],
-    label: Option<String>,
+    label: Option<Box<[u8]>>,
     k: usize,
 ) -> Result<Vec<u8>> {
     let h_size = <D as Digest>::output_size();
@@ -180,7 +180,7 @@ pub(crate) fn oaep_decrypt_digest<D: Digest, MGD: Digest + FixedOutputReset>(
         return Err(Error::LabelTooLong);
     }
 
-    let expected_p_hash = D::digest(label.as_bytes());
+    let expected_p_hash = D::digest(&label);
 
     let res = decrypt_inner(em, h_size, &expected_p_hash, k, |seed, db| {
         let mut mgf_digest = MGD::new();
