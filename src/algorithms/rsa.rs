@@ -289,7 +289,7 @@ pub(crate) fn compute_modulus(primes: &[BoxedUint]) -> Odd<BoxedUint> {
     let mut primes = primes.iter();
     let mut out = primes.next().expect("must at least be one prime").clone();
     for p in primes {
-        out = out * p;
+        out *= p;
     }
     Odd::new(out).expect("modulus must be odd")
 }
@@ -308,7 +308,7 @@ pub(crate) fn compute_private_exponent_euler_totient(
     let mut totient = BoxedUint::one_with_precision(bits);
 
     for prime in primes {
-        totient = totient * (prime - &BoxedUint::one());
+        totient *= prime - &BoxedUint::one();
     }
     let exp = exp.widen(totient.bits_precision());
 

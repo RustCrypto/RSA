@@ -135,8 +135,8 @@ pub(crate) fn verify(
     if sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
-
-    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
+    let raw = rsa_encrypt(pub_key, sig)?;
+    let mut em = uint_to_be_pad(raw, pub_key.size())?;
 
     emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits() as _)
 }
@@ -205,16 +205,15 @@ fn sign_pss_with_salt<T: CryptoRngCore>(
     digest: &mut dyn DynDigest,
 ) -> Result<Vec<u8>> {
     let em_bits = priv_key.n().bits() - 1;
+
     let em = emsa_pss_encode(hashed, em_bits as _, salt, digest)?;
 
     let em = BoxedUint::from_be_slice(
         &em,
         crate::traits::keys::PublicKeyParts::n_bits_precision(priv_key),
     )?;
-    uint_to_zeroizing_be_pad(
-        rsa_decrypt_and_check(priv_key, blind_rng, &em)?,
-        priv_key.size(),
-    )
+    let raw = rsa_decrypt_and_check(priv_key, blind_rng, &em)?;
+    uint_to_zeroizing_be_pad(raw, priv_key.size())
 }
 
 fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputReset>(
@@ -607,17 +606,20 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
     // Tests the corner case where the key is multiple of 8 + 1 bits long
     fn test_sign_and_verify_2049bit_key() {
         let plaintext = "Hello\n";
-        let rng = ChaCha8Rng::from_seed([42; 32]);
-        let priv_key = RsaPrivateKey::new(&mut rng.clone(), 2049).unwrap();
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        for i in 0..10 {
+            println!("round {i}");
+            let priv_key = RsaPrivateKey::new(&mut rng, 2049).unwrap();
 
-        let digest = Sha1::digest(plaintext.as_bytes()).to_vec();
-        let sig = priv_key
-            .sign_with_rng(&mut rng.clone(), Pss::new::<Sha1>(), &digest)
-            .expect("failed to sign");
+            let digest = Sha1::digest(plaintext.as_bytes()).to_vec();
+            let sig = priv_key
+                .sign_with_rng(&mut rng, Pss::new::<Sha1>(), &digest)
+                .expect("failed to sign");
 
-        priv_key
-            .to_public_key()
-            .verify(Pss::new::<Sha1>(), &digest, &sig)
-            .expect("failed to verify");
+            priv_key
+                .to_public_key()
+                .verify(Pss::new::<Sha1>(), &digest, &sig)
+                .expect("failed to verify");
+        }
     }
 }

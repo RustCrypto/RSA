@@ -2,7 +2,10 @@
 
 use alloc::vec::Vec;
 use crypto_bigint::{BoxedUint, Odd};
-use crypto_primes::generate_prime_with_rng;
+use crypto_primes::{
+    hazmat::{SetBits, SmallPrimesSieveFactory},
+    is_prime_with_rng, sieve_and_find,
+};
 use rand_core::CryptoRngCore;
 
 use crate::{
@@ -60,7 +63,7 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore>(
 
     'next: loop {
         let mut todo = bit_size;
-        // `gen_prime` should set the top two bits in each prime.
+        // `generate_prime_with_rng` should set the top two bits in each prime.
         // Thus each prime has the form
         //   p_i = 2^bitlen(p_i) × 0.11... (in base 2).
         // And the product is:
@@ -114,16 +117,25 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore>(
     })
 }
 
-/// Natural logrithm for `f64`.
+/// Natural logarithm for `f64`.
 #[cfg(feature = "std")]
 fn logf(val: f64) -> f64 {
     val.ln()
 }
 
-/// Natural logrithm for `f64`.
+/// Natural logarithm for `f64`.
 #[cfg(not(feature = "std"))]
 fn logf(val: f64) -> f64 {
     libm::logf(val as f32) as f64
+}
+
+fn generate_prime_with_rng<R: CryptoRngCore>(rng: &mut R, bit_length: u32) -> BoxedUint {
+    sieve_and_find(
+        rng,
+        SmallPrimesSieveFactory::new(bit_length, SetBits::TwoMsb),
+        is_prime_with_rng,
+    )
+    .expect("will produce a result eventually")
 }
 
 #[cfg(test)]

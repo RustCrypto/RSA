@@ -22,8 +22,8 @@ pkcs8 = { version = "0.11.0-rc.0", default-features = false, features = ["alloc"
 signature = { version = "=2.3.0-pre.4", default-features = false, features = ["alloc", "digest", "rand_core"] }
 spki = { version = "0.8.0-rc.1", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
-crypto-bigint = { version = "0.6.0-rc.6", default-features = false, features = ["zeroize", "alloc"] }
-crypto-primes = { version = "0.6.0-pre.2", default-features = false }
+crypto-bigint = { version = "0.6.0", default-features = false, features = ["zeroize", "alloc"] }
+crypto-primes = { version = "0.6.0", default-features = false }
 libm = "0.2"
 
 # optional dependencies
@@ -72,6 +72,3 @@ debug = true
 [patch.crates-io]
 pkcs1 = { git = "https://github.com/RustCrypto/formats.git" }
 pkcs8 = { git = "https://github.com/RustCrypto/formats.git" }
-
-# crypto-bigint = { git = "https://github.com/RustCrypto/crypto-bigint", branch = "master" }
-# crypto-bigint = { path = "../rustcrypto/crypto-bigint" }

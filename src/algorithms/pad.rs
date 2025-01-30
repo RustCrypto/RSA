@@ -23,10 +23,8 @@ fn left_pad(input: &[u8], padded_len: usize) -> Result<Vec<u8>> {
 /// before padding again.
 #[inline]
 pub(crate) fn uint_to_be_pad(input: BoxedUint, padded_len: usize) -> Result<Vec<u8>> {
-    let required_bits = input.bits();
-    let input = input.shorten(required_bits);
-
-    left_pad(&input.to_be_bytes(), padded_len)
+    let leading_zeros = input.leading_zeros() as usize / 8;
+    left_pad(&input.to_be_bytes()[leading_zeros..], padded_len)
 }
 
 /// Converts input to the new vector of the given length, using BE and with 0s left padded.
@@ -34,12 +32,12 @@ pub(crate) fn uint_to_be_pad(input: BoxedUint, padded_len: usize) -> Result<Vec<
 /// before padding again.
 #[inline]
 pub(crate) fn uint_to_zeroizing_be_pad(input: BoxedUint, padded_len: usize) -> Result<Vec<u8>> {
-    let required_bits = input.bits();
-    let input = input.shorten(required_bits);
+    let leading_zeros = input.leading_zeros() as usize / 8;
 
     let m = Zeroizing::new(input);
     let m = Zeroizing::new(m.to_be_bytes());
-    left_pad(&m, padded_len)
+
+    left_pad(&m[leading_zeros..], padded_len)
 }
 
 #[cfg(test)]

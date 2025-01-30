@@ -786,12 +786,12 @@ mod tests {
         let priv_key = RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
 
         let priv_tokens = [Token::Str(
-            "3054020100300d06092a864886f70d01010105000440303e020100020900aaadacc31e2e5119020301000102087e1710295cb2ba81020500b21fdf97020500f54c6acf02040b862461020463ed8f8d0205008bb00f5f",
+            "3054020100300d06092a864886f70d01010105000440303e020100020900c9269f2f225eb38d020301000102086ecdc49f528812a1020500d2aaa725020500f46fc249020500887e253902046b4851e1020423806864",
         )];
         assert_tokens(&priv_key.clone().readable(), &priv_tokens);
 
         let priv_tokens = [Token::Str(
-            "3024300d06092a864886f70d01010105000313003010020900aaadacc31e2e51190203010001",
+            "3024300d06092a864886f70d01010105000313003010020900c9269f2f225eb38d0203010001",
         )];
         assert_tokens(
             &RsaPublicKey::from(priv_key.clone()).readable(),
