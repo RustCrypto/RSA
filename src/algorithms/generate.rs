@@ -126,7 +126,20 @@ fn logf(val: f64) -> f64 {
 /// Natural logarithm for `f64`.
 #[cfg(not(feature = "std"))]
 fn logf(val: f64) -> f64 {
-    libm::logf(val as f32) as f64
+    logf_approx(val as f32) as f64
+}
+
+/// Ln implementation based on
+/// <https://gist.github.com/LingDong-/7e4c4cae5cbbc44400a05fba65f06f23>
+#[cfg(any(not(feature = "std"), test))]
+fn logf_approx(x: f32) -> f32 {
+    let bx: u32 = x.to_bits();
+    let ex: u32 = bx >> 23;
+    let t: i32 = (ex as i32) - 127;
+    let bx = 1065353216 | (bx & 8388607);
+    let x = f32::from_bits(bx);
+
+    -1.49278 + (2.11263 + (-0.729104 + 0.10969 * x) * x) * x + core::f32::consts::LN_2 * (t as f32)
 }
 
 fn generate_prime_with_rng<R: CryptoRngCore>(rng: &mut R, bit_length: u32) -> BoxedUint {
@@ -141,6 +154,7 @@ fn generate_prime_with_rng<R: CryptoRngCore>(rng: &mut R, bit_length: u32) -> Bo
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand::Rng;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 
     const EXP: u64 = 65537;
@@ -186,4 +200,19 @@ mod tests {
     key_generation!(key_generation_multi_8_576, 8, 576);
     // TODO: reenable, currently slow
     // key_generation!(key_generation_multi_16_1024, 16, 1024);
+
+    #[test]
+    fn test_log_approx() {
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+
+        for i in 0..100 {
+            println!("round {i}");
+            let prime_limit: f64 = rng.gen();
+            let a = logf(prime_limit);
+            let b = logf_approx(prime_limit as f32);
+
+            let diff = a - b as f64;
+            assert!(diff < 0.001, "{} != {}", a, b);
+        }
+    }
 }
