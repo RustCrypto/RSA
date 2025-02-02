@@ -28,7 +28,7 @@ zeroize = { version = "1.5", features = ["alloc"] }
 
 # optional dependencies
 sha1 = { version = "=0.11.0-pre.4", optional = true, default-features = false, features = ["oid"] }
-serdect = { version = "0.2.0", optional = true }
+serdect = { version = "0.3.0", optional = true }
 sha2 = { version = "=0.11.0-pre.4", optional = true, default-features = false, features = ["oid"] }
 serde = { version = "1.0.184", optional = true, default-features = false, features = ["derive"] }
 
