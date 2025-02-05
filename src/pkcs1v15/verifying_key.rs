@@ -170,10 +170,10 @@ where
 
 impl<D> From<RsaPublicKey> for VerifyingKey<D>
 where
-    D: Digest,
+    D: Digest + AssociatedOid,
 {
     fn from(key: RsaPublicKey) -> Self {
-        Self::new_unprefixed(key)
+        Self::new(key)
     }
 }
 
