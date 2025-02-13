@@ -3,6 +3,7 @@
 #![doc = include_str!("../README.md")]
 #![doc(html_logo_url = "https://raw.githubusercontent.com/RustCrypto/meta/master/logo_small.png")]
 #![warn(missing_docs)]
+#![cfg_attr(not(test), deny(clippy::unwrap_used))]
 
 //! # Supported algorithms
 //!
@@ -222,7 +223,7 @@ extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
-pub use num_bigint::BigUint;
+pub use crypto_bigint::BoxedUint;
 pub use rand_core;
 pub use signature;
 

@@ -66,7 +66,6 @@ where
             &self.inner,
             &digest.finalize(),
             &signature.inner,
-            signature.len,
             self.salt_len,
         )
         .map_err(|e| e.into())
@@ -78,14 +77,8 @@ where
     D: Digest + FixedOutputReset,
 {
     fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify_digest::<D>(
-            &self.inner,
-            prehash,
-            &signature.inner,
-            signature.len,
-            self.salt_len,
-        )
-        .map_err(|e| e.into())
+        verify_digest::<D>(&self.inner, prehash, &signature.inner, self.salt_len)
+            .map_err(|e| e.into())
     }
 }
 
@@ -98,7 +91,6 @@ where
             &self.inner,
             &D::digest(msg),
             &signature.inner,
-            signature.len,
             self.salt_len,
         )
         .map_err(|e| e.into())
@@ -241,7 +233,7 @@ mod tests {
         let verifying_key = VerifyingKey::<Sha256>::new(pub_key);
 
         let tokens = [Token::Str(
-            "3024300d06092a864886f70d01010105000313003010020900cc6c6130e35b46bf0203010001",
+            "3024300d06092a864886f70d01010105000313003010020900c9269f2f225eb38d0203010001",
         )];
 
         assert_tokens(&verifying_key.readable(), &tokens);

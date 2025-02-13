@@ -21,10 +21,10 @@ pub use self::{
 
 use alloc::{boxed::Box, vec::Vec};
 use core::fmt::{self, Debug};
+use crypto_bigint::BoxedUint;
 
 use const_oid::AssociatedOid;
 use digest::{Digest, DynDigest, FixedOutputReset};
-use num_bigint::BigUint;
 use pkcs1::RsaPssParams;
 use pkcs8::spki::{der::Any, AlgorithmIdentifierOwned};
 use rand_core::CryptoRngCore;
@@ -106,7 +106,7 @@ impl SignatureScheme for Pss {
         verify(
             pub_key,
             hashed,
-            &BigUint::from_bytes_be(sig),
+            &BoxedUint::from_be_slice(sig, sig.len() as u32 * 8)?,
             sig.len(),
             &mut *self.digest,
             self.salt_len,
@@ -127,7 +127,7 @@ impl Debug for Pss {
 pub(crate) fn verify(
     pub_key: &RsaPublicKey,
     hashed: &[u8],
-    sig: &BigUint,
+    sig: &BoxedUint,
     sig_len: usize,
     digest: &mut dyn DynDigest,
     salt_len: usize,
@@ -135,29 +135,29 @@ pub(crate) fn verify(
     if sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
+    let raw = rsa_encrypt(pub_key, sig)?;
+    let mut em = uint_to_be_pad(raw, pub_key.size())?;
 
-    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
-
-    emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits())
+    emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits() as _)
 }
 
 pub(crate) fn verify_digest<D>(
     pub_key: &RsaPublicKey,
     hashed: &[u8],
-    sig: &BigUint,
-    sig_len: usize,
+    sig: &BoxedUint,
     salt_len: usize,
 ) -> Result<()>
 where
     D: Digest + FixedOutputReset,
 {
-    if sig >= pub_key.n() || sig_len != pub_key.size() {
+    let n = pub_key.n();
+    if sig >= n.as_ref() || sig.bits_precision() != pub_key.n_bits_precision() {
         return Err(Error::Verification);
     }
 
     let mut em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
 
-    emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits())
+    emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits() as _)
 }
 
 /// SignPSS calculates the signature of hashed using RSASSA-PSS.
@@ -205,12 +205,12 @@ fn sign_pss_with_salt<T: CryptoRngCore>(
     digest: &mut dyn DynDigest,
 ) -> Result<Vec<u8>> {
     let em_bits = priv_key.n().bits() - 1;
-    let em = emsa_pss_encode(hashed, em_bits, salt, digest)?;
 
-    uint_to_zeroizing_be_pad(
-        rsa_decrypt_and_check(priv_key, blind_rng, &BigUint::from_bytes_be(&em))?,
-        priv_key.size(),
-    )
+    let em = emsa_pss_encode(hashed, em_bits as _, salt, digest)?;
+
+    let em = BoxedUint::from_be_slice(&em, priv_key.n_bits_precision())?;
+    let raw = rsa_decrypt_and_check(priv_key, blind_rng, &em)?;
+    uint_to_zeroizing_be_pad(raw, priv_key.size())
 }
 
 fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputReset>(
@@ -220,10 +220,11 @@ fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputR
     salt: &[u8],
 ) -> Result<Vec<u8>> {
     let em_bits = priv_key.n().bits() - 1;
-    let em = emsa_pss_encode_digest::<D>(hashed, em_bits, salt)?;
+    let em = emsa_pss_encode_digest::<D>(hashed, em_bits as _, salt)?;
 
+    let em = BoxedUint::from_be_slice(&em, priv_key.n_bits_precision())?;
     uint_to_zeroizing_be_pad(
-        rsa_decrypt_and_check(priv_key, blind_rng, &BigUint::from_bytes_be(&em))?,
+        rsa_decrypt_and_check(priv_key, blind_rng, &em)?,
         priv_key.size(),
     )
 }
@@ -249,14 +250,13 @@ where
     })
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "pem"))]
 mod test {
     use crate::pss::{BlindedSigningKey, Pss, Signature, SigningKey, VerifyingKey};
     use crate::{RsaPrivateKey, RsaPublicKey};
 
     use hex_literal::hex;
-    use num_bigint::BigUint;
-    use num_traits::{FromPrimitive, Num};
+    use pkcs1::DecodeRsaPrivateKey;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
     use sha1::{Digest, Sha1};
     use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
@@ -274,36 +274,18 @@ mod test {
         // tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         // -----END RSA PRIVATE KEY-----
 
-        RsaPrivateKey::from_components(
-            BigUint::from_str_radix(
-                "9353930466774385905609975137998169297361893554149986716853295022\
-                 5785357249796772529585244663504712103678351874807482688642774647\
-                 00638583474144061408845077",
-                10,
-            )
-            .unwrap(),
-            BigUint::from_u64(65537).unwrap(),
-            BigUint::from_str_radix(
-                "7266398431328116344057699379749222532279343923819063639497049039\
-                 3898993285385430876577337665541558398345195294398516730148002612\
-                 85757759040931985506583861",
-                10,
-            )
-            .unwrap(),
-            vec![
-                BigUint::from_str_radix(
-                    "98920366548084643601728869055592650835572950932266967461790948584315647051443",
-                    10,
-                )
-                .unwrap(),
-                BigUint::from_str_radix(
-                    "94560208308847015747498523884063394671606671904944666360068158221458669711639",
-                    10,
-                )
-                .unwrap(),
-            ],
-        )
-        .unwrap()
+        let pem = r#"
+-----BEGIN RSA PRIVATE KEY-----
+MIIBOgIBAAJBALKZD0nEffqM1ACuak0bijtqE2QrI/KLADv7l3kK3ppMyCuLKoF0
+fd7Ai2KW5ToIwzFofvJcS/STa6HA5gQenRUCAwEAAQJBAIq9amn00aS0h/CrjXqu
+/ThglAXJmZhOMPVn4eiu7/ROixi9sex436MaVeMqSNf7Ex9a8fRNfWss7Sqd9eWu
+RTUCIQDasvGASLqmjeffBNLTXV2A5g4t+kLVCpsEIZAycV5GswIhANEPLmax0ME/
+EO+ZJ79TJKN5yiGBRsv5yvx5UiHxajEXAiAhAol5N4EUyq6I9w1rYdhPMGpLfk7A
+IU2snfRJ6Nq2CQIgFrPsWRCkV+gOYcajD17rEqmuLrdIRexpg8N1DOSXoJ8CIGlS
+tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
+-----END RSA PRIVATE KEY-----"#;
+
+        RsaPrivateKey::from_pkcs1_pem(pem).unwrap()
     }
 
     #[test]
@@ -333,6 +315,7 @@ mod test {
         for (text, sig, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
             let result = pub_key.verify(Pss::new::<Sha1>(), &digest, sig);
+
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -617,17 +600,20 @@ mod test {
     // Tests the corner case where the key is multiple of 8 + 1 bits long
     fn test_sign_and_verify_2049bit_key() {
         let plaintext = "Hello\n";
-        let rng = ChaCha8Rng::from_seed([42; 32]);
-        let priv_key = RsaPrivateKey::new(&mut rng.clone(), 2049).unwrap();
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        for i in 0..10 {
+            println!("round {i}");
+            let priv_key = RsaPrivateKey::new(&mut rng, 2049).unwrap();
 
-        let digest = Sha1::digest(plaintext.as_bytes()).to_vec();
-        let sig = priv_key
-            .sign_with_rng(&mut rng.clone(), Pss::new::<Sha1>(), &digest)
-            .expect("failed to sign");
+            let digest = Sha1::digest(plaintext.as_bytes()).to_vec();
+            let sig = priv_key
+                .sign_with_rng(&mut rng, Pss::new::<Sha1>(), &digest)
+                .expect("failed to sign");
 
-        priv_key
-            .to_public_key()
-            .verify(Pss::new::<Sha1>(), &digest, &sig)
-            .expect("failed to verify");
+            priv_key
+                .to_public_key()
+                .verify(Pss::new::<Sha1>(), &digest, &sig)
+                .expect("failed to verify");
+        }
     }
 }

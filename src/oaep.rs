@@ -13,11 +13,10 @@ use alloc::boxed::Box;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
+use crypto_bigint::BoxedUint;
 
 use digest::{Digest, DynDigest, FixedOutputReset};
-use num_bigint::BigUint;
 use rand_core::CryptoRngCore;
-use zeroize::Zeroizing;
 
 use crate::algorithms::oaep::*;
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
@@ -55,14 +54,17 @@ impl Oaep {
     /// ```
     /// use sha1::Sha1;
     /// use sha2::Sha256;
-    /// use rsa::{BigUint, RsaPublicKey, Oaep, };
+    /// use rsa::{RsaPublicKey, Oaep};
     /// use base64ct::{Base64, Encoding};
+    /// use crypto_bigint::BoxedUint;
     ///
-    /// let n = Base64::decode_vec("ALHgDoZmBQIx+jTmgeeHW6KsPOrj11f6CvWsiRleJlQpW77AwSZhd21ZDmlTKfaIHBSUxRUsuYNh7E2SHx8rkFVCQA2/gXkZ5GK2IUbzSTio9qXA25MWHvVxjMfKSL8ZAxZyKbrG94FLLszFAFOaiLLY8ECs7g+dXOriYtBwLUJK+lppbd+El+8ZA/zH0bk7vbqph5pIoiWggxwdq3mEz4LnrUln7r6dagSQzYErKewY8GADVpXcq5mfHC1xF2DFBub7bFjMVM5fHq7RK+pG5xjNDiYITbhLYrbVv3X0z75OvN0dY49ITWjM7xyvMWJXVJS7sJlgmCCL6RwWgP8PhcE=").unwrap();
-    /// let e = Base64::decode_vec("AQAB").unwrap();
+    /// let n_bytes = Base64::decode_vec("seAOhmYFAjH6NOaB54dboqw86uPXV/oK9ayJGV4mVClbvsDBJmF3bVkOaVMp9ogcFJTFFSy5g2HsTZIfHyuQVUJADb+BeRnkYrYhRvNJOKj2pcDbkxYe9XGMx8pIvxkDFnIpusb3gUsuzMUAU5qIstjwQKzuD51c6uJi0HAtQkr6Wmlt34SX7xkD/MfRuTu9uqmHmkiiJaCDHB2reYTPguetSWfuvp1qBJDNgSsp7BjwYANWldyrmZ8cLXEXYMUG5vtsWMxUzl8ertEr6kbnGM0OJghNuEtittW/dfTPvk683R1jj0hNaMzvHK8xYldUlLuwmWCYIIvpHBaA/w+FwQ==").unwrap();
+    /// let e_bytes = Base64::decode_vec("AQAB").unwrap();
+    /// let n = BoxedUint::from_be_slice(&n_bytes, 2048).unwrap();
+    /// let e = BoxedUint::from_be_slice(&e_bytes, 32).unwrap();
     ///
     /// let mut rng = rand::thread_rng();
-    /// let key = RsaPublicKey::new(BigUint::from_bytes_be(&n), BigUint::from_bytes_be(&e)).unwrap();
+    /// let key = RsaPublicKey::new(n, e).unwrap();
     /// let padding = Oaep::new::<Sha256>();
     /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();
     /// ```
@@ -92,14 +94,17 @@ impl Oaep {
     /// ```
     /// use sha1::Sha1;
     /// use sha2::Sha256;
-    /// use rsa::{BigUint, RsaPublicKey, Oaep, };
+    /// use rsa::{RsaPublicKey, Oaep};
     /// use base64ct::{Base64, Encoding};
+    /// use crypto_bigint::BoxedUint;
     ///
-    /// let n = Base64::decode_vec("ALHgDoZmBQIx+jTmgeeHW6KsPOrj11f6CvWsiRleJlQpW77AwSZhd21ZDmlTKfaIHBSUxRUsuYNh7E2SHx8rkFVCQA2/gXkZ5GK2IUbzSTio9qXA25MWHvVxjMfKSL8ZAxZyKbrG94FLLszFAFOaiLLY8ECs7g+dXOriYtBwLUJK+lppbd+El+8ZA/zH0bk7vbqph5pIoiWggxwdq3mEz4LnrUln7r6dagSQzYErKewY8GADVpXcq5mfHC1xF2DFBub7bFjMVM5fHq7RK+pG5xjNDiYITbhLYrbVv3X0z75OvN0dY49ITWjM7xyvMWJXVJS7sJlgmCCL6RwWgP8PhcE=").unwrap();
-    /// let e = Base64::decode_vec("AQAB").unwrap();
+    /// let n_bytes = Base64::decode_vec("seAOhmYFAjH6NOaB54dboqw86uPXV/oK9ayJGV4mVClbvsDBJmF3bVkOaVMp9ogcFJTFFSy5g2HsTZIfHyuQVUJADb+BeRnkYrYhRvNJOKj2pcDbkxYe9XGMx8pIvxkDFnIpusb3gUsuzMUAU5qIstjwQKzuD51c6uJi0HAtQkr6Wmlt34SX7xkD/MfRuTu9uqmHmkiiJaCDHB2reYTPguetSWfuvp1qBJDNgSsp7BjwYANWldyrmZ8cLXEXYMUG5vtsWMxUzl8ertEr6kbnGM0OJghNuEtittW/dfTPvk683R1jj0hNaMzvHK8xYldUlLuwmWCYIIvpHBaA/w+FwQ==").unwrap();
+    /// let e_bytes = Base64::decode_vec("AQAB").unwrap();
+    /// let n = BoxedUint::from_be_slice(&n_bytes, 2048).unwrap();
+    /// let e = BoxedUint::from_be_slice(&e_bytes, 32).unwrap();
     ///
     /// let mut rng = rand::thread_rng();
-    /// let key = RsaPublicKey::new(BigUint::from_bytes_be(&n), BigUint::from_bytes_be(&e)).unwrap();
+    /// let key = RsaPublicKey::new(n, e).unwrap();
     /// let padding = Oaep::new_with_mgf_hash::<Sha256, Sha1>();
     /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();
     /// ```
@@ -194,7 +199,7 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
 
     let em = oaep_encrypt(rng, msg, digest, mgf_digest, label, pub_key.size())?;
 
-    let int = Zeroizing::new(BigUint::from_bytes_be(&em));
+    let int = BoxedUint::from_be_slice(&em, pub_key.n_bits_precision())?;
     uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
@@ -215,7 +220,7 @@ fn encrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
 
     let em = oaep_encrypt_digest::<_, D, MGD>(rng, msg, label, pub_key.size())?;
 
-    let int = Zeroizing::new(BigUint::from_bytes_be(&em));
+    let int = BoxedUint::from_be_slice(&em, pub_key.n_bits_precision())?;
     uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
@@ -244,7 +249,9 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
         return Err(Error::Decryption);
     }
 
-    let em = rsa_decrypt_and_check(priv_key, rng, &BigUint::from_bytes_be(ciphertext))?;
+    let ciphertext = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
+
+    let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
     let mut em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
     oaep_decrypt(&mut em, digest, mgf_digest, label, priv_key.size())
@@ -275,7 +282,8 @@ fn decrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
         return Err(Error::Decryption);
     }
 
-    let em = rsa_decrypt_and_check(priv_key, rng, &BigUint::from_bytes_be(ciphertext))?;
+    let ciphertext = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
+    let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
     let mut em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
     oaep_decrypt_digest::<D, MGD>(&mut em, label, priv_key.size())
@@ -289,9 +297,8 @@ mod tests {
     use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 
     use alloc::string::String;
+    use crypto_bigint::{BoxedUint, Odd};
     use digest::{Digest, DynDigest, FixedOutputReset};
-    use num_bigint::BigUint;
-    use num_traits::FromPrimitive;
     use rand_chacha::{
         rand_core::{RngCore, SeedableRng},
         ChaCha8Rng,
@@ -330,12 +337,12 @@ mod tests {
         // -----END RSA PRIVATE KEY-----
 
         RsaPrivateKey::from_components(
-            BigUint::parse_bytes(b"00d397b84d98a4c26138ed1b695a8106ead91d553bf06041b62d3fdc50a041e222b8f4529689c1b82c5e71554f5dd69fa2f4b6158cf0dbeb57811a0fc327e1f28e74fe74d3bc166c1eabdc1b8b57b934ca8be5b00b4f29975bcc99acaf415b59bb28a6782bb41a2c3c2976b3c18dbadef62f00c6bb226640095096c0cc60d22fe7ef987d75c6a81b10d96bf292028af110dc7cc1bbc43d22adab379a0cd5d8078cc780ff5cd6209dea34c922cf784f7717e428d75b5aec8ff30e5f0141510766e2e0ab8d473c84e8710b2b98227c3db095337ad3452f19e2b9bfbccdd8148abf6776fa552775e6e75956e45229ae5a9c46949bab1e622f0e48f56524a84ed3483b", 16).unwrap(),
-            BigUint::from_u64(65537).unwrap(),
-            BigUint::parse_bytes(b"00c4e70c689162c94c660828191b52b4d8392115df486a9adbe831e458d73958320dc1b755456e93701e9702d76fb0b92f90e01d1fe248153281fe79aa9763a92fae69d8d7ecd144de29fa135bd14f9573e349e45031e3b76982f583003826c552e89a397c1a06bd2163488630d92e8c2bb643d7abef700da95d685c941489a46f54b5316f62b5d2c3a7f1bbd134cb37353a44683fdc9d95d36458de22f6c44057fe74a0a436c4308f73f4da42f35c47ac16a7138d483afc91e41dc3a1127382e0c0f5119b0221b4fc639d6b9c38177a6de9b526ebd88c38d7982c07f98a0efd877d508aae275b946915c02e2e1106d175d74ec6777f5e80d12c053d9c7be1e341", 16).unwrap(),
+            Odd::new(BoxedUint::from_be_hex("d397b84d98a4c26138ed1b695a8106ead91d553bf06041b62d3fdc50a041e222b8f4529689c1b82c5e71554f5dd69fa2f4b6158cf0dbeb57811a0fc327e1f28e74fe74d3bc166c1eabdc1b8b57b934ca8be5b00b4f29975bcc99acaf415b59bb28a6782bb41a2c3c2976b3c18dbadef62f00c6bb226640095096c0cc60d22fe7ef987d75c6a81b10d96bf292028af110dc7cc1bbc43d22adab379a0cd5d8078cc780ff5cd6209dea34c922cf784f7717e428d75b5aec8ff30e5f0141510766e2e0ab8d473c84e8710b2b98227c3db095337ad3452f19e2b9bfbccdd8148abf6776fa552775e6e75956e45229ae5a9c46949bab1e622f0e48f56524a84ed3483b", 2048).unwrap()).unwrap(),
+            BoxedUint::from(65_537u64),
+            BoxedUint::from_be_hex("c4e70c689162c94c660828191b52b4d8392115df486a9adbe831e458d73958320dc1b755456e93701e9702d76fb0b92f90e01d1fe248153281fe79aa9763a92fae69d8d7ecd144de29fa135bd14f9573e349e45031e3b76982f583003826c552e89a397c1a06bd2163488630d92e8c2bb643d7abef700da95d685c941489a46f54b5316f62b5d2c3a7f1bbd134cb37353a44683fdc9d95d36458de22f6c44057fe74a0a436c4308f73f4da42f35c47ac16a7138d483afc91e41dc3a1127382e0c0f5119b0221b4fc639d6b9c38177a6de9b526ebd88c38d7982c07f98a0efd877d508aae275b946915c02e2e1106d175d74ec6777f5e80d12c053d9c7be1e341", 2048).unwrap(),
             vec![
-                BigUint::parse_bytes(b"00f827bbf3a41877c7cc59aebf42ed4b29c32defcb8ed96863d5b090a05a8930dd624a21c9dcf9838568fdfa0df65b8462a5f2ac913d6c56f975532bd8e78fb07bd405ca99a484bcf59f019bbddcb3933f2bce706300b4f7b110120c5df9018159067c35da3061a56c8635a52b54273b31271b4311f0795df6021e6355e1a42e61",16).unwrap(),
-                BigUint::parse_bytes(b"00da4817ce0089dd36f2ade6a3ff410c73ec34bf1b4f6bda38431bfede11cef1f7f6efa70e5f8063a3b1f6e17296ffb15feefa0912a0325b8d1fd65a559e717b5b961ec345072e0ec5203d03441d29af4d64054a04507410cf1da78e7b6119d909ec66e6ad625bf995b279a4b3c5be7d895cd7c5b9c4c497fde730916fcdb4e41b", 16).unwrap()
+                BoxedUint::from_be_hex("f827bbf3a41877c7cc59aebf42ed4b29c32defcb8ed96863d5b090a05a8930dd624a21c9dcf9838568fdfa0df65b8462a5f2ac913d6c56f975532bd8e78fb07bd405ca99a484bcf59f019bbddcb3933f2bce706300b4f7b110120c5df9018159067c35da3061a56c8635a52b54273b31271b4311f0795df6021e6355e1a42e61", 1024).unwrap(),
+                BoxedUint::from_be_hex("da4817ce0089dd36f2ade6a3ff410c73ec34bf1b4f6bda38431bfede11cef1f7f6efa70e5f8063a3b1f6e17296ffb15feefa0912a0325b8d1fd65a559e717b5b961ec345072e0ec5203d03441d29af4d64054a04507410cf1da78e7b6119d909ec66e6ad625bf995b279a4b3c5be7d895cd7c5b9c4c497fde730916fcdb4e41b", 1024).unwrap()
             ],
         ).unwrap()
     }

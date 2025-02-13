@@ -19,11 +19,10 @@ pub use self::{
 
 use alloc::{boxed::Box, vec::Vec};
 use core::fmt::Debug;
+use crypto_bigint::BoxedUint;
 use digest::Digest;
-use num_bigint::BigUint;
 use pkcs8::AssociatedOid;
 use rand_core::CryptoRngCore;
-use zeroize::Zeroizing;
 
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pkcs1v15::*;
@@ -127,8 +126,7 @@ impl SignatureScheme for Pkcs1v15Sign {
             pub_key,
             self.prefix.as_ref(),
             hashed,
-            &BigUint::from_bytes_be(sig),
-            sig.len(),
+            &BoxedUint::from_be_slice(sig, sig.len() as u32 * 8)?,
         )
     }
 }
@@ -145,7 +143,7 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
     key::check_public(pub_key)?;
 
     let em = pkcs1v15_encrypt_pad(rng, msg, pub_key.size())?;
-    let int = Zeroizing::new(BigUint::from_bytes_be(&em));
+    let int = BoxedUint::from_be_slice(&em, pub_key.n_bits_precision())?;
     uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
@@ -166,7 +164,8 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
-    let em = rsa_decrypt_and_check(priv_key, rng, &BigUint::from_bytes_be(ciphertext))?;
+    let ciphertext = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
+    let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
     let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
     pkcs1v15_encrypt_unpad(em, priv_key.size())
@@ -194,22 +193,15 @@ fn sign<R: CryptoRngCore + ?Sized>(
 ) -> Result<Vec<u8>> {
     let em = pkcs1v15_sign_pad(prefix, hashed, priv_key.size())?;
 
-    uint_to_zeroizing_be_pad(
-        rsa_decrypt_and_check(priv_key, rng, &BigUint::from_bytes_be(&em))?,
-        priv_key.size(),
-    )
+    let em = BoxedUint::from_be_slice(&em, priv_key.n_bits_precision())?;
+    uint_to_zeroizing_be_pad(rsa_decrypt_and_check(priv_key, rng, &em)?, priv_key.size())
 }
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
 #[inline]
-fn verify(
-    pub_key: &RsaPublicKey,
-    prefix: &[u8],
-    hashed: &[u8],
-    sig: &BigUint,
-    sig_len: usize,
-) -> Result<()> {
-    if sig >= pub_key.n() || sig_len != pub_key.size() {
+fn verify(pub_key: &RsaPublicKey, prefix: &[u8], hashed: &[u8], sig: &BoxedUint) -> Result<()> {
+    let n = pub_key.n();
+    if sig >= n.as_ref() || sig.bits_precision() != pub_key.n_bits_precision() {
         return Err(Error::Verification);
     }
 
@@ -269,10 +261,8 @@ mod tests {
         SignatureEncoding, Signer, Verifier,
     };
     use base64ct::{Base64, Encoding};
+    use crypto_bigint::Odd;
     use hex_literal::hex;
-    use num_bigint::BigUint;
-    use num_traits::FromPrimitive;
-    use num_traits::Num;
     use rand_chacha::{
         rand_core::{RngCore, SeedableRng},
         ChaCha8Rng,
@@ -299,12 +289,12 @@ mod tests {
         // -----END RSA PRIVATE KEY-----
 
         RsaPrivateKey::from_components(
-            BigUint::from_str_radix("9353930466774385905609975137998169297361893554149986716853295022578535724979677252958524466350471210367835187480748268864277464700638583474144061408845077", 10).unwrap(),
-            BigUint::from_u64(65537).unwrap(),
-            BigUint::from_str_radix("7266398431328116344057699379749222532279343923819063639497049039389899328538543087657733766554155839834519529439851673014800261285757759040931985506583861", 10).unwrap(),
+            Odd::new(BoxedUint::from_be_hex("B2990F49C47DFA8CD400AE6A4D1B8A3B6A13642B23F28B003BFB97790ADE9A4CC82B8B2A81747DDEC08B6296E53A08C331687EF25C4BF4936BA1C0E6041E9D15", 512).unwrap()).unwrap(),
+            BoxedUint::from(65_537u64),
+            BoxedUint::from_be_hex("8ABD6A69F4D1A4B487F0AB8D7AAEFD38609405C999984E30F567E1E8AEEFF44E8B18BDB1EC78DFA31A55E32A48D7FB131F5AF1F44D7D6B2CED2A9DF5E5AE4535", 512).unwrap(),
             vec![
-                BigUint::from_str_radix("98920366548084643601728869055592650835572950932266967461790948584315647051443",10).unwrap(),
-                BigUint::from_str_radix("94560208308847015747498523884063394671606671904944666360068158221458669711639", 10).unwrap()
+                BoxedUint::from_be_hex("DAB2F18048BAA68DE7DF04D2D35D5D80E60E2DFA42D50A9B04219032715E46B3", 256).unwrap(),
+                BoxedUint::from_be_hex("D10F2E66B1D0C13F10EF9927BF5324A379CA218146CBF9CAFC795221F16A3117", 256).unwrap()
             ],
         ).unwrap()
     }
