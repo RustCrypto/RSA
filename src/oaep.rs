@@ -10,7 +10,6 @@ mod encrypting_key;
 pub use self::{decrypting_key::DecryptingKey, encrypting_key::EncryptingKey};
 
 use alloc::boxed::Box;
-use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt;
 use crypto_bigint::BoxedUint;
@@ -44,7 +43,7 @@ pub struct Oaep {
     pub mgf_digest: Box<dyn DynDigest + Send + Sync>,
 
     /// Optional label.
-    pub label: Option<String>,
+    pub label: Option<Box<[u8]>>,
 }
 
 impl Oaep {
@@ -77,13 +76,13 @@ impl Oaep {
     }
 
     /// Create a new OAEP `PaddingScheme` with an associated `label`, using `T` as the hash function for both the label and for MGF1.
-    pub fn new_with_label<T: 'static + Digest + DynDigest + Send + Sync, S: AsRef<str>>(
+    pub fn new_with_label<T: 'static + Digest + DynDigest + Send + Sync, S: Into<Box<[u8]>>>(
         label: S,
     ) -> Self {
         Self {
             digest: Box::new(T::new()),
             mgf_digest: Box::new(T::new()),
-            label: Some(label.as_ref().to_string()),
+            label: Some(label.into()),
         }
     }
 
@@ -123,14 +122,14 @@ impl Oaep {
     pub fn new_with_mgf_hash_and_label<
         T: 'static + Digest + DynDigest + Send + Sync,
         U: 'static + Digest + DynDigest + Send + Sync,
-        S: AsRef<str>,
+        S: Into<Box<[u8]>>,
     >(
         label: S,
     ) -> Self {
         Self {
             digest: Box::new(T::new()),
             mgf_digest: Box::new(U::new()),
-            label: Some(label.as_ref().to_string()),
+            label: Some(label.into()),
         }
     }
 }
@@ -193,7 +192,7 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
     msg: &[u8],
     digest: &mut dyn DynDigest,
     mgf_digest: &mut dyn DynDigest,
-    label: Option<String>,
+    label: Option<Box<[u8]>>,
 ) -> Result<Vec<u8>> {
     key::check_public(pub_key)?;
 
@@ -214,7 +213,7 @@ fn encrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
     rng: &mut R,
     pub_key: &RsaPublicKey,
     msg: &[u8],
-    label: Option<String>,
+    label: Option<Box<[u8]>>,
 ) -> Result<Vec<u8>> {
     key::check_public(pub_key)?;
 
@@ -243,7 +242,7 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
     ciphertext: &[u8],
     digest: &mut dyn DynDigest,
     mgf_digest: &mut dyn DynDigest,
-    label: Option<String>,
+    label: Option<Box<[u8]>>,
 ) -> Result<Vec<u8>> {
     if ciphertext.len() != priv_key.size() {
         return Err(Error::Decryption);
@@ -274,7 +273,7 @@ fn decrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
     rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
-    label: Option<String>,
+    label: Option<Box<[u8]>>,
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
@@ -296,7 +295,6 @@ mod tests {
     use crate::traits::PublicKeyParts;
     use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 
-    use alloc::string::String;
     use crypto_bigint::{BoxedUint, Odd};
     use digest::{Digest, DynDigest, FixedOutputReset};
     use rand_chacha::{
@@ -369,18 +367,12 @@ mod tests {
         do_test_oaep_with_different_hashes::<Sha3_512, Sha1>(&priv_key);
     }
 
-    fn get_label(rng: &mut ChaCha8Rng) -> Option<String> {
-        const GEN_ASCII_STR_CHARSET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ\
-                abcdefghijklmnopqrstuvwxyz\
-                0123456789=+";
-
+    fn get_label(rng: &mut ChaCha8Rng) -> Option<Box<[u8]>> {
         let mut buf = [0u8; 32];
         rng.fill_bytes(&mut buf);
-        if buf[0] < (1 << 7) {
-            for v in buf.iter_mut() {
-                *v = GEN_ASCII_STR_CHARSET[(*v >> 2) as usize];
-            }
-            Some(core::str::from_utf8(&buf).unwrap().to_string())
+
+        if rng.next_u32() % 2 == 0 {
+            Some(buf.into())
         } else {
             None
         }
@@ -405,7 +397,7 @@ mod tests {
             let pub_key: RsaPublicKey = prk.into();
 
             let ciphertext = if let Some(ref label) = label {
-                let padding = Oaep::new_with_label::<D, _>(label);
+                let padding = Oaep::new_with_label::<D, _>(label.clone());
                 pub_key.encrypt(&mut rng, padding, &input).unwrap()
             } else {
                 let padding = Oaep::new::<D>();
@@ -415,8 +407,8 @@ mod tests {
             assert_ne!(input, ciphertext);
             let blind: bool = rng.next_u32() < (1 << 31);
 
-            let padding = if let Some(ref label) = label {
-                Oaep::new_with_label::<D, _>(label)
+            let padding = if let Some(label) = label {
+                Oaep::new_with_label::<D, Box<[u8]>>(label)
             } else {
                 Oaep::new::<D>()
             };
@@ -453,7 +445,7 @@ mod tests {
             let pub_key: RsaPublicKey = prk.into();
 
             let ciphertext = if let Some(ref label) = label {
-                let padding = Oaep::new_with_mgf_hash_and_label::<D, U, _>(label);
+                let padding = Oaep::new_with_mgf_hash_and_label::<D, U, _>(label.clone());
                 pub_key.encrypt(&mut rng, padding, &input).unwrap()
             } else {
                 let padding = Oaep::new_with_mgf_hash::<D, U>();
@@ -463,7 +455,7 @@ mod tests {
             assert_ne!(input, ciphertext);
             let blind: bool = rng.next_u32() < (1 << 31);
 
-            let padding = if let Some(ref label) = label {
+            let padding = if let Some(label) = label {
                 Oaep::new_with_mgf_hash_and_label::<D, U, _>(label)
             } else {
                 Oaep::new_with_mgf_hash::<D, U>()
@@ -491,7 +483,7 @@ mod tests {
             priv_key
                 .decrypt_blinded(
                     &mut rng,
-                    Oaep::new_with_label::<Sha1, _>("label"),
+                    Oaep::new_with_label::<Sha1, _>("label".as_bytes()),
                     &ciphertext,
                 )
                 .is_err(),
@@ -579,7 +571,7 @@ mod tests {
         let priv_key = get_private_key();
         let pub_key: RsaPublicKey = (&priv_key).into();
         let encrypting_key = EncryptingKey::<Sha1>::new(pub_key);
-        let decrypting_key = DecryptingKey::<Sha1>::new_with_label(priv_key, "label");
+        let decrypting_key = DecryptingKey::<Sha1>::new_with_label(priv_key, "label".as_bytes());
         let ciphertext = encrypting_key
             .encrypt_with_rng(&mut rng, "a_plain_text".as_bytes())
             .unwrap();

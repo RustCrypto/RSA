@@ -4,10 +4,7 @@ use crate::{
     traits::{Decryptor, RandomizedDecryptor},
     Result, RsaPrivateKey,
 };
-use alloc::{
-    string::{String, ToString},
-    vec::Vec,
-};
+use alloc::{boxed::Box, vec::Vec};
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset};
 use rand_core::CryptoRngCore;
@@ -26,7 +23,7 @@ where
     MGD: Digest + FixedOutputReset,
 {
     inner: RsaPrivateKey,
-    label: Option<String>,
+    label: Option<Box<[u8]>>,
     phantom: PhantomData<D>,
     mg_phantom: PhantomData<MGD>,
 }
@@ -47,10 +44,10 @@ where
     }
 
     /// Create a new verifying key from an RSA public key using provided label
-    pub fn new_with_label<S: AsRef<str>>(key: RsaPrivateKey, label: S) -> Self {
+    pub fn new_with_label<S: Into<Box<[u8]>>>(key: RsaPrivateKey, label: S) -> Self {
         Self {
             inner: key,
-            label: Some(label.as_ref().to_string()),
+            label: Some(label.into()),
             phantom: Default::default(),
             mg_phantom: Default::default(),
         }
@@ -63,12 +60,7 @@ where
     MGD: Digest + FixedOutputReset,
 {
     fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        decrypt_digest::<DummyRng, D, MGD>(
-            None,
-            &self.inner,
-            ciphertext,
-            self.label.as_ref().cloned(),
-        )
+        decrypt_digest::<DummyRng, D, MGD>(None, &self.inner, ciphertext, self.label.clone())
     }
 }
 
@@ -82,12 +74,7 @@ where
         rng: &mut R,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
-        decrypt_digest::<_, D, MGD>(
-            Some(rng),
-            &self.inner,
-            ciphertext,
-            self.label.as_ref().cloned(),
-        )
+        decrypt_digest::<_, D, MGD>(Some(rng), &self.inner, ciphertext, self.label.clone())
     }
 }
 
