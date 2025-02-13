@@ -147,7 +147,7 @@ checksum = "4919aa33c410cb537c1b2a8458a896f9e47ed4349a2002e5b240f358f7bf6ffc"
 dependencies = [
  "num-traits",
  "rand_core",
- "serdect 0.3.0",
+ "serdect",
  "subtle",
  "zeroize",
 ]
@@ -332,9 +332,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.20.2"
+version = "1.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1261fe7e33c73b354eab43b1273a57c8f967d0391e80353e51f764ac02cf6775"
+checksum = "945462a4b81e43c4e3ba96bd7b49d834c6f61198356aa858733bc4acf3cbe62e"
 
 [[package]]
 name = "opaque-debug"
@@ -364,7 +364,7 @@ dependencies = [
 [[package]]
 name = "pkcs1"
 version = "0.8.0-rc.1"
-source = "git+https://github.com/RustCrypto/formats.git#a4f4ff7dcea3f7b174aa7dd389da77cab2522d25"
+source = "git+https://github.com/RustCrypto/formats.git#c2bbe3308b2338954581e7125dbefb23d6519474"
 dependencies = [
  "der",
  "pkcs8",
@@ -391,7 +391,7 @@ dependencies = [
 [[package]]
 name = "pkcs8"
 version = "0.11.0-rc.1"
-source = "git+https://github.com/RustCrypto/formats.git#a4f4ff7dcea3f7b174aa7dd389da77cab2522d25"
+source = "git+https://github.com/RustCrypto/formats.git#c2bbe3308b2338954581e7125dbefb23d6519474"
 dependencies = [
  "der",
  "pkcs5",
@@ -528,7 +528,7 @@ dependencies = [
  "rand_xorshift",
  "serde",
  "serde_test",
- "serdect 0.2.0",
+ "serdect",
  "sha1",
  "sha2",
  "sha3",
@@ -615,16 +615,6 @@ dependencies = [
 
 [[package]]
 name = "serdect"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a84f14a19e9a014bb9f4512488d9829a68e04ecabffb0f9904cd1ace94598177"
-dependencies = [
- "base16ct",
- "serde",
-]
-
-[[package]]
-name = "serdect"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f42f67da2385b51a5f9652db9c93d78aeaf7610bf5ec366080b6de810604af53"
@@ -693,9 +683,9 @@ checksum = "13c2bddecc57b384dee18652358fb23172facb8a2c51ccc10d74c157bdea3292"
 
 [[package]]
 name = "syn"
-version = "2.0.96"
+version = "2.0.98"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5d0adab1ae378d7f53bdebc67a39f1f151407ef230f0ce2883572f5d8985c80"
+checksum = "36147f1a48ae0ec2b5b3bc5b537d267457555a10dc06f3dbc8cb11ba3006d3b1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -746,9 +736,9 @@ dependencies = [
 
 [[package]]
 name = "wait-timeout"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f200f5b12eb75f8c1ed65abd4b2db8a6e1b138a20de009dacee265a2498f3f6"
+checksum = "09ac3b126d3914f9849036f826e054cbabdc8519970b8998ddaf3b5bd3c65f11"
 dependencies = [
  "libc",
 ]
