@@ -143,10 +143,7 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
     key::check_public(pub_key)?;
 
     let em = pkcs1v15_encrypt_pad(rng, msg, pub_key.size())?;
-    let int = BoxedUint::from_be_slice(
-        &em,
-        crate::traits::keys::PublicKeyParts::n_bits_precision(pub_key),
-    )?;
+    let int = BoxedUint::from_be_slice(&em, pub_key.n_bits_precision())?;
     uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
@@ -167,10 +164,7 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
-    let ciphertext = BoxedUint::from_be_slice(
-        ciphertext,
-        crate::traits::keys::PublicKeyParts::n_bits_precision(priv_key),
-    )?;
+    let ciphertext = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
     let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
@@ -199,17 +193,14 @@ fn sign<R: CryptoRngCore + ?Sized>(
 ) -> Result<Vec<u8>> {
     let em = pkcs1v15_sign_pad(prefix, hashed, priv_key.size())?;
 
-    let em = BoxedUint::from_be_slice(
-        &em,
-        crate::traits::keys::PublicKeyParts::n_bits_precision(priv_key),
-    )?;
+    let em = BoxedUint::from_be_slice(&em, priv_key.n_bits_precision())?;
     uint_to_zeroizing_be_pad(rsa_decrypt_and_check(priv_key, rng, &em)?, priv_key.size())
 }
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
 #[inline]
 fn verify(pub_key: &RsaPublicKey, prefix: &[u8], hashed: &[u8], sig: &BoxedUint) -> Result<()> {
-    let n = crate::traits::keys::PublicKeyParts::n(pub_key);
+    let n = pub_key.n();
     if sig >= n.as_ref() || sig.bits_precision() != pub_key.n_bits_precision() {
         return Err(Error::Verification);
     }

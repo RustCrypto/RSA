@@ -1,12 +1,13 @@
 //! Generic RSA implementation
 
+use core::cmp::Ordering;
+
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
 use crypto_bigint::{BoxedUint, Gcd, NonZero, Odd, RandomMod, Wrapping};
 use rand_core::CryptoRngCore;
 use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
-use crate::key::reduce;
 use crate::traits::keys::{PrivateKeyParts, PublicKeyParts};
 
 /// ⚠️ Raw RSA encryption of m with the public key. No padding is performed.
@@ -203,8 +204,22 @@ fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: &BoxedMontyParams) ->
 
 /// Computes `base.pow_mod(exp, n)` with precomputed `n_params`.
 fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: &BoxedMontyParams) -> BoxedUint {
-    let base = reduce(base, n_params);
+    let base = reduce_vartime(base, n_params);
     base.pow(exp).retrieve()
+}
+
+fn reduce_vartime(n: &BoxedUint, p: &BoxedMontyParams) -> BoxedMontyForm {
+    let bits_precision = p.modulus().bits_precision();
+    let modulus = p.modulus().as_nz_ref().clone();
+
+    let n = match n.bits_precision().cmp(&bits_precision) {
+        Ordering::Less => n.widen(bits_precision),
+        Ordering::Equal => n.clone(),
+        Ordering::Greater => n.shorten(bits_precision),
+    };
+
+    let n_reduced = n.rem_vartime(&modulus).widen(p.bits_precision());
+    BoxedMontyForm::new(n_reduced, p.clone())
 }
 
 /// Computes `lhs.mul_mod(rhs, n)` with precomputed `n_params`.

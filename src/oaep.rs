@@ -199,10 +199,7 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
 
     let em = oaep_encrypt(rng, msg, digest, mgf_digest, label, pub_key.size())?;
 
-    let int = BoxedUint::from_be_slice(
-        &em,
-        crate::traits::keys::PublicKeyParts::n_bits_precision(pub_key),
-    )?;
+    let int = BoxedUint::from_be_slice(&em, pub_key.n_bits_precision())?;
     uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
@@ -223,10 +220,7 @@ fn encrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
 
     let em = oaep_encrypt_digest::<_, D, MGD>(rng, msg, label, pub_key.size())?;
 
-    let int = BoxedUint::from_be_slice(
-        &em,
-        crate::traits::keys::PublicKeyParts::n_bits_precision(pub_key),
-    )?;
+    let int = BoxedUint::from_be_slice(&em, pub_key.n_bits_precision())?;
     uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
@@ -255,10 +249,7 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
         return Err(Error::Decryption);
     }
 
-    let ciphertext = BoxedUint::from_be_slice(
-        ciphertext,
-        crate::traits::keys::PublicKeyParts::n_bits_precision(priv_key),
-    )?;
+    let ciphertext = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
 
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
     let mut em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
@@ -291,10 +282,7 @@ fn decrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
         return Err(Error::Decryption);
     }
 
-    let ciphertext = BoxedUint::from_be_slice(
-        ciphertext,
-        crate::traits::keys::PublicKeyParts::n_bits_precision(priv_key),
-    )?;
+    let ciphertext = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
     let mut em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 

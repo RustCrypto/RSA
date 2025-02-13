@@ -1,5 +1,4 @@
 use alloc::vec::Vec;
-use core::cmp::Ordering;
 use core::hash::{Hash, Hasher};
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
 use crypto_bigint::{BoxedUint, Integer, NonZero, Odd};
@@ -592,20 +591,6 @@ fn check_public_with_max_size(n: &BoxedUint, e: &BoxedUint, max_size: usize) -> 
     }
 
     Ok(())
-}
-
-pub(crate) fn reduce(n: &BoxedUint, p: &BoxedMontyParams) -> BoxedMontyForm {
-    let bits_precision = p.modulus().bits_precision();
-    let modulus = p.modulus().as_nz_ref().clone();
-
-    let n = match n.bits_precision().cmp(&bits_precision) {
-        Ordering::Less => n.widen(bits_precision),
-        Ordering::Equal => n.clone(),
-        Ordering::Greater => n.shorten(bits_precision),
-    };
-
-    let n_reduced = n.rem_vartime(&modulus).widen(p.bits_precision());
-    BoxedMontyForm::new(n_reduced, p.clone())
 }
 
 #[cfg(feature = "serde")]
