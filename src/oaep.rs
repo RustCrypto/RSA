@@ -15,7 +15,7 @@ use core::fmt;
 use crypto_bigint::BoxedUint;
 
 use digest::{Digest, DynDigest, FixedOutputReset};
-use rand_core::CryptoRngCore;
+use rand_core::TryCryptoRng;
 
 use crate::algorithms::oaep::*;
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
@@ -135,7 +135,7 @@ impl Oaep {
 }
 
 impl PaddingScheme for Oaep {
-    fn decrypt<Rng: CryptoRngCore>(
+    fn decrypt<Rng: TryCryptoRng + ?Sized>(
         mut self,
         rng: Option<&mut Rng>,
         priv_key: &RsaPrivateKey,
@@ -151,7 +151,7 @@ impl PaddingScheme for Oaep {
         )
     }
 
-    fn encrypt<Rng: CryptoRngCore>(
+    fn encrypt<Rng: TryCryptoRng + ?Sized>(
         mut self,
         rng: &mut Rng,
         pub_key: &RsaPublicKey,
@@ -186,7 +186,7 @@ impl fmt::Debug for Oaep {
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-fn encrypt<R: CryptoRngCore + ?Sized>(
+fn encrypt<R: TryCryptoRng + ?Sized>(
     rng: &mut R,
     pub_key: &RsaPublicKey,
     msg: &[u8],
@@ -209,7 +209,7 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
 /// `2 + (2 * hash.size())`.
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
-fn encrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutputReset>(
+fn encrypt_digest<R: TryCryptoRng + ?Sized, D: Digest, MGD: Digest + FixedOutputReset>(
     rng: &mut R,
     pub_key: &RsaPublicKey,
     msg: &[u8],
@@ -236,7 +236,7 @@ fn encrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutpu
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-fn decrypt<R: CryptoRngCore + ?Sized>(
+fn decrypt<R: TryCryptoRng + ?Sized>(
     rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
@@ -269,7 +269,7 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-fn decrypt_digest<R: CryptoRngCore + ?Sized, D: Digest, MGD: Digest + FixedOutputReset>(
+fn decrypt_digest<R: TryCryptoRng + ?Sized, D: Digest, MGD: Digest + FixedOutputReset>(
     rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     ciphertext: &[u8],

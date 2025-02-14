@@ -4,7 +4,7 @@ use alloc::boxed::Box;
 use alloc::vec::Vec;
 
 use digest::{Digest, DynDigest, FixedOutputReset};
-use rand_core::CryptoRngCore;
+use rand_core::TryCryptoRng;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use zeroize::Zeroizing;
 
@@ -19,7 +19,7 @@ use crate::errors::{Error, Result};
 const MAX_LABEL_LEN: u64 = 1 << 61;
 
 #[inline]
-fn encrypt_internal<R: CryptoRngCore + ?Sized, MGF: FnMut(&mut [u8], &mut [u8])>(
+fn encrypt_internal<R: TryCryptoRng + ?Sized, MGF: FnMut(&mut [u8], &mut [u8])>(
     rng: &mut R,
     msg: &[u8],
     p_hash: &[u8],
@@ -35,7 +35,7 @@ fn encrypt_internal<R: CryptoRngCore + ?Sized, MGF: FnMut(&mut [u8], &mut [u8])>
 
     let (_, payload) = em.split_at_mut(1);
     let (seed, db) = payload.split_at_mut(h_size);
-    rng.fill_bytes(seed);
+    rng.try_fill_bytes(seed).map_err(|_| Error::Rng)?;
 
     // Data block DB =  pHash || PS || 01 || M
     let db_len = k - h_size - 1;
@@ -57,7 +57,7 @@ fn encrypt_internal<R: CryptoRngCore + ?Sized, MGF: FnMut(&mut [u8], &mut [u8])>
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-pub(crate) fn oaep_encrypt<R: CryptoRngCore + ?Sized>(
+pub(crate) fn oaep_encrypt<R: TryCryptoRng + ?Sized>(
     rng: &mut R,
     msg: &[u8],
     digest: &mut dyn DynDigest,
@@ -90,7 +90,7 @@ pub(crate) fn oaep_encrypt<R: CryptoRngCore + ?Sized>(
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
 pub(crate) fn oaep_encrypt_digest<
-    R: CryptoRngCore + ?Sized,
+    R: TryCryptoRng + ?Sized,
     D: Digest,
     MGD: Digest + FixedOutputReset,
 >(

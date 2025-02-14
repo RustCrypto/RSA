@@ -22,7 +22,7 @@ use core::fmt::Debug;
 use crypto_bigint::BoxedUint;
 use digest::Digest;
 use pkcs8::AssociatedOid;
-use rand_core::CryptoRngCore;
+use rand_core::TryCryptoRng;
 
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pkcs1v15::*;
@@ -36,7 +36,7 @@ use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
 pub struct Pkcs1v15Encrypt;
 
 impl PaddingScheme for Pkcs1v15Encrypt {
-    fn decrypt<Rng: CryptoRngCore>(
+    fn decrypt<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: Option<&mut Rng>,
         priv_key: &RsaPrivateKey,
@@ -45,7 +45,7 @@ impl PaddingScheme for Pkcs1v15Encrypt {
         decrypt(rng, priv_key, ciphertext)
     }
 
-    fn encrypt<Rng: CryptoRngCore>(
+    fn encrypt<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: &mut Rng,
         pub_key: &RsaPublicKey,
@@ -100,7 +100,7 @@ impl Pkcs1v15Sign {
 }
 
 impl SignatureScheme for Pkcs1v15Sign {
-    fn sign<Rng: CryptoRngCore>(
+    fn sign<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: Option<&mut Rng>,
         priv_key: &RsaPrivateKey,
@@ -135,7 +135,7 @@ impl SignatureScheme for Pkcs1v15Sign {
 /// scheme from PKCS#1 v1.5.  The message must be no longer than the
 /// length of the public modulus minus 11 bytes.
 #[inline]
-fn encrypt<R: CryptoRngCore + ?Sized>(
+fn encrypt<R: TryCryptoRng + ?Sized>(
     rng: &mut R,
     pub_key: &RsaPublicKey,
     msg: &[u8],
@@ -157,7 +157,7 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
 /// forge signatures as if they had the private key. See
 /// `decrypt_session_key` for a way of solving this problem.
 #[inline]
-fn decrypt<R: CryptoRngCore + ?Sized>(
+fn decrypt<R: TryCryptoRng + ?Sized>(
     rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
@@ -185,7 +185,7 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
 /// messages to signatures and identify the signed messages. As ever,
 /// signatures provide authenticity, not confidentiality.
 #[inline]
-fn sign<R: CryptoRngCore + ?Sized>(
+fn sign<R: TryCryptoRng + ?Sized>(
     rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     prefix: &[u8],
@@ -303,19 +303,24 @@ mod tests {
     fn test_decrypt_pkcs1v15() {
         let priv_key = get_private_key();
 
-        let tests = [[
-	    "gIcUIoVkD6ATMBk/u/nlCZCCWRKdkfjCgFdo35VpRXLduiKXhNz1XupLLzTXAybEq15juc+EgY5o0DHv/nt3yg==",
-	    "x",
-	], [
-	    "Y7TOCSqofGhkRb+jaVRLzK8xw2cSo1IVES19utzv6hwvx+M8kFsoWQm5DzBeJCZTCVDPkTpavUuEbgp8hnUGDw==",
-	    "testing.",
-	], [
-	    "arReP9DJtEVyV2Dg3dDp4c/PSk1O6lxkoJ8HcFupoRorBZG+7+1fDAwT1olNddFnQMjmkb8vxwmNMoTAT/BFjQ==",
-	    "testing.\n",
-	], [
-	"WtaBXIoGC54+vH0NH0CHHE+dRDOsMc/6BrfFu2lEqcKL9+uDuWaf+Xj9mrbQCjjZcpQuX733zyok/jsnqe/Ftw==",
-		"01234567890123456789012345678901234567890123456789012",
-	]];
+        let tests = [
+            [
+                "gIcUIoVkD6ATMBk/u/nlCZCCWRKdkfjCgFdo35VpRXLduiKXhNz1XupLLzTXAybEq15juc+EgY5o0DHv/nt3yg==",
+                "x",
+            ],
+            [
+                "Y7TOCSqofGhkRb+jaVRLzK8xw2cSo1IVES19utzv6hwvx+M8kFsoWQm5DzBeJCZTCVDPkTpavUuEbgp8hnUGDw==",
+                "testing.",
+            ],
+            [
+                "arReP9DJtEVyV2Dg3dDp4c/PSk1O6lxkoJ8HcFupoRorBZG+7+1fDAwT1olNddFnQMjmkb8vxwmNMoTAT/BFjQ==",
+                "testing.\n",
+            ],
+            [
+                "WtaBXIoGC54+vH0NH0CHHE+dRDOsMc/6BrfFu2lEqcKL9+uDuWaf+Xj9mrbQCjjZcpQuX733zyok/jsnqe/Ftw==",
+                "01234567890123456789012345678901234567890123456789012",
+            ],
+        ];
 
         for test in &tests {
             let out = priv_key
@@ -354,19 +359,24 @@ mod tests {
         let priv_key = get_private_key();
         let decrypting_key = DecryptingKey::new(priv_key);
 
-        let tests = [[
-	    "gIcUIoVkD6ATMBk/u/nlCZCCWRKdkfjCgFdo35VpRXLduiKXhNz1XupLLzTXAybEq15juc+EgY5o0DHv/nt3yg==",
-	    "x",
-	], [
-	    "Y7TOCSqofGhkRb+jaVRLzK8xw2cSo1IVES19utzv6hwvx+M8kFsoWQm5DzBeJCZTCVDPkTpavUuEbgp8hnUGDw==",
-	    "testing.",
-	], [
-	    "arReP9DJtEVyV2Dg3dDp4c/PSk1O6lxkoJ8HcFupoRorBZG+7+1fDAwT1olNddFnQMjmkb8vxwmNMoTAT/BFjQ==",
-	    "testing.\n",
-	], [
-	"WtaBXIoGC54+vH0NH0CHHE+dRDOsMc/6BrfFu2lEqcKL9+uDuWaf+Xj9mrbQCjjZcpQuX733zyok/jsnqe/Ftw==",
-		"01234567890123456789012345678901234567890123456789012",
-	]];
+        let tests = [
+            [
+                "gIcUIoVkD6ATMBk/u/nlCZCCWRKdkfjCgFdo35VpRXLduiKXhNz1XupLLzTXAybEq15juc+EgY5o0DHv/nt3yg==",
+                "x",
+            ],
+            [
+                "Y7TOCSqofGhkRb+jaVRLzK8xw2cSo1IVES19utzv6hwvx+M8kFsoWQm5DzBeJCZTCVDPkTpavUuEbgp8hnUGDw==",
+                "testing.",
+            ],
+            [
+                "arReP9DJtEVyV2Dg3dDp4c/PSk1O6lxkoJ8HcFupoRorBZG+7+1fDAwT1olNddFnQMjmkb8vxwmNMoTAT/BFjQ==",
+                "testing.\n",
+            ],
+            [
+                "WtaBXIoGC54+vH0NH0CHHE+dRDOsMc/6BrfFu2lEqcKL9+uDuWaf+Xj9mrbQCjjZcpQuX733zyok/jsnqe/Ftw==",
+                "01234567890123456789012345678901234567890123456789012",
+            ],
+        ];
 
         for test in &tests {
             let out = decrypting_key

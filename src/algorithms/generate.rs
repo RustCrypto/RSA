@@ -4,9 +4,9 @@ use alloc::vec::Vec;
 use crypto_bigint::{BoxedUint, Odd};
 use crypto_primes::{
     hazmat::{SetBits, SmallPrimesSieveFactory},
-    is_prime_with_rng, sieve_and_find,
+    is_prime, sieve_and_find,
 };
-use rand_core::CryptoRngCore;
+use rand_core::CryptoRng;
 
 use crate::{
     algorithms::rsa::{compute_modulus, compute_private_exponent_euler_totient},
@@ -31,7 +31,7 @@ pub struct RsaPrivateKeyComponents {
 ///
 /// [1]: https://patents.google.com/patent/US4405829A/en
 /// [2]: http://www.cacr.math.uwaterloo.ca/techreports/2006/cacr2006-16.pdf
-pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore>(
+pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRng + ?Sized>(
     rng: &mut R,
     nprimes: usize,
     bit_size: usize,
@@ -120,11 +120,11 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRngCore>(
     })
 }
 
-fn generate_prime_with_rng<R: CryptoRngCore>(rng: &mut R, bit_length: u32) -> BoxedUint {
+fn generate_prime_with_rng<R: CryptoRng + ?Sized>(rng: &mut R, bit_length: u32) -> BoxedUint {
     sieve_and_find(
         rng,
         SmallPrimesSieveFactory::new(bit_length, SetBits::TwoMsb),
-        is_prime_with_rng,
+        |_rng, candidate| is_prime(candidate),
     )
     .expect("will produce a result eventually")
 }

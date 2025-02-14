@@ -69,6 +69,9 @@ pub enum Error {
 
     /// Decoding error.
     Decode(crypto_bigint::DecodeError),
+
+    /// Random number generator error.
+    Rng,
 }
 
 #[cfg(feature = "std")]
@@ -99,6 +102,7 @@ impl core::fmt::Display for Error {
             Error::InvalidPadLen => write!(f, "invalid padding length"),
             Error::InvalidArguments => write!(f, "invalid arguments"),
             Error::Decode(err) => write!(f, "{:?}", err),
+            Error::Rng => write!(f, "rng error"),
         }
     }
 }

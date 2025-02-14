@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 use core::hash::{Hash, Hasher};
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
 use crypto_bigint::{BoxedUint, Integer, NonZero, Odd};
-use rand_core::CryptoRngCore;
+use rand_core::CryptoRng;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 #[cfg(feature = "serde")]
 use {
@@ -169,7 +169,7 @@ impl PublicKeyParts for RsaPublicKey {
 
 impl RsaPublicKey {
     /// Encrypt the given message.
-    pub fn encrypt<R: CryptoRngCore, P: PaddingScheme>(
+    pub fn encrypt<R: CryptoRng + ?Sized, P: PaddingScheme>(
         &self,
         rng: &mut R,
         padding: P,
@@ -254,7 +254,7 @@ impl RsaPrivateKey {
     const EXP: u64 = 65537;
 
     /// Generate a new Rsa key pair of the given bit size using the passed in `rng`.
-    pub fn new<R: CryptoRngCore>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
+    pub fn new<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
         Self::new_with_exp(rng, bit_size, BoxedUint::from(Self::EXP))
     }
 
@@ -262,7 +262,7 @@ impl RsaPrivateKey {
     /// using the passed in `rng`.
     ///
     /// Unless you have specific needs, you should use `RsaPrivateKey::new` instead.
-    pub fn new_with_exp<R: CryptoRngCore>(
+    pub fn new_with_exp<R: CryptoRng + ?Sized>(
         rng: &mut R,
         bit_size: usize,
         exp: BoxedUint,
@@ -493,7 +493,7 @@ impl RsaPrivateKey {
     /// Decrypt the given message.
     ///
     /// Uses `rng` to blind the decryption process.
-    pub fn decrypt_blinded<R: CryptoRngCore, P: PaddingScheme>(
+    pub fn decrypt_blinded<R: CryptoRng + ?Sized, P: PaddingScheme>(
         &self,
         rng: &mut R,
         padding: P,
@@ -517,7 +517,7 @@ impl RsaPrivateKey {
     ///   [`Pss::new`][`crate::Pss::new`] for a standard RSASSA-PSS signature, or
     ///   [`Pss::new_blinded`][`crate::Pss::new_blinded`] for RSA-BSSA blind
     ///   signatures.
-    pub fn sign_with_rng<R: CryptoRngCore, S: SignatureScheme>(
+    pub fn sign_with_rng<R: CryptoRng + ?Sized, S: SignatureScheme>(
         &self,
         rng: &mut R,
         padding: S,
@@ -770,13 +770,15 @@ mod tests {
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
 
-        let priv_tokens = [Token::Str(
-            "3054020100300d06092a864886f70d01010105000440303e020100020900c9269f2f225eb38d020301000102086ecdc49f528812a1020500d2aaa725020500f46fc249020500887e253902046b4851e1020423806864",
-        )];
+        let priv_tokens = [Token::Str(concat!(
+            "3054020100300d06092a864886f70d01010105000440303e020100020900a",
+            "ecdb5fae1b092570203010001020869bf9ae9d6712899020500d2aaa72502",
+            "0500d46b68cb020500887e253902047b4e3a4f02040991164c"
+        ))];
         assert_tokens(&priv_key.clone().readable(), &priv_tokens);
 
         let priv_tokens = [Token::Str(
-            "3024300d06092a864886f70d01010105000313003010020900c9269f2f225eb38d0203010001",
+            "3024300d06092a864886f70d01010105000313003010020900aecdb5fae1b092570203010001",
         )];
         assert_tokens(
             &RsaPublicKey::from(priv_key.clone()).readable(),

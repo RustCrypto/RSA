@@ -27,7 +27,7 @@ use const_oid::AssociatedOid;
 use digest::{Digest, DynDigest, FixedOutputReset};
 use pkcs1::RsaPssParams;
 use pkcs8::spki::{der::Any, AlgorithmIdentifierOwned};
-use rand_core::CryptoRngCore;
+use rand_core::TryCryptoRng;
 
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pss::*;
@@ -86,7 +86,7 @@ impl Pss {
 }
 
 impl SignatureScheme for Pss {
-    fn sign<Rng: CryptoRngCore>(
+    fn sign<Rng: TryCryptoRng + ?Sized>(
         mut self,
         rng: Option<&mut Rng>,
         priv_key: &RsaPrivateKey,
@@ -165,7 +165,7 @@ where
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. The opts argument may be nil, in which case sensible
 /// defaults are used.
-pub(crate) fn sign<T: CryptoRngCore>(
+pub(crate) fn sign<T: TryCryptoRng + ?Sized>(
     rng: &mut T,
     blind: bool,
     priv_key: &RsaPrivateKey,
@@ -174,12 +174,12 @@ pub(crate) fn sign<T: CryptoRngCore>(
     digest: &mut dyn DynDigest,
 ) -> Result<Vec<u8>> {
     let mut salt = vec![0; salt_len];
-    rng.fill_bytes(&mut salt[..]);
+    rng.try_fill_bytes(&mut salt[..]).map_err(|_| Error::Rng)?;
 
     sign_pss_with_salt(blind.then_some(rng), priv_key, hashed, &salt, digest)
 }
 
-pub(crate) fn sign_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputReset>(
+pub(crate) fn sign_digest<T: TryCryptoRng + ?Sized, D: Digest + FixedOutputReset>(
     rng: &mut T,
     blind: bool,
     priv_key: &RsaPrivateKey,
@@ -187,7 +187,7 @@ pub(crate) fn sign_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputRese
     salt_len: usize,
 ) -> Result<Vec<u8>> {
     let mut salt = vec![0; salt_len];
-    rng.fill_bytes(&mut salt[..]);
+    rng.try_fill_bytes(&mut salt[..]).map_err(|_| Error::Rng)?;
 
     sign_pss_with_salt_digest::<_, D>(blind.then_some(rng), priv_key, hashed, &salt)
 }
@@ -197,7 +197,7 @@ pub(crate) fn sign_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputRese
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. salt is a random sequence of bytes whose length will be
 /// later used to verify the signature.
-fn sign_pss_with_salt<T: CryptoRngCore>(
+fn sign_pss_with_salt<T: TryCryptoRng + ?Sized>(
     blind_rng: Option<&mut T>,
     priv_key: &RsaPrivateKey,
     hashed: &[u8],
@@ -213,7 +213,7 @@ fn sign_pss_with_salt<T: CryptoRngCore>(
     uint_to_zeroizing_be_pad(raw, priv_key.size())
 }
 
-fn sign_pss_with_salt_digest<T: CryptoRngCore + ?Sized, D: Digest + FixedOutputReset>(
+fn sign_pss_with_salt_digest<T: TryCryptoRng + ?Sized, D: Digest + FixedOutputReset>(
     blind_rng: Option<&mut T>,
     priv_key: &RsaPrivateKey,
     hashed: &[u8],
