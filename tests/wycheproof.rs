@@ -9,7 +9,7 @@ use pkcs1::DecodeRsaPublicKey;
 use rsa::{
     pkcs1v15, pss,
     signature::{Error as SignatureError, Verifier},
-    Error, Pss, RsaPublicKey,
+    RsaPublicKey,
 };
 use serde::Deserialize;
 use sha1::Sha1;
@@ -27,9 +27,6 @@ struct TestFile {
 struct TestGroup {
     #[serde(rename(deserialize = "type"))]
     typ: String,
-
-    #[serde(default, rename(deserialize = "publicKey"))]
-    public_key: PublicKey,
 
     #[serde(default, rename(deserialize = "publicKeyAsn"), with = "hex::serde")]
     public_key_asn: Vec<u8>,
@@ -53,40 +50,11 @@ struct Test {
     id: usize,
     #[allow(unused)] // for Debug
     comment: String,
-    flags: Vec<String>,
-    #[serde(default, with = "hex::serde")]
-    key: Vec<u8>,
     #[serde(default, with = "hex::serde")]
     msg: Vec<u8>,
     #[serde(default, with = "hex::serde")]
-    tag: Vec<u8>,
-    #[serde(default, with = "hex::serde")]
     sig: Vec<u8>,
-    #[serde(default, with = "hex::serde")]
-    private: Vec<u8>,
-    #[serde(default, with = "hex::serde")]
-    public: Vec<u8>,
-    #[serde(default, with = "hex::serde")]
-    shared: Vec<u8>,
-    #[serde(default, with = "hex::serde")]
-    ct: Vec<u8>,
-    #[serde(default, with = "hex::serde")]
-    aad: Vec<u8>,
-    #[serde(default, with = "hex::serde")]
-    iv: Vec<u8>,
     result: ExpectedResult,
-}
-
-impl Test {
-    fn has_flag(&self, s: &str) -> bool {
-        self.flags.contains(&s.to_string())
-    }
-}
-
-#[derive(Deserialize, Debug, Default)]
-struct PublicKey {
-    #[serde(default, with = "hex::serde")]
-    uncompressed: Vec<u8>,
 }
 
 #[derive(Copy, Clone, Deserialize, Debug, PartialEq)]

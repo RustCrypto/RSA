@@ -39,6 +39,8 @@ jobs:
           - stable
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: RustCrypto/actions/cargo-cache@master
       - uses: dtolnay/rust-toolchain@master
         with:
@@ -52,6 +54,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: RustCrypto/actions/cargo-cache@master
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo update -Z minimal-versions
@@ -62,6 +66,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
       - uses: RustCrypto/actions/cargo-cache@master
       - uses: dtolnay/rust-toolchain@master
         with:
