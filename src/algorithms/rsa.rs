@@ -4,7 +4,7 @@ use core::cmp::Ordering;
 
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
 use crypto_bigint::{BoxedUint, Gcd, NonZero, Odd, RandomMod, Wrapping};
-use rand_core::CryptoRngCore;
+use rand_core::CryptoRng;
 use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
@@ -31,7 +31,7 @@ pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BoxedUint) -> Result<BoxedUin
 /// Use this function with great care! Raw RSA should never be used without an appropriate padding
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
-pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
+pub fn rsa_decrypt<R: CryptoRng + ?Sized>(
     mut rng: Option<&mut R>,
     priv_key: &impl PrivateKeyParts,
     c: &BoxedUint,
@@ -123,7 +123,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
 /// Use this function with great care! Raw RSA should never be used without an appropriate padding
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
-pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
+pub fn rsa_decrypt_and_check<R: CryptoRng + ?Sized>(
     priv_key: &impl PrivateKeyParts,
     rng: Option<&mut R>,
     c: &BoxedUint,
@@ -142,7 +142,7 @@ pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
 }
 
 /// Returns the blinded c, along with the unblinding factor.
-fn blind<R: CryptoRngCore, K: PublicKeyParts>(
+fn blind<R: CryptoRng, K: PublicKeyParts>(
     rng: &mut R,
     key: &K,
     c: &BoxedUint,

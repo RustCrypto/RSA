@@ -9,7 +9,7 @@
 use alloc::vec::Vec;
 use digest::Digest;
 use pkcs8::AssociatedOid;
-use rand_core::CryptoRngCore;
+use rand_core::CryptoRng;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;
 
@@ -18,7 +18,7 @@ use crate::errors::{Error, Result};
 /// Fills the provided slice with random values, which are guaranteed
 /// to not be zero.
 #[inline]
-fn non_zero_random_bytes<R: CryptoRngCore + ?Sized>(rng: &mut R, data: &mut [u8]) {
+fn non_zero_random_bytes<R: CryptoRng + ?Sized>(rng: &mut R, data: &mut [u8]) {
     rng.fill_bytes(data);
 
     for el in data {
@@ -39,7 +39,7 @@ pub(crate) fn pkcs1v15_encrypt_pad<R>(
     k: usize,
 ) -> Result<Zeroizing<Vec<u8>>>
 where
-    R: CryptoRngCore + ?Sized,
+    R: CryptoRng + ?Sized,
 {
     if msg.len() + 11 > k {
         return Err(Error::MessageTooLong);

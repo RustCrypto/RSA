@@ -1,7 +1,7 @@
 use super::encrypt;
 use crate::{traits::RandomizedEncryptor, Result, RsaPublicKey};
 use alloc::vec::Vec;
-use rand_core::CryptoRngCore;
+use rand_core::CryptoRng;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -22,11 +22,7 @@ impl EncryptingKey {
 }
 
 impl RandomizedEncryptor for EncryptingKey {
-    fn encrypt_with_rng<R: CryptoRngCore + ?Sized>(
-        &self,
-        rng: &mut R,
-        msg: &[u8],
-    ) -> Result<Vec<u8>> {
+    fn encrypt_with_rng<R: CryptoRng + ?Sized>(&self, rng: &mut R, msg: &[u8]) -> Result<Vec<u8>> {
         encrypt(rng, &self.inner, msg)
     }
 }

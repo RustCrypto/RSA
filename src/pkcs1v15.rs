@@ -22,7 +22,7 @@ use core::fmt::Debug;
 use crypto_bigint::BoxedUint;
 use digest::Digest;
 use pkcs8::AssociatedOid;
-use rand_core::CryptoRngCore;
+use rand_core::CryptoRng;
 
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pkcs1v15::*;
@@ -36,7 +36,7 @@ use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
 pub struct Pkcs1v15Encrypt;
 
 impl PaddingScheme for Pkcs1v15Encrypt {
-    fn decrypt<Rng: CryptoRngCore>(
+    fn decrypt<Rng: CryptoRng>(
         self,
         rng: Option<&mut Rng>,
         priv_key: &RsaPrivateKey,
@@ -45,7 +45,7 @@ impl PaddingScheme for Pkcs1v15Encrypt {
         decrypt(rng, priv_key, ciphertext)
     }
 
-    fn encrypt<Rng: CryptoRngCore>(
+    fn encrypt<Rng: CryptoRng>(
         self,
         rng: &mut Rng,
         pub_key: &RsaPublicKey,
@@ -100,7 +100,7 @@ impl Pkcs1v15Sign {
 }
 
 impl SignatureScheme for Pkcs1v15Sign {
-    fn sign<Rng: CryptoRngCore>(
+    fn sign<Rng: CryptoRng>(
         self,
         rng: Option<&mut Rng>,
         priv_key: &RsaPrivateKey,
@@ -135,7 +135,7 @@ impl SignatureScheme for Pkcs1v15Sign {
 /// scheme from PKCS#1 v1.5.  The message must be no longer than the
 /// length of the public modulus minus 11 bytes.
 #[inline]
-fn encrypt<R: CryptoRngCore + ?Sized>(
+fn encrypt<R: CryptoRng + ?Sized>(
     rng: &mut R,
     pub_key: &RsaPublicKey,
     msg: &[u8],
@@ -157,7 +157,7 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
 /// forge signatures as if they had the private key. See
 /// `decrypt_session_key` for a way of solving this problem.
 #[inline]
-fn decrypt<R: CryptoRngCore + ?Sized>(
+fn decrypt<R: CryptoRng + ?Sized>(
     rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
@@ -185,7 +185,7 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
 /// messages to signatures and identify the signed messages. As ever,
 /// signatures provide authenticity, not confidentiality.
 #[inline]
-fn sign<R: CryptoRngCore + ?Sized>(
+fn sign<R: CryptoRng + ?Sized>(
     rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     prefix: &[u8],

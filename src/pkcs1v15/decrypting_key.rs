@@ -5,7 +5,7 @@ use crate::{
     Result, RsaPrivateKey,
 };
 use alloc::vec::Vec;
-use rand_core::CryptoRngCore;
+use rand_core::CryptoRng;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use zeroize::ZeroizeOnDrop;
@@ -33,7 +33,7 @@ impl Decryptor for DecryptingKey {
 }
 
 impl RandomizedDecryptor for DecryptingKey {
-    fn decrypt_with_rng<R: CryptoRngCore + ?Sized>(
+    fn decrypt_with_rng<R: CryptoRng + ?Sized>(
         &self,
         rng: &mut R,
         ciphertext: &[u8],
