@@ -17,8 +17,8 @@ rand_core = { version = "0.6.4", default-features = false }
 const-oid = { version = "0.10.0-rc.3", default-features = false }
 subtle = { version = "2.6.1", default-features = false }
 digest = { version = "=0.11.0-pre.9", default-features = false, features = ["alloc", "oid"] }
-pkcs1 = { version = "0.8.0-rc.0", default-features = false, features = ["alloc", "pkcs8"] }
-pkcs8 = { version = "0.11.0-rc.0", default-features = false, features = ["alloc"] }
+pkcs1 = { version = "0.8.0-rc.1", default-features = false, features = ["alloc", "pkcs8"] }
+pkcs8 = { version = "0.11.0-rc.1", default-features = false, features = ["alloc"] }
 signature = { version = "=2.3.0-pre.4", default-features = false, features = ["alloc", "digest", "rand_core"] }
 spki = { version = "0.8.0-rc.1", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
@@ -70,7 +70,3 @@ opt-level = 2
 
 [profile.bench]
 debug = true
-
-[patch.crates-io]
-pkcs1 = { git = "https://github.com/RustCrypto/formats.git" }
-pkcs8 = { git = "https://github.com/RustCrypto/formats.git" }
