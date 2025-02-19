@@ -1,5 +1,5 @@
 use super::encrypt_digest;
-use crate::{traits::RandomizedEncryptor, Result, RsaPublicKey};
+use crate::{Result, RsaPublicKey, traits::RandomizedEncryptor};
 use alloc::{boxed::Box, vec::Vec};
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset};
@@ -76,8 +76,8 @@ mod tests {
     #[cfg(feature = "serde")]
     fn test_serde() {
         use super::*;
-        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
-        use serde_test::{assert_tokens, Configure, Token};
+        use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
+        use serde_test::{Configure, Token, assert_tokens};
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = crate::RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");

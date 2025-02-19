@@ -298,8 +298,8 @@ mod tests {
     use crypto_bigint::{BoxedUint, Odd};
     use digest::{Digest, DynDigest, FixedOutputReset};
     use rand_chacha::{
-        rand_core::{RngCore, SeedableRng},
         ChaCha8Rng,
+        rand_core::{RngCore, SeedableRng},
     };
     use sha1::Sha1;
     use sha2::{Sha224, Sha256, Sha384, Sha512};

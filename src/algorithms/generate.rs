@@ -132,7 +132,7 @@ fn generate_prime_with_rng<R: CryptoRng>(rng: &mut R, bit_length: u32) -> BoxedU
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+    use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
 
     const EXP: u64 = 65537;
 

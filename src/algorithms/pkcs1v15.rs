@@ -182,7 +182,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+    use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
 
     #[test]
     fn test_non_zero_bytes() {

@@ -1,8 +1,8 @@
 use super::decrypt_digest;
 use crate::{
+    Result, RsaPrivateKey,
     dummy_rng::DummyRng,
     traits::{Decryptor, RandomizedDecryptor},
-    Result, RsaPrivateKey,
 };
 use alloc::{boxed::Box, vec::Vec};
 use core::marker::PhantomData;
@@ -101,8 +101,8 @@ mod tests {
     #[cfg(feature = "serde")]
     fn test_serde() {
         use super::*;
-        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
-        use serde_test::{assert_tokens, Configure, Token};
+        use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
+        use serde_test::{Configure, Token, assert_tokens};
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
@@ -111,15 +111,24 @@ mod tests {
         );
 
         let tokens = [
-            Token::Struct { name: "DecryptingKey", len: 4 },
+            Token::Struct {
+                name: "DecryptingKey",
+                len: 4,
+            },
             Token::Str("inner"),
-            Token::Str("3054020100300d06092a864886f70d01010105000440303e020100020900c9269f2f225eb38d020301000102086ecdc49f528812a1020500d2aaa725020500f46fc249020500887e253902046b4851e1020423806864"),
+            Token::Str(
+                "3054020100300d06092a864886f70d01010105000440303e020100020900c9269f2f225eb38d020301000102086ecdc49f528812a1020500d2aaa725020500f46fc249020500887e253902046b4851e1020423806864",
+            ),
             Token::Str("label"),
             Token::None,
             Token::Str("phantom"),
-            Token::UnitStruct { name: "PhantomData", },
+            Token::UnitStruct {
+                name: "PhantomData",
+            },
             Token::Str("mg_phantom"),
-            Token::UnitStruct { name: "PhantomData", },
+            Token::UnitStruct {
+                name: "PhantomData",
+            },
             Token::StructEnd,
         ];
         assert_tokens(&decrypting_key.readable(), &tokens);

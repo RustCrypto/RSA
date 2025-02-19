@@ -1,24 +1,24 @@
-use super::{oid, pkcs1v15_generate_prefix, sign, Signature, VerifyingKey};
-use crate::{dummy_rng::DummyRng, Result, RsaPrivateKey};
+use super::{Signature, VerifyingKey, oid, pkcs1v15_generate_prefix, sign};
+use crate::{Result, RsaPrivateKey, dummy_rng::DummyRng};
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use digest::Digest;
 use pkcs8::{
-    spki::{
-        der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
-        SignatureAlgorithmIdentifier,
-    },
     AssociatedOid, EncodePrivateKey, SecretDocument,
+    spki::{
+        AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier, SignatureAlgorithmIdentifier,
+        der::AnyRef,
+    },
 };
 use rand_core::{CryptoRng, TryCryptoRng};
 #[cfg(feature = "serde")]
 use {
     pkcs8::DecodePrivateKey,
-    serdect::serde::{de, ser, Deserialize, Serialize},
+    serdect::serde::{Deserialize, Serialize, de, ser},
 };
 
 use signature::{
-    hazmat::PrehashSigner, DigestSigner, Keypair, RandomizedDigestSigner, RandomizedSigner, Signer,
+    DigestSigner, Keypair, RandomizedDigestSigner, RandomizedSigner, Signer, hazmat::PrehashSigner,
 };
 use zeroize::ZeroizeOnDrop;
 
@@ -310,17 +310,17 @@ mod tests {
     #[cfg(feature = "serde")]
     fn test_serde() {
         use super::*;
-        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
-        use serde_test::{assert_tokens, Configure, Token};
+        use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
+        use serde_test::{Configure, Token, assert_tokens};
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = crate::RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
         let signing_key = SigningKey::<Sha256>::new(priv_key);
 
-        let tokens = [
-            Token::Str("3054020100300d06092a864886f70d01010105000440303e020100020900c9269f2f225eb38d020301000102086ecdc49f528812a1020500d2aaa725020500f46fc249020500887e253902046b4851e1020423806864")
-        ];
+        let tokens = [Token::Str(
+            "3054020100300d06092a864886f70d01010105000440303e020100020900c9269f2f225eb38d020301000102086ecdc49f528812a1020500d2aaa725020500f46fc249020500887e253902046b4851e1020423806864",
+        )];
 
         assert_tokens(&signing_key.readable(), &tokens);
     }
