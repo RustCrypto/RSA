@@ -49,7 +49,7 @@ where
     }
 
     /// Generate a new signing key with a prefix for the digest `D`.
-    pub fn random<R: CryptoRng>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
             prefix: pkcs1v15_generate_prefix::<D>(),
@@ -65,7 +65,7 @@ where
 
     /// Generate a new signing key with a prefix for the digest `D`.
     #[deprecated(since = "0.9.0", note = "use SigningKey::random instead")]
-    pub fn random_with_prefix<R: CryptoRng>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random_with_prefix<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Self::random(rng, bit_size)
     }
 }
@@ -88,7 +88,7 @@ where
     }
 
     /// Generate a new signing key with an empty prefix.
-    pub fn random_unprefixed<R: CryptoRng>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random_unprefixed<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
             prefix: Vec::new(),
@@ -127,19 +127,14 @@ impl<D> RandomizedDigestSigner<D, Signature> for SigningKey<D>
 where
     D: Digest,
 {
-    fn try_sign_digest_with_rng<R: TryCryptoRng>(
+    fn try_sign_digest_with_rng<R: TryCryptoRng + ?Sized>(
         &self,
         rng: &mut R,
         digest: D,
     ) -> signature::Result<Signature> {
-        sign(
-            Some(&mut rng.unwrap_mut()),
-            &self.inner,
-            &self.prefix,
-            &digest.finalize(),
-        )?
-        .as_slice()
-        .try_into()
+        sign(Some(rng), &self.inner, &self.prefix, &digest.finalize())?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -147,19 +142,14 @@ impl<D> RandomizedSigner<Signature> for SigningKey<D>
 where
     D: Digest,
 {
-    fn try_sign_with_rng<R: TryCryptoRng>(
+    fn try_sign_with_rng<R: TryCryptoRng + ?Sized>(
         &self,
         rng: &mut R,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign(
-            Some(&mut rng.unwrap_mut()),
-            &self.inner,
-            &self.prefix,
-            &D::digest(msg),
-        )?
-        .as_slice()
-        .try_into()
+        sign(Some(rng), &self.inner, &self.prefix, &D::digest(msg))?
+            .as_slice()
+            .try_into()
     }
 }
 

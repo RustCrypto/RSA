@@ -169,7 +169,7 @@ impl PublicKeyParts for RsaPublicKey {
 
 impl RsaPublicKey {
     /// Encrypt the given message.
-    pub fn encrypt<R: CryptoRng, P: PaddingScheme>(
+    pub fn encrypt<R: CryptoRng + ?Sized, P: PaddingScheme>(
         &self,
         rng: &mut R,
         padding: P,
@@ -254,7 +254,7 @@ impl RsaPrivateKey {
     const EXP: u64 = 65537;
 
     /// Generate a new Rsa key pair of the given bit size using the passed in `rng`.
-    pub fn new<R: CryptoRng>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
+    pub fn new<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
         Self::new_with_exp(rng, bit_size, BoxedUint::from(Self::EXP))
     }
 
@@ -262,7 +262,7 @@ impl RsaPrivateKey {
     /// using the passed in `rng`.
     ///
     /// Unless you have specific needs, you should use `RsaPrivateKey::new` instead.
-    pub fn new_with_exp<R: CryptoRng>(
+    pub fn new_with_exp<R: CryptoRng + ?Sized>(
         rng: &mut R,
         bit_size: usize,
         exp: BoxedUint,
@@ -493,7 +493,7 @@ impl RsaPrivateKey {
     /// Decrypt the given message.
     ///
     /// Uses `rng` to blind the decryption process.
-    pub fn decrypt_blinded<R: CryptoRng, P: PaddingScheme>(
+    pub fn decrypt_blinded<R: CryptoRng + ?Sized, P: PaddingScheme>(
         &self,
         rng: &mut R,
         padding: P,
@@ -517,7 +517,7 @@ impl RsaPrivateKey {
     ///   [`Pss::new`][`crate::Pss::new`] for a standard RSASSA-PSS signature, or
     ///   [`Pss::new_blinded`][`crate::Pss::new_blinded`] for RSA-BSSA blind
     ///   signatures.
-    pub fn sign_with_rng<R: CryptoRng, S: SignatureScheme>(
+    pub fn sign_with_rng<R: CryptoRng + ?Sized, S: SignatureScheme>(
         &self,
         rng: &mut R,
         padding: S,

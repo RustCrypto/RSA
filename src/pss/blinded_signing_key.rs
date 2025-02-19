@@ -56,13 +56,13 @@ where
     /// Create a new random RSASSA-PSS signing key which produces "blinded"
     /// signatures.
     /// Digest output size is used as a salt length.
-    pub fn random<R: CryptoRng>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Self::random_with_salt_len(rng, bit_size, <D as Digest>::output_size())
     }
 
     /// Create a new random RSASSA-PSS signing key which produces "blinded"
     /// signatures with a salt of the given length.
-    pub fn random_with_salt_len<R: CryptoRng>(
+    pub fn random_with_salt_len<R: CryptoRng + ?Sized>(
         rng: &mut R,
         bit_size: usize,
         salt_len: usize,
@@ -88,20 +88,14 @@ impl<D> RandomizedSigner<Signature> for BlindedSigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
-    fn try_sign_with_rng<R: TryCryptoRng>(
+    fn try_sign_with_rng<R: TryCryptoRng + ?Sized>(
         &self,
         rng: &mut R,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, D>(
-            &mut rng.unwrap_mut(),
-            true,
-            &self.inner,
-            &D::digest(msg),
-            self.salt_len,
-        )?
-        .as_slice()
-        .try_into()
+        sign_digest::<_, D>(rng, true, &self.inner, &D::digest(msg), self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -109,20 +103,14 @@ impl<D> RandomizedDigestSigner<D, Signature> for BlindedSigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
-    fn try_sign_digest_with_rng<R: TryCryptoRng>(
+    fn try_sign_digest_with_rng<R: TryCryptoRng + ?Sized>(
         &self,
         rng: &mut R,
         digest: D,
     ) -> signature::Result<Signature> {
-        sign_digest::<_, D>(
-            &mut rng.unwrap_mut(),
-            true,
-            &self.inner,
-            &digest.finalize(),
-            self.salt_len,
-        )?
-        .as_slice()
-        .try_into()
+        sign_digest::<_, D>(rng, true, &self.inner, &digest.finalize(), self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
@@ -130,20 +118,14 @@ impl<D> RandomizedPrehashSigner<Signature> for BlindedSigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
-    fn sign_prehash_with_rng<R: TryCryptoRng>(
+    fn sign_prehash_with_rng<R: TryCryptoRng + ?Sized>(
         &self,
         rng: &mut R,
         prehash: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, D>(
-            &mut rng.unwrap_mut(),
-            true,
-            &self.inner,
-            prehash,
-            self.salt_len,
-        )?
-        .as_slice()
-        .try_into()
+        sign_digest::<_, D>(rng, true, &self.inner, prehash, self.salt_len)?
+            .as_slice()
+            .try_into()
     }
 }
 
