@@ -5,8 +5,8 @@ fn signature_stringify() {
     use pkcs8::DecodePrivateKey;
     use signature::Signer;
 
-    use rsa::pkcs1v15::SigningKey;
     use rsa::RsaPrivateKey;
+    use rsa::pkcs1v15::SigningKey;
 
     let pem = include_str!("examples/pkcs8/rsa2048-priv.pem");
     let private_key = RsaPrivateKey::from_pkcs8_pem(pem).unwrap();

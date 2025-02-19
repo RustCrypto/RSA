@@ -1,23 +1,23 @@
-use super::{oid, pkcs1v15_generate_prefix, verify, Signature};
+use super::{Signature, oid, pkcs1v15_generate_prefix, verify};
 use crate::RsaPublicKey;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
 use digest::Digest;
 use pkcs8::{
-    spki::{
-        der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
-        SignatureAlgorithmIdentifier,
-    },
     AssociatedOid,
+    spki::{
+        AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier, SignatureAlgorithmIdentifier,
+        der::AnyRef,
+    },
 };
 
 #[cfg(feature = "serde")]
 use {
-    serdect::serde::{de, ser, Deserialize, Serialize},
+    serdect::serde::{Deserialize, Serialize, de, ser},
     spki::DecodePublicKey,
 };
 
-use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
+use signature::{DigestVerifier, Verifier, hazmat::PrehashVerifier};
 use spki::{Document, EncodePublicKey};
 
 /// Verifying key for `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
@@ -246,8 +246,8 @@ mod tests {
     #[cfg(feature = "serde")]
     fn test_serde() {
         use super::*;
-        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
-        use serde_test::{assert_tokens, Configure, Token};
+        use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
+        use serde_test::{Configure, Token, assert_tokens};
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);

@@ -26,7 +26,7 @@ use crypto_bigint::BoxedUint;
 use const_oid::AssociatedOid;
 use digest::{Digest, DynDigest, FixedOutputReset};
 use pkcs1::RsaPssParams;
-use pkcs8::spki::{der::Any, AlgorithmIdentifierOwned};
+use pkcs8::spki::{AlgorithmIdentifierOwned, der::Any};
 use rand_core::CryptoRng;
 
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
@@ -257,7 +257,7 @@ mod test {
 
     use hex_literal::hex;
     use pkcs1::DecodeRsaPrivateKey;
-    use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+    use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
     use sha1::{Digest, Sha1};
     use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
     use signature::{DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, Verifier};

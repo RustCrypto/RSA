@@ -1,8 +1,8 @@
 //! Traits related to the key components
 
 use crypto_bigint::{
-    modular::{BoxedMontyForm, BoxedMontyParams},
     BoxedUint, NonZero,
+    modular::{BoxedMontyForm, BoxedMontyParams},
 };
 use zeroize::Zeroize;
 

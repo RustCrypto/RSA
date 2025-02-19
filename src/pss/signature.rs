@@ -6,10 +6,10 @@ use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use crypto_bigint::BoxedUint;
 
 #[cfg(feature = "serde")]
-use serdect::serde::{de, Deserialize, Serialize};
+use serdect::serde::{Deserialize, Serialize, de};
 use spki::{
-    der::{asn1::BitString, Result as DerResult},
     SignatureBitStringEncoding,
+    der::{Result as DerResult, asn1::BitString},
 };
 
 /// `RSASSA-PSS` signatures as described in [RFC8017 § 8.1].
@@ -100,7 +100,7 @@ mod tests {
     #[cfg(feature = "serde")]
     fn test_serde() {
         use super::*;
-        use serde_test::{assert_tokens, Configure, Token};
+        use serde_test::{Configure, Token, assert_tokens};
         let signature = Signature {
             inner: BoxedUint::from(42u32),
         };

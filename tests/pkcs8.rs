@@ -3,11 +3,10 @@
 use crypto_bigint::BoxedUint;
 use hex_literal::hex;
 use rsa::{
-    pkcs1v15,
+    RsaPrivateKey, RsaPublicKey, pkcs1v15,
     pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
     pss,
     traits::{PrivateKeyParts, PublicKeyParts},
-    RsaPrivateKey, RsaPublicKey,
 };
 use sha2::Sha256;
 use subtle::ConstantTimeEq;

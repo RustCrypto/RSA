@@ -1,31 +1,31 @@
-use super::{get_pss_signature_algo_id, sign_digest, Signature, VerifyingKey};
+use super::{Signature, VerifyingKey, get_pss_signature_algo_id, sign_digest};
 use crate::encoding::verify_algorithm_id;
 use crate::{Result, RsaPrivateKey};
 use const_oid::AssociatedOid;
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset};
 use pkcs8::{
-    spki::{
-        der::AnyRef, AlgorithmIdentifierOwned, AlgorithmIdentifierRef,
-        AssociatedAlgorithmIdentifier, DynSignatureAlgorithmIdentifier,
-    },
     EncodePrivateKey, SecretDocument,
+    spki::{
+        AlgorithmIdentifierOwned, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
+        DynSignatureAlgorithmIdentifier, der::AnyRef,
+    },
 };
 use rand_core::{CryptoRng, TryCryptoRng};
 use signature::{
-    hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedSigner,
+    Keypair, RandomizedDigestSigner, RandomizedSigner, hazmat::RandomizedPrehashSigner,
 };
 use zeroize::ZeroizeOnDrop;
 #[cfg(feature = "serde")]
 use {
     pkcs8::DecodePrivateKey,
-    serdect::serde::{de, ser, Deserialize, Serialize},
+    serdect::serde::{Deserialize, Serialize, de, ser},
 };
 
 #[cfg(feature = "getrandom")]
 use {
     rand_core::{OsRng, TryRngCore},
-    signature::{hazmat::PrehashSigner, Signer},
+    signature::{Signer, hazmat::PrehashSigner},
 };
 
 /// Signing key for producing RSASSA-PSS signatures as described in
@@ -294,17 +294,17 @@ mod tests {
     #[cfg(feature = "serde")]
     fn test_serde() {
         use super::*;
-        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
-        use serde_test::{assert_tokens, Configure, Token};
+        use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
+        use serde_test::{Configure, Token, assert_tokens};
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = crate::RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
         let signing_key = SigningKey::<Sha256>::new(priv_key);
 
-        let tokens = [
-            Token::Str("3054020100300d06092a864886f70d01010105000440303e020100020900c9269f2f225eb38d020301000102086ecdc49f528812a1020500d2aaa725020500f46fc249020500887e253902046b4851e1020423806864")
-        ];
+        let tokens = [Token::Str(
+            "3054020100300d06092a864886f70d01010105000440303e020100020900c9269f2f225eb38d020301000102086ecdc49f528812a1020500d2aaa725020500f46fc249020500887e253902046b4851e1020423806864",
+        )];
 
         assert_tokens(&signing_key.readable(), &tokens);
     }
