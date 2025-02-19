@@ -31,7 +31,7 @@ pub struct RsaPrivateKeyComponents {
 ///
 /// [1]: https://patents.google.com/patent/US4405829A/en
 /// [2]: http://www.cacr.math.uwaterloo.ca/techreports/2006/cacr2006-16.pdf
-pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRng>(
+pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRng + ?Sized>(
     rng: &mut R,
     nprimes: usize,
     bit_size: usize,
@@ -120,7 +120,7 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRng>(
     })
 }
 
-fn generate_prime_with_rng<R: CryptoRng>(rng: &mut R, bit_length: u32) -> BoxedUint {
+fn generate_prime_with_rng<R: CryptoRng + ?Sized>(rng: &mut R, bit_length: u32) -> BoxedUint {
     sieve_and_find(
         rng,
         SmallPrimesSieveFactory::new(bit_length, SetBits::TwoMsb),
