@@ -4,14 +4,14 @@
 //! `pkcs1` crate's traits for types which impl the `pkcs8` crate's traits.
 
 use crate::{
-    traits::{PrivateKeyParts, PublicKeyParts},
     RsaPrivateKey, RsaPublicKey,
+    traits::{PrivateKeyParts, PublicKeyParts},
 };
 use core::convert::{TryFrom, TryInto};
 use crypto_bigint::{BoxedUint, NonZero, Odd};
 use pkcs8::{
-    der::{asn1::OctetStringRef, Encode},
     Document, EncodePrivateKey, EncodePublicKey, ObjectIdentifier, SecretDocument,
+    der::{Encode, asn1::OctetStringRef},
 };
 use zeroize::Zeroizing;
 

@@ -2,7 +2,7 @@
 name = "rsa"
 version = "0.10.0-pre.4"
 authors = ["RustCrypto Developers", "dignifiedquire <dignifiedquire@gmail.com>"]
-edition = "2021"
+edition = "2024"
 description = "Pure Rust RSA implementation"
 license = "MIT OR Apache-2.0"
 documentation = "https://docs.rs/rsa"
@@ -10,20 +10,20 @@ repository = "https://github.com/RustCrypto/RSA"
 keywords = ["rsa", "encryption", "security", "crypto"]
 categories = ["cryptography"]
 readme = "README.md"
-rust-version = "1.83"
+rust-version = "1.85"
 
 [dependencies]
-rand_core = { version = "0.6.4", default-features = false }
+rand_core = { version = "0.9.2", default-features = false }
 const-oid = { version = "0.10.0-rc.3", default-features = false }
 subtle = { version = "2.6.1", default-features = false }
 digest = { version = "=0.11.0-pre.9", default-features = false, features = ["alloc", "oid"] }
 pkcs1 = { version = "0.8.0-rc.1", default-features = false, features = ["alloc", "pkcs8"] }
 pkcs8 = { version = "0.11.0-rc.1", default-features = false, features = ["alloc"] }
-signature = { version = "=2.3.0-pre.4", default-features = false, features = ["alloc", "digest", "rand_core"] }
+signature = { version = "=2.3.0-pre.6", default-features = false, features = ["alloc", "digest", "rand_core"] }
 spki = { version = "0.8.0-rc.1", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
-crypto-bigint = { version = "0.6.0", default-features = false, features = ["zeroize", "alloc"] }
-crypto-primes = { version = "0.6.0", default-features = false }
+crypto-bigint = { version = "0.7.0-pre.0", default-features = false, features = ["zeroize", "alloc"] }
+crypto-primes = { version = "0.7.0-pre.0", default-features = false }
 
 # optional dependencies
 sha1 = { version = "=0.11.0-pre.4", optional = true, default-features = false, features = ["oid"] }
@@ -37,10 +37,10 @@ base64ct = { version = "1", features = ["alloc"] }
 hex-literal = "0.4.1"
 proptest = "1"
 serde_test = "1.0.89"
-rand_xorshift = "0.3"
-rand_chacha = "0.3"
-rand = "0.8"
-rand_core = { version = "0.6", default-features = false }
+rand_xorshift = "0.4"
+rand_chacha = "0.9"
+rand = "0.9"
+rand_core = { version = "0.9.2", default-features = false }
 sha1 = { version = "=0.11.0-pre.4", default-features = false, features = ["oid"] }
 sha2 = { version = "=0.11.0-pre.4", default-features = false, features = ["oid"] }
 sha3 = { version = "=0.11.0-pre.4", default-features = false, features = ["oid"] }
@@ -54,7 +54,7 @@ name = "key"
 [features]
 default = ["std", "pem"]
 hazmat = []
-getrandom = ["rand_core/getrandom", "crypto-bigint/rand_core"]
+getrandom = ["rand_core/os_rng", "crypto-bigint/rand_core"]
 serde = ["dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pem = ["pkcs1/pem", "pkcs8/pem"]
 pkcs5 = ["pkcs8/encryption"]
@@ -70,3 +70,11 @@ opt-level = 2
 
 [profile.bench]
 debug = true
+
+[patch.crates-io]
+# https://github.com/RustCrypto/crypto-bigint/pull/770
+crypto-bigint = { git = "https://github.com/RustCrypto/crypto-bigint.git" }
+
+# https://github.com/RustCrypto/traits/pull/1765
+# https://github.com/RustCrypto/traits/pull/1766
+signature = { git = "https://github.com/RustCrypto/traits.git" }

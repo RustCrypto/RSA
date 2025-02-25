@@ -4,9 +4,8 @@ use proptest::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use rand_core::SeedableRng;
 use rsa::{
-    pkcs1v15,
+    RsaPrivateKey, pkcs1v15,
     signature::{Keypair, SignatureEncoding, Signer, Verifier},
-    RsaPrivateKey,
 };
 use sha2::Sha256;
 
