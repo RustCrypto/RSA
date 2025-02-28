@@ -2,7 +2,7 @@
 
 use alloc::vec::Vec;
 
-use rand_core::CryptoRngCore;
+use rand_core::TryCryptoRng;
 
 use crate::errors::Result;
 use crate::key::{RsaPrivateKey, RsaPublicKey};
@@ -13,7 +13,7 @@ pub trait PaddingScheme {
     ///
     /// If an `rng` is passed, it uses RSA blinding to help mitigate timing
     /// side-channel attacks.
-    fn decrypt<Rng: CryptoRngCore>(
+    fn decrypt<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: Option<&mut Rng>,
         priv_key: &RsaPrivateKey,
@@ -21,7 +21,7 @@ pub trait PaddingScheme {
     ) -> Result<Vec<u8>>;
 
     /// Encrypt the given message using the given public key.
-    fn encrypt<Rng: CryptoRngCore>(
+    fn encrypt<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: &mut Rng,
         pub_key: &RsaPublicKey,
@@ -32,7 +32,7 @@ pub trait PaddingScheme {
 /// Digital signature scheme.
 pub trait SignatureScheme {
     /// Sign the given digest.
-    fn sign<Rng: CryptoRngCore>(
+    fn sign<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: Option<&mut Rng>,
         priv_key: &RsaPrivateKey,

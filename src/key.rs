@@ -2,12 +2,12 @@ use alloc::vec::Vec;
 use core::hash::{Hash, Hasher};
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
 use crypto_bigint::{BoxedUint, Integer, NonZero, Odd};
-use rand_core::CryptoRngCore;
+use rand_core::CryptoRng;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 #[cfg(feature = "serde")]
 use {
     pkcs8::{DecodePrivateKey, EncodePrivateKey},
-    serdect::serde::{de, ser, Deserialize, Serialize},
+    serdect::serde::{Deserialize, Serialize, de, ser},
     spki::{DecodePublicKey, EncodePublicKey},
 };
 
@@ -169,7 +169,7 @@ impl PublicKeyParts for RsaPublicKey {
 
 impl RsaPublicKey {
     /// Encrypt the given message.
-    pub fn encrypt<R: CryptoRngCore, P: PaddingScheme>(
+    pub fn encrypt<R: CryptoRng + ?Sized, P: PaddingScheme>(
         &self,
         rng: &mut R,
         padding: P,
@@ -254,7 +254,7 @@ impl RsaPrivateKey {
     const EXP: u64 = 65537;
 
     /// Generate a new Rsa key pair of the given bit size using the passed in `rng`.
-    pub fn new<R: CryptoRngCore>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
+    pub fn new<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
         Self::new_with_exp(rng, bit_size, BoxedUint::from(Self::EXP))
     }
 
@@ -262,7 +262,7 @@ impl RsaPrivateKey {
     /// using the passed in `rng`.
     ///
     /// Unless you have specific needs, you should use `RsaPrivateKey::new` instead.
-    pub fn new_with_exp<R: CryptoRngCore>(
+    pub fn new_with_exp<R: CryptoRng + ?Sized>(
         rng: &mut R,
         bit_size: usize,
         exp: BoxedUint,
@@ -493,7 +493,7 @@ impl RsaPrivateKey {
     /// Decrypt the given message.
     ///
     /// Uses `rng` to blind the decryption process.
-    pub fn decrypt_blinded<R: CryptoRngCore, P: PaddingScheme>(
+    pub fn decrypt_blinded<R: CryptoRng + ?Sized, P: PaddingScheme>(
         &self,
         rng: &mut R,
         padding: P,
@@ -517,7 +517,7 @@ impl RsaPrivateKey {
     ///   [`Pss::new`][`crate::Pss::new`] for a standard RSASSA-PSS signature, or
     ///   [`Pss::new_blinded`][`crate::Pss::new_blinded`] for RSA-BSSA blind
     ///   signatures.
-    pub fn sign_with_rng<R: CryptoRngCore, S: SignatureScheme>(
+    pub fn sign_with_rng<R: CryptoRng + ?Sized, S: SignatureScheme>(
         &self,
         rng: &mut R,
         padding: S,
@@ -645,7 +645,7 @@ mod tests {
 
     use hex_literal::hex;
     use pkcs8::DecodePrivateKey;
-    use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+    use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
 
     #[test]
     fn test_from_into() {
@@ -764,8 +764,8 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn test_serde() {
-        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
-        use serde_test::{assert_tokens, Configure, Token};
+        use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
+        use serde_test::{Configure, Token, assert_tokens};
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");

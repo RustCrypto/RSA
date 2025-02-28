@@ -3,9 +3,9 @@
 use crypto_bigint::BoxedUint;
 use hex_literal::hex;
 use rsa::{
+    RsaPrivateKey, RsaPublicKey,
     pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},
     traits::{PrivateKeyParts, PublicKeyParts},
-    RsaPrivateKey, RsaPublicKey,
 };
 use subtle::ConstantTimeEq;
 

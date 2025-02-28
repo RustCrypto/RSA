@@ -17,7 +17,7 @@ jobs:
       - uses: RustCrypto/actions/cargo-cache@master
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.83.0
+          toolchain: 1.85.0
           components: clippy
       - run: cargo clippy --all -- -D warnings
 
@@ -40,7 +40,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           # We need Nightly for doc_auto_cfg
-          toolchain: nightly-2024-11-30
+          toolchain: nightly-2025-02-22
       - uses: Swatinem/rust-cache@v2
       - env:
           RUSTDOCFLAGS: "-Dwarnings --cfg docsrs"
