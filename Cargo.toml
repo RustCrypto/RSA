@@ -23,7 +23,7 @@ signature = { version = "=2.3.0-pre.4", default-features = false, features = ["a
 spki = { version = "0.8.0-rc.1", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
 crypto-bigint = { version = "0.6.0", default-features = false, features = ["zeroize", "alloc"] }
-crypto-primes = { version = "0.6.0", default-features = false }
+crypto-primes = { version = "0.6.1", default-features = false }
 
 # optional dependencies
 sha1 = { version = "=0.11.0-pre.4", optional = true, default-features = false, features = ["oid"] }
