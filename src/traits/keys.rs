@@ -17,7 +17,7 @@ pub trait PublicKeyParts {
     /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
     /// or by this public key will have the same size.
     fn size(&self) -> usize {
-        (self.n().bits() as usize + 7) / 8
+        (self.n().bits() as usize).div_ceil(8)
     }
 
     /// Returns the parameters for montgomery operations.

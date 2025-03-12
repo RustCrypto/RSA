@@ -25,7 +25,7 @@ pub(crate) fn emsa_pss_encode(
     // See [1], section 9.1.1
     let h_len = hash.output_size();
     let s_len = salt.len();
-    let em_len = (em_bits + 7) / 8;
+    let em_len = em_bits.div_ceil(8);
 
     // 1. If the length of M is greater than the input limitation for the
     //     hash function (2^61 - 1 octets for SHA-1), output "message too
@@ -100,7 +100,7 @@ where
     // See [1], section 9.1.1
     let h_len = <D as Digest>::output_size();
     let s_len = salt.len();
-    let em_len = (em_bits + 7) / 8;
+    let em_len = em_bits.div_ceil(8);
 
     // 1. If the length of M is greater than the input limitation for the
     //     hash function (2^61 - 1 octets for SHA-1), output "message too
@@ -235,8 +235,8 @@ pub(crate) fn emsa_pss_verify(
     key_bits: usize,
 ) -> Result<()> {
     let em_bits = key_bits - 1;
-    let em_len = (em_bits + 7) / 8;
-    let key_len = (key_bits + 7) / 8;
+    let em_len = em_bits.div_ceil(8);
+    let key_len = key_bits.div_ceil(8);
     let h_len = hash.output_size();
 
     let em = &mut em[key_len - em_len..];
@@ -288,8 +288,8 @@ where
     D: Digest + FixedOutputReset,
 {
     let em_bits = key_bits - 1;
-    let em_len = (em_bits + 7) / 8;
-    let key_len = (key_bits + 7) / 8;
+    let em_len = em_bits.div_ceil(8);
+    let key_len = key_bits.div_ceil(8);
     let h_len = <D as Digest>::output_size();
 
     let em = &mut em[key_len - em_len..];
