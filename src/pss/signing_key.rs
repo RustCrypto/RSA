@@ -22,7 +22,7 @@ use {
     serdect::serde::{de, ser, Deserialize, Serialize},
 };
 
-#[cfg(feature = "getrandom")]
+#[cfg(feature = "os_rng")]
 use {
     rand_core::OsRng,
     signature::{hazmat::PrehashSigner, Signer},
@@ -133,7 +133,7 @@ where
     }
 }
 
-#[cfg(feature = "getrandom")]
+#[cfg(feature = "os_rng")]
 impl<D> PrehashSigner<Signature> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
@@ -143,7 +143,7 @@ where
     }
 }
 
-#[cfg(feature = "getrandom")]
+#[cfg(feature = "os_rng")]
 impl<D> Signer<Signature> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
