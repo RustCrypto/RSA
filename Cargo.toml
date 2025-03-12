@@ -53,7 +53,7 @@ name = "key"
 [features]
 default = ["std", "pem"]
 hazmat = []
-getrandom = ["rand_core/os_rng", "crypto-bigint/rand_core"]
+os_rng = ["rand_core/os_rng", "crypto-bigint/rand_core"]
 serde = ["dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pem = ["pkcs1/pem", "pkcs8/pem"]
 pkcs5 = ["pkcs8/encryption"]
