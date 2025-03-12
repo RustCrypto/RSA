@@ -106,8 +106,8 @@ dual licensed as above, without any additional terms or conditions.
 [crate-link]: https://crates.io/crates/rsa
 [doc-image]: https://docs.rs/rsa/badge.svg
 [doc-link]: https://docs.rs/rsa
-[build-image]: https://github.com/rustcrypto/RSA/workflows/CI/badge.svg
-[build-link]: https://github.com/RustCrypto/RSA/actions?query=workflow%3ACI+branch%3Amaster
+[build-image]: https://github.com/RustCrypto/RSA/actions/workflows/ci.yml/badge.svg?branch=master
+[build-link]: https://github.com/RustCrypto/RSA/actions/workflows/ci.yml?query=branch:master
 [msrv-image]: https://img.shields.io/badge/rustc-1.83+-blue.svg
 [chat-image]: https://img.shields.io/badge/zulip-join_chat-blue.svg
 [chat-link]: https://rustcrypto.zulipchat.com/#narrow/stream/260047-RSA
