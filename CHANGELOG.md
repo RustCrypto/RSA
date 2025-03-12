@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.8 (2025-03-12)
+### Added
+- Doc comments to specify the `rand` version ([#473])
+
+[#473]: https://github.com/RustCrypto/RSA/pull/473
+
+## 0.9.7 (2024-11-26)
+### Fixed
+- Always validate keys in `RsaPrivateKey::from_components` ([#459])
+- Do not crash when handling tiny keys in PKCS1v15 ([#459])
+
+[#459]: https://github.com/RustCrypto/RSA/pull/459
+
 ## 0.9.6 (2023-12-01)
 ### Added
 - expose a `pss::get_default_pss_signature_algo_id` helper ([#393])
