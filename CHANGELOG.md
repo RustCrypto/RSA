@@ -12,8 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.9.7 (2024-11-26)
 ### Fixed
-- always validate keys in from_components
-- do not crash when handling tiny keys in PKCS1v15
+- Always validate keys in `RsaPrivateKey::from_components` ([#459])
+- Do not crash when handling tiny keys in PKCS1v15 ([#459])
+
+[#459]: https://github.com/RustCrypto/RSA/pull/459
 
 ## 0.9.6 (2023-12-01)
 ### Added
