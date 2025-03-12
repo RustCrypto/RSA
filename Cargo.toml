@@ -33,7 +33,7 @@ serde = { version = "1.0.184", optional = true, default-features = false, featur
 
 [dev-dependencies]
 base64ct = { version = "1", features = ["alloc"] }
-hex-literal = "0.4.1"
+hex-literal = "1.0.0"
 proptest = "1"
 serde_test = "1.0.89"
 rand_xorshift = "0.4"
