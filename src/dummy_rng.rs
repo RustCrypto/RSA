@@ -17,10 +17,6 @@ impl RngCore for DummyRng {
     fn fill_bytes(&mut self, _: &mut [u8]) {
         unimplemented!();
     }
-
-    fn try_fill_bytes(&mut self, _: &mut [u8]) -> core::result::Result<(), rand_core::Error> {
-        unimplemented!();
-    }
 }
 
 impl CryptoRng for DummyRng {}

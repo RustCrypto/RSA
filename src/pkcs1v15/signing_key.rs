@@ -10,7 +10,7 @@ use pkcs8::{
     },
     AssociatedOid, EncodePrivateKey, SecretDocument,
 };
-use rand_core::CryptoRngCore;
+use rand_core::{CryptoRng, TryCryptoRng};
 #[cfg(feature = "serde")]
 use {
     pkcs8::DecodePrivateKey,
@@ -49,7 +49,7 @@ where
     }
 
     /// Generate a new signing key with a prefix for the digest `D`.
-    pub fn random<R: CryptoRngCore>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
             prefix: pkcs1v15_generate_prefix::<D>(),
@@ -65,7 +65,7 @@ where
 
     /// Generate a new signing key with a prefix for the digest `D`.
     #[deprecated(since = "0.9.0", note = "use SigningKey::random instead")]
-    pub fn random_with_prefix<R: CryptoRngCore>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random_with_prefix<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Self::random(rng, bit_size)
     }
 }
@@ -88,7 +88,7 @@ where
     }
 
     /// Generate a new signing key with an empty prefix.
-    pub fn random_unprefixed<R: CryptoRngCore>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random_unprefixed<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
             prefix: Vec::new(),
@@ -127,9 +127,9 @@ impl<D> RandomizedDigestSigner<D, Signature> for SigningKey<D>
 where
     D: Digest,
 {
-    fn try_sign_digest_with_rng(
+    fn try_sign_digest_with_rng<R: TryCryptoRng + ?Sized>(
         &self,
-        rng: &mut impl CryptoRngCore,
+        rng: &mut R,
         digest: D,
     ) -> signature::Result<Signature> {
         sign(Some(rng), &self.inner, &self.prefix, &digest.finalize())?
@@ -142,9 +142,9 @@ impl<D> RandomizedSigner<Signature> for SigningKey<D>
 where
     D: Digest,
 {
-    fn try_sign_with_rng(
+    fn try_sign_with_rng<R: TryCryptoRng + ?Sized>(
         &self,
-        rng: &mut impl CryptoRngCore,
+        rng: &mut R,
         msg: &[u8],
     ) -> signature::Result<Signature> {
         sign(Some(rng), &self.inner, &self.prefix, &D::digest(msg))?
@@ -308,9 +308,11 @@ mod tests {
         let priv_key = crate::RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
         let signing_key = SigningKey::<Sha256>::new(priv_key);
 
-        let tokens = [
-            Token::Str("3054020100300d06092a864886f70d01010105000440303e020100020900c9269f2f225eb38d020301000102086ecdc49f528812a1020500d2aaa725020500f46fc249020500887e253902046b4851e1020423806864")
-        ];
+        let tokens = [Token::Str(concat!(
+            "3054020100300d06092a864886f70d01010105000440303e020100020900aecdb5",
+            "fae1b092570203010001020869bf9ae9d6712899020500d2aaa725020500d46b68",
+            "cb020500887e253902047b4e3a4f02040991164c"
+        ))];
 
         assert_tokens(&signing_key.readable(), &tokens);
     }

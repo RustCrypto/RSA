@@ -4,7 +4,7 @@ use core::cmp::Ordering;
 
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
 use crypto_bigint::{BoxedUint, Gcd, NonZero, Odd, RandomMod, Wrapping};
-use rand_core::CryptoRngCore;
+use rand_core::TryCryptoRng;
 use zeroize::Zeroize;
 
 use crate::errors::{Error, Result};
@@ -31,8 +31,8 @@ pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BoxedUint) -> Result<BoxedUin
 /// Use this function with great care! Raw RSA should never be used without an appropriate padding
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
-pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
-    mut rng: Option<&mut R>,
+pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
+    rng: Option<&mut R>,
     priv_key: &impl PrivateKeyParts,
     c: &BoxedUint,
 ) -> Result<BoxedUint> {
@@ -48,8 +48,8 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
     let n_params = priv_key.n_params();
     let bits = d.bits_precision();
 
-    let c = if let Some(ref mut rng) = rng {
-        let (blinded, unblinder) = blind(rng, priv_key, c, n_params);
+    let c = if let Some(rng) = rng {
+        let (blinded, unblinder) = blind(rng, priv_key, c, n_params)?;
         ir = Some(unblinder);
         blinded.widen(bits)
     } else {
@@ -123,7 +123,7 @@ pub fn rsa_decrypt<R: CryptoRngCore + ?Sized>(
 /// Use this function with great care! Raw RSA should never be used without an appropriate padding
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
-pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
+pub fn rsa_decrypt_and_check<R: TryCryptoRng + ?Sized>(
     priv_key: &impl PrivateKeyParts,
     rng: Option<&mut R>,
     c: &BoxedUint,
@@ -142,12 +142,12 @@ pub fn rsa_decrypt_and_check<R: CryptoRngCore + ?Sized>(
 }
 
 /// Returns the blinded c, along with the unblinding factor.
-fn blind<R: CryptoRngCore, K: PublicKeyParts>(
+fn blind<R: TryCryptoRng + ?Sized, K: PublicKeyParts>(
     rng: &mut R,
     key: &K,
     c: &BoxedUint,
     n_params: &BoxedMontyParams,
-) -> (BoxedUint, BoxedUint) {
+) -> Result<(BoxedUint, BoxedUint)> {
     // Blinding involves multiplying c by r^e.
     // Then the decryption operation performs (m^e * r^e)^d mod n
     // which equals mr mod n. The factor of r can then be removed
@@ -158,7 +158,7 @@ fn blind<R: CryptoRngCore, K: PublicKeyParts>(
     let mut r: BoxedUint = BoxedUint::one_with_precision(bits);
     let mut ir: Option<BoxedUint> = None;
     while ir.is_none() {
-        r = BoxedUint::random_mod(rng, key.n());
+        r = BoxedUint::try_random_mod(rng, key.n()).map_err(|_| Error::Rng)?;
         if r.is_zero().into() {
             r = BoxedUint::one_with_precision(bits);
         }
@@ -181,7 +181,7 @@ fn blind<R: CryptoRngCore, K: PublicKeyParts>(
     debug_assert_eq!(blinded.bits_precision(), bits);
     debug_assert_eq!(ir.bits_precision(), bits);
 
-    (blinded, ir)
+    Ok((blinded, ir))
 }
 
 /// Given an m and and unblinding factor, unblind the m.

@@ -9,7 +9,7 @@
 use alloc::vec::Vec;
 use digest::Digest;
 use pkcs8::AssociatedOid;
-use rand_core::CryptoRngCore;
+use rand_core::TryCryptoRng;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;
 
@@ -18,17 +18,22 @@ use crate::errors::{Error, Result};
 /// Fills the provided slice with random values, which are guaranteed
 /// to not be zero.
 #[inline]
-fn non_zero_random_bytes<R: CryptoRngCore + ?Sized>(rng: &mut R, data: &mut [u8]) {
-    rng.fill_bytes(data);
+fn non_zero_random_bytes<R: TryCryptoRng + ?Sized>(
+    rng: &mut R,
+    data: &mut [u8],
+) -> core::result::Result<(), R::Error> {
+    rng.try_fill_bytes(data)?;
 
     for el in data {
         if *el == 0u8 {
             // TODO: break after a certain amount of time
             while *el == 0u8 {
-                rng.fill_bytes(core::slice::from_mut(el));
+                rng.try_fill_bytes(core::slice::from_mut(el))?;
             }
         }
     }
+
+    Ok(())
 }
 
 /// Applied the padding scheme from PKCS#1 v1.5 for encryption.  The message must be no longer than
@@ -39,7 +44,7 @@ pub(crate) fn pkcs1v15_encrypt_pad<R>(
     k: usize,
 ) -> Result<Zeroizing<Vec<u8>>>
 where
-    R: CryptoRngCore + ?Sized,
+    R: TryCryptoRng + ?Sized,
 {
     if msg.len() + 11 > k {
         return Err(Error::MessageTooLong);
@@ -48,7 +53,7 @@ where
     // EM = 0x00 || 0x02 || PS || 0x00 || M
     let mut em = Zeroizing::new(vec![0u8; k]);
     em[1] = 2;
-    non_zero_random_bytes(rng, &mut em[2..k - msg.len() - 1]);
+    non_zero_random_bytes(rng, &mut em[2..k - msg.len() - 1]).map_err(|_: R::Error| Error::Rng)?;
     em[k - msg.len() - 1] = 0;
     em[k - msg.len()..].copy_from_slice(msg);
     Ok(em)
@@ -189,7 +194,7 @@ mod tests {
         for _ in 0..10 {
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
             let mut b = vec![0u8; 512];
-            non_zero_random_bytes(&mut rng, &mut b);
+            non_zero_random_bytes(&mut rng, &mut b).unwrap();
             for el in &b {
                 assert_ne!(*el, 0u8);
             }
