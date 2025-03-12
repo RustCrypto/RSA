@@ -1,5 +1,7 @@
 use alloc::vec::Vec;
+use core::fmt;
 use core::hash::{Hash, Hasher};
+
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
 use crypto_bigint::{BoxedUint, Integer, NonZero, Odd};
 use rand_core::CryptoRng;
@@ -55,7 +57,7 @@ impl Hash for RsaPublicKey {
 }
 
 /// Represents a whole RSA key, public and private parts.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct RsaPrivateKey {
     /// Public components of the private key.
     pubkey_components: RsaPublicKey,
@@ -65,6 +67,22 @@ pub struct RsaPrivateKey {
     pub(crate) primes: Vec<BoxedUint>,
     /// Precomputed values to speed up private operations
     pub(crate) precomputed: Option<PrecomputedValues>,
+}
+
+impl fmt::Debug for RsaPrivateKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let precomputed = if self.precomputed.is_some() {
+            "Some(...)"
+        } else {
+            "None"
+        };
+        f.debug_struct("RsaPrivateKey")
+            .field("pubkey_components", &self.pubkey_components)
+            .field("d", &"...")
+            .field("primes", &"&[...]")
+            .field("precomputed", &precomputed)
+            .finish()
+    }
 }
 
 impl Eq for RsaPrivateKey {}
@@ -101,7 +119,7 @@ impl Drop for RsaPrivateKey {
 
 impl ZeroizeOnDrop for RsaPrivateKey {}
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub(crate) struct PrecomputedValues {
     /// D mod (P-1)
     pub(crate) dp: BoxedUint,
