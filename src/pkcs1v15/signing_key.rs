@@ -197,10 +197,10 @@ where
 
 impl<D> From<RsaPrivateKey> for SigningKey<D>
 where
-    D: Digest,
+    D: Digest + AssociatedOid,
 {
     fn from(key: RsaPrivateKey) -> Self {
-        Self::new_unprefixed(key)
+        Self::new(key)
     }
 }
 
