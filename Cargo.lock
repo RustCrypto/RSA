@@ -157,7 +157,7 @@ dependencies = [
 [[package]]
 name = "crypto-primes"
 version = "0.7.0-dev"
-source = "git+https://github.com/entropyxyz/crypto-primes.git#dfc396609a8fdaab895976933edad36c06de8a19"
+source = "git+https://github.com/entropyxyz/crypto-primes.git#541a5eb1c05664385aaff2697faf72c7200a9786"
 dependencies = [
  "crypto-bigint",
  "rand_core 0.9.3",
