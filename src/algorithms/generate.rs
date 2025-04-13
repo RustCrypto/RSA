@@ -3,8 +3,8 @@
 use alloc::vec::Vec;
 use crypto_bigint::{BoxedUint, Odd};
 use crypto_primes::{
-    hazmat::{SetBits, SmallPrimesSieveFactory},
-    is_prime, sieve_and_find,
+    hazmat::{SetBits, SmallFactorsSieveFactory},
+    is_prime, sieve_and_find, Flavor,
 };
 use rand_core::CryptoRng;
 
@@ -121,11 +121,13 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRng + ?Sized>(
 }
 
 fn generate_prime_with_rng<R: CryptoRng + ?Sized>(rng: &mut R, bit_length: u32) -> BoxedUint {
-    sieve_and_find(
-        rng,
-        SmallPrimesSieveFactory::new(bit_length, SetBits::TwoMsb),
-        |_rng, candidate| is_prime(candidate),
-    )
+    let factory = SmallFactorsSieveFactory::new(Flavor::Any, bit_length, SetBits::TwoMsb)
+        .unwrap_or_else(|err| panic!("Error creating the sieve: {err}"));
+
+    sieve_and_find(rng, factory, |_rng, candidate| {
+        is_prime(Flavor::Any, candidate)
+    })
+    .unwrap_or_else(|err| panic!("Error generating random candidates: {}", err))
     .expect("will produce a result eventually")
 }
 
