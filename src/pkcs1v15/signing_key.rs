@@ -17,9 +17,7 @@ use {
     serdect::serde::{de, ser, Deserialize, Serialize},
 };
 
-use signature::{
-    hazmat::PrehashSigner, DigestSigner, Keypair, RandomizedDigestSigner, RandomizedSigner, Signer,
-};
+use signature::{hazmat::PrehashSigner, DigestSigner, Keypair, RandomizedDigestSigner};
 use zeroize::ZeroizeOnDrop;
 
 /// Signing key for `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
@@ -101,29 +99,29 @@ where
 // `*Signer` trait impls
 //
 
-impl<D> DigestSigner<D, Signature> for SigningKey<D>
+impl<D> DigestSigner<D, Signature<D>> for SigningKey<D>
 where
     D: Digest,
 {
-    fn try_sign_digest(&self, digest: D) -> signature::Result<Signature> {
+    fn try_sign_digest(&self, digest: D) -> signature::Result<Signature<D>> {
         sign::<DummyRng>(None, &self.inner, &self.prefix, &digest.finalize())?
             .as_slice()
             .try_into()
     }
 }
 
-impl<D> PrehashSigner<Signature> for SigningKey<D>
+impl<D> PrehashSigner<Signature<D>> for SigningKey<D>
 where
     D: Digest,
 {
-    fn sign_prehash(&self, prehash: &[u8]) -> signature::Result<Signature> {
+    fn sign_prehash(&self, prehash: &[u8]) -> signature::Result<Signature<D>> {
         sign::<DummyRng>(None, &self.inner, &self.prefix, prehash)?
             .as_slice()
             .try_into()
     }
 }
 
-impl<D> RandomizedDigestSigner<D, Signature> for SigningKey<D>
+impl<D> RandomizedDigestSigner<D, Signature<D>> for SigningKey<D>
 where
     D: Digest,
 {
@@ -131,34 +129,8 @@ where
         &self,
         rng: &mut R,
         digest: D,
-    ) -> signature::Result<Signature> {
+    ) -> signature::Result<Signature<D>> {
         sign(Some(rng), &self.inner, &self.prefix, &digest.finalize())?
-            .as_slice()
-            .try_into()
-    }
-}
-
-impl<D> RandomizedSigner<Signature> for SigningKey<D>
-where
-    D: Digest,
-{
-    fn try_sign_with_rng<R: TryCryptoRng + ?Sized>(
-        &self,
-        rng: &mut R,
-        msg: &[u8],
-    ) -> signature::Result<Signature> {
-        sign(Some(rng), &self.inner, &self.prefix, &D::digest(msg))?
-            .as_slice()
-            .try_into()
-    }
-}
-
-impl<D> Signer<Signature> for SigningKey<D>
-where
-    D: Digest,
-{
-    fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
-        sign::<DummyRng>(None, &self.inner, &self.prefix, &D::digest(msg))?
             .as_slice()
             .try_into()
     }

@@ -165,17 +165,22 @@ fn test_rsa_pkcs1_verify() {
             for test in group.tests {
                 summary.start(&test);
 
-                let sig = pkcs1v15::Signature::try_from(&test.sig[..]).expect("invalid signature");
                 let result = match group.sha.as_ref() {
                     "SHA-256" => {
+                        let sig = pkcs1v15::Signature::try_from(&test.sig[..])
+                            .expect("invalid signature");
                         let vk = pkcs1v15::VerifyingKey::<Sha256>::new(key.clone());
                         vk.verify(&test.msg, &sig)
                     }
                     "SHA-384" => {
+                        let sig = pkcs1v15::Signature::try_from(&test.sig[..])
+                            .expect("invalid signature");
                         let vk = pkcs1v15::VerifyingKey::<Sha384>::new(key.clone());
                         vk.verify(&test.msg, &sig)
                     }
                     "SHA-512" => {
+                        let sig = pkcs1v15::Signature::try_from(&test.sig[..])
+                            .expect("invalid signature");
                         let vk = pkcs1v15::VerifyingKey::<Sha512>::new(key.clone());
                         vk.verify(&test.msg, &sig)
                     }
@@ -228,9 +233,10 @@ fn test_rsa_pss_verify() {
                         group.sha, group.mgf_sha, group.salt_len,
                     ));
                 }
-                let sig = pss::Signature::try_from(&test.sig[..]).expect("invalid signature");
                 let result = match group.sha.as_ref() {
                     "SHA-1" => {
+                        let sig =
+                            pss::Signature::try_from(&test.sig[..]).expect("invalid signature");
                         let vk = pss::VerifyingKey::<Sha1>::new_with_salt_len(
                             key.clone(),
                             group.salt_len,
@@ -238,6 +244,8 @@ fn test_rsa_pss_verify() {
                         vk.verify(&test.msg, &sig)
                     }
                     "SHA-256" => {
+                        let sig =
+                            pss::Signature::try_from(&test.sig[..]).expect("invalid signature");
                         let vk = pss::VerifyingKey::<Sha256>::new_with_salt_len(
                             key.clone(),
                             group.salt_len,
@@ -245,6 +253,8 @@ fn test_rsa_pss_verify() {
                         vk.verify(&test.msg, &sig)
                     }
                     "SHA-224" => {
+                        let sig =
+                            pss::Signature::try_from(&test.sig[..]).expect("invalid signature");
                         let vk = pss::VerifyingKey::<Sha224>::new_with_salt_len(
                             key.clone(),
                             group.salt_len,
@@ -252,6 +262,8 @@ fn test_rsa_pss_verify() {
                         vk.verify(&test.msg, &sig)
                     }
                     "SHA-384" => {
+                        let sig =
+                            pss::Signature::try_from(&test.sig[..]).expect("invalid signature");
                         let vk = pss::VerifyingKey::<Sha384>::new_with_salt_len(
                             key.clone(),
                             group.salt_len,
@@ -259,6 +271,8 @@ fn test_rsa_pss_verify() {
                         vk.verify(&test.msg, &sig)
                     }
                     "SHA-512" => {
+                        let sig =
+                            pss::Signature::try_from(&test.sig[..]).expect("invalid signature");
                         let vk = pss::VerifyingKey::<Sha512>::new_with_salt_len(
                             key.clone(),
                             group.salt_len,

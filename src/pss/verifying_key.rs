@@ -7,7 +7,7 @@ use pkcs8::{
     spki::{der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier},
     AssociatedOid, Document, EncodePublicKey,
 };
-use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
+use signature::{hazmat::PrehashVerifier, DigestVerifier};
 #[cfg(feature = "serde")]
 use {
     serdect::serde::{de, ser, Deserialize, Serialize},
@@ -57,11 +57,11 @@ where
 // `*Verifier` trait impls
 //
 
-impl<D> DigestVerifier<D, Signature> for VerifyingKey<D>
+impl<D> DigestVerifier<D, Signature<D>> for VerifyingKey<D>
 where
     D: Digest + FixedOutputReset,
 {
-    fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
+    fn verify_digest(&self, digest: D, signature: &Signature<D>) -> signature::Result<()> {
         verify_digest::<D>(
             &self.inner,
             &digest.finalize(),
@@ -72,28 +72,13 @@ where
     }
 }
 
-impl<D> PrehashVerifier<Signature> for VerifyingKey<D>
+impl<D> PrehashVerifier<Signature<D>> for VerifyingKey<D>
 where
     D: Digest + FixedOutputReset,
 {
-    fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
+    fn verify_prehash(&self, prehash: &[u8], signature: &Signature<D>) -> signature::Result<()> {
         verify_digest::<D>(&self.inner, prehash, &signature.inner, self.salt_len)
             .map_err(|e| e.into())
-    }
-}
-
-impl<D> Verifier<Signature> for VerifyingKey<D>
-where
-    D: Digest + FixedOutputReset,
-{
-    fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify_digest::<D>(
-            &self.inner,
-            &D::digest(msg),
-            &signature.inner,
-            self.salt_len,
-        )
-        .map_err(|e| e.into())
     }
 }
 

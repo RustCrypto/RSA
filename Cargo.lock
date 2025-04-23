@@ -723,8 +723,8 @@ dependencies = [
 
 [[package]]
 name = "signature"
-version = "2.3.0-pre.6"
-source = "git+https://github.com/RustCrypto/traits.git#7b82f397511d68f823d06a0fe50867e9011dd0f0"
+version = "3.0.0-pre"
+source = "git+https://github.com/RustCrypto/traits.git#5d3e03178b822f13e85ce46316e1f524ed7921c4"
 dependencies = [
  "digest",
  "rand_core 0.9.3",

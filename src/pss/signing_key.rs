@@ -12,9 +12,7 @@ use pkcs8::{
     EncodePrivateKey, SecretDocument,
 };
 use rand_core::{CryptoRng, TryCryptoRng};
-use signature::{
-    hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedSigner,
-};
+use signature::{hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner};
 use zeroize::ZeroizeOnDrop;
 #[cfg(feature = "serde")]
 use {
@@ -23,10 +21,7 @@ use {
 };
 
 #[cfg(feature = "os_rng")]
-use {
-    rand_core::OsRng,
-    signature::{hazmat::PrehashSigner, Signer},
-};
+use {rand_core::OsRng, signature::hazmat::PrehashSigner};
 
 /// Signing key for producing RSASSA-PSS signatures as described in
 /// [RFC8017 § 8.1].
@@ -90,7 +85,7 @@ where
 // `*Signer` trait impls
 //
 
-impl<D> RandomizedDigestSigner<D, Signature> for SigningKey<D>
+impl<D> RandomizedDigestSigner<D, Signature<D>> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
@@ -98,27 +93,14 @@ where
         &self,
         rng: &mut R,
         digest: D,
-    ) -> signature::Result<Signature> {
+    ) -> signature::Result<Signature<D>> {
         sign_digest::<_, D>(rng, false, &self.inner, &digest.finalize(), self.salt_len)?
             .as_slice()
             .try_into()
     }
 }
 
-impl<D> RandomizedSigner<Signature> for SigningKey<D>
-where
-    D: Digest + FixedOutputReset,
-{
-    fn try_sign_with_rng<R: TryCryptoRng + ?Sized>(
-        &self,
-        rng: &mut R,
-        msg: &[u8],
-    ) -> signature::Result<Signature> {
-        self.try_sign_digest_with_rng(rng, D::new_with_prefix(msg))
-    }
-}
-
-impl<D> RandomizedPrehashSigner<Signature> for SigningKey<D>
+impl<D> RandomizedPrehashSigner<Signature<D>> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
@@ -126,7 +108,7 @@ where
         &self,
         rng: &mut R,
         prehash: &[u8],
-    ) -> signature::Result<Signature> {
+    ) -> signature::Result<Signature<D>> {
         sign_digest::<_, D>(rng, false, &self.inner, prehash, self.salt_len)?
             .as_slice()
             .try_into()
@@ -134,22 +116,12 @@ where
 }
 
 #[cfg(feature = "os_rng")]
-impl<D> PrehashSigner<Signature> for SigningKey<D>
+impl<D> PrehashSigner<Signature<D>> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
-    fn sign_prehash(&self, prehash: &[u8]) -> signature::Result<Signature> {
+    fn sign_prehash(&self, prehash: &[u8]) -> signature::Result<Signature<D>> {
         self.sign_prehash_with_rng(&mut OsRng, prehash)
-    }
-}
-
-#[cfg(feature = "os_rng")]
-impl<D> Signer<Signature> for SigningKey<D>
-where
-    D: Digest + FixedOutputReset,
-{
-    fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
-        self.try_sign_with_rng(&mut OsRng, msg)
     }
 }
 

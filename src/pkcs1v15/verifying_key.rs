@@ -17,7 +17,7 @@ use {
     spki::DecodePublicKey,
 };
 
-use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
+use signature::{hazmat::PrehashVerifier, DigestVerifier};
 use spki::{Document, EncodePublicKey};
 
 /// Verifying key for `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
@@ -75,11 +75,11 @@ where
 // `*Verifier` trait impls
 //
 
-impl<D> DigestVerifier<D, Signature> for VerifyingKey<D>
+impl<D> DigestVerifier<D, Signature<D>> for VerifyingKey<D>
 where
     D: Digest,
 {
-    fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
+    fn verify_digest(&self, digest: D, signature: &Signature<D>) -> signature::Result<()> {
         verify(
             &self.inner,
             &self.prefix,
@@ -90,27 +90,12 @@ where
     }
 }
 
-impl<D> PrehashVerifier<Signature> for VerifyingKey<D>
+impl<D> PrehashVerifier<Signature<D>> for VerifyingKey<D>
 where
     D: Digest,
 {
-    fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
+    fn verify_prehash(&self, prehash: &[u8], signature: &Signature<D>) -> signature::Result<()> {
         verify(&self.inner, &self.prefix, prehash, &signature.inner).map_err(|e| e.into())
-    }
-}
-
-impl<D> Verifier<Signature> for VerifyingKey<D>
-where
-    D: Digest,
-{
-    fn verify(&self, msg: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify(
-            &self.inner,
-            &self.prefix.clone(),
-            &D::digest(msg),
-            &signature.inner,
-        )
-        .map_err(|e| e.into())
     }
 }
 

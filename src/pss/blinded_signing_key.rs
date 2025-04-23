@@ -11,9 +11,7 @@ use pkcs8::{
     EncodePrivateKey, SecretDocument,
 };
 use rand_core::{CryptoRng, TryCryptoRng};
-use signature::{
-    hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedSigner,
-};
+use signature::{hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner};
 use zeroize::ZeroizeOnDrop;
 #[cfg(feature = "serde")]
 use {
@@ -84,22 +82,7 @@ where
 // `*Signer` trait impls
 //
 
-impl<D> RandomizedSigner<Signature> for BlindedSigningKey<D>
-where
-    D: Digest + FixedOutputReset,
-{
-    fn try_sign_with_rng<R: TryCryptoRng + ?Sized>(
-        &self,
-        rng: &mut R,
-        msg: &[u8],
-    ) -> signature::Result<Signature> {
-        sign_digest::<_, D>(rng, true, &self.inner, &D::digest(msg), self.salt_len)?
-            .as_slice()
-            .try_into()
-    }
-}
-
-impl<D> RandomizedDigestSigner<D, Signature> for BlindedSigningKey<D>
+impl<D> RandomizedDigestSigner<D, Signature<D>> for BlindedSigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
@@ -107,14 +90,14 @@ where
         &self,
         rng: &mut R,
         digest: D,
-    ) -> signature::Result<Signature> {
+    ) -> signature::Result<Signature<D>> {
         sign_digest::<_, D>(rng, true, &self.inner, &digest.finalize(), self.salt_len)?
             .as_slice()
             .try_into()
     }
 }
 
-impl<D> RandomizedPrehashSigner<Signature> for BlindedSigningKey<D>
+impl<D> RandomizedPrehashSigner<Signature<D>> for BlindedSigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
@@ -122,7 +105,7 @@ where
         &self,
         rng: &mut R,
         prehash: &[u8],
-    ) -> signature::Result<Signature> {
+    ) -> signature::Result<Signature<D>> {
         sign_digest::<_, D>(rng, true, &self.inner, prehash, self.salt_len)?
             .as_slice()
             .try_into()
