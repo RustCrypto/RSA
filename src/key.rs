@@ -1,4 +1,5 @@
 use alloc::vec::Vec;
+use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{Hash, Hasher};
 
@@ -308,6 +309,10 @@ impl RsaPrivateKey {
         d: BoxedUint,
         mut primes: Vec<BoxedUint>,
     ) -> Result<RsaPrivateKey> {
+        // The modulus may come in padded with zeros, shorten it
+        // to ensure optimal performance of arithmetic operations.
+        let n = Odd::new(n.shorten(n.bits_vartime())).expect("`n` is odd");
+
         let n_params = BoxedMontyParams::new(n.clone());
         let n_c = NonZero::new(n.get())
             .into_option()
@@ -322,8 +327,18 @@ impl RsaPrivateKey {
                 primes.push(q);
             }
             1 => return Err(Error::NprimesTooSmall),
-            _ => {}
+            _ => {
+                // Check that the product of primes matches the modulus.
+                // This also ensures that `bit_precision` of each prime is <= that of the modulus,
+                // and `bit_precision` of their product is >= that of the modulus.
+                if &primes.iter().fold(BoxedUint::one(), |acc, p| acc * p) != n_c.as_ref() {
+                    return Err(Error::InvalidModulus);
+                }
+            }
         }
+
+        // The primes may come in padded with zeros too, so we need to shorten them as well.
+        let primes = primes.iter().map(|p| p.shorten(p.bits())).collect();
 
         let mut k = RsaPrivateKey {
             pubkey_components: RsaPublicKey {
@@ -408,9 +423,8 @@ impl RsaPrivateKey {
         }
 
         let d = &self.d;
-        let bits = d.bits_precision();
-        let p = self.primes[0].widen(bits);
-        let q = self.primes[1].widen(bits);
+        let p = self.primes[0].clone();
+        let q = self.primes[1].clone();
 
         let p_odd = Odd::new(p.clone())
             .into_option()
@@ -431,14 +445,26 @@ impl RsaPrivateKey {
             .ok_or(Error::InvalidPrime)?;
         let dq = d.rem_vartime(&x);
 
-        let qinv = BoxedMontyForm::new(q.clone(), p_params.clone());
-        let qinv = qinv.invert().into_option().ok_or(Error::InvalidPrime)?;
+        // Note that since `p` and `q` may have different `bits_precision`,
+        // so we have to equalize them to calculate the remainder.
+        let q_mod_p = match p.bits_precision().cmp(&q.bits_precision()) {
+            Ordering::Less => (&q
+                % &NonZero::new(p.widen(q.bits_precision())).expect("`p` is non-zero"))
+                .shorten(p.bits_precision()),
+            Ordering::Greater => {
+                q.widen(p.bits_precision()) % &NonZero::new(p.clone()).expect("`p` is non-zero")
+            }
+            Ordering::Equal => &q % NonZero::new(p.clone()).expect("`p` is non-zero"),
+        };
 
-        debug_assert_eq!(dp.bits_precision(), bits);
-        debug_assert_eq!(dq.bits_precision(), bits);
-        debug_assert_eq!(qinv.bits_precision(), bits);
-        debug_assert_eq!(p_params.bits_precision(), bits);
-        debug_assert_eq!(q_params.bits_precision(), bits);
+        let q_mod_p = BoxedMontyForm::new(q_mod_p, p_params.clone());
+        let qinv = q_mod_p.invert().into_option().ok_or(Error::InvalidPrime)?;
+
+        debug_assert_eq!(dp.bits_precision(), p.bits_precision());
+        debug_assert_eq!(dq.bits_precision(), q.bits_precision());
+        debug_assert_eq!(qinv.bits_precision(), p.bits_precision());
+        debug_assert_eq!(p_params.bits_precision(), p.bits_precision());
+        debug_assert_eq!(q_params.bits_precision(), q.bits_precision());
 
         self.precomputed = Some(PrecomputedValues {
             dp,
@@ -742,8 +768,7 @@ mod tests {
 
     key_generation!(key_generation_multi_5_64, 5, 64);
     key_generation!(key_generation_multi_8_576, 8, 576);
-    // TODO: reenable, currently slow
-    // key_generation!(key_generation_multi_16_1024, 16, 1024);
+    key_generation!(key_generation_multi_16_1024, 16, 1024);
 
     #[test]
     fn test_negative_decryption_value() {
@@ -768,8 +793,8 @@ mod tests {
             )
             .unwrap(),
             vec![
-                BoxedUint::from_le_slice(&[105, 101, 60, 173, 19, 153, 3, 192], bits).unwrap(),
-                BoxedUint::from_le_slice(&[235, 65, 160, 134, 32, 136, 6, 241], bits).unwrap(),
+                BoxedUint::from_le_slice(&[105, 101, 60, 173, 19, 153, 3, 192], bits / 2).unwrap(),
+                BoxedUint::from_le_slice(&[235, 65, 160, 134, 32, 136, 6, 241], bits / 2).unwrap(),
             ],
         )
         .unwrap();
