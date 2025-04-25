@@ -252,15 +252,7 @@ fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: &BoxedMontyParams
 }
 
 fn reduce_vartime(n: &BoxedUint, p: &BoxedMontyParams) -> BoxedMontyForm {
-    let bits_precision = p.modulus().bits_precision();
     let modulus = p.modulus().as_nz_ref().clone();
-
-    let n = match n.bits_precision().cmp(&bits_precision) {
-        Ordering::Less => n.widen(bits_precision),
-        Ordering::Equal => n.clone(),
-        Ordering::Greater => n.shorten(bits_precision),
-    };
-
     let n_reduced = n.rem_vartime(&modulus).widen(p.bits_precision());
     BoxedMontyForm::new(n_reduced, p.clone())
 }
