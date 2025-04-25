@@ -514,11 +514,9 @@ impl RsaPrivateKey {
         // inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
         // exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
         // mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
-        let d = self.d.widen(2 * self.d.bits_precision());
-        let de = d.wrapping_mul(&self.pubkey_components.e);
+        let de = self.d.mul(&self.pubkey_components.e);
 
         for prime in &self.primes {
-            let prime = prime.widen(d.bits_precision());
             let x = NonZero::new(prime.wrapping_sub(&BoxedUint::one())).unwrap();
             let congruence = de.rem_vartime(&x);
             if !bool::from(congruence.is_one()) {
