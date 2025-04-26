@@ -22,20 +22,6 @@ pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BoxedUint) -> Result<BoxedUin
     Ok(res)
 }
 
-fn try_set_precision(x: BoxedUint, bits_precision: u32) -> Result<BoxedUint> {
-    match x.bits_precision().cmp(&bits_precision) {
-        Ordering::Greater => {
-            if x.bits() <= bits_precision {
-                Ok(x.shorten(bits_precision))
-            } else {
-                Err(Error::Internal)
-            }
-        }
-        Ordering::Less => Ok(x.widen(bits_precision)),
-        Ordering::Equal => Ok(x),
-    }
-}
-
 /// ⚠️ Performs raw RSA decryption with no padding or error checking.
 ///
 /// Returns a plaintext `BoxedUint`. Performs RSA blinding if an `Rng` is passed.
@@ -69,9 +55,9 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
     let c = if let Some(rng) = rng {
         let (blinded, unblinder) = blind(rng, priv_key, c, n_params)?;
         ir = Some(unblinder);
-        blinded.widen(bits)
+        blinded.try_resize(bits).ok_or(Error::Internal)?
     } else {
-        c.widen(bits)
+        c.try_resize(bits).ok_or(Error::Internal)?
     };
 
     let is_multiprime = priv_key.primes().len() > 2;
@@ -96,15 +82,13 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
             // (modulo `p` and `q`) rather than calculating the remainder directly.
 
             // m1 = c^dP mod p
-            let p_wide = NonZero::new(p_params.modulus().widen(c.bits_precision()))
-                .expect("`p` is non-zero");
-            let c_mod_dp = (&c % p_wide).shorten(dp.bits_precision());
+            let p_wide = p_params.modulus().resize_unchecked(c.bits_precision());
+            let c_mod_dp = (&c % p_wide.as_nz_ref()).resize_unchecked(dp.bits_precision());
             let cp = BoxedMontyForm::new(c_mod_dp, p_params.clone());
             let mut m1 = cp.pow(dp);
             // m2 = c^dQ mod q
-            let q_wide = NonZero::new(q_params.modulus().widen(c.bits_precision()))
-                .expect("`q` is non-zero");
-            let c_mod_dq = (&c % q_wide).shorten(dq.bits_precision());
+            let q_wide = q_params.modulus().resize_unchecked(c.bits_precision());
+            let c_mod_dq = (&c % q_wide.as_nz_ref()).resize_unchecked(dq.bits_precision());
             let cq = BoxedMontyForm::new(c_mod_dq, q_params.clone());
             let m2 = cq.pow(dq).retrieve();
 
@@ -112,20 +96,17 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
             // it may be different for `m1` and `m2` as well.
 
             // (m1 - m2) mod p = (m1 mod p) - (m2 mod p) mod p
-            let m2r = match p_params.bits_precision().cmp(&q_params.bits_precision()) {
+            let m2_mod_p = match p_params.bits_precision().cmp(&q_params.bits_precision()) {
                 Ordering::Less => {
-                    let p_wide =
-                        NonZero::new(p.widen(q_params.bits_precision())).expect("`p` is non-zero");
-                    BoxedMontyForm::new(
-                        (&m2 % p_wide).shorten(p_params.bits_precision()),
-                        p_params.clone(),
-                    )
+                    let p_wide = NonZero::new(p.clone())
+                        .expect("`p` is non-zero")
+                        .resize_unchecked(q_params.bits_precision());
+                    (&m2 % p_wide).resize_unchecked(p_params.bits_precision())
                 }
-                Ordering::Greater => {
-                    BoxedMontyForm::new(m2.widen(p_params.bits_precision()), p_params.clone())
-                }
-                Ordering::Equal => BoxedMontyForm::new(m2.clone(), p_params.clone()),
+                Ordering::Greater => (&m2).resize_unchecked(p_params.bits_precision()),
+                Ordering::Equal => m2.clone(),
             };
+            let m2r = BoxedMontyForm::new(m2_mod_p, p_params.clone());
             m1 -= &m2r;
 
             // precomputed: qInv = (1/q) mod p
@@ -134,8 +115,10 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
             let h = (qinv * m1).retrieve();
 
             // m = m2 + h.q
-            let m2 = try_set_precision(m2, n.bits_precision())?;
-            let hq = try_set_precision(h * q, n.bits_precision())?;
+            let m2 = m2.try_resize(n.bits_precision()).ok_or(Error::Internal)?;
+            let hq = (h * q)
+                .try_resize(n.bits_precision())
+                .ok_or(Error::Internal)?;
             m2.wrapping_add(&hq)
         }
         _ => {
@@ -253,7 +236,7 @@ fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: &BoxedMontyParams
 
 fn reduce_vartime(n: &BoxedUint, p: &BoxedMontyParams) -> BoxedMontyForm {
     let modulus = p.modulus().as_nz_ref().clone();
-    let n_reduced = n.rem_vartime(&modulus).widen(p.bits_precision());
+    let n_reduced = n.rem_vartime(&modulus).resize_unchecked(p.bits_precision());
     BoxedMontyForm::new(n_reduced, p.clone())
 }
 
@@ -283,19 +266,20 @@ pub fn recover_primes(
 
     // 1. Let a = (de – 1) × GCD(n – 1, de – 1).
     let bits = d.bits_precision() * 2;
-    let one = BoxedUint::one().widen(bits);
-    let e = e.widen(bits);
-    let d = d.widen(bits);
-    let n = n.as_ref().widen(bits);
+    let one = BoxedUint::one_with_precision(bits);
+    let e = e.resize_unchecked(d.bits_precision());
+    let d = d.resize_unchecked(d.bits_precision());
+    let n = n.resize_unchecked(bits);
 
-    let a1 = &d * &e - &one;
-    let a2 = (&n - &one).gcd(&a1);
+    let a1 = d * e - &one;
+    let a2 = (n.as_ref() - &one).gcd(&a1);
     let a = a1 * a2;
-    let n = n.widen(a.bits_precision());
+    let n = n.resize_unchecked(a.bits_precision());
 
     // 2. Let m = floor(a /n) and r = a – m n, so that a = m n + r and 0 ≤ r < n.
-    let m = &a / NonZero::new(n.clone()).expect("checked");
-    let r = a - &m * &n;
+    let m = &a / &n;
+    let r = a - &m * n.as_ref();
+    let n = n.get();
 
     // 3. Let b = ( (n – r)/(m + 1) ) + 1; if b is not an integer or b^2 ≤ 4n, then output an error indicator,
     //    and exit without further processing.
@@ -360,7 +344,7 @@ pub(crate) fn compute_private_exponent_euler_totient(
     for prime in primes {
         totient *= prime - &BoxedUint::one();
     }
-    let exp = exp.widen(totient.bits_precision());
+    let exp = exp.resize_unchecked(totient.bits_precision());
 
     // NOTE: `mod_inverse` checks if `exp` evenly divides `totient` and returns `None` if so.
     // This ensures that `exp` is not a factor of any `(prime - 1)`.
@@ -391,7 +375,7 @@ pub(crate) fn compute_private_exponent_carmicheal(
     // LCM inlined
     let gcd = p1.gcd(&q1);
     let lcm = p1 / NonZero::new(gcd).expect("gcd is non zero") * &q1;
-    let exp = exp.widen(lcm.bits_precision());
+    let exp = exp.resize_unchecked(lcm.bits_precision());
     if let Some(d) = exp.inv_mod(&lcm).into() {
         Ok(d)
     } else {

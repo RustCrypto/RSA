@@ -4,7 +4,7 @@ use core::fmt;
 use core::hash::{Hash, Hasher};
 
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
-use crypto_bigint::{BoxedUint, Integer, NonZero, Odd};
+use crypto_bigint::{BoxedUint, Integer, NonZero, Odd, Resize};
 use rand_core::CryptoRng;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 #[cfg(feature = "serde")]
@@ -311,7 +311,8 @@ impl RsaPrivateKey {
     ) -> Result<RsaPrivateKey> {
         // The modulus may come in padded with zeros, shorten it
         // to ensure optimal performance of arithmetic operations.
-        let n = Odd::new(n.shorten(n.bits_vartime())).expect("`n` is odd");
+        let n_bits = n.bits_vartime();
+        let n = n.resize_unchecked(n_bits);
 
         let n_params = BoxedMontyParams::new(n.clone());
         let n_c = NonZero::new(n.get())
@@ -338,7 +339,13 @@ impl RsaPrivateKey {
         }
 
         // The primes may come in padded with zeros too, so we need to shorten them as well.
-        let primes = primes.iter().map(|p| p.shorten(p.bits())).collect();
+        let primes = primes
+            .into_iter()
+            .map(|p| {
+                let p_bits = p.bits();
+                p.resize_unchecked(p_bits)
+            })
+            .collect();
 
         let mut k = RsaPrivateKey {
             pubkey_components: RsaPublicKey {
@@ -449,10 +456,13 @@ impl RsaPrivateKey {
         // so we have to equalize them to calculate the remainder.
         let q_mod_p = match p.bits_precision().cmp(&q.bits_precision()) {
             Ordering::Less => (&q
-                % &NonZero::new(p.widen(q.bits_precision())).expect("`p` is non-zero"))
-                .shorten(p.bits_precision()),
+                % NonZero::new(p.clone())
+                    .expect("`p` is non-zero")
+                    .resize_unchecked(q.bits_precision()))
+            .resize_unchecked(p.bits_precision()),
             Ordering::Greater => {
-                q.widen(p.bits_precision()) % &NonZero::new(p.clone()).expect("`p` is non-zero")
+                (&q).resize_unchecked(p.bits_precision())
+                    % &NonZero::new(p.clone()).expect("`p` is non-zero")
             }
             Ordering::Equal => &q % NonZero::new(p.clone()).expect("`p` is non-zero"),
         };

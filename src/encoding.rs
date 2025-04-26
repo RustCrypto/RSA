@@ -8,7 +8,7 @@ use crate::{
     RsaPrivateKey, RsaPublicKey,
 };
 use core::convert::{TryFrom, TryInto};
-use crypto_bigint::{BoxedUint, NonZero, Odd};
+use crypto_bigint::{BoxedUint, NonZero, Odd, Resize};
 use pkcs8::{
     der::{asn1::OctetStringRef, Encode},
     Document, EncodePrivateKey, EncodePublicKey, ObjectIdentifier, SecretDocument,
@@ -115,13 +115,20 @@ impl EncodePrivateKey for RsaPrivateKey {
 
         let bits = self.d().bits_precision();
 
+        debug_assert!(bits >= self.primes[0].bits_vartime());
+        debug_assert!(bits >= self.primes[1].bits_vartime());
+
         let exponent1 = Zeroizing::new(
-            (self.d() % NonZero::new(&self.primes[0].widen(bits) - &BoxedUint::one()).unwrap())
-                .to_be_bytes(),
+            (self.d()
+                % NonZero::new((&self.primes[0]).resize_unchecked(bits) - &BoxedUint::one())
+                    .unwrap())
+            .to_be_bytes(),
         );
         let exponent2 = Zeroizing::new(
-            (self.d() % NonZero::new(&self.primes[1].widen(bits) - &BoxedUint::one()).unwrap())
-                .to_be_bytes(),
+            (self.d()
+                % NonZero::new((&self.primes[1]).resize_unchecked(bits) - &BoxedUint::one())
+                    .unwrap())
+            .to_be_bytes(),
         );
         let coefficient = Zeroizing::new(
             self.crt_coefficient()
