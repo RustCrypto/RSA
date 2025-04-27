@@ -3,7 +3,7 @@
 use core::cmp::Ordering;
 
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
-use crypto_bigint::{BoxedUint, Gcd, NonZero, Odd, RandomMod, Wrapping};
+use crypto_bigint::{BoxedUint, Gcd, NonZero, Odd, RandomMod, Resize, Wrapping};
 use rand_core::TryCryptoRng;
 use zeroize::Zeroize;
 
@@ -292,7 +292,7 @@ pub fn recover_primes(
     let bits = core::cmp::max(b.bits_precision(), y.bits_precision());
     let two = NonZero::new(BoxedUint::from(2u64))
         .expect("2 is non zero")
-        .widen(bits);
+        .resize_unchecked(bits);
     let p = (&b + &y) / &two;
     let q = (b - y) / two;
 

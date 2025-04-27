@@ -256,7 +256,7 @@ mod tests {
         let verifying_key = VerifyingKey::<Sha256>::new(pub_key);
 
         let tokens = [Token::Str(
-            "3024300d06092a864886f70d01010105000313003010020900aecdb5fae1b092570203010001",
+            "3024300d06092a864886f70d01010105000313003010020900ab240c3361d02e370203010001",
         )];
 
         assert_tokens(&verifying_key.readable(), &tokens);

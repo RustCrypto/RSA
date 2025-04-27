@@ -135,8 +135,8 @@ dependencies = [
 
 [[package]]
 name = "crypto-bigint"
-version = "0.7.0-pre.0"
-source = "git+https://github.com/RustCrypto/crypto-bigint.git#2734f1852d9a713dc92183bb6e2d4b987f1e38f1"
+version = "0.7.0-pre.1"
+source = "git+https://github.com/RustCrypto/crypto-bigint.git#cd2ccf3878739ecf9f2eb0b035587987c5f4dc47"
 dependencies = [
  "num-traits",
  "rand_core 0.9.3",

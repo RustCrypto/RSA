@@ -309,9 +309,9 @@ mod tests {
         let signing_key = SigningKey::<Sha256>::new(priv_key);
 
         let tokens = [Token::Str(concat!(
-            "3054020100300d06092a864886f70d01010105000440303e020100020900aecdb5",
-            "fae1b092570203010001020869bf9ae9d6712899020500d2aaa725020500d46b68",
-            "cb020500887e253902047b4e3a4f02040991164c"
+            "3056020100300d06092a864886f70d010101050004423040020100020900ab240c",
+            "3361d02e370203010001020811e54a15259d22f9020500ceff5cf3020500d3a7aa",
+            "ad020500ccaddf17020500cb529d3d020500bb526d6f",
         ))];
 
         assert_tokens(&signing_key.readable(), &tokens);
