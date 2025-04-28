@@ -1,9 +1,10 @@
 use alloc::vec::Vec;
+use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{Hash, Hasher};
 
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
-use crypto_bigint::{BoxedUint, Integer, NonZero, Odd};
+use crypto_bigint::{BoxedUint, Integer, NonZero, Odd, Resize};
 use rand_core::CryptoRng;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 #[cfg(feature = "serde")]
@@ -308,6 +309,11 @@ impl RsaPrivateKey {
         d: BoxedUint,
         mut primes: Vec<BoxedUint>,
     ) -> Result<RsaPrivateKey> {
+        // The modulus may come in padded with zeros, shorten it
+        // to ensure optimal performance of arithmetic operations.
+        let n_bits = n.bits_vartime();
+        let n = n.resize_unchecked(n_bits);
+
         let n_params = BoxedMontyParams::new(n.clone());
         let n_c = NonZero::new(n.get())
             .into_option()
@@ -322,8 +328,24 @@ impl RsaPrivateKey {
                 primes.push(q);
             }
             1 => return Err(Error::NprimesTooSmall),
-            _ => {}
+            _ => {
+                // Check that the product of primes matches the modulus.
+                // This also ensures that `bit_precision` of each prime is <= that of the modulus,
+                // and `bit_precision` of their product is >= that of the modulus.
+                if &primes.iter().fold(BoxedUint::one(), |acc, p| acc * p) != n_c.as_ref() {
+                    return Err(Error::InvalidModulus);
+                }
+            }
         }
+
+        // The primes may come in padded with zeros too, so we need to shorten them as well.
+        let primes = primes
+            .into_iter()
+            .map(|p| {
+                let p_bits = p.bits();
+                p.resize_unchecked(p_bits)
+            })
+            .collect();
 
         let mut k = RsaPrivateKey {
             pubkey_components: RsaPublicKey {
@@ -408,9 +430,8 @@ impl RsaPrivateKey {
         }
 
         let d = &self.d;
-        let bits = d.bits_precision();
-        let p = self.primes[0].widen(bits);
-        let q = self.primes[1].widen(bits);
+        let p = self.primes[0].clone();
+        let q = self.primes[1].clone();
 
         let p_odd = Odd::new(p.clone())
             .into_option()
@@ -431,14 +452,29 @@ impl RsaPrivateKey {
             .ok_or(Error::InvalidPrime)?;
         let dq = d.rem_vartime(&x);
 
-        let qinv = BoxedMontyForm::new(q.clone(), p_params.clone());
-        let qinv = qinv.invert().into_option().ok_or(Error::InvalidPrime)?;
+        // Note that since `p` and `q` may have different `bits_precision`,
+        // so we have to equalize them to calculate the remainder.
+        let q_mod_p = match p.bits_precision().cmp(&q.bits_precision()) {
+            Ordering::Less => (&q
+                % NonZero::new(p.clone())
+                    .expect("`p` is non-zero")
+                    .resize_unchecked(q.bits_precision()))
+            .resize_unchecked(p.bits_precision()),
+            Ordering::Greater => {
+                (&q).resize_unchecked(p.bits_precision())
+                    % &NonZero::new(p.clone()).expect("`p` is non-zero")
+            }
+            Ordering::Equal => &q % NonZero::new(p.clone()).expect("`p` is non-zero"),
+        };
 
-        debug_assert_eq!(dp.bits_precision(), bits);
-        debug_assert_eq!(dq.bits_precision(), bits);
-        debug_assert_eq!(qinv.bits_precision(), bits);
-        debug_assert_eq!(p_params.bits_precision(), bits);
-        debug_assert_eq!(q_params.bits_precision(), bits);
+        let q_mod_p = BoxedMontyForm::new(q_mod_p, p_params.clone());
+        let qinv = q_mod_p.invert().into_option().ok_or(Error::InvalidPrime)?;
+
+        debug_assert_eq!(dp.bits_precision(), p.bits_precision());
+        debug_assert_eq!(dq.bits_precision(), q.bits_precision());
+        debug_assert_eq!(qinv.bits_precision(), p.bits_precision());
+        debug_assert_eq!(p_params.bits_precision(), p.bits_precision());
+        debug_assert_eq!(q_params.bits_precision(), q.bits_precision());
 
         self.precomputed = Some(PrecomputedValues {
             dp,
@@ -488,11 +524,9 @@ impl RsaPrivateKey {
         // inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
         // exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
         // mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
-        let d = self.d.widen(2 * self.d.bits_precision());
-        let de = d.wrapping_mul(&self.pubkey_components.e);
+        let de = self.d.mul(&self.pubkey_components.e);
 
         for prime in &self.primes {
-            let prime = prime.widen(d.bits_precision());
             let x = NonZero::new(prime.wrapping_sub(&BoxedUint::one())).unwrap();
             let congruence = de.rem_vartime(&x);
             if !bool::from(congruence.is_one()) {
@@ -742,8 +776,7 @@ mod tests {
 
     key_generation!(key_generation_multi_5_64, 5, 64);
     key_generation!(key_generation_multi_8_576, 8, 576);
-    // TODO: reenable, currently slow
-    // key_generation!(key_generation_multi_16_1024, 16, 1024);
+    key_generation!(key_generation_multi_16_1024, 16, 1024);
 
     #[test]
     fn test_negative_decryption_value() {
@@ -768,8 +801,8 @@ mod tests {
             )
             .unwrap(),
             vec![
-                BoxedUint::from_le_slice(&[105, 101, 60, 173, 19, 153, 3, 192], bits).unwrap(),
-                BoxedUint::from_le_slice(&[235, 65, 160, 134, 32, 136, 6, 241], bits).unwrap(),
+                BoxedUint::from_le_slice(&[105, 101, 60, 173, 19, 153, 3, 192], bits / 2).unwrap(),
+                BoxedUint::from_le_slice(&[235, 65, 160, 134, 32, 136, 6, 241], bits / 2).unwrap(),
             ],
         )
         .unwrap();
@@ -789,14 +822,14 @@ mod tests {
         let priv_key = RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
 
         let priv_tokens = [Token::Str(concat!(
-            "3054020100300d06092a864886f70d01010105000440303e020100020900a",
-            "ecdb5fae1b092570203010001020869bf9ae9d6712899020500d2aaa72502",
-            "0500d46b68cb020500887e253902047b4e3a4f02040991164c"
+            "3056020100300d06092a864886f70d010101050004423040020100020900a",
+            "b240c3361d02e370203010001020811e54a15259d22f9020500ceff5cf302",
+            "0500d3a7aaad020500ccaddf17020500cb529d3d020500bb526d6f"
         ))];
         assert_tokens(&priv_key.clone().readable(), &priv_tokens);
 
         let priv_tokens = [Token::Str(
-            "3024300d06092a864886f70d01010105000313003010020900aecdb5fae1b092570203010001",
+            "3024300d06092a864886f70d01010105000313003010020900ab240c3361d02e370203010001",
         )];
         assert_tokens(
             &RsaPublicKey::from(priv_key.clone()).readable(),

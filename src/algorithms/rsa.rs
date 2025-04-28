@@ -3,7 +3,7 @@
 use core::cmp::Ordering;
 
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
-use crypto_bigint::{BoxedUint, Gcd, NonZero, Odd, RandomMod, Wrapping};
+use crypto_bigint::{BoxedUint, Gcd, NonZero, Odd, RandomMod, Resize};
 use rand_core::TryCryptoRng;
 use zeroize::Zeroize;
 
@@ -39,6 +39,10 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
     let n = priv_key.n();
     let d = priv_key.d();
 
+    if c.bits_precision() != n.as_ref().bits_precision() {
+        return Err(Error::Decryption);
+    }
+
     if c >= n.as_ref() {
         return Err(Error::Decryption);
     }
@@ -51,9 +55,9 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
     let c = if let Some(rng) = rng {
         let (blinded, unblinder) = blind(rng, priv_key, c, n_params)?;
         ir = Some(unblinder);
-        blinded.widen(bits)
+        blinded.try_resize(bits).ok_or(Error::Internal)?
     } else {
-        c.widen(bits)
+        c.try_resize(bits).ok_or(Error::Internal)?
     };
 
     let is_multiprime = priv_key.primes().len() > 2;
@@ -68,32 +72,54 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
         (Some(dp), Some(dq), Some(qinv), Some(p_params), Some(q_params)) if !is_multiprime => {
             // We have the precalculated values needed for the CRT.
 
-            let _p = &priv_key.primes()[0];
+            let p = &priv_key.primes()[0];
             let q = &priv_key.primes()[1];
 
             // precomputed: dP = (1/e) mod (p-1) = d mod (p-1)
             // precomputed: dQ = (1/e) mod (q-1) = d mod (q-1)
 
+            // TODO: it may be faster to convert to and from Montgomery with prepared parameters
+            // (modulo `p` and `q`) rather than calculating the remainder directly.
+
             // m1 = c^dP mod p
-            let cp = BoxedMontyForm::new(c.clone(), p_params.clone());
+            let p_wide = p_params.modulus().resize_unchecked(c.bits_precision());
+            let c_mod_dp = (&c % p_wide.as_nz_ref()).resize_unchecked(dp.bits_precision());
+            let cp = BoxedMontyForm::new(c_mod_dp, p_params.clone());
             let mut m1 = cp.pow(dp);
             // m2 = c^dQ mod q
-            let cq = BoxedMontyForm::new(c, q_params.clone());
+            let q_wide = q_params.modulus().resize_unchecked(c.bits_precision());
+            let c_mod_dq = (&c % q_wide.as_nz_ref()).resize_unchecked(dq.bits_precision());
+            let cq = BoxedMontyForm::new(c_mod_dq, q_params.clone());
             let m2 = cq.pow(dq).retrieve();
 
+            // Note that since `p` and `q` may have different `bits_precision`,
+            // it may be different for `m1` and `m2` as well.
+
             // (m1 - m2) mod p = (m1 mod p) - (m2 mod p) mod p
-            let m2r = BoxedMontyForm::new(m2.clone(), p_params.clone());
+            let m2_mod_p = match p_params.bits_precision().cmp(&q_params.bits_precision()) {
+                Ordering::Less => {
+                    let p_wide = NonZero::new(p.clone())
+                        .expect("`p` is non-zero")
+                        .resize_unchecked(q_params.bits_precision());
+                    (&m2 % p_wide).resize_unchecked(p_params.bits_precision())
+                }
+                Ordering::Greater => (&m2).resize_unchecked(p_params.bits_precision()),
+                Ordering::Equal => m2.clone(),
+            };
+            let m2r = BoxedMontyForm::new(m2_mod_p, p_params.clone());
             m1 -= &m2r;
 
             // precomputed: qInv = (1/q) mod p
 
             // h = qInv.(m1 - m2) mod p
-            let mut m: Wrapping<BoxedUint> = Wrapping(qinv.mul(&m1).retrieve());
+            let h = (qinv * m1).retrieve();
 
             // m = m2 + h.q
-            m *= Wrapping(q.clone());
-            m += Wrapping(m2);
-            m.0
+            let m2 = m2.try_resize(n.bits_precision()).ok_or(Error::Internal)?;
+            let hq = (h * q)
+                .try_resize(n.bits_precision())
+                .ok_or(Error::Internal)?;
+            m2.wrapping_add(&hq)
         }
         _ => {
             // c^d (mod n)
@@ -101,8 +127,6 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
         }
     };
 
-    // Ensure output precision matches input precision
-    let m = m.shorten(n_params.bits_precision());
     match ir {
         Some(ref ir) => {
             // unblind
@@ -117,6 +141,8 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
 ///
 /// Returns a plaintext `BoxedUint`. Performs RSA blinding if an `Rng` is passed.  This will also
 /// check for errors in the CRT computation.
+///
+/// `c` must have the same `bits_precision` as the RSA key modulus.
 ///
 /// # ☢️️ WARNING: HAZARDOUS API ☢️
 ///
@@ -209,16 +235,8 @@ fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: &BoxedMontyParams
 }
 
 fn reduce_vartime(n: &BoxedUint, p: &BoxedMontyParams) -> BoxedMontyForm {
-    let bits_precision = p.modulus().bits_precision();
     let modulus = p.modulus().as_nz_ref().clone();
-
-    let n = match n.bits_precision().cmp(&bits_precision) {
-        Ordering::Less => n.widen(bits_precision),
-        Ordering::Equal => n.clone(),
-        Ordering::Greater => n.shorten(bits_precision),
-    };
-
-    let n_reduced = n.rem_vartime(&modulus).widen(p.bits_precision());
+    let n_reduced = n.rem_vartime(&modulus).resize_unchecked(p.bits_precision());
     BoxedMontyForm::new(n_reduced, p.clone())
 }
 
@@ -248,19 +266,20 @@ pub fn recover_primes(
 
     // 1. Let a = (de – 1) × GCD(n – 1, de – 1).
     let bits = d.bits_precision() * 2;
-    let one = BoxedUint::one().widen(bits);
-    let e = e.widen(bits);
-    let d = d.widen(bits);
-    let n = n.as_ref().widen(bits);
+    let one = BoxedUint::one_with_precision(bits);
+    let e = e.resize_unchecked(d.bits_precision());
+    let d = d.resize_unchecked(d.bits_precision());
+    let n = n.resize_unchecked(bits);
 
-    let a1 = &d * &e - &one;
-    let a2 = (&n - &one).gcd(&a1);
+    let a1 = d * e - &one;
+    let a2 = (n.as_ref() - &one).gcd(&a1);
     let a = a1 * a2;
-    let n = n.widen(a.bits_precision());
+    let n = n.resize_unchecked(a.bits_precision());
 
     // 2. Let m = floor(a /n) and r = a – m n, so that a = m n + r and 0 ≤ r < n.
-    let m = &a / NonZero::new(n.clone()).expect("checked");
-    let r = a - &m * &n;
+    let m = &a / &n;
+    let r = a - &m * n.as_ref();
+    let n = n.get();
 
     // 3. Let b = ( (n – r)/(m + 1) ) + 1; if b is not an integer or b^2 ≤ 4n, then output an error indicator,
     //    and exit without further processing.
@@ -292,7 +311,7 @@ pub fn recover_primes(
     let bits = core::cmp::max(b.bits_precision(), y.bits_precision());
     let two = NonZero::new(BoxedUint::from(2u64))
         .expect("2 is non zero")
-        .widen(bits);
+        .resize_unchecked(bits);
     let p = (&b + &y) / &two;
     let q = (b - y) / two;
 
@@ -325,7 +344,7 @@ pub(crate) fn compute_private_exponent_euler_totient(
     for prime in primes {
         totient *= prime - &BoxedUint::one();
     }
-    let exp = exp.widen(totient.bits_precision());
+    let exp = exp.resize_unchecked(totient.bits_precision());
 
     // NOTE: `mod_inverse` checks if `exp` evenly divides `totient` and returns `None` if so.
     // This ensures that `exp` is not a factor of any `(prime - 1)`.
@@ -356,7 +375,7 @@ pub(crate) fn compute_private_exponent_carmicheal(
     // LCM inlined
     let gcd = p1.gcd(&q1);
     let lcm = p1 / NonZero::new(gcd).expect("gcd is non zero") * &q1;
-    let exp = exp.widen(lcm.bits_precision());
+    let exp = exp.resize_unchecked(lcm.bits_precision());
     if let Some(d) = exp.inv_mod(&lcm).into() {
         Ok(d)
     } else {
@@ -373,11 +392,55 @@ mod tests {
     fn recover_primes_works() {
         let bits = 2048;
 
-        let n = BoxedUint::from_be_hex("d397b84d98a4c26138ed1b695a8106ead91d553bf06041b62d3fdc50a041e222b8f4529689c1b82c5e71554f5dd69fa2f4b6158cf0dbeb57811a0fc327e1f28e74fe74d3bc166c1eabdc1b8b57b934ca8be5b00b4f29975bcc99acaf415b59bb28a6782bb41a2c3c2976b3c18dbadef62f00c6bb226640095096c0cc60d22fe7ef987d75c6a81b10d96bf292028af110dc7cc1bbc43d22adab379a0cd5d8078cc780ff5cd6209dea34c922cf784f7717e428d75b5aec8ff30e5f0141510766e2e0ab8d473c84e8710b2b98227c3db095337ad3452f19e2b9bfbccdd8148abf6776fa552775e6e75956e45229ae5a9c46949bab1e622f0e48f56524a84ed3483b", bits).unwrap();
+        let n = BoxedUint::from_be_hex(
+            concat!(
+                "d397b84d98a4c26138ed1b695a8106ead91d553bf06041b62d3fdc50a041e222",
+                "b8f4529689c1b82c5e71554f5dd69fa2f4b6158cf0dbeb57811a0fc327e1f28e",
+                "74fe74d3bc166c1eabdc1b8b57b934ca8be5b00b4f29975bcc99acaf415b59bb",
+                "28a6782bb41a2c3c2976b3c18dbadef62f00c6bb226640095096c0cc60d22fe7",
+                "ef987d75c6a81b10d96bf292028af110dc7cc1bbc43d22adab379a0cd5d8078c",
+                "c780ff5cd6209dea34c922cf784f7717e428d75b5aec8ff30e5f0141510766e2",
+                "e0ab8d473c84e8710b2b98227c3db095337ad3452f19e2b9bfbccdd8148abf67",
+                "76fa552775e6e75956e45229ae5a9c46949bab1e622f0e48f56524a84ed3483b"
+            ),
+            bits,
+        )
+        .unwrap();
         let e = BoxedUint::from(65_537u64);
-        let d = BoxedUint::from_be_hex("c4e70c689162c94c660828191b52b4d8392115df486a9adbe831e458d73958320dc1b755456e93701e9702d76fb0b92f90e01d1fe248153281fe79aa9763a92fae69d8d7ecd144de29fa135bd14f9573e349e45031e3b76982f583003826c552e89a397c1a06bd2163488630d92e8c2bb643d7abef700da95d685c941489a46f54b5316f62b5d2c3a7f1bbd134cb37353a44683fdc9d95d36458de22f6c44057fe74a0a436c4308f73f4da42f35c47ac16a7138d483afc91e41dc3a1127382e0c0f5119b0221b4fc639d6b9c38177a6de9b526ebd88c38d7982c07f98a0efd877d508aae275b946915c02e2e1106d175d74ec6777f5e80d12c053d9c7be1e341", bits).unwrap();
-        let p = BoxedUint::from_be_hex("f827bbf3a41877c7cc59aebf42ed4b29c32defcb8ed96863d5b090a05a8930dd624a21c9dcf9838568fdfa0df65b8462a5f2ac913d6c56f975532bd8e78fb07bd405ca99a484bcf59f019bbddcb3933f2bce706300b4f7b110120c5df9018159067c35da3061a56c8635a52b54273b31271b4311f0795df6021e6355e1a42e61", bits / 2).unwrap();
-        let q = BoxedUint::from_be_hex("da4817ce0089dd36f2ade6a3ff410c73ec34bf1b4f6bda38431bfede11cef1f7f6efa70e5f8063a3b1f6e17296ffb15feefa0912a0325b8d1fd65a559e717b5b961ec345072e0ec5203d03441d29af4d64054a04507410cf1da78e7b6119d909ec66e6ad625bf995b279a4b3c5be7d895cd7c5b9c4c497fde730916fcdb4e41b", bits / 2).unwrap();
+        let d = BoxedUint::from_be_hex(
+            concat!(
+                "c4e70c689162c94c660828191b52b4d8392115df486a9adbe831e458d7395832",
+                "0dc1b755456e93701e9702d76fb0b92f90e01d1fe248153281fe79aa9763a92f",
+                "ae69d8d7ecd144de29fa135bd14f9573e349e45031e3b76982f583003826c552",
+                "e89a397c1a06bd2163488630d92e8c2bb643d7abef700da95d685c941489a46f",
+                "54b5316f62b5d2c3a7f1bbd134cb37353a44683fdc9d95d36458de22f6c44057",
+                "fe74a0a436c4308f73f4da42f35c47ac16a7138d483afc91e41dc3a1127382e0",
+                "c0f5119b0221b4fc639d6b9c38177a6de9b526ebd88c38d7982c07f98a0efd87",
+                "7d508aae275b946915c02e2e1106d175d74ec6777f5e80d12c053d9c7be1e341"
+            ),
+            bits,
+        )
+        .unwrap();
+        let p = BoxedUint::from_be_hex(
+            concat!(
+                "f827bbf3a41877c7cc59aebf42ed4b29c32defcb8ed96863d5b090a05a8930dd",
+                "624a21c9dcf9838568fdfa0df65b8462a5f2ac913d6c56f975532bd8e78fb07b",
+                "d405ca99a484bcf59f019bbddcb3933f2bce706300b4f7b110120c5df9018159",
+                "067c35da3061a56c8635a52b54273b31271b4311f0795df6021e6355e1a42e61"
+            ),
+            bits / 2,
+        )
+        .unwrap();
+        let q = BoxedUint::from_be_hex(
+            concat!(
+                "da4817ce0089dd36f2ade6a3ff410c73ec34bf1b4f6bda38431bfede11cef1f7",
+                "f6efa70e5f8063a3b1f6e17296ffb15feefa0912a0325b8d1fd65a559e717b5b",
+                "961ec345072e0ec5203d03441d29af4d64054a04507410cf1da78e7b6119d909",
+                "ec66e6ad625bf995b279a4b3c5be7d895cd7c5b9c4c497fde730916fcdb4e41b"
+            ),
+            bits / 2,
+        )
+        .unwrap();
 
         let (mut p1, mut q1) = recover_primes(&NonZero::new(n).unwrap(), &e, &d).unwrap();
 
