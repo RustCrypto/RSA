@@ -453,7 +453,7 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
-            let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
+            let sig: Signature = signing_key.sign_with_rng(&mut rng, test.as_bytes());
             verifying_key
                 .verify(test.as_bytes(), &sig)
                 .expect("failed to verify");
@@ -470,7 +470,7 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
-            let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
+            let sig: Signature = signing_key.sign_with_rng(&mut rng, test.as_bytes());
             verifying_key
                 .verify(test.as_bytes(), &sig)
                 .expect("failed to verify");

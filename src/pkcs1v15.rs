@@ -458,15 +458,15 @@ mod tests {
         let signing_key = SigningKey::<Sha1>::new(priv_key);
 
         for (text, expected) in &tests {
-            let out = signing_key.sign(text.as_bytes()).to_bytes();
+            let sig: Signature = signing_key.sign(text.as_bytes());
+            let out = sig.to_bytes();
             assert_ne!(out.as_ref(), text.as_bytes());
             assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
             assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = signing_key
-                .sign_with_rng(&mut rng, text.as_bytes())
-                .to_bytes();
+            let sig2: Signature = signing_key.sign_with_rng(&mut rng, text.as_bytes());
+            let out2 = sig2.to_bytes();
             assert_eq!(out2.as_ref(), expected);
         }
     }
@@ -486,14 +486,14 @@ mod tests {
         let signing_key = SigningKey::<Sha256>::new(priv_key);
 
         for (text, expected) in &tests {
-            let out = signing_key.sign(text.as_bytes()).to_bytes();
+            let sig: Signature = signing_key.sign(text.as_bytes());
+            let out = sig.to_bytes();
             assert_ne!(out.as_ref(), text.as_bytes());
             assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = signing_key
-                .sign_with_rng(&mut rng, text.as_bytes())
-                .to_bytes();
+            let sig2: Signature = signing_key.sign_with_rng(&mut rng, text.as_bytes());
+            let out2 = sig2.to_bytes();
             assert_eq!(out2.as_ref(), expected);
         }
     }
@@ -513,14 +513,14 @@ mod tests {
         let signing_key = SigningKey::<Sha3_256>::new(priv_key);
 
         for (text, expected) in &tests {
-            let out = signing_key.sign(text.as_bytes()).to_bytes();
+            let signature: Signature = signing_key.sign(text.as_bytes());
+            let out = signature.to_bytes();
             assert_ne!(out.as_ref(), text.as_bytes());
             assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = signing_key
-                .sign_with_rng(&mut rng, text.as_bytes())
-                .to_bytes();
+            let sig2: Signature = signing_key.sign_with_rng(&mut rng, text.as_bytes());
+            let out2 = sig2.to_bytes();
             assert_eq!(out2.as_ref(), expected);
         }
     }
