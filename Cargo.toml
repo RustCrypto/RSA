@@ -22,7 +22,7 @@ pkcs8 = { version = "0.11.0-rc.2", default-features = false, features = ["alloc"
 signature = { version = "=2.3.0-pre.6", default-features = false, features = ["alloc", "digest", "rand_core"] }
 spki = { version = "0.8.0-rc.1", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
-crypto-bigint = { version = "0.7.0-pre", default-features = false, features = ["zeroize", "alloc"] }
+crypto-bigint = { version = "0.7.0-pre.2", default-features = false, features = ["zeroize", "alloc"] }
 crypto-primes = { version = "0.7.0-dev", default-features = false }
 
 # optional dependencies
@@ -71,10 +71,6 @@ opt-level = 2
 debug = true
 
 [patch.crates-io]
-# https://github.com/RustCrypto/crypto-bigint/pull/762
-# https://github.com/RustCrypto/crypto-bigint/pull/765
-crypto-bigint = { git = "https://github.com/RustCrypto/crypto-bigint.git" }
-
 # https://github.com/entropyxyz/crypto-primes/pull/74
 crypto-primes = { git = "https://github.com/entropyxyz/crypto-primes.git" }
 
