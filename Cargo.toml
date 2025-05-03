@@ -19,7 +19,7 @@ subtle = { version = "2.6.1", default-features = false }
 digest = { version = "=0.11.0-pre.10", default-features = false, features = ["alloc", "oid"] }
 pkcs1 = { version = "0.8.0-rc.1", default-features = false, features = ["alloc", "pkcs8"] }
 pkcs8 = { version = "0.11.0-rc.2", default-features = false, features = ["alloc"] }
-signature = { version = "=2.3.0-pre.6", default-features = false, features = ["alloc", "digest", "rand_core"] }
+signature = { version = "=3.0.0-pre", default-features = false, features = ["alloc", "digest", "rand_core"] }
 spki = { version = "0.8.0-rc.1", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
 crypto-bigint = { version = "0.7.0-pre", default-features = false, features = ["zeroize", "alloc"] }
@@ -57,7 +57,7 @@ os_rng = ["rand_core/os_rng", "crypto-bigint/rand_core"]
 serde = ["dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pem = ["pkcs1/pem", "pkcs8/pem"]
 pkcs5 = ["pkcs8/encryption"]
-std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std", "signature/std", "crypto-bigint/rand"]
+std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std", "crypto-bigint/rand"]
 
 
 [package.metadata.docs.rs]
