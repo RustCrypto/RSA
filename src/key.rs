@@ -497,7 +497,7 @@ impl RsaPrivateKey {
         let p = &self.primes[0];
         let q = &self.primes[1];
 
-        Option::from(q.inv_mod(p))
+        Option::from(q.invert_mod(p))
     }
 
     /// Performs basic sanity checks on the key.
