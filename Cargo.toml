@@ -73,6 +73,7 @@ debug = true
 [patch.crates-io]
 # https://github.com/entropyxyz/crypto-primes/pull/74
 crypto-primes = { git = "https://github.com/entropyxyz/crypto-primes.git" }
+crypto-bigint = { git = "https://github.com/RustCrypto/crypto-bigint.git" }
 
 signature = { git = "https://github.com/RustCrypto/traits.git" }
 
