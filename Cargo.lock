@@ -149,8 +149,7 @@ dependencies = [
 [[package]]
 name = "crypto-common"
 version = "0.2.0-rc.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "170d71b5b14dec99db7739f6fc7d6ec2db80b78c3acb77db48392ccc3d8a9ea0"
+source = "git+https://github.com/RustCrypto/traits.git?branch=digest%2Fnewtype#2aced1d84f450f788f68586b519a828ce4d54600"
 dependencies = [
  "hybrid-array",
 ]
@@ -187,8 +186,7 @@ dependencies = [
 [[package]]
 name = "digest"
 version = "0.11.0-pre.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c478574b20020306f98d61c8ca3322d762e1ff08117422ac6106438605ea516"
+source = "git+https://github.com/RustCrypto/traits.git?branch=digest%2Fnewtype#2aced1d84f450f788f68586b519a828ce4d54600"
 dependencies = [
  "block-buffer",
  "const-oid",
@@ -269,8 +267,7 @@ checksum = "bcaaec4551594c969335c98c903c1397853d4198408ea609190f420500f6be71"
 [[package]]
 name = "hmac"
 version = "0.13.0-pre.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62c11fc82c6b89c906b4d26b7b5a305d0b3aebd4b458dd1bd0a7ed98c548a28e"
+source = "git+https://github.com/baloo/MACs.git?branch=baloo%2Fdigest-pin#dc3909c01db08a3c865eaaee16dbcfb783804ede"
 dependencies = [
  "digest",
 ]
@@ -363,7 +360,7 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 [[package]]
 name = "pbkdf2"
 version = "0.13.0-pre.1"
-source = "git+https://github.com/baloo/password-hashes.git?branch=baloo%2Fhmac-0.13.0-pre.5#5fcba783b95daf9a2dba4b938c77e2904a261750"
+source = "git+https://github.com/baloo/password-hashes.git?branch=baloo%2Fdigest%2Fnewtype#3f329536e23e9918b7b3a5c1dd3c28e6e6cc7a9d"
 dependencies = [
  "digest",
  "hmac",
@@ -639,7 +636,7 @@ dependencies = [
 [[package]]
 name = "scrypt"
 version = "0.12.0-pre.2"
-source = "git+https://github.com/baloo/password-hashes.git?branch=baloo%2Fhmac-0.13.0-pre.5#5fcba783b95daf9a2dba4b938c77e2904a261750"
+source = "git+https://github.com/baloo/password-hashes.git?branch=baloo%2Fdigest%2Fnewtype#3f329536e23e9918b7b3a5c1dd3c28e6e6cc7a9d"
 dependencies = [
  "pbkdf2",
  "salsa20",
@@ -700,8 +697,7 @@ dependencies = [
 [[package]]
 name = "sha1"
 version = "0.11.0-pre.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55f44e40722caefdd99383c25d3ae52a1094a1951215ae76f68837ece4e7f566"
+source = "git+https://github.com/RustCrypto/hashes.git?branch=newtype#9a29611af87269187575e51d0ffbdc56ac979abc"
 dependencies = [
  "cfg-if",
  "cpufeatures",
@@ -711,8 +707,7 @@ dependencies = [
 [[package]]
 name = "sha2"
 version = "0.11.0-pre.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19b4241d1a56954dce82cecda5c8e9c794eef6f53abe5e5216bac0a0ea71ffa7"
+source = "git+https://github.com/RustCrypto/hashes.git?branch=newtype#9a29611af87269187575e51d0ffbdc56ac979abc"
 dependencies = [
  "cfg-if",
  "cpufeatures",
@@ -722,8 +717,7 @@ dependencies = [
 [[package]]
 name = "sha3"
 version = "0.11.0-pre.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1bc997d7a5fa67cc1e352b2001124d28edb948b4e7a16567f9b3c1e51952524"
+source = "git+https://github.com/RustCrypto/hashes.git?branch=newtype#9a29611af87269187575e51d0ffbdc56ac979abc"
 dependencies = [
  "digest",
  "keccak",
@@ -732,7 +726,7 @@ dependencies = [
 [[package]]
 name = "signature"
 version = "3.0.0-pre"
-source = "git+https://github.com/RustCrypto/traits.git#439fc8c28c61b09eff35349b4c091a5586d70ea7"
+source = "git+https://github.com/RustCrypto/traits.git?branch=digest%2Fnewtype#2aced1d84f450f788f68586b519a828ce4d54600"
 dependencies = [
  "digest",
  "rand_core 0.9.3",

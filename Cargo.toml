@@ -57,7 +57,7 @@ os_rng = ["rand_core/os_rng", "crypto-bigint/rand_core"]
 serde = ["dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pem = ["pkcs1/pem", "pkcs8/pem"]
 pkcs5 = ["pkcs8/encryption"]
-std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std", "crypto-bigint/rand"]
+std = ["pkcs1/std", "pkcs8/std", "rand_core/std", "crypto-bigint/rand"]
 
 
 [package.metadata.docs.rs]
@@ -74,14 +74,22 @@ debug = true
 # https://github.com/entropyxyz/crypto-primes/pull/74
 crypto-primes = { git = "https://github.com/entropyxyz/crypto-primes.git" }
 
-signature = { git = "https://github.com/RustCrypto/traits.git" }
+crypto-common = { git = "https://github.com/RustCrypto/traits.git", branch = "digest/newtype" }
+digest        = { git = "https://github.com/RustCrypto/traits.git", branch = "digest/newtype" }
+signature     = { git = "https://github.com/RustCrypto/traits.git", branch = "digest/newtype" }
 
 der   = { git = "https://github.com/RustCrypto/formats.git" }
 pkcs1 = { git = "https://github.com/RustCrypto/formats.git" }
 pkcs5 = { git = "https://github.com/RustCrypto/formats.git" }
 pkcs8 = { git = "https://github.com/RustCrypto/formats.git" }
 
+sha1   = { git = "https://github.com/RustCrypto/hashes.git", branch = "newtype" }
+sha2   = { git = "https://github.com/RustCrypto/hashes.git", branch = "newtype" }
+sha3   = { git = "https://github.com/RustCrypto/hashes.git", branch = "newtype" }
+
 # https://github.com/RustCrypto/password-hashes/pull/577
 # https://github.com/RustCrypto/password-hashes/pull/578
-pbkdf2 = { git = "https://github.com/baloo/password-hashes.git", branch = "baloo/hmac-0.13.0-pre.5" }
-scrypt = { git = "https://github.com/baloo/password-hashes.git", branch = "baloo/hmac-0.13.0-pre.5" }
+pbkdf2 = { git = "https://github.com/baloo/password-hashes.git", branch = "baloo/digest/newtype" }
+scrypt = { git = "https://github.com/baloo/password-hashes.git", branch = "baloo/digest/newtype" }
+
+hmac = { git = "https://github.com/baloo/MACs.git", branch = "baloo/digest-pin" }
