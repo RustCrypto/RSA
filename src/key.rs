@@ -718,6 +718,8 @@ mod tests {
         let n_limbs: &[u64] = PublicKeyParts::n(&public_key).as_ref().as_ref();
         assert_eq!(n_limbs, &[101u64]);
         assert_eq!(PublicKeyParts::e(&public_key), &BoxedUint::from(200u64));
+        assert_eq!(PublicKeyParts::e_bytes(&public_key), [200].into());
+        assert_eq!(PublicKeyParts::n_bytes(&public_key), [101].into());
     }
 
     fn test_key_basics(private_key: &RsaPrivateKey) {

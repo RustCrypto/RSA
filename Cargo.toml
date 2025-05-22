@@ -85,3 +85,6 @@ pkcs8 = { git = "https://github.com/RustCrypto/formats.git" }
 # https://github.com/RustCrypto/password-hashes/pull/578
 pbkdf2 = { git = "https://github.com/baloo/password-hashes.git", branch = "baloo/hmac-0.13.0-pre.5" }
 scrypt = { git = "https://github.com/baloo/password-hashes.git", branch = "baloo/hmac-0.13.0-pre.5" }
+
+# https://github.com/RustCrypto/crypto-bigint/pull/824
+crypto-bigint = { git = "https://github.com/RustCrypto/crypto-bigint.git" }
