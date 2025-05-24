@@ -1,5 +1,6 @@
 //! Traits related to the key components
 
+use alloc::boxed::Box;
 use crypto_bigint::{
     modular::{BoxedMontyForm, BoxedMontyParams},
     BoxedUint, NonZero,
@@ -26,6 +27,16 @@ pub trait PublicKeyParts {
     /// Returns precision (in bits) of `n`.
     fn n_bits_precision(&self) -> u32 {
         self.n().bits_precision()
+    }
+
+    /// Returns the big endian serialization of the modulus of the key
+    fn n_bytes(&self) -> Box<[u8]> {
+        self.n().to_be_bytes_trimmed_vartime()
+    }
+
+    /// Returns the big endian serialization of the public exponent of the key
+    fn e_bytes(&self) -> Box<[u8]> {
+        self.e().to_be_bytes_trimmed_vartime()
     }
 }
 
