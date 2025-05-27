@@ -18,7 +18,7 @@ const-oid = { version = "0.10.0", default-features = false }
 subtle = { version = "2.6.1", default-features = false }
 digest = { version = "=0.11.0-pre.10", default-features = false, features = ["alloc", "oid"] }
 pkcs1 = { version = "0.8.0-rc.1", default-features = false, features = ["alloc", "pkcs8"] }
-pkcs8 = { version = "0.11.0-rc.2", default-features = false, features = ["alloc"] }
+pkcs8 = { version = "0.11.0-rc.3", default-features = false, features = ["alloc"] }
 signature = { version = "=3.0.0-pre", default-features = false, features = ["alloc", "digest", "rand_core"] }
 spki = { version = "0.8.0-rc.1", default-features = false, features = ["alloc"] }
 zeroize = { version = "1.5", features = ["alloc"] }
@@ -57,7 +57,7 @@ os_rng = ["rand_core/os_rng", "crypto-bigint/rand_core"]
 serde = ["dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pem = ["pkcs1/pem", "pkcs8/pem"]
 pkcs5 = ["pkcs8/encryption"]
-std = ["digest/std", "pkcs1/std", "pkcs8/std", "rand_core/std", "crypto-bigint/rand"]
+std = ["pkcs1/std", "pkcs8/std", "rand_core/std", "crypto-bigint/rand"]
 
 
 [package.metadata.docs.rs]
@@ -74,17 +74,33 @@ debug = true
 # https://github.com/entropyxyz/crypto-primes/pull/74
 crypto-primes = { git = "https://github.com/entropyxyz/crypto-primes.git" }
 
-signature = { git = "https://github.com/RustCrypto/traits.git" }
+aead          = { git = "https://github.com/RustCrypto/traits.git" }
+crypto-common = { git = "https://github.com/RustCrypto/traits.git" }
+digest        = { git = "https://github.com/RustCrypto/traits.git" }
+signature     = { git = "https://github.com/RustCrypto/traits.git" }
 
 der   = { git = "https://github.com/RustCrypto/formats.git" }
 pkcs1 = { git = "https://github.com/RustCrypto/formats.git" }
+# https://github.com/RustCrypto/formats/pull/1844
 pkcs5 = { git = "https://github.com/RustCrypto/formats.git" }
 pkcs8 = { git = "https://github.com/RustCrypto/formats.git" }
 
+sha1   = { git = "https://github.com/RustCrypto/hashes.git" }
+sha2   = { git = "https://github.com/RustCrypto/hashes.git" }
+sha3   = { git = "https://github.com/RustCrypto/hashes.git" }
+
 # https://github.com/RustCrypto/password-hashes/pull/577
 # https://github.com/RustCrypto/password-hashes/pull/578
-pbkdf2 = { git = "https://github.com/baloo/password-hashes.git", branch = "baloo/hmac-0.13.0-pre.5" }
-scrypt = { git = "https://github.com/baloo/password-hashes.git", branch = "baloo/hmac-0.13.0-pre.5" }
+# https://github.com/RustCrypto/password-hashes/pull/592
+pbkdf2 = { git = "https://github.com/RustCrypto/password-hashes.git" }
+scrypt = { git = "https://github.com/RustCrypto/password-hashes.git" }
+
+hmac = { git = "https://github.com/RustCrypto/MACs.git" }
 
 # https://github.com/RustCrypto/crypto-bigint/pull/824
 crypto-bigint = { git = "https://github.com/RustCrypto/crypto-bigint.git" }
+
+cbc = { git = "https://github.com/RustCrypto/block-modes.git" }
+ctr = { git = "https://github.com/RustCrypto/block-modes.git" }
+aes-gcm = { git = "https://github.com/RustCrypto/AEADs.git" }
+salsa20 = { git = "https://github.com/RustCrypto/stream-ciphers.git" }
