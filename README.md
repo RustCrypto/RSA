@@ -3,7 +3,8 @@
 [![crates.io][crate-image]][crate-link]
 [![Documentation][doc-image]][doc-link]
 [![Build Status][build-image]][build-link]
-[![dependency status][deps-image]][deps-link]
+[![Dependency Status][deps-image]][deps-link]
+![Apache2/MIT licensed][license-image]
 ![MSRV][msrv-image]
 [![Project Chat][chat-image]][chat-link]
 
@@ -81,7 +82,7 @@ You can follow our work on mitigating this issue in [#390].
 
 ## Minimum Supported Rust Version (MSRV)
 
-This crate supports Rust 1.83 or higher.
+This crate supports Rust 1.85 or higher.
 
 In the future MSRV can be changed, but it will be done with a minor version bump.
 
@@ -102,13 +103,16 @@ dual licensed as above, without any additional terms or conditions.
 
 [//]: # (badges)
 
-[crate-image]: https://img.shields.io/crates/v/rsa
+[crate-image]: https://img.shields.io/crates/v/rsa?logo=rust
 [crate-link]: https://crates.io/crates/rsa
 [doc-image]: https://docs.rs/rsa/badge.svg
 [doc-link]: https://docs.rs/rsa
+[build-image]: https://github.com/RustCrypto/RSA/actions/workflows/ci.yml/badge.svg
+[build-link]: https://github.com/RustCrypto/RSA/actions/workflows/ci.yml
 [build-image]: https://github.com/RustCrypto/RSA/actions/workflows/ci.yml/badge.svg?branch=master
 [build-link]: https://github.com/RustCrypto/RSA/actions/workflows/ci.yml?query=branch:master
-[msrv-image]: https://img.shields.io/badge/rustc-1.83+-blue.svg
+[license-image]: https://img.shields.io/badge/license-Apache2.0/MIT-blue.svg
+[msrv-image]: https://img.shields.io/badge/rustc-1.85+-blue.svg
 [chat-image]: https://img.shields.io/badge/zulip-join_chat-blue.svg
 [chat-link]: https://rustcrypto.zulipchat.com/#narrow/stream/260047-RSA
 [deps-image]: https://deps.rs/repo/github/RustCrypto/RSA/status.svg
