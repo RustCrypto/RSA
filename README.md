@@ -35,13 +35,6 @@ assert_eq!(&data[..], &dec_data[..]);
 > [profile.debug]
 > opt-level = 3
 > ```
-> If you don't want to turn on optimizations for all dependencies,
-> you can only optimize the `num-bigint-dig` dependency. This should
-> give most of the speedups.
-> ```toml
-> [profile.dev.package.num-bigint-dig]
-> opt-level = 3
-> ```
 
 ## Status
 
