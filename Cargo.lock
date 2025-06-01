@@ -737,8 +737,7 @@ dependencies = [
 [[package]]
 name = "signature"
 version = "3.0.0-rc.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d7ae074ff622614874804868b07d9cb786223082c9fe726a6653608f32f37b02"
+source = "git+https://github.com/RustCrypto/traits?rev=f05989fadee8bb73d2c278f40c7ba943b0582977#f05989fadee8bb73d2c278f40c7ba943b0582977"
 dependencies = [
  "digest",
  "rand_core 0.9.3",
