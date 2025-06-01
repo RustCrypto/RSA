@@ -56,18 +56,6 @@ where
             phantom: Default::default(),
         })
     }
-
-    /// Create a new signing key with a prefix for the digest `D`.
-    #[deprecated(since = "0.9.0", note = "use SigningKey::new instead")]
-    pub fn new_with_prefix(key: RsaPrivateKey) -> Self {
-        Self::new(key)
-    }
-
-    /// Generate a new signing key with a prefix for the digest `D`.
-    #[deprecated(since = "0.9.0", note = "use SigningKey::random instead")]
-    pub fn random_with_prefix<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
-        Self::random(rng, bit_size)
-    }
 }
 
 impl<D> SigningKey<D>
