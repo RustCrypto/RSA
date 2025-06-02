@@ -45,12 +45,6 @@ where
             phantom: Default::default(),
         }
     }
-
-    /// Create a new verifying key with a prefix for the digest `D`.
-    #[deprecated(since = "0.9.0", note = "use VerifyingKey::new instead")]
-    pub fn new_with_prefix(key: RsaPublicKey) -> Self {
-        Self::new(key)
-    }
 }
 
 impl<D> VerifyingKey<D>

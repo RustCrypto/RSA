@@ -89,14 +89,6 @@ impl Pkcs1v15Sign {
             prefix: Box::new([]),
         }
     }
-
-    /// Create new PKCS#1 v1.5 padding for computing an unprefixed signature.
-    ///
-    /// This sets `hash_len` to `None` and uses an empty `prefix`.
-    #[deprecated(since = "0.9.0", note = "use Pkcs1v15Sign::new_unprefixed instead")]
-    pub fn new_raw() -> Self {
-        Self::new_unprefixed()
-    }
 }
 
 impl SignatureScheme for Pkcs1v15Sign {
