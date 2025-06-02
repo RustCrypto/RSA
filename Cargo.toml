@@ -49,7 +49,7 @@ serde = { version = "1.0.184", features = ["derive"] }
 
 [patch.crates-io]
 # https://github.com/RustCrypto/traits/pull/1880
-signature = { git = "https://github.com/RustCrypto/traits", rev = "f05989fadee8bb73d2c278f40c7ba943b0582977" }
+signature = { git = "https://github.com/RustCrypto/traits" }
 
 [[bench]]
 name = "key"
