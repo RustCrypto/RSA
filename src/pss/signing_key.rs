@@ -13,7 +13,8 @@ use pkcs8::{
 };
 use rand_core::{CryptoRng, TryCryptoRng};
 use signature::{
-    hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedSigner,
+    hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedMultipartSigner,
+    RandomizedSigner,
 };
 use zeroize::ZeroizeOnDrop;
 #[cfg(feature = "serde")]
@@ -25,7 +26,7 @@ use {
 #[cfg(feature = "os_rng")]
 use {
     rand_core::OsRng,
-    signature::{hazmat::PrehashSigner, Signer},
+    signature::{hazmat::PrehashSigner, MultipartSigner, Signer},
 };
 
 /// Signing key for producing RSASSA-PSS signatures as described in
@@ -118,6 +119,22 @@ where
     }
 }
 
+impl<D> RandomizedMultipartSigner<Signature> for SigningKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn try_multipart_sign_with_rng<R: TryCryptoRng + ?Sized>(
+        &self,
+        rng: &mut R,
+        msg: &[&[u8]],
+    ) -> signature::Result<Signature> {
+        let mut digest = D::new();
+        msg.iter()
+            .for_each(|slice| <D as Digest>::update(&mut digest, slice));
+        self.try_sign_digest_with_rng(rng, digest)
+    }
+}
+
 impl<D> RandomizedPrehashSigner<Signature> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
@@ -150,6 +167,16 @@ where
 {
     fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
         self.try_sign_with_rng(&mut OsRng, msg)
+    }
+}
+
+#[cfg(feature = "os_rng")]
+impl<D> MultipartSigner<Signature> for SigningKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn try_multipart_sign(&self, msg: &[&[u8]]) -> signature::Result<Signature> {
+        self.try_multipart_sign_with_rng(&mut OsRng, msg)
     }
 }
 

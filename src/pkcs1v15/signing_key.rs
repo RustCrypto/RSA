@@ -18,7 +18,8 @@ use {
 };
 
 use signature::{
-    hazmat::PrehashSigner, DigestSigner, Keypair, RandomizedDigestSigner, RandomizedSigner, Signer,
+    hazmat::PrehashSigner, DigestSigner, Keypair, MultipartSigner, RandomizedDigestSigner,
+    RandomizedMultipartSigner, RandomizedSigner, Signer,
 };
 use zeroize::ZeroizeOnDrop;
 
@@ -135,7 +136,22 @@ where
         rng: &mut R,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign(Some(rng), &self.inner, &self.prefix, &D::digest(msg))?
+        self.try_multipart_sign_with_rng(rng, &[msg])
+    }
+}
+
+impl<D> RandomizedMultipartSigner<Signature> for SigningKey<D>
+where
+    D: Digest,
+{
+    fn try_multipart_sign_with_rng<R: TryCryptoRng + ?Sized>(
+        &self,
+        rng: &mut R,
+        msg: &[&[u8]],
+    ) -> signature::Result<Signature> {
+        let mut digest = D::new();
+        msg.iter().for_each(|slice| digest.update(slice));
+        sign(Some(rng), &self.inner, &self.prefix, &digest.finalize())?
             .as_slice()
             .try_into()
     }
@@ -146,7 +162,18 @@ where
     D: Digest,
 {
     fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
-        sign::<DummyRng>(None, &self.inner, &self.prefix, &D::digest(msg))?
+        self.try_multipart_sign(&[msg])
+    }
+}
+
+impl<D> MultipartSigner<Signature> for SigningKey<D>
+where
+    D: Digest,
+{
+    fn try_multipart_sign(&self, msg: &[&[u8]]) -> signature::Result<Signature> {
+        let mut digest = D::new();
+        msg.iter().for_each(|slice| digest.update(slice));
+        sign::<DummyRng>(None, &self.inner, &self.prefix, &digest.finalize())?
             .as_slice()
             .try_into()
     }

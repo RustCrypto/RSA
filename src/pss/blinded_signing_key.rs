@@ -12,7 +12,8 @@ use pkcs8::{
 };
 use rand_core::{CryptoRng, TryCryptoRng};
 use signature::{
-    hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedSigner,
+    hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedMultipartSigner,
+    RandomizedSigner,
 };
 use zeroize::ZeroizeOnDrop;
 #[cfg(feature = "serde")]
@@ -93,7 +94,23 @@ where
         rng: &mut R,
         msg: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, D>(rng, true, &self.inner, &D::digest(msg), self.salt_len)?
+        self.try_multipart_sign_with_rng(rng, &[msg])
+    }
+}
+
+impl<D> RandomizedMultipartSigner<Signature> for BlindedSigningKey<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn try_multipart_sign_with_rng<R: TryCryptoRng + ?Sized>(
+        &self,
+        rng: &mut R,
+        msg: &[&[u8]],
+    ) -> signature::Result<Signature> {
+        let mut digest = D::new();
+        msg.iter()
+            .for_each(|slice| <D as Digest>::update(&mut digest, slice));
+        sign_digest::<_, D>(rng, true, &self.inner, &digest.finalize(), self.salt_len)?
             .as_slice()
             .try_into()
     }
