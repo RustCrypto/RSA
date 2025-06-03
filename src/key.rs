@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{Hash, Hasher};
+use core::ops::Range;
 
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
 use crypto_bigint::{BoxedUint, Integer, NonZero, Odd, Resize};
@@ -215,7 +216,10 @@ impl RsaPublicKey {
     /// Maximum value of the public exponent `e`.
     pub const MAX_PUB_EXPONENT: u64 = (1 << 33) - 1;
 
-    /// Maximum size of the modulus `n` in bits.
+    /// Default minimum size of the modulus `n` in bits.
+    pub const MIN_SIZE: usize = 1024;
+
+    /// Default maximum size of the modulus `n` in bits.
     pub const MAX_SIZE: usize = 4096;
 
     /// Create a new public key from its components.
@@ -223,12 +227,19 @@ impl RsaPublicKey {
     /// This function accepts public keys with a modulus size up to 4096-bits,
     /// i.e. [`RsaPublicKey::MAX_SIZE`].
     pub fn new(n: BoxedUint, e: BoxedUint) -> Result<Self> {
-        Self::new_with_max_size(n, e, Self::MAX_SIZE)
+        Self::new_with_size_limits(n, e, Self::MIN_SIZE..Self::MAX_SIZE)
     }
 
     /// Create a new public key from its components.
-    pub fn new_with_max_size(n: BoxedUint, e: BoxedUint, max_size: usize) -> Result<Self> {
-        check_public_with_max_size(&n, &e, max_size)?;
+    ///
+    /// Accepts a third argument which specifies a range of allowed sizes from minimum to maximum
+    /// in bits, which by default is `1024..4096`.
+    pub fn new_with_size_limits(
+        n: BoxedUint,
+        e: BoxedUint,
+        size_range_bits: Range<usize>,
+    ) -> Result<Self> {
+        check_public_with_size_range(&n, &e, size_range_bits)?;
 
         let n_odd = Odd::new(n.clone())
             .into_option()
@@ -244,7 +255,7 @@ impl RsaPublicKey {
     ///
     /// This method is not recommended, and only intended for unusual use cases.
     /// Most applications should use [`RsaPublicKey::new`] or
-    /// [`RsaPublicKey::new_with_max_size`] instead.
+    /// [`RsaPublicKey::new_with_size_limits`] instead.
     pub fn new_unchecked(n: BoxedUint, e: BoxedUint) -> Self {
         let n_odd = Odd::new(n.clone()).expect("n must be odd");
         let n_params = BoxedMontyParams::new(n_odd);
@@ -613,16 +624,28 @@ impl PrivateKeyParts for RsaPrivateKey {
     }
 }
 
-/// Check that the public key is well formed and has an exponent within acceptable bounds.
+/// Check that the public key is well-formed and has an exponent within acceptable bounds.
 #[inline]
 pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
-    check_public_with_max_size(public_key.n(), public_key.e(), RsaPublicKey::MAX_SIZE)
+    check_public_with_size_range(
+        public_key.n(),
+        public_key.e(),
+        RsaPublicKey::MIN_SIZE..RsaPublicKey::MAX_SIZE,
+    )
 }
 
-/// Check that the public key is well formed and has an exponent within acceptable bounds.
+/// Check that the public key is well-formed and has an exponent within acceptable bounds.
 #[inline]
-fn check_public_with_max_size(n: &BoxedUint, e: &BoxedUint, max_size: usize) -> Result<()> {
-    if n.bits_precision() as usize > max_size {
+fn check_public_with_size_range(
+    n: &BoxedUint,
+    e: &BoxedUint,
+    size_range_bits: Range<usize>,
+) -> Result<()> {
+    if (n.bits_precision() as usize) < size_range_bits.start {
+        return Err(Error::ModulusTooSmall);
+    }
+
+    if (n.bits_precision() as usize) > size_range_bits.end {
         return Err(Error::ModulusTooLarge);
     }
 
