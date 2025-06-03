@@ -2,6 +2,7 @@ use alloc::vec::Vec;
 use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{Hash, Hasher};
+use core::ops::Range;
 
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
 use crypto_bigint::{BoxedUint, Integer, NonZero, Odd, Resize};
@@ -206,29 +207,37 @@ impl RsaPublicKey {
     pub fn verify<S: SignatureScheme>(&self, scheme: S, hashed: &[u8], sig: &[u8]) -> Result<()> {
         scheme.verify(self, hashed, sig)
     }
-}
 
-impl RsaPublicKey {
     /// Minimum value of the public exponent `e`.
     pub const MIN_PUB_EXPONENT: u64 = 2;
 
     /// Maximum value of the public exponent `e`.
     pub const MAX_PUB_EXPONENT: u64 = (1 << 33) - 1;
 
-    /// Maximum size of the modulus `n` in bits.
-    pub const MAX_SIZE: usize = 4096;
+    /// Default minimum size of the modulus `n` in bits.
+    pub const MIN_SIZE: u32 = 1024;
+
+    /// Default maximum size of the modulus `n` in bits.
+    pub const MAX_SIZE: u32 = 4096;
 
     /// Create a new public key from its components.
     ///
     /// This function accepts public keys with a modulus size up to 4096-bits,
     /// i.e. [`RsaPublicKey::MAX_SIZE`].
     pub fn new(n: BoxedUint, e: BoxedUint) -> Result<Self> {
-        Self::new_with_max_size(n, e, Self::MAX_SIZE)
+        Self::new_with_size_limits(n, e, Self::MIN_SIZE..Self::MAX_SIZE)
     }
 
     /// Create a new public key from its components.
-    pub fn new_with_max_size(n: BoxedUint, e: BoxedUint, max_size: usize) -> Result<Self> {
-        check_public_with_max_size(&n, &e, max_size)?;
+    ///
+    /// Accepts a third argument which specifies a range of allowed sizes from minimum to maximum
+    /// in bits, which by default is `1024..4096`.
+    pub fn new_with_size_limits(
+        n: BoxedUint,
+        e: BoxedUint,
+        size_range_bits: Range<u32>,
+    ) -> Result<Self> {
+        check_public_with_size_limits(&n, &e, size_range_bits)?;
 
         let n_odd = Odd::new(n.clone())
             .into_option()
@@ -239,18 +248,29 @@ impl RsaPublicKey {
         Ok(Self { n, e, n_params })
     }
 
+    /// Deprecated: this has been replaced with [`RsaPublicKey::new_with_size_limits`].
+    #[deprecated(since = "0.10.0", note = "please use `new_with_size_limits` instead")]
+    pub fn new_with_max_size(n: BoxedUint, e: BoxedUint, max_size: usize) -> Result<Self> {
+        Self::new_with_size_limits(n, e, Self::MIN_SIZE..(max_size as u32))
+    }
+
     /// Create a new public key, bypassing checks around the modulus and public
     /// exponent size.
     ///
     /// This method is not recommended, and only intended for unusual use cases.
     /// Most applications should use [`RsaPublicKey::new`] or
-    /// [`RsaPublicKey::new_with_max_size`] instead.
+    /// [`RsaPublicKey::new_with_size_limits`] instead.
     pub fn new_unchecked(n: BoxedUint, e: BoxedUint) -> Self {
         let n_odd = Odd::new(n.clone()).expect("n must be odd");
         let n_params = BoxedMontyParams::new(n_odd);
         let n = NonZero::new(n).expect("odd numbers are non zero");
 
         Self { n, e, n_params }
+    }
+
+    /// Get the size of the modulus `n` in bits.
+    pub fn bits(&self) -> u32 {
+        self.n.bits_vartime()
     }
 }
 
@@ -312,6 +332,36 @@ impl RsaPrivateKey {
         n: BoxedUint,
         e: BoxedUint,
         d: BoxedUint,
+        primes: Vec<BoxedUint>,
+    ) -> Result<RsaPrivateKey> {
+        // The primes may come in padded with zeros too, so we need to shorten them as well.
+        let primes = primes
+            .into_iter()
+            .map(|p| {
+                let p_bits = p.bits();
+                p.resize_unchecked(p_bits)
+            })
+            .collect();
+
+        let mut k = Self::from_components_unchecked(n, e, d, primes)?;
+
+        // Always validate the key, to ensure precompute can't fail
+        k.validate()?;
+
+        // Precompute when possible, ignore error otherwise.
+        k.precompute().ok();
+
+        Ok(k)
+    }
+
+    /// Constructs an RSA key pair from individual components. Bypasses checks on the key's
+    /// validity like the modulus size.
+    ///
+    /// Please use [`RsaPrivateKey::from_components`] whenever possible.
+    pub fn from_components_unchecked(
+        n: BoxedUint,
+        e: BoxedUint,
+        d: BoxedUint,
         mut primes: Vec<BoxedUint>,
     ) -> Result<RsaPrivateKey> {
         let n = Odd::new(n).into_option().ok_or(Error::InvalidModulus)?;
@@ -337,8 +387,8 @@ impl RsaPrivateKey {
             1 => return Err(Error::NprimesTooSmall),
             _ => {
                 // Check that the product of primes matches the modulus.
-                // This also ensures that `bit_precision` of each prime is <= that of the modulus,
-                // and `bit_precision` of their product is >= that of the modulus.
+                // This also ensures that `bits_precision` of each prime is <= that of the modulus,
+                // and `bits_precision` of their product is >= that of the modulus.
                 if &primes.iter().fold(BoxedUint::one(), |acc, p| acc * p) != n_c.as_ref() {
                     return Err(Error::InvalidModulus);
                 }
@@ -354,7 +404,7 @@ impl RsaPrivateKey {
             })
             .collect();
 
-        let mut k = RsaPrivateKey {
+        Ok(RsaPrivateKey {
             pubkey_components: RsaPublicKey {
                 n: n_c,
                 e,
@@ -363,15 +413,7 @@ impl RsaPrivateKey {
             d,
             primes,
             precomputed: None,
-        };
-
-        // Always validate the key, to ensure precompute can't fail
-        k.validate()?;
-
-        // Precompute when possible, ignore error otherwise.
-        k.precompute().ok();
-
-        Ok(k)
+        })
     }
 
     /// Constructs an RSA key pair from its two primes p and q.
@@ -584,6 +626,11 @@ impl RsaPrivateKey {
     ) -> Result<Vec<u8>> {
         padding.sign(Some(rng), self, digest_in)
     }
+
+    /// Get the size of the modulus `n` in bits.
+    pub fn bits(&self) -> u32 {
+        self.pubkey_components.bits()
+    }
 }
 
 impl PrivateKeyParts for RsaPrivateKey {
@@ -620,16 +667,30 @@ impl PrivateKeyParts for RsaPrivateKey {
     }
 }
 
-/// Check that the public key is well formed and has an exponent within acceptable bounds.
+/// Check that the public key is well-formed and has an exponent within acceptable bounds.
 #[inline]
 pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
-    check_public_with_max_size(public_key.n(), public_key.e(), RsaPublicKey::MAX_SIZE)
+    check_public_with_size_limits(
+        public_key.n(),
+        public_key.e(),
+        RsaPublicKey::MIN_SIZE..RsaPublicKey::MAX_SIZE,
+    )
 }
 
-/// Check that the public key is well formed and has an exponent within acceptable bounds.
+/// Check that the public key is well-formed and has an exponent within acceptable bounds.
 #[inline]
-fn check_public_with_max_size(n: &BoxedUint, e: &BoxedUint, max_size: usize) -> Result<()> {
-    if n.bits_vartime() as usize > max_size {
+fn check_public_with_size_limits(
+    n: &BoxedUint,
+    e: &BoxedUint,
+    size_range_bits: Range<u32>,
+) -> Result<()> {
+    let modulus_bits = n.bits_vartime();
+
+    if modulus_bits < size_range_bits.start {
+        return Err(Error::ModulusTooSmall);
+    }
+
+    if modulus_bits > size_range_bits.end {
         return Err(Error::ModulusTooLarge);
     }
 
@@ -732,7 +793,10 @@ mod tests {
     }
 
     fn test_key_basics(private_key: &RsaPrivateKey) {
-        private_key.validate().expect("invalid private key");
+        // Some test keys have moduli which are smaller than 1024-bits
+        if private_key.bits() >= RsaPublicKey::MIN_SIZE {
+            private_key.validate().expect("invalid private key");
+        }
 
         assert!(
             PrivateKeyParts::d(private_key) < PublicKeyParts::n(private_key).as_ref(),
@@ -778,29 +842,17 @@ mod tests {
         };
     }
 
-    key_generation!(key_generation_128, 2, 128);
     key_generation!(key_generation_1024, 2, 1024);
-
-    key_generation!(key_generation_multi_3_256, 3, 256);
-
-    key_generation!(key_generation_multi_4_64, 4, 64);
-
-    key_generation!(key_generation_multi_5_64, 5, 64);
-    key_generation!(key_generation_multi_8_576, 8, 576);
     key_generation!(key_generation_multi_16_1024, 16, 1024);
 
     #[test]
     fn test_negative_decryption_value() {
         let bits = 128;
-        let private_key = RsaPrivateKey::from_components(
-            BoxedUint::from_le_slice(
-                &[
-                    99, 192, 208, 179, 0, 220, 7, 29, 49, 151, 75, 107, 75, 73, 200, 180,
-                ],
-                bits,
-            )
-            .unwrap(),
-            BoxedUint::from_le_slice(&[1, 0, 1, 0, 0, 0, 0, 0], 64).unwrap(),
+        let private_key = RsaPrivateKey::from_components_unchecked(
+            BoxedUint::from_le_slice_vartime(&[
+                99, 192, 208, 179, 0, 220, 7, 29, 49, 151, 75, 107, 75, 73, 200, 180,
+            ]),
+            BoxedUint::from_le_slice_vartime(&[1, 0, 1, 0, 0, 0, 0, 0]),
             BoxedUint::from_le_slice(
                 &[
                     81, 163, 254, 144, 171, 159, 144, 42, 244, 133, 51, 249, 28, 12, 63, 65,
@@ -827,21 +879,43 @@ mod tests {
         use serde_test::{assert_tokens, Configure, Token};
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let priv_key = RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
+        let priv_key = RsaPrivateKey::new(&mut rng, 1024).expect("failed to generate key");
 
         let priv_tokens = [Token::Str(concat!(
-            "3056020100300d06092a864886f70d010101050004423040020100020900a",
-            "b240c3361d02e370203010001020811e54a15259d22f9020500ceff5cf302",
-            "0500d3a7aaad020500ccaddf17020500cb529d3d020500bb526d6f"
+            "30820278020100300d06092a864886f70d0101010500048202623082025e0",
+            "2010002818100cd1419dc3771354bee0955a90489cce0c98aee6577851358",
+            "afe386a68bc95287862a1157d5aba8847e8e57b6f2f94748ab7efda3f3c74",
+            "a6702329397ffe0a8f83e2ef5297aa3d9d883cbeb94ee018fd68e986e08d5",
+            "b044c15e8170217cd57501d42dd72ef691b2a95bcc090d9bca735bba3ecb8",
+            "38650f13b1aa36d0f454e37ff020301000102818100935c4248cf3df5c21d",
+            "c56f5c07faccd129813f5481d189d94c69fdb366f6beeacb2927552a2032f",
+            "321cd3e92237da40f3fcbfc8df6f9d928b3978c1ec8aab23e857a3ba2db26",
+            "941ace6ecda8dcb290866a80820b3aa9138179ca867d37825ebcdb48adbe7",
+            "c397f1e77c4160f0fbf87cc0cd5dff195ac96fd333c0b38384c74c1024100",
+            "e90ad93c4b19bb40807391b5a9404ce5ea359e7b0556ee25cb2e7455aeb5c",
+            "af83fc26f34457cdbb173347962c66b6fe0c4686b54dbe0d2c913a7aa924e",
+            "ff5d67024100e148067566a1fa3aabd0672361be62715516c9d62790b03f4",
+            "326cc00b2f782e6b64a167689e5c9aebe6a4cf594f3083380fe2a0a7edf1f",
+            "325e58c523b98199a9024100df15fc8924577892b1a4707b178faf4d751c6",
+            "91ed928b387486eaafd0ee7866a8916c73fa1b979d1f037ee6fa904563033",
+            "b4c5f2911e328a3c9f87c0d190d1c7024057461ce26c7141cc6af5608f6f7",
+            "55f13c2c0024f49a29ef4d321fb9425c1076033ac7e094c20ce4239185b5a",
+            "246b06795576a178d16fc4d9317db859bfaafa8902410084b2d64651b471b",
+            "f805af14018db693cdab6059063a6aa4eb8f9ca99b319074b79d7dead3d05",
+            "68c364978be262d3395aa60541d670f94367babebe7616dbc260"
         ))];
         assert_tokens(&priv_key.clone().readable(), &priv_tokens);
 
-        let priv_tokens = [Token::Str(
-            "3024300d06092a864886f70d01010105000313003010020900ab240c3361d02e370203010001",
-        )];
+        let pub_tokens = [Token::Str(concat!(
+            "30819f300d06092a864886f70d010101050003818d0030818902818100cd1419dc3771354bee",
+            "0955a90489cce0c98aee6577851358afe386a68bc95287862a1157d5aba8847e8e57b6f2f947",
+            "48ab7efda3f3c74a6702329397ffe0a8f83e2ef5297aa3d9d883cbeb94ee018fd68e986e08d5",
+            "b044c15e8170217cd57501d42dd72ef691b2a95bcc090d9bca735bba3ecb838650f13b1aa36d",
+            "0f454e37ff0203010001",
+        ))];
         assert_tokens(
             &RsaPublicKey::from(priv_key.clone()).readable(),
-            &priv_tokens,
+            &pub_tokens,
         );
     }
 
