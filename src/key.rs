@@ -622,7 +622,7 @@ pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
 fn check_public_with_max_size(n: &BoxedUint, e: &BoxedUint, max_size: usize) -> Result<()> {
-    if n.bits() as usize > max_size {
+    if n.bits_vartime() as usize > max_size {
         return Err(Error::ModulusTooLarge);
     }
 
