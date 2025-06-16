@@ -1,9 +1,9 @@
 //! `RSASSA-PSS` signatures.
 
-use ::signature::SignatureEncoding;
 use alloc::boxed::Box;
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use crypto_bigint::BoxedUint;
+use signature::SignatureEncoding;
 
 #[cfg(feature = "serde")]
 use serdect::serde::{de, Deserialize, Serialize};
@@ -34,15 +34,8 @@ impl TryFrom<&[u8]> for Signature {
     type Error = signature::Error;
 
     fn try_from(bytes: &[u8]) -> signature::Result<Self> {
-        let len = bytes.len();
-        let inner = BoxedUint::from_be_slice(bytes, len as u32 * 8);
-
-        #[cfg(feature = "std")]
-        let inner = inner
-            .map_err(|e| Box::new(e) as Box<dyn core::error::Error + Send + Sync + 'static>)?;
-        #[cfg(not(feature = "std"))]
-        let inner = inner.map_err(|_| signature::Error::new())?;
-
+        // TODO(tarcieri): max length restriction? (#350)
+        let inner = BoxedUint::from_be_slice_vartime(bytes);
         Ok(Self { inner })
     }
 }
