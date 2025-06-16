@@ -3,7 +3,7 @@
 extern crate test;
 
 use base64ct::{Base64, Encoding};
-use crypto_bigint::{BoxedUint, Odd};
+use crypto_bigint::BoxedUint;
 use hex_literal::hex;
 use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 use rsa::{Pkcs1v15Encrypt, Pkcs1v15Sign, RsaPrivateKey};
@@ -64,7 +64,7 @@ fn get_key() -> RsaPrivateKey {
     ];
 
     RsaPrivateKey::from_components(
-        Odd::new(BoxedUint::from_be_slice(&n, 2048).unwrap()).unwrap(),
+        BoxedUint::from_be_slice(&n, 2048).unwrap(),
         BoxedUint::from(3u32),
         BoxedUint::from_be_slice(&d, 2048).unwrap(),
         vec![
