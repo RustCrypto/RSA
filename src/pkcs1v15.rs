@@ -253,7 +253,6 @@ mod tests {
         SignatureEncoding, Signer, Verifier,
     };
     use base64ct::{Base64, Encoding};
-    use crypto_bigint::Odd;
     use hex_literal::hex;
     use rand_chacha::{
         rand_core::{RngCore, SeedableRng},
@@ -281,7 +280,7 @@ mod tests {
         // -----END RSA PRIVATE KEY-----
 
         RsaPrivateKey::from_components(
-            Odd::new(BoxedUint::from_be_hex("B2990F49C47DFA8CD400AE6A4D1B8A3B6A13642B23F28B003BFB97790ADE9A4CC82B8B2A81747DDEC08B6296E53A08C331687EF25C4BF4936BA1C0E6041E9D15", 512).unwrap()).unwrap(),
+            BoxedUint::from_be_hex("B2990F49C47DFA8CD400AE6A4D1B8A3B6A13642B23F28B003BFB97790ADE9A4CC82B8B2A81747DDEC08B6296E53A08C331687EF25C4BF4936BA1C0E6041E9D15", 512).unwrap(),
             BoxedUint::from(65_537u64),
             BoxedUint::from_be_hex("8ABD6A69F4D1A4B487F0AB8D7AAEFD38609405C999984E30F567E1E8AEEFF44E8B18BDB1EC78DFA31A55E32A48D7FB131F5AF1F44D7D6B2CED2A9DF5E5AE4535", 512).unwrap(),
             vec![

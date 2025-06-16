@@ -287,7 +287,12 @@ impl RsaPrivateKey {
         exp: BoxedUint,
     ) -> Result<RsaPrivateKey> {
         let components = generate_multi_prime_key_with_exp(rng, 2, bit_size, exp)?;
-        RsaPrivateKey::from_components(components.n, components.e, components.d, components.primes)
+        RsaPrivateKey::from_components(
+            components.n.get(),
+            components.e,
+            components.d,
+            components.primes,
+        )
     }
 
     /// Constructs an RSA key pair from individual components:
@@ -304,11 +309,13 @@ impl RsaPrivateKey {
     ///
     ///  [NIST SP 800-56B Revision 2]: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf
     pub fn from_components(
-        n: Odd<BoxedUint>,
+        n: BoxedUint,
         e: BoxedUint,
         d: BoxedUint,
         mut primes: Vec<BoxedUint>,
     ) -> Result<RsaPrivateKey> {
+        let n = Odd::new(n).into_option().ok_or(Error::InvalidModulus)?;
+
         // The modulus may come in padded with zeros, shorten it
         // to ensure optimal performance of arithmetic operations.
         let n_bits = n.bits_vartime();
@@ -386,7 +393,7 @@ impl RsaPrivateKey {
         let primes = vec![p, q];
         let n = compute_modulus(&primes);
 
-        Self::from_components(n, public_exponent, d, primes)
+        Self::from_components(n.get(), public_exponent, d, primes)
     }
 
     /// Constructs an RSA key pair from its primes.
@@ -412,7 +419,7 @@ impl RsaPrivateKey {
         let n = compute_modulus(&primes);
         let d = compute_private_exponent_euler_totient(&primes, &public_exponent)?;
 
-        Self::from_components(n, public_exponent, d, primes)
+        Self::from_components(n.get(), public_exponent, d, primes)
     }
 
     /// Get the public key from the private key, cloning `n` and `e`.
@@ -755,7 +762,7 @@ mod tests {
                         generate_multi_prime_key_with_exp(&mut rng, $multi, $size, exp.clone())
                             .unwrap();
                     let private_key = RsaPrivateKey::from_components(
-                        components.n,
+                        components.n.get(),
                         components.e,
                         components.d,
                         components.primes,
@@ -784,14 +791,11 @@ mod tests {
     fn test_negative_decryption_value() {
         let bits = 128;
         let private_key = RsaPrivateKey::from_components(
-            Odd::new(
-                BoxedUint::from_le_slice(
-                    &[
-                        99, 192, 208, 179, 0, 220, 7, 29, 49, 151, 75, 107, 75, 73, 200, 180,
-                    ],
-                    bits,
-                )
-                .unwrap(),
+            BoxedUint::from_le_slice(
+                &[
+                    99, 192, 208, 179, 0, 220, 7, 29, 49, 151, 75, 107, 75, 73, 200, 180,
+                ],
+                bits,
             )
             .unwrap(),
             BoxedUint::from_le_slice(&[1, 0, 1, 0, 0, 0, 0, 0], 64).unwrap(),
@@ -923,7 +927,7 @@ mod tests {
         let e = BoxedUint::from_be_slice(&e, 64).unwrap();
 
         let bits = 4096;
-        let n = Odd::new(BoxedUint::from_be_slice(&n, bits).unwrap()).unwrap();
+        let n = BoxedUint::from_be_slice(&n, bits).unwrap();
         let d = BoxedUint::from_be_slice(&d, bits).unwrap();
         let primes = primes
             .iter()

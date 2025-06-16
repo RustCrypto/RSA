@@ -8,7 +8,7 @@ use crate::{
     RsaPrivateKey, RsaPublicKey,
 };
 use core::convert::{TryFrom, TryInto};
-use crypto_bigint::{BoxedUint, NonZero, Odd, Resize};
+use crypto_bigint::{BoxedUint, NonZero, Resize};
 use pkcs8::{
     der::{asn1::OctetStringRef, Encode},
     Document, EncodePrivateKey, EncodePublicKey, ObjectIdentifier, SecretDocument,
@@ -60,8 +60,6 @@ impl TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for RsaPrivateKey {
         let bits = u32::try_from(pkcs1_key.modulus.as_bytes().len()).map_err(|_| KeyMalformed)? * 8;
 
         let n = uint_from_slice(pkcs1_key.modulus.as_bytes(), bits)?;
-        let n = Option::from(Odd::new(n)).ok_or(KeyMalformed)?;
-
         let bits_e = u32::try_from(pkcs1_key.public_exponent.as_bytes().len())
             .map_err(|_| KeyMalformed)?
             * 8;
