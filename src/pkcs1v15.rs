@@ -118,7 +118,7 @@ impl SignatureScheme for Pkcs1v15Sign {
             pub_key,
             self.prefix.as_ref(),
             hashed,
-            &BoxedUint::from_be_slice(sig, sig.len() as u32 * 8)?,
+            &BoxedUint::from_be_slice_vartime(sig),
         )
     }
 }

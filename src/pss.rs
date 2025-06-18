@@ -106,7 +106,7 @@ impl SignatureScheme for Pss {
         verify(
             pub_key,
             hashed,
-            &BoxedUint::from_be_slice(sig, sig.len() as u32 * 8)?,
+            &BoxedUint::from_be_slice_vartime(sig),
             sig.len(),
             &mut *self.digest,
             self.salt_len,
