@@ -703,8 +703,10 @@ mod tests {
     use crate::traits::{PrivateKeyParts, PublicKeyParts};
 
     use hex_literal::hex;
-    use pkcs8::DecodePrivateKey;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+
+    #[cfg(feature = "encoding")]
+    use pkcs8::DecodePrivateKey;
 
     #[test]
     fn test_from_into() {
@@ -1014,6 +1016,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "encoding")]
     fn build_key_from_primes() {
         const RSA_2048_PRIV_DER: &[u8] = include_bytes!("../tests/examples/pkcs8/rsa2048-priv.der");
         let ref_key = RsaPrivateKey::from_pkcs8_der(RSA_2048_PRIV_DER).unwrap();
@@ -1035,6 +1038,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "encoding")]
     fn build_key_from_p_q() {
         const RSA_2048_SP800_PRIV_DER: &[u8] =
             include_bytes!("../tests/examples/pkcs8/rsa2048-sp800-56b-priv.der");

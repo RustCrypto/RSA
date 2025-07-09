@@ -18,10 +18,10 @@ pub use self::{
 };
 
 use alloc::{boxed::Box, vec::Vec};
+use const_oid::AssociatedOid;
 use core::fmt::Debug;
 use crypto_bigint::BoxedUint;
 use digest::Digest;
-use pkcs8::AssociatedOid;
 use rand_core::TryCryptoRng;
 
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};

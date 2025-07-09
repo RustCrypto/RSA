@@ -7,8 +7,8 @@
 //! [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 
 use alloc::vec::Vec;
+use const_oid::AssociatedOid;
 use digest::Digest;
-use pkcs8::AssociatedOid;
 use rand_core::TryCryptoRng;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;

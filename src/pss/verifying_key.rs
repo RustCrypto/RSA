@@ -1,13 +1,16 @@
 use super::{verify_digest, Signature};
-use crate::encoding::ID_RSASSA_PSS;
 use crate::RsaPublicKey;
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset};
-use pkcs8::{
-    spki::{der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier},
-    AssociatedOid, Document, EncodePublicKey,
-};
 use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
+
+#[cfg(feature = "encoding")]
+use {
+    crate::encoding::ID_RSASSA_PSS,
+    const_oid::AssociatedOid,
+    pkcs8::{Document, EncodePublicKey},
+    spki::{der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier},
+};
 #[cfg(feature = "serde")]
 use {
     serdect::serde::{de, ser, Deserialize, Serialize},
@@ -110,6 +113,7 @@ where
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> AssociatedAlgorithmIdentifier for VerifyingKey<D>
 where
     D: Digest,
@@ -133,11 +137,12 @@ where
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> EncodePublicKey for VerifyingKey<D>
 where
     D: Digest,
 {
-    fn to_public_key_der(&self) -> pkcs8::spki::Result<Document> {
+    fn to_public_key_der(&self) -> spki::Result<Document> {
         self.inner.to_public_key_der()
     }
 }
@@ -160,13 +165,14 @@ where
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> TryFrom<pkcs8::SubjectPublicKeyInfoRef<'_>> for VerifyingKey<D>
 where
     D: Digest + AssociatedOid,
 {
-    type Error = pkcs8::spki::Error;
+    type Error = spki::Error;
 
-    fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> pkcs8::spki::Result<Self> {
+    fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> spki::Result<Self> {
         match spki.algorithm.oid {
             ID_RSASSA_PSS | pkcs1::ALGORITHM_OID => (),
             _ => {

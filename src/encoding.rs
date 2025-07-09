@@ -3,6 +3,8 @@
 //! Note: PKCS#1 support is achieved through a blanket impl of the
 //! `pkcs1` crate's traits for types which impl the `pkcs8` crate's traits.
 
+#![cfg(feature = "encoding")]
+
 use crate::{
     traits::{PrivateKeyParts, PublicKeyParts},
     RsaPrivateKey, RsaPublicKey,
@@ -19,21 +21,19 @@ use zeroize::Zeroizing;
 pub const ID_RSASSA_PSS: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.10");
 
 /// Verify that the `AlgorithmIdentifier` for a key is correct.
-pub(crate) fn verify_algorithm_id(
-    algorithm: &pkcs8::AlgorithmIdentifierRef,
-) -> pkcs8::spki::Result<()> {
+pub(crate) fn verify_algorithm_id(algorithm: &pkcs8::AlgorithmIdentifierRef) -> spki::Result<()> {
     match algorithm.oid {
         pkcs1::ALGORITHM_OID => {
             if algorithm.parameters_any()? != pkcs8::der::asn1::Null.into() {
-                return Err(pkcs8::spki::Error::KeyMalformed);
+                return Err(spki::Error::KeyMalformed);
             }
         }
         ID_RSASSA_PSS => {
             if algorithm.parameters.is_some() {
-                return Err(pkcs8::spki::Error::KeyMalformed);
+                return Err(spki::Error::KeyMalformed);
             }
         }
-        _ => return Err(pkcs8::spki::Error::OidUnknown { oid: algorithm.oid }),
+        _ => return Err(spki::Error::OidUnknown { oid: algorithm.oid }),
     };
 
     Ok(())
@@ -76,10 +76,10 @@ impl TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for RsaPrivateKey {
 }
 
 impl TryFrom<pkcs8::SubjectPublicKeyInfoRef<'_>> for RsaPublicKey {
-    type Error = pkcs8::spki::Error;
+    type Error = spki::Error;
 
-    fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> pkcs8::spki::Result<Self> {
-        use pkcs8::spki::Error::KeyMalformed;
+    fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> spki::Result<Self> {
+        use spki::Error::KeyMalformed;
 
         verify_algorithm_id(&spki.algorithm)?;
 
@@ -156,7 +156,7 @@ impl EncodePrivateKey for RsaPrivateKey {
 }
 
 impl EncodePublicKey for RsaPublicKey {
-    fn to_public_key_der(&self) -> pkcs8::spki::Result<Document> {
+    fn to_public_key_der(&self) -> spki::Result<Document> {
         let modulus = self.n().to_be_bytes();
         let public_exponent = self.e().to_be_bytes();
 

@@ -1,24 +1,24 @@
-use super::{oid, pkcs1v15_generate_prefix, verify, Signature};
+use super::{pkcs1v15_generate_prefix, verify, Signature};
 use crate::RsaPublicKey;
 use alloc::vec::Vec;
+use const_oid::AssociatedOid;
 use core::marker::PhantomData;
 use digest::Digest;
-use pkcs8::{
-    spki::{
-        der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
-        SignatureAlgorithmIdentifier,
-    },
-    AssociatedOid,
-};
+use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
 
+#[cfg(feature = "encoding")]
+use {
+    super::oid,
+    spki::{
+        der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier, Document,
+        EncodePublicKey, SignatureAlgorithmIdentifier,
+    },
+};
 #[cfg(feature = "serde")]
 use {
     serdect::serde::{de, ser, Deserialize, Serialize},
     spki::DecodePublicKey,
 };
-
-use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
-use spki::{Document, EncodePublicKey};
 
 /// Verifying key for `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
 ///
@@ -121,6 +121,7 @@ where
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> AssociatedAlgorithmIdentifier for VerifyingKey<D>
 where
     D: Digest,
@@ -144,11 +145,12 @@ where
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> EncodePublicKey for VerifyingKey<D>
 where
     D: Digest,
 {
-    fn to_public_key_der(&self) -> pkcs8::spki::Result<Document> {
+    fn to_public_key_der(&self) -> spki::Result<Document> {
         self.inner.to_public_key_der()
     }
 }
@@ -171,6 +173,7 @@ where
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> SignatureAlgorithmIdentifier for VerifyingKey<D>
 where
     D: Digest + oid::RsaSignatureAssociatedOid,
@@ -184,13 +187,14 @@ where
         };
 }
 
+#[cfg(feature = "encoding")]
 impl<D> TryFrom<pkcs8::SubjectPublicKeyInfoRef<'_>> for VerifyingKey<D>
 where
     D: Digest + AssociatedOid,
 {
-    type Error = pkcs8::spki::Error;
+    type Error = spki::Error;
 
-    fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> pkcs8::spki::Result<Self> {
+    fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> spki::Result<Self> {
         spki.algorithm.assert_algorithm_oid(pkcs1::ALGORITHM_OID)?;
 
         RsaPublicKey::try_from(spki).map(Self::new)

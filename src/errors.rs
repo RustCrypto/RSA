@@ -50,9 +50,11 @@ pub enum Error {
     PublicExponentTooLarge,
 
     /// PKCS#1 error.
+    #[cfg(feature = "encoding")]
     Pkcs1(pkcs1::Error),
 
     /// PKCS#8 error.
+    #[cfg(feature = "encoding")]
     Pkcs8(pkcs8::Error),
 
     /// Internal error.
@@ -95,7 +97,9 @@ impl core::fmt::Display for Error {
             Error::ModulusTooLarge => write!(f, "modulus too large"),
             Error::PublicExponentTooSmall => write!(f, "public exponent too small"),
             Error::PublicExponentTooLarge => write!(f, "public exponent too large"),
+            #[cfg(feature = "encoding")]
             Error::Pkcs1(err) => write!(f, "{}", err),
+            #[cfg(feature = "encoding")]
             Error::Pkcs8(err) => write!(f, "{}", err),
             Error::Internal => write!(f, "internal error"),
             Error::LabelTooLong => write!(f, "label too long"),
@@ -107,12 +111,14 @@ impl core::fmt::Display for Error {
     }
 }
 
+#[cfg(feature = "encoding")]
 impl From<pkcs1::Error> for Error {
     fn from(err: pkcs1::Error) -> Error {
         Error::Pkcs1(err)
     }
 }
 
+#[cfg(feature = "encoding")]
 impl From<pkcs8::Error> for Error {
     fn from(err: pkcs8::Error) -> Error {
         Error::Pkcs8(err)
