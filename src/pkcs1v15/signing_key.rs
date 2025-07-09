@@ -1,27 +1,30 @@
-use super::{oid, pkcs1v15_generate_prefix, sign, Signature, VerifyingKey};
+use super::{pkcs1v15_generate_prefix, sign, Signature, VerifyingKey};
 use crate::{dummy_rng::DummyRng, Result, RsaPrivateKey};
 use alloc::vec::Vec;
+use const_oid::AssociatedOid;
 use core::marker::PhantomData;
 use digest::Digest;
-use pkcs8::{
-    spki::{
-        der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
-        SignatureAlgorithmIdentifier,
-    },
-    AssociatedOid, EncodePrivateKey, SecretDocument,
-};
 use rand_core::{CryptoRng, TryCryptoRng};
-#[cfg(feature = "serde")]
-use {
-    pkcs8::DecodePrivateKey,
-    serdect::serde::{de, ser, Deserialize, Serialize},
-};
-
 use signature::{
     hazmat::PrehashSigner, DigestSigner, Keypair, MultipartSigner, RandomizedDigestSigner,
     RandomizedMultipartSigner, RandomizedSigner, Signer,
 };
 use zeroize::ZeroizeOnDrop;
+
+#[cfg(feature = "encoding")]
+use {
+    super::oid,
+    pkcs8::{EncodePrivateKey, SecretDocument},
+    spki::{
+        der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
+        SignatureAlgorithmIdentifier,
+    },
+};
+#[cfg(feature = "serde")]
+use {
+    pkcs8::DecodePrivateKey,
+    serdect::serde::{de, ser, Deserialize, Serialize},
+};
 
 /// Signing key for `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
 ///
@@ -192,6 +195,7 @@ where
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> AssociatedAlgorithmIdentifier for SigningKey<D>
 where
     D: Digest,
@@ -201,6 +205,7 @@ where
     const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
 }
 
+#[cfg(feature = "encoding")]
 impl<D> EncodePrivateKey for SigningKey<D>
 where
     D: Digest,
@@ -243,6 +248,7 @@ where
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> SignatureAlgorithmIdentifier for SigningKey<D>
 where
     D: Digest + oid::RsaSignatureAssociatedOid,
@@ -256,6 +262,7 @@ where
         };
 }
 
+#[cfg(feature = "encoding")]
 impl<D> TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for SigningKey<D>
 where
     D: Digest + AssociatedOid,

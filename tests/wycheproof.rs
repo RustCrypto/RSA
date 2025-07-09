@@ -1,5 +1,7 @@
 //! Executes tests based on the wycheproof testsuite.
 
+#![cfg(feature = "encoding")]
+
 // This implementation here is based on
 // <https://github.com/ctz/graviola/blob/main/graviola/tests/wycheproof.rs>
 

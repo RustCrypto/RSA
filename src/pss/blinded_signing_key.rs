@@ -1,26 +1,30 @@
-use super::{get_pss_signature_algo_id, sign_digest, Signature, VerifyingKey};
+use super::{sign_digest, Signature, VerifyingKey};
 use crate::{Result, RsaPrivateKey};
-use const_oid::AssociatedOid;
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset};
-use pkcs8::{
-    spki::{
-        der::AnyRef, AlgorithmIdentifierOwned, AlgorithmIdentifierRef,
-        AssociatedAlgorithmIdentifier, DynSignatureAlgorithmIdentifier,
-    },
-    EncodePrivateKey, SecretDocument,
-};
 use rand_core::{CryptoRng, TryCryptoRng};
 use signature::{
     hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedMultipartSigner,
     RandomizedSigner,
 };
 use zeroize::ZeroizeOnDrop;
+
+#[cfg(feature = "encoding")]
+use {
+    super::get_pss_signature_algo_id,
+    const_oid::AssociatedOid,
+    pkcs8::{EncodePrivateKey, SecretDocument},
+    spki::{
+        der::AnyRef, AlgorithmIdentifierOwned, AlgorithmIdentifierRef,
+        AssociatedAlgorithmIdentifier, DynSignatureAlgorithmIdentifier,
+    },
+};
 #[cfg(feature = "serde")]
 use {
     pkcs8::DecodePrivateKey,
     serdect::serde::{de, ser, Deserialize, Serialize},
 };
+
 /// Signing key for producing "blinded" RSASSA-PSS signatures as described in
 /// [draft-irtf-cfrg-rsa-blind-signatures](https://datatracker.ietf.org/doc/draft-irtf-cfrg-rsa-blind-signatures/).
 #[derive(Debug, Clone)]
@@ -159,6 +163,7 @@ where
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> AssociatedAlgorithmIdentifier for BlindedSigningKey<D>
 where
     D: Digest,
@@ -168,15 +173,17 @@ where
     const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
 }
 
+#[cfg(feature = "encoding")]
 impl<D> DynSignatureAlgorithmIdentifier for BlindedSigningKey<D>
 where
     D: Digest + AssociatedOid,
 {
-    fn signature_algorithm_identifier(&self) -> pkcs8::spki::Result<AlgorithmIdentifierOwned> {
+    fn signature_algorithm_identifier(&self) -> spki::Result<AlgorithmIdentifierOwned> {
         get_pss_signature_algo_id::<D>(self.salt_len as u8)
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> EncodePrivateKey for BlindedSigningKey<D>
 where
     D: Digest,
@@ -218,6 +225,7 @@ where
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for BlindedSigningKey<D>
 where
     D: Digest + AssociatedOid,

@@ -1,5 +1,7 @@
 //! PKCS#1 encoding tests
 
+#![cfg(feature = "encoding")]
+
 use crypto_bigint::BoxedUint;
 use hex_literal::hex;
 use rsa::{
@@ -9,7 +11,7 @@ use rsa::{
 };
 use subtle::ConstantTimeEq;
 
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 use rsa::pkcs1::LineEnding;
 
 /// RSA-2048 PKCS#1 private key encoded as ASN.1 DER.
@@ -31,19 +33,19 @@ const RSA_2048_PUB_DER: &[u8] = include_bytes!("examples/pkcs1/rsa2048-pub.der")
 const RSA_4096_PUB_DER: &[u8] = include_bytes!("examples/pkcs1/rsa4096-pub.der");
 
 /// RSA-2048 PKCS#1 private key encoded as PEM
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 const RSA_2048_PRIV_PEM: &str = include_str!("examples/pkcs1/rsa2048-priv.pem");
 
 /// RSA-4096 PKCS#1 private key encoded as PEM
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 const RSA_4096_PRIV_PEM: &str = include_str!("examples/pkcs1/rsa4096-priv.pem");
 
 /// RSA-2048 PKCS#1 public key encoded as PEM
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 const RSA_2048_PUB_PEM: &str = include_str!("examples/pkcs1/rsa2048-pub.pem");
 
 /// RSA-4096 PKCS#1 public key encoded as PEM
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 const RSA_4096_PUB_PEM: &str = include_str!("examples/pkcs1/rsa4096-pub.pem");
 
 #[test]
@@ -272,7 +274,7 @@ fn encode_rsa4096_pub_der() {
 }
 
 #[test]
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 fn decode_rsa2048_priv_pem() {
     let key = RsaPrivateKey::from_pkcs1_pem(RSA_2048_PRIV_PEM).unwrap();
 
@@ -332,7 +334,7 @@ fn decode_rsa2048_priv_pem() {
 }
 
 #[test]
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 fn decode_rsa4096_priv_pem() {
     let key = RsaPrivateKey::from_pkcs1_pem(RSA_4096_PRIV_PEM).unwrap();
 
@@ -417,7 +419,7 @@ fn decode_rsa4096_priv_pem() {
 }
 
 #[test]
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 fn decode_rsa2048_pub_pem() {
     let key = RsaPublicKey::from_pkcs1_pem(RSA_2048_PUB_PEM).unwrap();
 
@@ -441,7 +443,7 @@ fn decode_rsa2048_pub_pem() {
 }
 
 #[test]
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 fn decode_rsa4096_pub_pem() {
     let key = RsaPublicKey::from_pkcs1_pem(RSA_4096_PUB_PEM).unwrap();
 
@@ -473,7 +475,7 @@ fn decode_rsa4096_pub_pem() {
 }
 
 #[test]
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 fn encode_rsa2048_priv_pem() {
     let key = RsaPrivateKey::from_pkcs1_pem(RSA_2048_PRIV_PEM).unwrap();
     let pem = key.to_pkcs1_pem(LineEnding::LF).unwrap();
@@ -481,7 +483,7 @@ fn encode_rsa2048_priv_pem() {
 }
 
 #[test]
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 fn encode_rsa4096_priv_pem() {
     let key = RsaPrivateKey::from_pkcs1_pem(RSA_4096_PRIV_PEM).unwrap();
     let pem = key.to_pkcs1_pem(LineEnding::LF).unwrap();
@@ -489,7 +491,7 @@ fn encode_rsa4096_priv_pem() {
 }
 
 #[test]
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 fn encode_rsa2048_pub_pem() {
     let key = RsaPublicKey::from_pkcs1_pem(RSA_2048_PUB_PEM).unwrap();
     let pem = key.to_pkcs1_pem(LineEnding::LF).unwrap();
@@ -497,7 +499,7 @@ fn encode_rsa2048_pub_pem() {
 }
 
 #[test]
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 fn encode_rsa4096_pub_pem() {
     let key = RsaPublicKey::from_pkcs1_pem(RSA_4096_PUB_PEM).unwrap();
     let pem = key.to_pkcs1_pem(LineEnding::LF).unwrap();

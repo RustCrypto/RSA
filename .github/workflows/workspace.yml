@@ -44,4 +44,4 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - env:
           RUSTDOCFLAGS: "-Dwarnings --cfg docsrs"
-        run: cargo doc --no-deps --features std,pem,serde,hazmat,sha2
+        run: cargo doc --no-deps --features std,serde,hazmat,sha2

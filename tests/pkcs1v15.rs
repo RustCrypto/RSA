@@ -1,5 +1,5 @@
 // simple but prevent regression - see https://github.com/RustCrypto/RSA/issues/329
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 #[test]
 fn signature_stringify() {
     use pkcs8::DecodePrivateKey;
@@ -22,7 +22,7 @@ fn signature_stringify() {
     assert_eq!(signature.to_string(), expected);
 }
 
-#[cfg(feature = "pem")]
+#[cfg(feature = "encoding")]
 #[test]
 fn signing_key_new_same_as_from() {
     use pkcs1::DecodeRsaPrivateKey;

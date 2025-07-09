@@ -7,6 +7,7 @@ use signature::SignatureEncoding;
 
 #[cfg(feature = "serde")]
 use serdect::serde::{de, Deserialize, Serialize};
+#[cfg(feature = "encoding")]
 use spki::{
     der::{asn1::BitString, Result as DerResult},
     SignatureBitStringEncoding,
@@ -24,6 +25,7 @@ impl SignatureEncoding for Signature {
     type Repr = Box<[u8]>;
 }
 
+#[cfg(feature = "encoding")]
 impl SignatureBitStringEncoding for Signature {
     fn to_bitstring(&self) -> DerResult<BitString> {
         BitString::new(0, self.to_vec())
