@@ -57,7 +57,7 @@ hazmat = []
 os_rng = ["rand_core/os_rng", "crypto-bigint/rand_core"]
 serde = ["encoding", "dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pkcs5 = ["pkcs8/encryption"]
-std = ["pkcs1/std", "pkcs8/std", "rand_core/std", "crypto-bigint/rand"]
+std = ["pkcs1?/std", "pkcs8?/std", "rand_core/std", "crypto-bigint/rand"]
 
 [package.metadata.docs.rs]
 features = ["std", "pem", "serde", "hazmat", "sha2"]
