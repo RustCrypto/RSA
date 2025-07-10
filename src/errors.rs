@@ -130,16 +130,8 @@ impl From<crypto_bigint::DecodeError> for Error {
     }
 }
 
-#[cfg(feature = "std")]
 impl From<Error> for signature::Error {
     fn from(err: Error) -> Self {
         Self::from_source(err)
-    }
-}
-
-#[cfg(not(feature = "std"))]
-impl From<Error> for signature::Error {
-    fn from(_err: Error) -> Self {
-        Self::new()
     }
 }
