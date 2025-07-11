@@ -40,6 +40,9 @@ pub enum Error {
     /// Invalid coefficient.
     InvalidCoefficient,
 
+    /// Modulus too small.
+    ModulusTooSmall,
+
     /// Modulus too large.
     ModulusTooLarge,
 
@@ -94,6 +97,7 @@ impl core::fmt::Display for Error {
             Error::InvalidModulus => write!(f, "invalid modulus"),
             Error::InvalidExponent => write!(f, "invalid exponent"),
             Error::InvalidCoefficient => write!(f, "invalid coefficient"),
+            Error::ModulusTooSmall => write!(f, "modulus too small"),
             Error::ModulusTooLarge => write!(f, "modulus too large"),
             Error::PublicExponentTooSmall => write!(f, "public exponent too small"),
             Error::PublicExponentTooLarge => write!(f, "public exponent too large"),
