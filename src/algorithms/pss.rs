@@ -170,7 +170,7 @@ fn emsa_pss_verify_pre<'a>(
     m_hash: &[u8],
     em: &'a mut [u8],
     em_bits: usize,
-    s_len: usize,
+    s_len: Option<usize>,
     h_len: usize,
 ) -> Result<(&'a mut [u8], &'a mut [u8])> {
     // 1. If the length of M is greater than the input limitation for the
@@ -182,10 +182,12 @@ fn emsa_pss_verify_pre<'a>(
         return Err(Error::Verification);
     }
 
-    // 3. If emLen < hLen + sLen + 2, output "inconsistent" and stop.
     let em_len = em.len(); //(em_bits + 7) / 8;
-    if em_len < h_len + s_len + 2 {
-        return Err(Error::Verification);
+    if let Some(s_len) = s_len {
+        // 3. If emLen < hLen + sLen + 2, output "inconsistent" and stop.
+        if em_len < h_len + s_len + 2 {
+            return Err(Error::Verification);
+        }
     }
 
     // 4. If the rightmost octet of EM does not have hexadecimal value
@@ -227,10 +229,27 @@ fn emsa_pss_verify_salt(db: &[u8], em_len: usize, s_len: usize, h_len: usize) ->
     valid & rest[0].ct_eq(&0x01)
 }
 
+/// Detect salt length by scanning DB for the 0x01 separator byte.
+/// Returns (s_len, valid) where s_len is 0 on failure.
+fn emsa_pss_get_salt_len(db: &[u8], em_len: usize, h_len: usize) -> (usize, Choice) {
+    // Scan backwards to find 0x01 separator: DB = PS || 0x01 || salt
+    match (0..=em_len - (h_len + 2)).rev().try_fold(None, |state, i| {
+        match (state, db[em_len - h_len - i - 2]) {
+            (Some(i), _) => Ok(Some(i)),
+            (_, 1) => Ok(Some(i)),
+            (_, 0) => Ok(None),
+            _ => Err(Error::Verification),
+        }
+    }) {
+        Ok(Some(s_len)) => (s_len, Choice::from(1u8)),
+        _ => (0, Choice::from(0u8)),
+    }
+}
+
 pub(crate) fn emsa_pss_verify(
     m_hash: &[u8],
     em: &mut [u8],
-    s_len: usize,
+    s_len: Option<usize>,
     hash: &mut dyn DynDigest,
     key_bits: usize,
 ) -> Result<()> {
@@ -252,7 +271,10 @@ pub(crate) fn emsa_pss_verify(
     //     to zero.
     db[0] &= 0xFF >> /*uint*/(8 * em_len - em_bits);
 
-    let salt_valid = emsa_pss_verify_salt(db, em_len, s_len, h_len);
+    let (s_len, salt_valid) = match s_len {
+        Some(s_len) => (s_len, emsa_pss_verify_salt(db, em_len, s_len, h_len)),
+        None => emsa_pss_get_salt_len(db, em_len, h_len),
+    };
 
     // 11. Let salt be the last s_len octets of DB.
     let salt = &db[db.len() - s_len..];
@@ -281,7 +303,7 @@ pub(crate) fn emsa_pss_verify(
 pub(crate) fn emsa_pss_verify_digest<D>(
     m_hash: &[u8],
     em: &mut [u8],
-    s_len: usize,
+    s_len: Option<usize>,
     key_bits: usize,
 ) -> Result<()>
 where
@@ -307,7 +329,10 @@ where
     //     to zero.
     db[0] &= 0xFF >> /*uint*/(8 * em_len - em_bits);
 
-    let salt_valid = emsa_pss_verify_salt(db, em_len, s_len, h_len);
+    let (s_len, salt_valid) = match s_len {
+        Some(s_len) => (s_len, emsa_pss_verify_salt(db, em_len, s_len, h_len)),
+        None => emsa_pss_get_salt_len(db, em_len, h_len),
+    };
 
     // 11. Let salt be the last s_len octets of DB.
     let salt = &db[db.len() - s_len..];
