@@ -11,7 +11,7 @@
 
 use alloc::vec::Vec;
 use digest::{Digest, DynDigest, FixedOutputReset};
-use subtle::{Choice, ConstantTimeEq};
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 use super::mgf::{mgf1_xor, mgf1_xor_digest};
 use crate::errors::{Error, Result};
@@ -232,18 +232,39 @@ fn emsa_pss_verify_salt(db: &[u8], em_len: usize, s_len: usize, h_len: usize) ->
 /// Detect salt length by scanning DB for the 0x01 separator byte.
 /// Returns (s_len, valid) where s_len is 0 on failure.
 fn emsa_pss_get_salt_len(db: &[u8], em_len: usize, h_len: usize) -> (usize, Choice) {
-    // Scan backwards to find 0x01 separator: DB = PS || 0x01 || salt
-    match (0..=em_len - (h_len + 2)).rev().try_fold(None, |state, i| {
-        match (state, db[em_len - h_len - i - 2]) {
-            (Some(i), _) => Ok(Some(i)),
-            (_, 1) => Ok(Some(i)),
-            (_, 0) => Ok(None),
-            _ => Err(Error::Verification),
-        }
-    }) {
-        Ok(Some(s_len)) => (s_len, Choice::from(1u8)),
-        _ => (0, Choice::from(0u8)),
+    let em_len = em_len as u32;
+    let h_len = h_len as u32;
+    let max_scan_len = em_len - h_len - 2;
+
+    let mut separator_pos = 0u32;
+    let mut found_separator = Choice::from(0u8);
+    let mut padding_valid = Choice::from(1u8);
+
+    // Single forward scan to find separator and validate padding
+    for i in 0..=max_scan_len {
+        let byte_val = db[i as usize];
+        let is_zero = byte_val.ct_eq(&0x00);
+        let is_separator = byte_val.ct_eq(&0x01);
+        let is_invalid = !(is_zero | is_separator);
+
+        // Update separator position if we found one and haven't found one before
+        let should_update_pos = is_separator & !found_separator;
+        separator_pos = u32::conditional_select(&separator_pos, &i, should_update_pos);
+        found_separator =
+            Choice::conditional_select(&found_separator, &Choice::from(1u8), should_update_pos);
+
+        // Padding is invalid if we see a non-zero, non-separator byte before finding separator
+        let corrupts_padding = is_invalid & !found_separator;
+        padding_valid &= !corrupts_padding;
     }
+
+    let salt_len = max_scan_len.wrapping_sub(separator_pos);
+    let final_valid = found_separator & padding_valid;
+
+    // Return 0 length on failure
+    let result_len = u32::conditional_select(&0u32, &salt_len, final_valid);
+
+    (result_len as usize, final_valid)
 }
 
 pub(crate) fn emsa_pss_verify(
