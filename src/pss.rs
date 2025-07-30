@@ -261,6 +261,7 @@ mod test {
     use crate::pss::{BlindedSigningKey, Pss, Signature, SigningKey, VerifyingKey};
     use crate::{RsaPrivateKey, RsaPublicKey};
 
+    use crate::traits::PublicKeyParts;
     use hex_literal::hex;
     use pkcs1::DecodeRsaPrivateKey;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
@@ -620,6 +621,41 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
                 .to_public_key()
                 .verify(Pss::new::<Sha1>(), &digest, &sig)
                 .expect("failed to verify");
+        }
+    }
+
+    #[test]
+    // Tests the case where the salt length used for signing differs from the default length
+    // while the verifier uses the default setting.
+    fn test_sign_and_verify_pss_differing_salt_len() {
+        let priv_key = get_private_key();
+
+        let tests = ["test\n"];
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+
+        // signing keys using different salt lengths
+        let signing_keys = [
+            // default salt length
+            SigningKey::<Sha1>::new(priv_key.clone()),
+            // maximum salt length
+            SigningKey::<Sha1>::new_with_salt_len(
+                priv_key.clone(),
+                priv_key.size() - Sha1::output_size() - 2,
+            ),
+            // unsalted
+            SigningKey::<Sha1>::new_with_salt_len(priv_key.clone(), 0),
+        ];
+
+        // verifying key uses default salt length strategy
+        let verifying_key = VerifyingKey::<Sha1>::new(priv_key.to_public_key());
+
+        for test in tests {
+            for signing_key in &signing_keys {
+                let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
+                verifying_key
+                    .verify(test.as_bytes(), &sig)
+                    .expect("verification to succeed");
+            }
         }
     }
 }
