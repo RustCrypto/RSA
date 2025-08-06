@@ -44,7 +44,7 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRng + ?Sized>(
     if bit_size < 64 {
         let prime_limit = (1u64 << (bit_size / nprimes) as u64) as f64;
 
-        // pi aproximates the number of primes less than prime_limit
+        // pi approximates the number of primes less than prime_limit
 
         // Calculate `log(prime_limit)` as `log(x) = log2(x) / log2(e) = log2(x) * log(2)`.
         let mut pi = prime_limit / ((bit_size / nprimes) as f64 * core::f64::consts::LN_2 - 1.);

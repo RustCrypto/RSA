@@ -210,7 +210,7 @@ fn blind<R: TryCryptoRng + ?Sized, K: PublicKeyParts>(
     Ok((blinded, ir))
 }
 
-/// Given an m and and unblinding factor, unblind the m.
+/// Given an m and unblinding factor, unblind the m.
 fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: &BoxedMontyParams) -> BoxedUint {
     // m * r^-1 (mod n)
     debug_assert_eq!(

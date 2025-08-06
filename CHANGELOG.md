@@ -95,7 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Removed
 - "Unsalted" PSS support ([#294])
-- `EncryptionPrimitive`/`DecriptionPrimitive` traits ([#300])
+- `EncryptionPrimitive`/`DescriptionPrimitive` traits ([#300])
 - `PublicKey`/`PrivateKey` traits ([#300])
 - `Zeroize` impl on `RsaPrivateKey`; automatically zeroized on drop ([#311])
 - `Deref<Target=RsaPublicKey>` impl on `RsaPrivateKey`; use `AsRef` instead ([#317])
