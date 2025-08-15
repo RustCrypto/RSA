@@ -5,7 +5,7 @@ extern crate test;
 use base64ct::{Base64, Encoding};
 use crypto_bigint::BoxedUint;
 use hex_literal::hex;
-use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
 use rsa::{Pkcs1v15Encrypt, Pkcs1v15Sign, RsaPrivateKey};
 use sha2::{Digest, Sha256};
 use test::Bencher;
@@ -73,6 +73,26 @@ fn get_key() -> RsaPrivateKey {
         ],
     )
     .unwrap()
+}
+
+#[bench]
+fn bench_rsa_1024_gen_key(b: &mut Bencher) {
+    let mut rng = ChaCha8Rng::from_seed([42; 32]);
+
+    b.iter(|| {
+        let key = RsaPrivateKey::new(&mut rng, 1024).unwrap();
+        test::black_box(key);
+    });
+}
+
+#[bench]
+fn bench_rsa_2048_gen_key(b: &mut Bencher) {
+    let mut rng = ChaCha8Rng::from_seed([42; 32]);
+
+    b.iter(|| {
+        let key = RsaPrivateKey::new(&mut rng, 2048).unwrap();
+        test::black_box(key);
+    });
 }
 
 #[bench]
