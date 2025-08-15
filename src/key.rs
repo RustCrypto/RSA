@@ -297,6 +297,25 @@ impl RsaPrivateKey {
         Self::new_with_exp(rng, bit_size, BoxedUint::from(Self::EXP))
     }
 
+    /// Generate a new Rsa key pair of the given bit size using the passed in `rng
+    /// and allowing hazardous insecure or weak constructions of `RsaPrivateKey
+    ///
+    /// Unless you have specific needs, you should use `RsaPrivateKey::new` instead
+    #[cfg(feature = "hazmat")]
+    pub fn new_unchecked<R: CryptoRng + ?Sized>(
+        rng: &mut R,
+        bit_size: usize,
+    ) -> Result<RsaPrivateKey> {
+        let components =
+            generate_multi_prime_key_with_exp(rng, 2, bit_size, BoxedUint::from(Self::EXP))?;
+        RsaPrivateKey::from_components_unchecked(
+            components.n.get(),
+            components.e,
+            components.d,
+            components.primes,
+        )
+    }
+
     /// Generate a new RSA key pair of the given bit size and the public exponent
     /// using the passed in `rng`.
     ///
