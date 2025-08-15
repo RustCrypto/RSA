@@ -10,7 +10,7 @@ use zeroize::{Zeroize, ZeroizeOnDrop};
 #[cfg(feature = "serde")]
 use {
     pkcs8::{DecodePrivateKey, EncodePrivateKey},
-    serdect::serde::{Deserialize, Serialize, de, ser},
+    serdect::serde::{de, ser, Deserialize, Serialize},
     spki::{DecodePublicKey, EncodePublicKey},
 };
 
@@ -703,7 +703,7 @@ mod tests {
     use crate::traits::{PrivateKeyParts, PublicKeyParts};
 
     use hex_literal::hex;
-    use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
+    use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 
     #[cfg(feature = "encoding")]
     use pkcs8::DecodePrivateKey;
@@ -823,8 +823,8 @@ mod tests {
     #[test]
     #[cfg(feature = "serde")]
     fn test_serde() {
-        use rand_chacha::{ChaCha8Rng, rand_core::SeedableRng};
-        use serde_test::{Configure, Token, assert_tokens};
+        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+        use serde_test::{assert_tokens, Configure, Token};
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
