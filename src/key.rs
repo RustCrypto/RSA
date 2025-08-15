@@ -503,8 +503,8 @@ impl RsaPrivateKey {
     pub fn crt_coefficient(&self) -> Option<BoxedUint> {
         let p = &self.primes[0];
         let q = &self.primes[1];
-
-        Option::from(q.invert_mod(p))
+        // TODO: maybe store primes as `NonZero`?
+        Option::from(q.invert_mod(&NonZero::new(p.clone()).expect("prime")))
     }
 
     /// Performs basic sanity checks on the key.
