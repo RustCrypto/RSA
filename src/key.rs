@@ -545,8 +545,8 @@ impl RsaPrivateKey {
     pub fn crt_coefficient(&self) -> Option<BoxedUint> {
         let p = &self.primes[0];
         let q = &self.primes[1];
-
-        Option::from(q.invert_mod(p))
+        // TODO: maybe store primes as `NonZero`?
+        Option::from(q.invert_mod(&NonZero::new(p.clone()).expect("prime")))
     }
 
     /// Performs basic sanity checks on the key.
@@ -764,8 +764,10 @@ mod tests {
     use crate::traits::{PrivateKeyParts, PublicKeyParts};
 
     use hex_literal::hex;
-    use pkcs8::DecodePrivateKey;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+
+    #[cfg(feature = "encoding")]
+    use pkcs8::DecodePrivateKey;
 
     #[test]
     fn test_from_into() {
@@ -803,7 +805,7 @@ mod tests {
 
         let pub_key: RsaPublicKey = private_key.clone().into();
         let m = BoxedUint::from(42u64);
-        let c = rsa_encrypt(&pub_key, &m).expect("encryption successfull");
+        let c = rsa_encrypt(&pub_key, &m).expect("encryption successful");
 
         let m2 = rsa_decrypt_and_check::<ChaCha8Rng>(private_key, None, &c)
             .expect("unable to decrypt without blinding");
@@ -1088,6 +1090,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "encoding")]
     fn build_key_from_primes() {
         const RSA_2048_PRIV_DER: &[u8] = include_bytes!("../tests/examples/pkcs8/rsa2048-priv.der");
         let ref_key = RsaPrivateKey::from_pkcs8_der(RSA_2048_PRIV_DER).unwrap();
@@ -1109,6 +1112,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "encoding")]
     fn build_key_from_p_q() {
         const RSA_2048_SP800_PRIV_DER: &[u8] =
             include_bytes!("../tests/examples/pkcs8/rsa2048-sp800-56b-priv.der");

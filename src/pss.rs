@@ -23,20 +23,24 @@ use alloc::{boxed::Box, vec::Vec};
 use core::fmt::{self, Debug};
 use crypto_bigint::BoxedUint;
 
-use const_oid::AssociatedOid;
 use digest::{Digest, DynDigest, FixedOutputReset};
-use pkcs1::RsaPssParams;
-use pkcs8::spki::{der::Any, AlgorithmIdentifierOwned};
 use rand_core::TryCryptoRng;
 
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pss::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
-use crate::encoding::ID_RSASSA_PSS;
 use crate::errors::{Error, Result};
 use crate::traits::PublicKeyParts;
 use crate::traits::SignatureScheme;
 use crate::{RsaPrivateKey, RsaPublicKey};
+
+#[cfg(feature = "encoding")]
+use {
+    crate::encoding::ID_RSASSA_PSS,
+    const_oid::AssociatedOid,
+    pkcs1::RsaPssParams,
+    spki::{der::Any, AlgorithmIdentifierOwned},
+};
 
 /// Digital signatures using PSS padding.
 pub struct Pss {
@@ -230,7 +234,8 @@ fn sign_pss_with_salt_digest<T: TryCryptoRng + ?Sized, D: Digest + FixedOutputRe
 }
 
 /// Returns the [`AlgorithmIdentifierOwned`] associated with PSS signature using a given digest.
-pub fn get_default_pss_signature_algo_id<D>() -> pkcs8::spki::Result<AlgorithmIdentifierOwned>
+#[cfg(feature = "encoding")]
+pub fn get_default_pss_signature_algo_id<D>() -> spki::Result<AlgorithmIdentifierOwned>
 where
     D: Digest + AssociatedOid,
 {
@@ -238,7 +243,8 @@ where
     get_pss_signature_algo_id::<D>(salt_len)
 }
 
-fn get_pss_signature_algo_id<D>(salt_len: u8) -> pkcs8::spki::Result<AlgorithmIdentifierOwned>
+#[cfg(feature = "encoding")]
+fn get_pss_signature_algo_id<D>(salt_len: u8) -> spki::Result<AlgorithmIdentifierOwned>
 where
     D: Digest + AssociatedOid,
 {
@@ -250,7 +256,7 @@ where
     })
 }
 
-#[cfg(all(test, feature = "pem"))]
+#[cfg(all(test, feature = "encoding"))]
 mod test {
     use crate::pss::{BlindedSigningKey, Pss, Signature, SigningKey, VerifyingKey};
     use crate::{RsaPrivateKey, RsaPublicKey};

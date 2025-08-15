@@ -145,7 +145,7 @@
 //!
 //! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # #[cfg(all(feature = "pem", feature = "std"))]
+//! # #[cfg(all(feature = "encoding", feature = "std"))]
 //! # {
 //! use rsa::{RsaPublicKey, pkcs1::DecodeRsaPublicKey};
 //!
@@ -189,7 +189,7 @@
 //!
 //! ```
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! # #[cfg(all(feature = "pem", feature = "std"))]
+//! # #[cfg(all(feature = "encoding", feature = "std"))]
 //! # {
 //! use rsa::{RsaPublicKey, pkcs8::DecodePublicKey};
 //!
@@ -238,7 +238,9 @@ mod dummy_rng;
 mod encoding;
 mod key;
 
+#[cfg(feature = "encoding")]
 pub use pkcs1;
+#[cfg(feature = "encoding")]
 pub use pkcs8;
 #[cfg(feature = "sha2")]
 pub use sha2;

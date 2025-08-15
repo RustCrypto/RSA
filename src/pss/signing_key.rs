@@ -1,16 +1,7 @@
-use super::{get_pss_signature_algo_id, sign_digest, Signature, VerifyingKey};
-use crate::encoding::verify_algorithm_id;
+use super::{sign_digest, Signature, VerifyingKey};
 use crate::{Result, RsaPrivateKey};
-use const_oid::AssociatedOid;
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset};
-use pkcs8::{
-    spki::{
-        der::AnyRef, AlgorithmIdentifierOwned, AlgorithmIdentifierRef,
-        AssociatedAlgorithmIdentifier, DynSignatureAlgorithmIdentifier,
-    },
-    EncodePrivateKey, SecretDocument,
-};
 use rand_core::{CryptoRng, TryCryptoRng};
 use signature::{
     hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedMultipartSigner,
@@ -23,6 +14,17 @@ use {
     serdect::serde::{de, ser, Deserialize, Serialize},
 };
 
+#[cfg(feature = "encoding")]
+use {
+    super::get_pss_signature_algo_id,
+    crate::encoding::verify_algorithm_id,
+    const_oid::AssociatedOid,
+    pkcs8::{EncodePrivateKey, SecretDocument},
+    spki::{
+        der::AnyRef, AlgorithmIdentifierOwned, AlgorithmIdentifierRef,
+        AssociatedAlgorithmIdentifier, DynSignatureAlgorithmIdentifier,
+    },
+};
 #[cfg(feature = "os_rng")]
 use {
     rand_core::OsRng,
@@ -193,6 +195,7 @@ where
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> AssociatedAlgorithmIdentifier for SigningKey<D>
 where
     D: Digest,
@@ -202,15 +205,17 @@ where
     const ALGORITHM_IDENTIFIER: AlgorithmIdentifierRef<'static> = pkcs1::ALGORITHM_ID;
 }
 
+#[cfg(feature = "encoding")]
 impl<D> DynSignatureAlgorithmIdentifier for SigningKey<D>
 where
     D: Digest + AssociatedOid,
 {
-    fn signature_algorithm_identifier(&self) -> pkcs8::spki::Result<AlgorithmIdentifierOwned> {
+    fn signature_algorithm_identifier(&self) -> spki::Result<AlgorithmIdentifierOwned> {
         get_pss_signature_algo_id::<D>(self.salt_len as u8)
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> EncodePrivateKey for SigningKey<D>
 where
     D: Digest,
@@ -252,6 +257,7 @@ where
     }
 }
 
+#[cfg(feature = "encoding")]
 impl<D> TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for SigningKey<D>
 where
     D: Digest + AssociatedOid,

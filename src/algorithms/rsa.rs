@@ -210,7 +210,7 @@ fn blind<R: TryCryptoRng + ?Sized, K: PublicKeyParts>(
     Ok((blinded, ir))
 }
 
-/// Given an m and and unblinding factor, unblind the m.
+/// Given an m and unblinding factor, unblind the m.
 fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: &BoxedMontyParams) -> BoxedUint {
     // m * r^-1 (mod n)
     debug_assert_eq!(
@@ -348,6 +348,7 @@ pub(crate) fn compute_private_exponent_euler_totient(
 
     // NOTE: `mod_inverse` checks if `exp` evenly divides `totient` and returns `None` if so.
     // This ensures that `exp` is not a factor of any `(prime - 1)`.
+    let totient = NonZero::new(totient).expect("known");
     match exp.invert_mod(&totient).into_option() {
         Some(res) => Ok(res),
         None => Err(Error::InvalidPrime),
@@ -376,7 +377,7 @@ pub(crate) fn compute_private_exponent_carmicheal(
     let gcd = p1.gcd(&q1);
     let lcm = p1 / NonZero::new(gcd).expect("gcd is non zero") * &q1;
     let exp = exp.resize_unchecked(lcm.bits_precision());
-    if let Some(d) = exp.invert_mod(&lcm).into() {
+    if let Some(d) = exp.invert_mod(&NonZero::new(lcm).expect("non zero")).into() {
         Ok(d)
     } else {
         // `exp` evenly divides `lcm`

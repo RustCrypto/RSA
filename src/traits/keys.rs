@@ -60,10 +60,10 @@ pub trait PrivateKeyParts: PublicKeyParts {
     /// Returns an iterator over the CRT Values
     fn crt_values(&self) -> Option<&[CrtValue]>;
 
-    /// Returns the params for `p` if precomupted.
+    /// Returns the params for `p` if precomputed.
     fn p_params(&self) -> Option<&BoxedMontyParams>;
 
-    /// Returns the params for `q` if precomupted.
+    /// Returns the params for `q` if precomputed.
     fn q_params(&self) -> Option<&BoxedMontyParams>;
 }
 
