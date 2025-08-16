@@ -251,7 +251,7 @@ where
     fn verifying_key(&self) -> Self::VerifyingKey {
         VerifyingKey {
             inner: self.inner.to_public_key(),
-            salt_len: self.salt_len,
+            salt_len: Some(self.salt_len),
             phantom: Default::default(),
         }
     }

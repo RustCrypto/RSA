@@ -11,7 +11,7 @@
 
 use alloc::vec::Vec;
 use digest::{Digest, DynDigest, FixedOutputReset};
-use subtle::{Choice, ConstantTimeEq};
+use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 use super::mgf::{mgf1_xor, mgf1_xor_digest};
 use crate::errors::{Error, Result};
@@ -170,7 +170,7 @@ fn emsa_pss_verify_pre<'a>(
     m_hash: &[u8],
     em: &'a mut [u8],
     em_bits: usize,
-    s_len: usize,
+    s_len: Option<usize>,
     h_len: usize,
 ) -> Result<(&'a mut [u8], &'a mut [u8])> {
     // 1. If the length of M is greater than the input limitation for the
@@ -182,10 +182,12 @@ fn emsa_pss_verify_pre<'a>(
         return Err(Error::Verification);
     }
 
-    // 3. If emLen < hLen + sLen + 2, output "inconsistent" and stop.
     let em_len = em.len(); //(em_bits + 7) / 8;
-    if em_len < h_len + s_len + 2 {
-        return Err(Error::Verification);
+    if let Some(s_len) = s_len {
+        // 3. If emLen < hLen + sLen + 2, output "inconsistent" and stop.
+        if em_len < h_len + s_len + 2 {
+            return Err(Error::Verification);
+        }
     }
 
     // 4. If the rightmost octet of EM does not have hexadecimal value
@@ -227,10 +229,48 @@ fn emsa_pss_verify_salt(db: &[u8], em_len: usize, s_len: usize, h_len: usize) ->
     valid & rest[0].ct_eq(&0x01)
 }
 
+/// Detect salt length by scanning DB for the 0x01 separator byte.
+/// Returns (s_len, valid) where s_len is 0 on failure.
+fn emsa_pss_get_salt_len(db: &[u8], em_len: usize, h_len: usize) -> (usize, Choice) {
+    let em_len = em_len as u32;
+    let h_len = h_len as u32;
+    let max_scan_len = em_len - h_len - 2;
+
+    let mut separator_pos = 0u32;
+    let mut found_separator = Choice::from(0u8);
+    let mut padding_valid = Choice::from(1u8);
+
+    // Single forward scan to find separator and validate padding
+    for i in 0..=max_scan_len {
+        let byte_val = db[i as usize];
+        let is_zero = byte_val.ct_eq(&0x00);
+        let is_separator = byte_val.ct_eq(&0x01);
+        let is_invalid = !(is_zero | is_separator);
+
+        // Update separator position if we found one and haven't found one before
+        let should_update_pos = is_separator & !found_separator;
+        separator_pos = u32::conditional_select(&separator_pos, &i, should_update_pos);
+        found_separator =
+            Choice::conditional_select(&found_separator, &Choice::from(1u8), should_update_pos);
+
+        // Padding is invalid if we see a non-zero, non-separator byte before finding separator
+        let corrupts_padding = is_invalid & !found_separator;
+        padding_valid &= !corrupts_padding;
+    }
+
+    let salt_len = max_scan_len.wrapping_sub(separator_pos);
+    let final_valid = found_separator & padding_valid;
+
+    // Return 0 length on failure
+    let result_len = u32::conditional_select(&0u32, &salt_len, final_valid);
+
+    (result_len as usize, final_valid)
+}
+
 pub(crate) fn emsa_pss_verify(
     m_hash: &[u8],
     em: &mut [u8],
-    s_len: usize,
+    s_len: Option<usize>,
     hash: &mut dyn DynDigest,
     key_bits: usize,
 ) -> Result<()> {
@@ -252,7 +292,10 @@ pub(crate) fn emsa_pss_verify(
     //     to zero.
     db[0] &= 0xFF >> /*uint*/(8 * em_len - em_bits);
 
-    let salt_valid = emsa_pss_verify_salt(db, em_len, s_len, h_len);
+    let (s_len, salt_valid) = match s_len {
+        Some(s_len) => (s_len, emsa_pss_verify_salt(db, em_len, s_len, h_len)),
+        None => emsa_pss_get_salt_len(db, em_len, h_len),
+    };
 
     // 11. Let salt be the last s_len octets of DB.
     let salt = &db[db.len() - s_len..];
@@ -281,7 +324,7 @@ pub(crate) fn emsa_pss_verify(
 pub(crate) fn emsa_pss_verify_digest<D>(
     m_hash: &[u8],
     em: &mut [u8],
-    s_len: usize,
+    s_len: Option<usize>,
     key_bits: usize,
 ) -> Result<()>
 where
@@ -307,7 +350,10 @@ where
     //     to zero.
     db[0] &= 0xFF >> /*uint*/(8 * em_len - em_bits);
 
-    let salt_valid = emsa_pss_verify_salt(db, em_len, s_len, h_len);
+    let (s_len, salt_valid) = match s_len {
+        Some(s_len) => (s_len, emsa_pss_verify_salt(db, em_len, s_len, h_len)),
+        None => emsa_pss_get_salt_len(db, em_len, h_len),
+    };
 
     // 11. Let salt be the last s_len octets of DB.
     let salt = &db[db.len() - s_len..];
