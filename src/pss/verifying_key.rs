@@ -244,13 +244,17 @@ mod tests {
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let priv_key = crate::RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
+        let priv_key = crate::RsaPrivateKey::new(&mut rng, 1024).expect("failed to generate key");
         let pub_key = priv_key.to_public_key();
         let verifying_key = VerifyingKey::<Sha256>::new(pub_key);
 
-        let tokens = [Token::Str(
-            "3024300d06092a864886f70d01010105000313003010020900ab240c3361d02e370203010001",
-        )];
+        let tokens = [Token::Str(concat!(
+            "30819f300d06092a864886f70d010101050003818d0030818902818100cd1419dc",
+            "3771354bee0955a90489cce0c98aee6577851358afe386a68bc95287862a1157d5",
+            "aba8847e8e57b6f2f94748ab7efda3f3c74a6702329397ffe0b1d4f76e1b025d87",
+            "d583e48b3cfce99d6a507d94eb46c5242b3addb54d346ecf43eb0d7343bcb258a3",
+            "1d5fa51f47b9e0d7280623901d1d29af1a986fec92ba5fe2430203010001",
+        ))];
 
         assert_tokens(&verifying_key.readable(), &tokens);
     }
