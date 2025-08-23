@@ -269,26 +269,21 @@ mod test {
     use signature::{DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, Verifier};
 
     fn get_private_key() -> RsaPrivateKey {
-        // In order to generate new test vectors you'll need the PEM form of this key:
-        // -----BEGIN RSA PRIVATE KEY-----
-        // MIIBOgIBAAJBALKZD0nEffqM1ACuak0bijtqE2QrI/KLADv7l3kK3ppMyCuLKoF0
-        // fd7Ai2KW5ToIwzFofvJcS/STa6HA5gQenRUCAwEAAQJBAIq9amn00aS0h/CrjXqu
-        // /ThglAXJmZhOMPVn4eiu7/ROixi9sex436MaVeMqSNf7Ex9a8fRNfWss7Sqd9eWu
-        // RTUCIQDasvGASLqmjeffBNLTXV2A5g4t+kLVCpsEIZAycV5GswIhANEPLmax0ME/
-        // EO+ZJ79TJKN5yiGBRsv5yvx5UiHxajEXAiAhAol5N4EUyq6I9w1rYdhPMGpLfk7A
-        // IU2snfRJ6Nq2CQIgFrPsWRCkV+gOYcajD17rEqmuLrdIRexpg8N1DOSXoJ8CIGlS
-        // tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
-        // -----END RSA PRIVATE KEY-----
-
         let pem = r#"
 -----BEGIN RSA PRIVATE KEY-----
-MIIBOgIBAAJBALKZD0nEffqM1ACuak0bijtqE2QrI/KLADv7l3kK3ppMyCuLKoF0
-fd7Ai2KW5ToIwzFofvJcS/STa6HA5gQenRUCAwEAAQJBAIq9amn00aS0h/CrjXqu
-/ThglAXJmZhOMPVn4eiu7/ROixi9sex436MaVeMqSNf7Ex9a8fRNfWss7Sqd9eWu
-RTUCIQDasvGASLqmjeffBNLTXV2A5g4t+kLVCpsEIZAycV5GswIhANEPLmax0ME/
-EO+ZJ79TJKN5yiGBRsv5yvx5UiHxajEXAiAhAol5N4EUyq6I9w1rYdhPMGpLfk7A
-IU2snfRJ6Nq2CQIgFrPsWRCkV+gOYcajD17rEqmuLrdIRexpg8N1DOSXoJ8CIGlS
-tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
+MIICXQIBAAKBgQDQlB5jqYD6kvsl7Ux7Mwf4JwIwNK5/GnSR8Gmcp2ByheYq2OmU
+usIbi24wXjNPSHQGfSjjBCMNyn8OhffOWVdwtuBUyfhEuobAaW7roHadjUo0fo/o
+XHJKwcRJlK8Yo55xn3IfG8UMRqOebAdfzRZJ8B8iYIzn3GlVUCJYM2mH2QIDAQAB
+AoGAX/SkfmkOozhXPj2LP+pcMjeP9CloVaUQF8uoap896bHcD742x2ubvRxKFwpf
+RIwqhImz86yFi+Sqyz2qoU3MwYNiLu3Trm8EJ6KimLUbl4GKVDDxNwX0LYslR2+T
+nJNeOJ4w2a3l0BgJIBNfWu8MX+zRXwC4O1HauLqTDYiCaAECQQDogtEtXwviaoA1
+nxPAghC9y/dZ3+5pUxPvqIhpGWWbBk48ZWomevYnXtGviaXf6eJbMaArr71ZRFt1
+B6IpiaaBAkEA5aZc+maL2FfVkTWnjBjIrbfCIjaOnXSrrY6DKZ96w8KteqRN2wXe
+6m2bINuvCahhUoShfHLTcjJAM0aF6n4lWQJBAKMnyOjxnUFQQo9eBVo86sqEahnj
+DUVTStYNiUtWyvmxvwyajZZbCogt/S4UhRVO5cvgUujU9SXC1fqVVLGZKgECQQCR
+8XzrQRokfgVih/eXh/SYucwtFADkPc4QuR3P6OMK34CCDULRK1T0JH3Oju4ZNCHN
+YC6EOTD5RMgaDfpzAIHZAkB1kVpFR3C0kIJCN2EkTM7GWm5IrplmNEtnVhD6ytkW
+L6W9HMUQjDIsL7PBRPgHdzosfQl/Y+XI072M6O+sKt4E
 -----END RSA PRIVATE KEY-----"#;
 
         RsaPrivateKey::from_pkcs1_pem(pem).unwrap()
@@ -301,22 +296,16 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         let tests = [
             (
                 "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
-                ),
+                hex!("699c0fa19964fe6db15b04e78f99d720d8b5d4aa7febd262e1177afed16340f8619583e3bb8e6489753ae60e83053a2c146a60bdd1be17ba952abf53499cc5ea71b092058cba4e3ad5a8740ecf77ba2ee42410fc4642b5d56f9ba075ec87f9c08c90f11e052efde3675a79e6fe4b2a6e73ebcfab277532b138d709e0618b1939"),
                 true,
             ),
             (
                 "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
-                ),
+                hex!("699c0fa19964fe6db15b04e78f99d720d8b5d4aa7febd262e1177afed16340f8619583e3bb8e6489753ae60e83053a2c146a60bdd1be17ba952abf53499cc5ea71b092058cba4e3ad5a8740ecf77ba2ee42410fc4642b5d56f9ba075ec87f9c08c90f11e052efde3675a79e6fe4b2a6e73ebcfab277532b138d709e0618b1900"),
                 false,
             ),
         ];
-        let pub_key: RsaPublicKey = priv_key.into();
+        let pub_key: RsaPublicKey = priv_key.clone().into();
 
         for (text, sig, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
@@ -338,22 +327,16 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         let tests = [
             (
                 "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
-                ),
+                hex!("699c0fa19964fe6db15b04e78f99d720d8b5d4aa7febd262e1177afed16340f8619583e3bb8e6489753ae60e83053a2c146a60bdd1be17ba952abf53499cc5ea71b092058cba4e3ad5a8740ecf77ba2ee42410fc4642b5d56f9ba075ec87f9c08c90f11e052efde3675a79e6fe4b2a6e73ebcfab277532b138d709e0618b1939"),
                 true,
             ),
             (
                 "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
-                ),
+                hex!("699c0fa19964fe6db15b04e78f99d720d8b5d4aa7febd262e1177afed16340f8619583e3bb8e6489753ae60e83053a2c146a60bdd1be17ba952abf53499cc5ea71b092058cba4e3ad5a8740ecf77ba2ee42410fc4642b5d56f9ba075ec87f9c08c90f11e052efde3675a79e6fe4b2a6e73ebcfab277532b138d709e0618b1900"),
                 false,
             ),
         ];
-        let pub_key: RsaPublicKey = priv_key.into();
+        let pub_key: RsaPublicKey = priv_key.clone().into();
         let verifying_key: VerifyingKey<Sha1> = VerifyingKey::new(pub_key);
 
         for (text, sig, expected) in &tests {
@@ -377,27 +360,22 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         let tests = [
             (
                 "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
-                ),
+                hex!("699c0fa19964fe6db15b04e78f99d720d8b5d4aa7febd262e1177afed16340f8619583e3bb8e6489753ae60e83053a2c146a60bdd1be17ba952abf53499cc5ea71b092058cba4e3ad5a8740ecf77ba2ee42410fc4642b5d56f9ba075ec87f9c08c90f11e052efde3675a79e6fe4b2a6e73ebcfab277532b138d709e0618b1939"),
                 true,
             ),
             (
                 "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
-                ),
+                hex!("699c0fa19964fe6db15b04e78f99d720d8b5d4aa7febd262e1177afed16340f8619583e3bb8e6489753ae60e83053a2c146a60bdd1be17ba952abf53499cc5ea71b092058cba4e3ad5a8740ecf77ba2ee42410fc4642b5d56f9ba075ec87f9c08c90f11e052efde3675a79e6fe4b2a6e73ebcfab277532b138d709e0618b1900"),
                 false,
             ),
         ];
-        let pub_key: RsaPublicKey = priv_key.into();
+        let pub_key: RsaPublicKey = priv_key.clone().into();
         let verifying_key = VerifyingKey::new(pub_key);
 
         for (text, sig, expected) in &tests {
             let mut digest = Sha1::new();
             digest.update(text.as_bytes());
+
             let result =
                 verifying_key.verify_digest(digest, &Signature::try_from(sig.as_slice()).unwrap());
             match expected {
@@ -534,18 +512,12 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         let tests = [
             (
                 Sha1::digest("test\n"),
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
-                ),
+                hex!("699c0fa19964fe6db15b04e78f99d720d8b5d4aa7febd262e1177afed16340f8619583e3bb8e6489753ae60e83053a2c146a60bdd1be17ba952abf53499cc5ea71b092058cba4e3ad5a8740ecf77ba2ee42410fc4642b5d56f9ba075ec87f9c08c90f11e052efde3675a79e6fe4b2a6e73ebcfab277532b138d709e0618b1939"),
                 true,
             ),
             (
                 Sha1::digest("test\n"),
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
-                ),
+                hex!("699c0fa19964fe6db15b04e78f99d720d8b5d4aa7febd262e1177afed16340f8619583e3bb8e6489753ae60e83053a2c146a60bdd1be17ba952abf53499cc5ea71b092058cba4e3ad5a8740ecf77ba2ee42410fc4642b5d56f9ba075ec87f9c08c90f11e052efde3675a79e6fe4b2a6e73ebcfab277532b138d709e0618b1900"),
                 false,
             ),
         ];
