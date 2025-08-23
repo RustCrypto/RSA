@@ -320,13 +320,30 @@ mod tests {
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let priv_key = crate::RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
+        let priv_key = crate::RsaPrivateKey::new(&mut rng, 1024).expect("failed to generate key");
         let signing_key = SigningKey::<Sha256>::new(priv_key);
 
         let tokens = [Token::Str(concat!(
-            "3056020100300d06092a864886f70d010101050004423040020100020900ab240c",
-            "3361d02e370203010001020811e54a15259d22f9020500ceff5cf3020500d3a7aa",
-            "ad020500ccaddf17020500cb529d3d020500bb526d6f"
+            "30820278020100300d06092a864886f70d0101010500048202623082025e020100",
+            "02818100cd1419dc3771354bee0955a90489cce0c98aee6577851358afe386a68b",
+            "c95287862a1157d5aba8847e8e57b6f2f94748ab7efda3f3c74a6702329397ffe0",
+            "b1d4f76e1b025d87d583e48b3cfce99d6a507d94eb46c5242b3addb54d346ecf43",
+            "eb0d7343bcb258a31d5fa51f47b9e0d7280623901d1d29af1a986fec92ba5fe243",
+            "0203010001028181009bb3203326d0c7b31f456d08c6ce4c8379e10640792ecad2",
+            "71afe002406d184096a707c5d50ee001c00818266970c3233439551f0e2d879a8f",
+            "7b90bd3d62fdffa3e661f14c8dcce071f081966e25bb351289810c2f8a012f2fa3",
+            "f001029d7f2e0cf24f6a4b139292f8078fac24e7fc8185bab4f02f539267bd09b6",
+            "15e4e19fe1024100e90ad93c4b19bb40807391b5a9404ce5ea359e7b0556ee25cb",
+            "2e7455aeb5caf83fc26f34457cdbb173347962c66b6fe0c4686b54dbe0d2c913a7",
+            "aa924eff6031024100e148067566a1fa3aabd0672361be62715516c9d62790b03f",
+            "4326cc00b2f782e6b64a167689e5c9aebe6a4cf594f3083380fe2a0a7edf1f325e",
+            "58c523b981a0b3024100ab96e85323bd038a3fca588c58ddd681278d696e8d84ef",
+            "7ef676f303afcb7d728287e897a55e84e8c8b9e772da447b31158d0912877fa7d4",
+            "945b4d15c382f7d102400ddde317e2e36185af01baf78092b97884664cb233e942",
+            "1002d0268a7c79a3c313c167b4903466bfacd4da3bdb99420df988ab89cdd96a10",
+            "2da2852ff7c134e5024100bafb0dac0fda53f9c755c23483343922727b88a5256a",
+            "6fb47242e1c99b8f8a2c914f39f7af301219245786a6bb15336231d6a9b57ee7e0",
+            "b3dd75129f93f54ecf"
         ))];
 
         assert_tokens(&signing_key.readable(), &tokens);
