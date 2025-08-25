@@ -365,7 +365,7 @@ impl RsaPrivateKey {
             precomputed: None,
         };
 
-        // Alaways validate the key, to ensure precompute can't fail
+        // Always validate the key, to ensure precompute can't fail
         k.validate()?;
 
         // Precompute when possible, ignore error otherwise.
