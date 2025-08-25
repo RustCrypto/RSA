@@ -27,7 +27,7 @@ where
     D: Digest,
 {
     pub(super) inner: RsaPublicKey,
-    pub(super) salt_len: usize,
+    pub(super) salt_len: Option<usize>,
     pub(super) phantom: PhantomData<D>,
 }
 
@@ -45,13 +45,23 @@ where
     pub fn new_with_salt_len(key: RsaPublicKey, salt_len: usize) -> Self {
         Self {
             inner: key,
-            salt_len,
+            salt_len: Some(salt_len),
+            phantom: Default::default(),
+        }
+    }
+
+    /// Create a new RSASSA-PSS verifying key.
+    /// Attempts to automatically detect the salt length.
+    pub fn new_with_auto_salt_len(key: RsaPublicKey) -> Self {
+        Self {
+            inner: key,
+            salt_len: None,
             phantom: Default::default(),
         }
     }
 
     /// Return specified salt length for this key
-    pub fn salt_len(&self) -> usize {
+    pub fn salt_len(&self) -> Option<usize> {
         self.salt_len
     }
 }
