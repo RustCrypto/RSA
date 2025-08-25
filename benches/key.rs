@@ -76,6 +76,26 @@ fn get_key() -> RsaPrivateKey {
 }
 
 #[bench]
+fn bench_rsa_1024_gen_key(b: &mut Bencher) {
+    let mut rng = ChaCha8Rng::from_seed([42; 32]);
+
+    b.iter(|| {
+        let key = RsaPrivateKey::new(&mut rng, 1024).unwrap();
+        test::black_box(key);
+    });
+}
+
+#[bench]
+fn bench_rsa_2048_gen_key(b: &mut Bencher) {
+    let mut rng = ChaCha8Rng::from_seed([42; 32]);
+
+    b.iter(|| {
+        let key = RsaPrivateKey::new(&mut rng, 2048).unwrap();
+        test::black_box(key);
+    });
+}
+
+#[bench]
 fn bench_rsa_2048_pkcsv1_decrypt(b: &mut Bencher) {
     let priv_key = get_key();
     let x = Base64::decode_vec(DECRYPT_VAL).unwrap();
