@@ -51,9 +51,8 @@ jobs:
           RUSTDOCFLAGS: "-Dwarnings --cfg docsrs"
         run: cargo doc --no-deps --features std,serde,hazmat,sha2
 
-# does not understand concat! macro
-#  typos:
-#    runs-on: ubuntu-latest
-#    steps:
-#      - uses: actions/checkout@v4
-#      - uses: crate-ci/typos@v1.35.1
+  typos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crate-ci/typos@v1.35.1
