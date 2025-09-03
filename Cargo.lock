@@ -520,7 +520,7 @@ checksum = "2b15c43186be67a4fd63bee50d0303afffcef381492ebe2c5d87f324e1b8815c"
 
 [[package]]
 name = "rsa"
-version = "0.10.0-rc.5"
+version = "0.10.0-rc.6"
 dependencies = [
  "base64ct",
  "const-oid",
@@ -696,9 +696,9 @@ dependencies = [
 
 [[package]]
 name = "signature"
-version = "3.0.0-rc.2"
+version = "3.0.0-rc.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4835c3b5ecb10171941a4998a95a3a76ecac1c5ae8e6954f2ad030acd1c7e8ab"
+checksum = "39195ff4c0dc41c93e123825ca1f0d11b856df8b26d5fe140a522355632c4345"
 dependencies = [
  "digest",
  "rand_core",
