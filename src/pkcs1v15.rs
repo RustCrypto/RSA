@@ -268,14 +268,24 @@ mod tests {
     use crate::{RsaPrivateKey, RsaPublicKey};
 
     fn get_private_key() -> RsaPrivateKey {
-        // https://github.com/C2SP/wycheproof/blob/main/testvectors/rsa_oaep_misc_test.json
+        // In order to generate new test vectors you'll need the PEM form of this key:
+        // -----BEGIN RSA PRIVATE KEY-----
+        // MIIBOgIBAAJBALKZD0nEffqM1ACuak0bijtqE2QrI/KLADv7l3kK3ppMyCuLKoF0
+        // fd7Ai2KW5ToIwzFofvJcS/STa6HA5gQenRUCAwEAAQJBAIq9amn00aS0h/CrjXqu
+        // /ThglAXJmZhOMPVn4eiu7/ROixi9sex436MaVeMqSNf7Ex9a8fRNfWss7Sqd9eWu
+        // RTUCIQDasvGASLqmjeffBNLTXV2A5g4t+kLVCpsEIZAycV5GswIhANEPLmax0ME/
+        // EO+ZJ79TJKN5yiGBRsv5yvx5UiHxajEXAiAhAol5N4EUyq6I9w1rYdhPMGpLfk7A
+        // IU2snfRJ6Nq2CQIgFrPsWRCkV+gOYcajD17rEqmuLrdIRexpg8N1DOSXoJ8CIGlS
+        // tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
+        // -----END RSA PRIVATE KEY-----
+
         RsaPrivateKey::from_components(
-            BoxedUint::from_be_hex("d0941e63a980fa92fb25ed4c7b3307f827023034ae7f1a7491f0699ca7607285e62ad8e994bac21b8b6e305e334f4874067d28e304230dca7f0e85f7ce595770b6e054c9f844ba86c0696eeba0769d8d4a347e8fe85c724ac1c44994af18a39e719f721f1bc50c46a39e6c075fcd1649f01f22608ce7dc6955502258336987d9", 1024).unwrap(),
+            BoxedUint::from_be_hex("B2990F49C47DFA8CD400AE6A4D1B8A3B6A13642B23F28B003BFB97790ADE9A4CC82B8B2A81747DDEC08B6296E53A08C331687EF25C4BF4936BA1C0E6041E9D15", 512).unwrap(),
             BoxedUint::from(65_537u64),
-            BoxedUint::from_be_hex("5ff4a47e690ea338573e3d8b3fea5c32378ff4296855a51017cba86a9f3de9b1dc0fbe36c76b9bbd1c4a170a5f448c2a8489b3f3ac858be4aacb3daaa14dccc183622eedd3ae6f0427a2a298b51b97818a5430f13705f42d8b25476f939c935e389e30d9ade5d0180920135f5aef0c5fecd15f00b83b51dab8ba930d88826801", 1024).unwrap(),
+            BoxedUint::from_be_hex("8ABD6A69F4D1A4B487F0AB8D7AAEFD38609405C999984E30F567E1E8AEEFF44E8B18BDB1EC78DFA31A55E32A48D7FB131F5AF1F44D7D6B2CED2A9DF5E5AE4535", 512).unwrap(),
             vec![
-                BoxedUint::from_be_hex("e882d12d5f0be26a80359f13c08210bdcbf759dfee695313efa8886919659b064e3c656a267af6275ed1af89a5dfe9e25b31a02bafbd59445b7507a22989a681", 512).unwrap(),
-                BoxedUint::from_be_hex("e5a65cfa668bd857d59135a78c18c8adb7c222368e9d74abad8e83299f7ac3c2ad7aa44ddb05deea6d9b20dbaf09a8615284a17c72d3723240334685ea7e2559", 512).unwrap(),
+                BoxedUint::from_be_hex("DAB2F18048BAA68DE7DF04D2D35D5D80E60E2DFA42D50A9B04219032715E46B3", 256).unwrap(),
+                BoxedUint::from_be_hex("D10F2E66B1D0C13F10EF9927BF5324A379CA218146CBF9CAFC795221F16A3117", 256).unwrap()
             ],
         ).unwrap()
     }
@@ -286,19 +296,19 @@ mod tests {
 
         let tests = [
             [
-                "f0f4qsNunKxRgsag5/p3AER7uoqs/Gupe33kuJWGAkLjobLsLszxp7uwVngeoxpDi87rTcJ9y0Sbu2QfnV/KvwEHiuQ8NL1FCRt4ujwgNtQms9XHjkTeLUX9tapoxdA0QhLsjblZFdb3fAvZXHGKPTBdHkxHut6LHG37SxbHeQY=",
+                "gIcUIoVkD6ATMBk/u/nlCZCCWRKdkfjCgFdo35VpRXLduiKXhNz1XupLLzTXAybEq15juc+EgY5o0DHv/nt3yg==",
                 "x",
             ],
             [
-                "l+L4+CdrgcFJ9LngppA+o7pZAKmZs4Gu5cRsum7OAji0+XNamTaPKxgtAio5A8ltRLJxrfZnRFOIOyn4964vMIB2YfVG/Vak//kLIn/rbgaVGndmWxQuR6ykEruOuqn5JUqv4JHaW30aDzEkCbpXWpFJ7dhfrWZdSv4XKpt9cY4=",
+                "Y7TOCSqofGhkRb+jaVRLzK8xw2cSo1IVES19utzv6hwvx+M8kFsoWQm5DzBeJCZTCVDPkTpavUuEbgp8hnUGDw==",
                 "testing.",
             ],
             [
-                "JtlpY3lTeCmkRRrIgfuOXH0ubMOL1U/n6nM6r6kF2iuRiFIPapfEzHF2WSvrbxZXa8gzJo1PuAJiJ6Vy90vOWbP43VEXLk5wyGZPePwHQ1WwOcE+6okZ9j9zmAmAnQUyaUjPfhwyDC64ObjiSKeIPCYSsdURy/Z67lcTZ6JJ8+8=",
+                "arReP9DJtEVyV2Dg3dDp4c/PSk1O6lxkoJ8HcFupoRorBZG+7+1fDAwT1olNddFnQMjmkb8vxwmNMoTAT/BFjQ==",
                 "testing.\n",
             ],
             [
-                "TcyqI5jrGyln5AspqnvWShPIjKIZtXbNApf9TqAZrsl31RS+k6blEJy6YVZeow9QKis+UyIcz08nMGX/D3lm/JA4bwpyBFAvSFr2MNjNpGh9QqEcGryI0CpLA1fy56x7YGB/Y0eJZXnSj91udGubJTEI9ULTouoFAKxoWq7ioTc=",
+                "WtaBXIoGC54+vH0NH0CHHE+dRDOsMc/6BrfFu2lEqcKL9+uDuWaf+Xj9mrbQCjjZcpQuX733zyok/jsnqe/Ftw==",
                 "01234567890123456789012345678901234567890123456789012",
             ],
         ];
@@ -342,19 +352,19 @@ mod tests {
 
         let tests = [
             [
-                "f0f4qsNunKxRgsag5/p3AER7uoqs/Gupe33kuJWGAkLjobLsLszxp7uwVngeoxpDi87rTcJ9y0Sbu2QfnV/KvwEHiuQ8NL1FCRt4ujwgNtQms9XHjkTeLUX9tapoxdA0QhLsjblZFdb3fAvZXHGKPTBdHkxHut6LHG37SxbHeQY=",
+                "gIcUIoVkD6ATMBk/u/nlCZCCWRKdkfjCgFdo35VpRXLduiKXhNz1XupLLzTXAybEq15juc+EgY5o0DHv/nt3yg==",
                 "x",
             ],
             [
-                "l+L4+CdrgcFJ9LngppA+o7pZAKmZs4Gu5cRsum7OAji0+XNamTaPKxgtAio5A8ltRLJxrfZnRFOIOyn4964vMIB2YfVG/Vak//kLIn/rbgaVGndmWxQuR6ykEruOuqn5JUqv4JHaW30aDzEkCbpXWpFJ7dhfrWZdSv4XKpt9cY4=",
+                "Y7TOCSqofGhkRb+jaVRLzK8xw2cSo1IVES19utzv6hwvx+M8kFsoWQm5DzBeJCZTCVDPkTpavUuEbgp8hnUGDw==",
                 "testing.",
             ],
             [
-                "JtlpY3lTeCmkRRrIgfuOXH0ubMOL1U/n6nM6r6kF2iuRiFIPapfEzHF2WSvrbxZXa8gzJo1PuAJiJ6Vy90vOWbP43VEXLk5wyGZPePwHQ1WwOcE+6okZ9j9zmAmAnQUyaUjPfhwyDC64ObjiSKeIPCYSsdURy/Z67lcTZ6JJ8+8=",
+                "arReP9DJtEVyV2Dg3dDp4c/PSk1O6lxkoJ8HcFupoRorBZG+7+1fDAwT1olNddFnQMjmkb8vxwmNMoTAT/BFjQ==",
                 "testing.\n",
             ],
             [
-                "TcyqI5jrGyln5AspqnvWShPIjKIZtXbNApf9TqAZrsl31RS+k6blEJy6YVZeow9QKis+UyIcz08nMGX/D3lm/JA4bwpyBFAvSFr2MNjNpGh9QqEcGryI0CpLA1fy56x7YGB/Y0eJZXnSj91udGubJTEI9ULTouoFAKxoWq7ioTc=",
+                "WtaBXIoGC54+vH0NH0CHHE+dRDOsMc/6BrfFu2lEqcKL9+uDuWaf+Xj9mrbQCjjZcpQuX733zyok/jsnqe/Ftw==",
                 "01234567890123456789012345678901234567890123456789012",
             ],
         ];
@@ -403,21 +413,24 @@ mod tests {
 
         let tests = [(
             "Test.\n",
-            hex!("2c5954065af5f8c651cc46c49af719507648947a6100ef5c37294939a396c529551bd65c90c4aae0417cd3e621bcfb1d40630b6593a14589b94943efa50342310c23b07aa7acd102dc0b922272db0908509467d56ae3edc5d4ec71ba072f509d0f83d7bc1d88174c0c39a3587963c8625e606c3b99cf9a202da0c0b3677a082d"),
+            hex!(
+                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+            ),
         )];
 
         for (text, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
 
             let out = priv_key.sign(Pkcs1v15Sign::new::<Sha1>(), &digest).unwrap();
-            assert_ne!(hex::encode(&out), hex::encode(&digest));
-            assert_eq!(hex::encode(&out), hex::encode(&expected));
+            assert_ne!(out, digest);
+            assert_eq!(out, expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
             let out2 = priv_key
                 .sign_with_rng(&mut rng, Pkcs1v15Sign::new::<Sha1>(), &digest)
                 .unwrap();
-            assert_eq!(hex::encode(&out2), hex::encode(&expected));
+            assert_eq!(out2, expected);
         }
     }
 
@@ -427,7 +440,10 @@ mod tests {
 
         let tests = [(
             "Test.\n",
-            hex!("2c5954065af5f8c651cc46c49af719507648947a6100ef5c37294939a396c529551bd65c90c4aae0417cd3e621bcfb1d40630b6593a14589b94943efa50342310c23b07aa7acd102dc0b922272db0908509467d56ae3edc5d4ec71ba072f509d0f83d7bc1d88174c0c39a3587963c8625e606c3b99cf9a202da0c0b3677a082d"),
+            hex!(
+                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+            ),
         )];
 
         let signing_key = SigningKey::<Sha1>::new(priv_key);
@@ -436,7 +452,7 @@ mod tests {
             let out = signing_key.sign(text.as_bytes()).to_bytes();
             assert_ne!(out.as_ref(), text.as_bytes());
             assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
-            assert_eq!(hex::encode(out.as_ref()), hex::encode(&expected));
+            assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
             let out2 = signing_key
@@ -452,7 +468,10 @@ mod tests {
 
         let tests = [(
             "Test.\n",
-            hex!("506ea024cfef1a98540d98da07d50a3c08bf03e09f9503e211dada539cd99bcb31e1d439d19182e4ec195496602180874ee1300282f62c74f7d57b9b619ac6092eebb47fedeca1d5d0e63bb5e1f630b06e170a1409fd310e265409b29bb741c37f5400524a6cf18e396ebda1190bc585086e214586d97f0ff822907796bc3879"),
+            hex!(
+                "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
+                "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451b"
+            ),
         )];
 
         let signing_key = SigningKey::<Sha256>::new(priv_key);
@@ -460,7 +479,7 @@ mod tests {
         for (text, expected) in &tests {
             let out = signing_key.sign(text.as_bytes()).to_bytes();
             assert_ne!(out.as_ref(), text.as_bytes());
-            assert_eq!(hex::encode(out.as_ref()), hex::encode(&expected));
+            assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
             let out2 = signing_key
@@ -476,7 +495,10 @@ mod tests {
 
         let tests = [(
             "Test.\n",
-            hex!("54e376075e2dfb2c98329102f932f44bc3ae993184742f6572dc5bb86da6d33c966164e377735056e9c56847cf8905ee2f8fd326468571502b3119b8ec8cd30c25a479f2ae204cddff3a0ecc206ce27eca4fdf5d26bad83ef891f9ebb443c6150cae5718ef567f9a8056c8819aad6134ee1d06ed8f150ff573c7938ec568efa1"),
+            hex!(
+                "55e9fba3354dfb51d2c8111794ea552c86afc2cab154652c03324df8c2c51ba7"
+                "2ff7c14de59a6f9ba50d90c13a7537cc3011948369f1f0ec4a49d21eb7e723f9"
+            ),
         )];
 
         let signing_key = SigningKey::<Sha3_256>::new(priv_key);
@@ -484,7 +506,7 @@ mod tests {
         for (text, expected) in &tests {
             let out = signing_key.sign(text.as_bytes()).to_bytes();
             assert_ne!(out.as_ref(), text.as_bytes());
-            assert_eq!(hex::encode(out.as_ref()), hex::encode(&expected));
+            assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
             let out2 = signing_key
@@ -500,7 +522,10 @@ mod tests {
 
         let tests = [(
             "Test.\n",
-            hex!("2c5954065af5f8c651cc46c49af719507648947a6100ef5c37294939a396c529551bd65c90c4aae0417cd3e621bcfb1d40630b6593a14589b94943efa50342310c23b07aa7acd102dc0b922272db0908509467d56ae3edc5d4ec71ba072f509d0f83d7bc1d88174c0c39a3587963c8625e606c3b99cf9a202da0c0b3677a082d"),
+            hex!(
+                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+            ),
         )];
 
         let signing_key = SigningKey::new(priv_key);
@@ -530,12 +555,18 @@ mod tests {
         let tests = [
             (
                 "Test.\n",
-                hex!("2c5954065af5f8c651cc46c49af719507648947a6100ef5c37294939a396c529551bd65c90c4aae0417cd3e621bcfb1d40630b6593a14589b94943efa50342310c23b07aa7acd102dc0b922272db0908509467d56ae3edc5d4ec71ba072f509d0f83d7bc1d88174c0c39a3587963c8625e606c3b99cf9a202da0c0b3677a082d"),
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+                ),
                 true,
             ),
             (
                 "Test.\n",
-                hex!("7919de0402424f7b00f16bda36bb7b4d83dd7fb2cb315d9083f60457063393948dc991cfc8161c7b1266ec373b69bc47554a833f95edab8266385a3a36786fe90f172a9882eddc451f3f678a85ed09c60b26300490dd69ef601849c1f4c01f78046bb8351f3a7888b8ce2213790ab11c5402c4a279cbc9a52e4bc76c4cc41600"),
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
+                ),
                 false,
             ),
         ];
@@ -543,8 +574,8 @@ mod tests {
 
         for (text, sig, expected) in &tests {
             let digest = Sha1::digest(text.as_bytes()).to_vec();
-            let result = pub_key.verify(Pkcs1v15Sign::new::<Sha1>(), &digest, sig);
 
+            let result = pub_key.verify(Pkcs1v15Sign::new::<Sha1>(), &digest, sig);
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -561,12 +592,18 @@ mod tests {
         let tests = [
             (
                 "Test.\n",
-                hex!("2c5954065af5f8c651cc46c49af719507648947a6100ef5c37294939a396c529551bd65c90c4aae0417cd3e621bcfb1d40630b6593a14589b94943efa50342310c23b07aa7acd102dc0b922272db0908509467d56ae3edc5d4ec71ba072f509d0f83d7bc1d88174c0c39a3587963c8625e606c3b99cf9a202da0c0b3677a082d"),
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+                ),
                 true,
             ),
             (
                 "Test.\n",
-                hex!("2c5954065af5f8c651cc46c49af719507648947a6100ef5c37294939a396c529551bd65c90c4aae0417cd3e621bcfb1d40630b6593a14589b94943efa50342310c23b07aa7acd102dc0b922272db0908509467d56ae3edc5d4ec71ba072f509d0f83d7bc1d88174c0c39a3587963c8625e606c3b99cf9a202da0c0b3677a0800"),
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
+                ),
                 false,
             ),
         ];
@@ -594,12 +631,18 @@ mod tests {
         let tests = [
             (
                 "Test.\n",
-                hex!("2c5954065af5f8c651cc46c49af719507648947a6100ef5c37294939a396c529551bd65c90c4aae0417cd3e621bcfb1d40630b6593a14589b94943efa50342310c23b07aa7acd102dc0b922272db0908509467d56ae3edc5d4ec71ba072f509d0f83d7bc1d88174c0c39a3587963c8625e606c3b99cf9a202da0c0b3677a082d"),
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+                ),
                 true,
             ),
             (
                 "Test.\n",
-                hex!("2c5954065af5f8c651cc46c49af719507648947a6100ef5c37294939a396c529551bd65c90c4aae0417cd3e621bcfb1d40630b6593a14589b94943efa50342310c23b07aa7acd102dc0b922272db0908509467d56ae3edc5d4ec71ba072f509d0f83d7bc1d88174c0c39a3587963c8625e606c3b99cf9a202da0c0b3677a0800"),
+                hex!(
+                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
+                ),
                 false,
             ),
         ];
@@ -609,7 +652,6 @@ mod tests {
         for (text, sig, expected) in &tests {
             let mut digest = Sha1::new();
             digest.update(text.as_bytes());
-
             let result =
                 verifying_key.verify_digest(digest, &Signature::try_from(sig.as_slice()).unwrap());
             match expected {
@@ -624,14 +666,11 @@ mod tests {
     #[test]
     fn test_unpadded_signature() {
         let msg = b"Thu Dec 19 18:06:16 EST 2013\n";
-        let expected_sig = Base64::decode_vec("E3O2B8toxZitc013ZK0TRP4uo47Clpm/Me/o+Yv5qpU7ZP6x9gFUc8IVv2LkX7kUtkgPl/85f/ehJhcXCsoRoOEbcio8PR3JCt/uPJSzokTvNx7bmYxXTJox6oF3kM3+NI+21jh8CZVyk81lTtFulLfmzAsH4L4w5QJcwWtNJpE=").unwrap();
+        let expected_sig = Base64::decode_vec("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
         let priv_key = get_private_key();
 
         let sig = priv_key.sign(Pkcs1v15Sign::new_unprefixed(), msg).unwrap();
-        assert_eq!(
-            Base64::encode_string(&expected_sig),
-            Base64::encode_string(&sig)
-        );
+        assert_eq!(expected_sig, sig);
 
         let pub_key: RsaPublicKey = priv_key.into();
         pub_key
@@ -642,7 +681,7 @@ mod tests {
     #[test]
     fn test_unpadded_signature_hazmat() {
         let msg = b"Thu Dec 19 18:06:16 EST 2013\n";
-        let expected_sig = Base64::decode_vec("E3O2B8toxZitc013ZK0TRP4uo47Clpm/Me/o+Yv5qpU7ZP6x9gFUc8IVv2LkX7kUtkgPl/85f/ehJhcXCsoRoOEbcio8PR3JCt/uPJSzokTvNx7bmYxXTJox6oF3kM3+NI+21jh8CZVyk81lTtFulLfmzAsH4L4w5QJcwWtNJpE=").unwrap();
+        let expected_sig = Base64::decode_vec("pX4DR8azytjdQ1rtUiC040FjkepuQut5q2ZFX1pTjBrOVKNjgsCDyiJDGZTCNoh9qpXYbhl7iEym30BWWwuiZg==").unwrap();
         let priv_key = get_private_key();
 
         let signing_key = SigningKey::<Sha1>::new_unprefixed(priv_key);
@@ -650,10 +689,7 @@ mod tests {
             .sign_prehash(msg)
             .expect("Failure during sign")
             .to_bytes();
-        assert_eq!(
-            Base64::encode_string(sig.as_ref()),
-            Base64::encode_string(&expected_sig)
-        );
+        assert_eq!(sig.as_ref(), expected_sig);
 
         let verifying_key = signing_key.verifying_key();
         verifying_key
