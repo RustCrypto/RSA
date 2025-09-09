@@ -1,5 +1,7 @@
 //! Property-based tests.
 
+#![cfg(feature = "hazmat")]
+
 use proptest::prelude::*;
 use rand_chacha::ChaCha8Rng;
 use rand_core::SeedableRng;
@@ -14,7 +16,7 @@ prop_compose! {
     // WARNING: do *NOT* copy and paste this code. It's insecure and optimized for test speed.
     fn private_key()(seed in any::<[u8; 32]>()) -> RsaPrivateKey {
         let mut rng = ChaCha8Rng::from_seed(seed);
-        RsaPrivateKey::new(&mut rng, 512).unwrap()
+        RsaPrivateKey::new_unchecked(&mut rng, 512).unwrap()
     }
 }
 

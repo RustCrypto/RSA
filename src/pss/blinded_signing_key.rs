@@ -279,7 +279,7 @@ where
 #[cfg(test)]
 mod tests {
     #[test]
-    #[cfg(feature = "serde")]
+    #[cfg(all(feature = "hazmat", feature = "serde"))]
     fn test_serde() {
         use super::*;
         use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
@@ -288,7 +288,7 @@ mod tests {
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = BlindedSigningKey::<Sha256>::new(
-            RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key"),
+            RsaPrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key"),
         );
 
         let tokens = [Token::Str(concat!(
