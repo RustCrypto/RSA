@@ -272,16 +272,59 @@ impl RsaPrivateKey {
     /// Default exponent for RSA keys.
     const EXP: u64 = 65537;
 
-    /// Generate a new Rsa key pair of the given bit size using the passed in `rng`.
-    pub fn new<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<RsaPrivateKey> {
-        Self::new_with_exp(rng, bit_size, BoxedUint::from(Self::EXP))
+    /// Minimum size of the modulus `n` in bits. Currently only applies to keygen.
+    const MIN_SIZE: u32 = 1024;
+
+    /// Generate a new RSA key pair with a modulus of the given bit size using the passed in `rng`.
+    ///
+    /// # Errors
+    /// - If `bit_size` is lower than the minimum 1024-bits.
+    pub fn new<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+        Self::new_with_exp(rng, bit_size, Self::EXP.into())
+    }
+
+    /// Generate a new RSA key pair of the given bit size.
+    ///
+    /// #⚠️Warning: Hazmat!
+    /// This version does not apply minimum key size checks, and as such may generate keys
+    /// which are insecure!
+    #[cfg(feature = "hazmat")]
+    pub fn new_unchecked<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+        Self::new_with_exp_unchecked(rng, bit_size, Self::EXP.into())
     }
 
     /// Generate a new RSA key pair of the given bit size and the public exponent
     /// using the passed in `rng`.
     ///
-    /// Unless you have specific needs, you should use `RsaPrivateKey::new` instead.
+    /// Unless you have specific needs, you should use [`RsaPrivateKey::new`] instead.
     pub fn new_with_exp<R: CryptoRng + ?Sized>(
+        rng: &mut R,
+        bit_size: usize,
+        exp: BoxedUint,
+    ) -> Result<RsaPrivateKey> {
+        if bit_size < Self::MIN_SIZE as usize {
+            return Err(Error::ModulusTooSmall);
+        }
+
+        let components = generate_multi_prime_key_with_exp(rng, 2, bit_size, exp)?;
+        RsaPrivateKey::from_components(
+            components.n.get(),
+            components.e,
+            components.d,
+            components.primes,
+        )
+    }
+
+    /// Generate a new RSA key pair of the given bit size and the public exponent
+    /// using the passed in `rng`.
+    ///
+    /// Unless you have specific needs, you should use [`RsaPrivateKey::new`] instead.
+    ///
+    /// #⚠️Warning: Hazmat!
+    /// This version does not apply minimum key size checks, and as such may generate keys
+    /// which are insecure!
+    #[cfg(feature = "hazmat")]
+    pub fn new_with_exp_unchecked<R: CryptoRng + ?Sized>(
         rng: &mut R,
         bit_size: usize,
         exp: BoxedUint,
@@ -821,13 +864,13 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "serde")]
+    #[cfg(all(feature = "hazmat", feature = "serde"))]
     fn test_serde() {
         use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
         use serde_test::{assert_tokens, Configure, Token};
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let priv_key = RsaPrivateKey::new(&mut rng, 64).expect("failed to generate key");
+        let priv_key = RsaPrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key");
 
         let priv_tokens = [Token::Str(concat!(
             "3056020100300d06092a864886f70d010101050004423040020100020900a",
