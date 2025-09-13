@@ -14,8 +14,8 @@ rust-version = "1.85"
 
 [dependencies]
 const-oid = { version = "0.10", default-features = false }
-crypto-bigint = { version = "0.7.0-rc.4", default-features = false, features = ["zeroize", "alloc"] }
-crypto-primes = { version = "0.7.0-pre.1", default-features = false }
+crypto-bigint = { version = "0.7.0-rc.6", default-features = false, features = ["zeroize", "alloc"] }
+crypto-primes = { version = "0.7.0-pre.2", default-features = false }
 digest = { version = "0.11.0-rc.1", default-features = false, features = ["alloc", "oid"] }
 rand_core = { version = "0.9", default-features = false }
 signature = { version = "3.0.0-rc.3", default-features = false, features = ["alloc", "digest", "rand_core"] }
