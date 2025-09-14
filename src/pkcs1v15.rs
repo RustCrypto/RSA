@@ -533,16 +533,16 @@ mod tests {
         for (text, expected) in &tests {
             let mut digest = Sha1::new();
             digest.update(text.as_bytes());
-            let out = signing_key.sign_digest(digest).to_bytes();
+            let out = signing_key
+                .sign_digest(|digest: &mut Sha1| digest.update(text.as_bytes()))
+                .to_bytes();
             assert_ne!(out.as_ref(), text.as_bytes());
             assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
             assert_eq!(out.as_ref(), expected);
 
             let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let mut digest = Sha1::new();
-            digest.update(text.as_bytes());
             let out2 = signing_key
-                .sign_digest_with_rng(&mut rng, digest)
+                .sign_digest_with_rng(&mut rng, |digest: &mut Sha1| digest.update(text.as_bytes()))
                 .to_bytes();
             assert_eq!(out2.as_ref(), expected);
         }
@@ -650,10 +650,13 @@ mod tests {
         let verifying_key = VerifyingKey::new(pub_key);
 
         for (text, sig, expected) in &tests {
-            let mut digest = Sha1::new();
-            digest.update(text.as_bytes());
-            let result =
-                verifying_key.verify_digest(digest, &Signature::try_from(sig.as_slice()).unwrap());
+            let result = verifying_key.verify_digest(
+                |digest: &mut Sha1| {
+                    digest.update(text.as_bytes());
+                    Ok(())
+                },
+                &Signature::try_from(sig.as_slice()).unwrap(),
+            );
             match expected {
                 true => result.expect("failed to verify"),
                 false => {

@@ -1,7 +1,7 @@
 use super::{sign_digest, Signature, VerifyingKey};
 use crate::{Result, RsaPrivateKey};
 use core::marker::PhantomData;
-use digest::{Digest, FixedOutputReset};
+use digest::{Digest, FixedOutputReset, HashMarker, Update};
 use rand_core::{CryptoRng, TryCryptoRng};
 use signature::{
     hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedMultipartSigner,
@@ -122,13 +122,18 @@ where
 
 impl<D> RandomizedDigestSigner<D, Signature> for BlindedSigningKey<D>
 where
-    D: Digest + FixedOutputReset,
+    D: Default + FixedOutputReset + HashMarker + Update,
 {
-    fn try_sign_digest_with_rng<R: TryCryptoRng + ?Sized>(
+    fn try_sign_digest_with_rng<
+        R: TryCryptoRng + ?Sized,
+        F: Fn(&mut D) -> signature::Result<()>,
+    >(
         &self,
         rng: &mut R,
-        digest: D,
+        f: F,
     ) -> signature::Result<Signature> {
+        let mut digest = D::default();
+        f(&mut digest)?;
         sign_digest::<_, D>(rng, true, &self.inner, &digest.finalize(), self.salt_len)?
             .as_slice()
             .try_into()

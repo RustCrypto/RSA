@@ -3,7 +3,7 @@ use crate::RsaPublicKey;
 use alloc::vec::Vec;
 use const_oid::AssociatedOid;
 use core::marker::PhantomData;
-use digest::Digest;
+use digest::{Digest, FixedOutput, HashMarker, Update};
 use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
 
 #[cfg(feature = "encoding")]
@@ -71,13 +71,19 @@ where
 
 impl<D> DigestVerifier<D, Signature> for VerifyingKey<D>
 where
-    D: Digest,
+    D: Default + FixedOutput + HashMarker + Update,
 {
-    fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
+    fn verify_digest<F: Fn(&mut D) -> signature::Result<()>>(
+        &self,
+        f: F,
+        signature: &Signature,
+    ) -> signature::Result<()> {
+        let mut digest = D::default();
+        f(&mut digest)?;
         verify(
             &self.inner,
             &self.prefix,
-            &digest.finalize(),
+            &digest.finalize_fixed(),
             &signature.inner,
         )
         .map_err(|e| e.into())

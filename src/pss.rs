@@ -398,10 +398,13 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         let verifying_key = VerifyingKey::new(pub_key);
 
         for (text, sig, expected) in &tests {
-            let mut digest = Sha1::new();
-            digest.update(text.as_bytes());
-            let result =
-                verifying_key.verify_digest(digest, &Signature::try_from(sig.as_slice()).unwrap());
+            let result = verifying_key.verify_digest(
+                |digest: &mut Sha1| {
+                    digest.update(text.as_bytes());
+                    Ok(())
+                },
+                &Signature::try_from(sig.as_slice()).unwrap(),
+            );
             match expected {
                 true => result.expect("failed to verify"),
                 false => {
@@ -495,14 +498,17 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
-            let mut digest = Sha1::new();
-            digest.update(test.as_bytes());
-            let sig = signing_key.sign_digest_with_rng(&mut rng, digest);
+            let sig = signing_key
+                .sign_digest_with_rng(&mut rng, |digest: &mut Sha1| digest.update(test.as_bytes()));
 
-            let mut digest = Sha1::new();
-            digest.update(test.as_bytes());
             verifying_key
-                .verify_digest(digest, &sig)
+                .verify_digest(
+                    |digest: &mut Sha1| {
+                        digest.update(test.as_bytes());
+                        Ok(())
+                    },
+                    &sig,
+                )
                 .expect("failed to verify");
         }
     }
@@ -517,14 +523,17 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         let verifying_key = signing_key.verifying_key();
 
         for test in &tests {
-            let mut digest = Sha1::new();
-            digest.update(test.as_bytes());
-            let sig = signing_key.sign_digest_with_rng(&mut rng, digest);
+            let sig = signing_key
+                .sign_digest_with_rng(&mut rng, |digest: &mut Sha1| digest.update(test.as_bytes()));
 
-            let mut digest = Sha1::new();
-            digest.update(test.as_bytes());
             verifying_key
-                .verify_digest(digest, &sig)
+                .verify_digest(
+                    |digest: &mut Sha1| {
+                        digest.update(test.as_bytes());
+                        Ok(())
+                    },
+                    &sig,
+                )
                 .expect("failed to verify");
         }
     }
