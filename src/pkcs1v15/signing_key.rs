@@ -3,7 +3,7 @@ use crate::{dummy_rng::DummyRng, Result, RsaPrivateKey};
 use alloc::vec::Vec;
 use const_oid::AssociatedOid;
 use core::marker::PhantomData;
-use digest::Digest;
+use digest::{Digest, FixedOutput, HashMarker, Update};
 use rand_core::{CryptoRng, TryCryptoRng};
 use signature::{
     hazmat::PrehashSigner, DigestSigner, Keypair, MultipartSigner, RandomizedDigestSigner,
@@ -95,10 +95,15 @@ where
 
 impl<D> DigestSigner<D, Signature> for SigningKey<D>
 where
-    D: Digest,
+    D: Default + FixedOutput + HashMarker + Update,
 {
-    fn try_sign_digest(&self, digest: D) -> signature::Result<Signature> {
-        sign::<DummyRng>(None, &self.inner, &self.prefix, &digest.finalize())?
+    fn try_sign_digest<F: Fn(&mut D) -> signature::Result<()>>(
+        &self,
+        f: F,
+    ) -> signature::Result<Signature> {
+        let mut digest = D::default();
+        f(&mut digest)?;
+        sign::<DummyRng>(None, &self.inner, &self.prefix, &digest.finalize_fixed())?
             .as_slice()
             .try_into()
     }
@@ -117,16 +122,26 @@ where
 
 impl<D> RandomizedDigestSigner<D, Signature> for SigningKey<D>
 where
-    D: Digest,
+    D: Default + FixedOutput + HashMarker + Update,
 {
-    fn try_sign_digest_with_rng<R: TryCryptoRng + ?Sized>(
+    fn try_sign_digest_with_rng<
+        R: TryCryptoRng + ?Sized,
+        F: Fn(&mut D) -> signature::Result<()>,
+    >(
         &self,
         rng: &mut R,
-        digest: D,
+        f: F,
     ) -> signature::Result<Signature> {
-        sign(Some(rng), &self.inner, &self.prefix, &digest.finalize())?
-            .as_slice()
-            .try_into()
+        let mut digest = D::default();
+        f(&mut digest)?;
+        sign(
+            Some(rng),
+            &self.inner,
+            &self.prefix,
+            &digest.finalize_fixed(),
+        )?
+        .as_slice()
+        .try_into()
     }
 }
 

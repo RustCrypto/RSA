@@ -1,7 +1,7 @@
 use super::{verify_digest, Signature};
 use crate::RsaPublicKey;
 use core::marker::PhantomData;
-use digest::{Digest, FixedOutputReset};
+use digest::{Digest, FixedOutputReset, Update};
 use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
 
 #[cfg(feature = "encoding")]
@@ -72,9 +72,15 @@ where
 
 impl<D> DigestVerifier<D, Signature> for VerifyingKey<D>
 where
-    D: Digest + FixedOutputReset,
+    D: Digest + FixedOutputReset + Update,
 {
-    fn verify_digest(&self, digest: D, signature: &Signature) -> signature::Result<()> {
+    fn verify_digest<F: Fn(&mut D) -> signature::Result<()>>(
+        &self,
+        f: F,
+        signature: &Signature,
+    ) -> signature::Result<()> {
+        let mut digest = D::new();
+        f(&mut digest)?;
         verify_digest::<D>(
             &self.inner,
             &digest.finalize(),
