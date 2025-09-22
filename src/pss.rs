@@ -517,7 +517,7 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
     }
 
     #[rstest]
-    #[case(                
+    #[case(
         "test\n",
         hex!(
             "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
@@ -525,7 +525,7 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         ),
         true
     )]
-    #[case(                
+    #[case(
         "test\n",
         hex!(
             "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
