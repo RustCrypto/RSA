@@ -138,8 +138,7 @@ dependencies = [
 [[package]]
 name = "crypto-bigint"
 version = "0.7.0-rc.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2966eb7f877e5cdac7e808e71010d0bef6321d58b8e58bf01b8bbbe44f77ea0"
+source = "git+https://github.com/andrewwhitehead/crypto-bigint.git?branch=feat%2Fwrapping-mul-2#025a1d6b4fefb3664819be060240aa47e3d51959"
 dependencies = [
  "num-traits",
  "rand_core",

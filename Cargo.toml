@@ -68,3 +68,6 @@ opt-level = 2
 
 [profile.bench]
 debug = true
+
+[patch.crates-io]
+crypto-bigint = { git = "https://github.com/andrewwhitehead/crypto-bigint.git", branch = "feat/wrapping-mul-2" }
