@@ -258,6 +258,7 @@ mod tests {
         rand_core::{RngCore, SeedableRng},
         ChaCha8Rng,
     };
+    use rstest::rstest;
     use sha1::{Digest, Sha1};
     use sha2::Sha256;
     use sha3::Sha3_256;
@@ -290,35 +291,30 @@ mod tests {
         ).unwrap()
     }
 
-    #[test]
-    fn test_decrypt_pkcs1v15() {
+    #[rstest]
+    #[case(
+        "gIcUIoVkD6ATMBk/u/nlCZCCWRKdkfjCgFdo35VpRXLduiKXhNz1XupLLzTXAybEq15juc+EgY5o0DHv/nt3yg==",
+        "x"
+    )]
+    #[case(
+        "Y7TOCSqofGhkRb+jaVRLzK8xw2cSo1IVES19utzv6hwvx+M8kFsoWQm5DzBeJCZTCVDPkTpavUuEbgp8hnUGDw==",
+        "testing."
+    )]
+    #[case(
+        "arReP9DJtEVyV2Dg3dDp4c/PSk1O6lxkoJ8HcFupoRorBZG+7+1fDAwT1olNddFnQMjmkb8vxwmNMoTAT/BFjQ==",
+        "testing.\n"
+    )]
+    #[case(
+        "WtaBXIoGC54+vH0NH0CHHE+dRDOsMc/6BrfFu2lEqcKL9+uDuWaf+Xj9mrbQCjjZcpQuX733zyok/jsnqe/Ftw==",
+        "01234567890123456789012345678901234567890123456789012"
+    )]
+    fn test_decrypt_pkcs1v15(#[case] ciphertext: &str, #[case] plaintext: &str) {
         let priv_key = get_private_key();
 
-        let tests = [
-            [
-                "gIcUIoVkD6ATMBk/u/nlCZCCWRKdkfjCgFdo35VpRXLduiKXhNz1XupLLzTXAybEq15juc+EgY5o0DHv/nt3yg==",
-                "x",
-            ],
-            [
-                "Y7TOCSqofGhkRb+jaVRLzK8xw2cSo1IVES19utzv6hwvx+M8kFsoWQm5DzBeJCZTCVDPkTpavUuEbgp8hnUGDw==",
-                "testing.",
-            ],
-            [
-                "arReP9DJtEVyV2Dg3dDp4c/PSk1O6lxkoJ8HcFupoRorBZG+7+1fDAwT1olNddFnQMjmkb8vxwmNMoTAT/BFjQ==",
-                "testing.\n",
-            ],
-            [
-                "WtaBXIoGC54+vH0NH0CHHE+dRDOsMc/6BrfFu2lEqcKL9+uDuWaf+Xj9mrbQCjjZcpQuX733zyok/jsnqe/Ftw==",
-                "01234567890123456789012345678901234567890123456789012",
-            ],
-        ];
-
-        for test in &tests {
-            let out = priv_key
-                .decrypt(Pkcs1v15Encrypt, &Base64::decode_vec(test[0]).unwrap())
-                .unwrap();
-            assert_eq!(out, test[1].as_bytes());
-        }
+        let out = priv_key
+            .decrypt(Pkcs1v15Encrypt, &Base64::decode_vec(ciphertext).unwrap())
+            .unwrap();
+        assert_eq!(out, plaintext.as_bytes());
     }
 
     #[test]
@@ -345,36 +341,31 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_decrypt_pkcs1v15_traits() {
+    #[rstest]
+    #[case(
+        "gIcUIoVkD6ATMBk/u/nlCZCCWRKdkfjCgFdo35VpRXLduiKXhNz1XupLLzTXAybEq15juc+EgY5o0DHv/nt3yg==",
+        "x"
+    )]
+    #[case(
+        "Y7TOCSqofGhkRb+jaVRLzK8xw2cSo1IVES19utzv6hwvx+M8kFsoWQm5DzBeJCZTCVDPkTpavUuEbgp8hnUGDw==",
+        "testing."
+    )]
+    #[case(
+        "arReP9DJtEVyV2Dg3dDp4c/PSk1O6lxkoJ8HcFupoRorBZG+7+1fDAwT1olNddFnQMjmkb8vxwmNMoTAT/BFjQ==",
+        "testing.\n"
+    )]
+    #[case(
+        "WtaBXIoGC54+vH0NH0CHHE+dRDOsMc/6BrfFu2lEqcKL9+uDuWaf+Xj9mrbQCjjZcpQuX733zyok/jsnqe/Ftw==",
+        "01234567890123456789012345678901234567890123456789012"
+    )]
+    fn test_decrypt_pkcs1v15_traits(#[case] ciphertext: &str, #[case] plaintext: &str) {
         let priv_key = get_private_key();
         let decrypting_key = DecryptingKey::new(priv_key);
 
-        let tests = [
-            [
-                "gIcUIoVkD6ATMBk/u/nlCZCCWRKdkfjCgFdo35VpRXLduiKXhNz1XupLLzTXAybEq15juc+EgY5o0DHv/nt3yg==",
-                "x",
-            ],
-            [
-                "Y7TOCSqofGhkRb+jaVRLzK8xw2cSo1IVES19utzv6hwvx+M8kFsoWQm5DzBeJCZTCVDPkTpavUuEbgp8hnUGDw==",
-                "testing.",
-            ],
-            [
-                "arReP9DJtEVyV2Dg3dDp4c/PSk1O6lxkoJ8HcFupoRorBZG+7+1fDAwT1olNddFnQMjmkb8vxwmNMoTAT/BFjQ==",
-                "testing.\n",
-            ],
-            [
-                "WtaBXIoGC54+vH0NH0CHHE+dRDOsMc/6BrfFu2lEqcKL9+uDuWaf+Xj9mrbQCjjZcpQuX733zyok/jsnqe/Ftw==",
-                "01234567890123456789012345678901234567890123456789012",
-            ],
-        ];
-
-        for test in &tests {
-            let out = decrypting_key
-                .decrypt(&Base64::decode_vec(test[0]).unwrap())
-                .unwrap();
-            assert_eq!(out, test[1].as_bytes());
-        }
+        let out = decrypting_key
+            .decrypt(&Base64::decode_vec(ciphertext).unwrap())
+            .unwrap();
+        assert_eq!(out, plaintext.as_bytes());
     }
 
     #[test]
@@ -407,261 +398,225 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_sign_pkcs1v15() {
+    #[rstest]
+    #[case("Test.\n", hex!(
+        "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+        "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"))
+    ]
+    fn test_sign_pkcs1v15(#[case] text: &str, #[case] expected: [u8; 64]) {
         let priv_key = get_private_key();
 
-        let tests = [(
-            "Test.\n",
-            hex!(
-                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
-            ),
-        )];
+        let digest = Sha1::digest(text.as_bytes()).to_vec();
 
-        for (text, expected) in &tests {
-            let digest = Sha1::digest(text.as_bytes()).to_vec();
+        let out = priv_key.sign(Pkcs1v15Sign::new::<Sha1>(), &digest).unwrap();
+        assert_ne!(out, digest);
+        assert_eq!(out, expected);
 
-            let out = priv_key.sign(Pkcs1v15Sign::new::<Sha1>(), &digest).unwrap();
-            assert_ne!(out, digest);
-            assert_eq!(out, expected);
-
-            let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = priv_key
-                .sign_with_rng(&mut rng, Pkcs1v15Sign::new::<Sha1>(), &digest)
-                .unwrap();
-            assert_eq!(out2, expected);
-        }
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let out2 = priv_key
+            .sign_with_rng(&mut rng, Pkcs1v15Sign::new::<Sha1>(), &digest)
+            .unwrap();
+        assert_eq!(out2, expected);
     }
 
-    #[test]
-    fn test_sign_pkcs1v15_signer() {
+    #[rstest]
+    #[case("Test.\n", hex!(
+        "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+        "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"))
+    ]
+    fn test_sign_pkcs1v15_signer(#[case] text: &str, #[case] expected: [u8; 64]) {
         let priv_key = get_private_key();
-
-        let tests = [(
-            "Test.\n",
-            hex!(
-                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
-            ),
-        )];
 
         let signing_key = SigningKey::<Sha1>::new(priv_key);
+        let out = signing_key.sign(text.as_bytes()).to_bytes();
+        assert_ne!(out.as_ref(), text.as_bytes());
+        assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
+        assert_eq!(out.as_ref(), expected);
 
-        for (text, expected) in &tests {
-            let out = signing_key.sign(text.as_bytes()).to_bytes();
-            assert_ne!(out.as_ref(), text.as_bytes());
-            assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
-            assert_eq!(out.as_ref(), expected);
-
-            let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = signing_key
-                .sign_with_rng(&mut rng, text.as_bytes())
-                .to_bytes();
-            assert_eq!(out2.as_ref(), expected);
-        }
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let out2 = signing_key
+            .sign_with_rng(&mut rng, text.as_bytes())
+            .to_bytes();
+        assert_eq!(out2.as_ref(), expected);
     }
 
-    #[test]
-    fn test_sign_pkcs1v15_signer_sha2_256() {
+    #[rstest]
+    #[case("Test.\n", hex!(
+        "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
+        "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451b"))
+    ]
+    fn test_sign_pkcs1v15_signer_sha2_256(#[case] text: &str, #[case] expected: [u8; 64]) {
         let priv_key = get_private_key();
-
-        let tests = [(
-            "Test.\n",
-            hex!(
-                "2ffae3f3e130287b3a1dcb320e46f52e8f3f7969b646932273a7e3a6f2a182ea"
-                "02d42875a7ffa4a148aa311f9e4b562e4e13a2223fb15f4e5bf5f2b206d9451b"
-            ),
-        )];
-
         let signing_key = SigningKey::<Sha256>::new(priv_key);
 
-        for (text, expected) in &tests {
-            let out = signing_key.sign(text.as_bytes()).to_bytes();
-            assert_ne!(out.as_ref(), text.as_bytes());
-            assert_eq!(out.as_ref(), expected);
+        let out = signing_key.sign(text.as_bytes()).to_bytes();
+        assert_ne!(out.as_ref(), text.as_bytes());
+        assert_eq!(out.as_ref(), expected);
 
-            let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = signing_key
-                .sign_with_rng(&mut rng, text.as_bytes())
-                .to_bytes();
-            assert_eq!(out2.as_ref(), expected);
-        }
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let out2 = signing_key
+            .sign_with_rng(&mut rng, text.as_bytes())
+            .to_bytes();
+        assert_eq!(out2.as_ref(), expected);
     }
 
-    #[test]
-    fn test_sign_pkcs1v15_signer_sha3_256() {
+    #[rstest]
+    #[case("Test.\n", hex!(
+        "55e9fba3354dfb51d2c8111794ea552c86afc2cab154652c03324df8c2c51ba7"
+        "2ff7c14de59a6f9ba50d90c13a7537cc3011948369f1f0ec4a49d21eb7e723f9"))
+    ]
+    fn test_sign_pkcs1v15_signer_sha3_256(#[case] text: &str, #[case] expected: [u8; 64]) {
         let priv_key = get_private_key();
-
-        let tests = [(
-            "Test.\n",
-            hex!(
-                "55e9fba3354dfb51d2c8111794ea552c86afc2cab154652c03324df8c2c51ba7"
-                "2ff7c14de59a6f9ba50d90c13a7537cc3011948369f1f0ec4a49d21eb7e723f9"
-            ),
-        )];
-
         let signing_key = SigningKey::<Sha3_256>::new(priv_key);
 
-        for (text, expected) in &tests {
-            let out = signing_key.sign(text.as_bytes()).to_bytes();
-            assert_ne!(out.as_ref(), text.as_bytes());
-            assert_eq!(out.as_ref(), expected);
+        let out = signing_key.sign(text.as_bytes()).to_bytes();
+        assert_ne!(out.as_ref(), text.as_bytes());
+        assert_eq!(out.as_ref(), expected);
 
-            let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = signing_key
-                .sign_with_rng(&mut rng, text.as_bytes())
-                .to_bytes();
-            assert_eq!(out2.as_ref(), expected);
-        }
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let out2 = signing_key
+            .sign_with_rng(&mut rng, text.as_bytes())
+            .to_bytes();
+        assert_eq!(out2.as_ref(), expected);
     }
 
-    #[test]
-    fn test_sign_pkcs1v15_digest_signer() {
+    #[rstest]
+    #[case(
+        "Test.\n", 
+        hex!(
+            "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+            "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+        )
+    )]
+    fn test_sign_pkcs1v15_digest_signer(#[case] text: &str, #[case] expected: [u8; 64]) {
         let priv_key = get_private_key();
-
-        let tests = [(
-            "Test.\n",
-            hex!(
-                "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
-            ),
-        )];
-
         let signing_key = SigningKey::new(priv_key);
 
-        for (text, expected) in &tests {
-            let mut digest = Sha1::new();
-            digest.update(text.as_bytes());
-            let out = signing_key
-                .sign_digest(|digest: &mut Sha1| digest.update(text.as_bytes()))
-                .to_bytes();
-            assert_ne!(out.as_ref(), text.as_bytes());
-            assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
-            assert_eq!(out.as_ref(), expected);
+        let mut digest = Sha1::new();
+        digest.update(text.as_bytes());
+        let out = signing_key
+            .sign_digest(|digest: &mut Sha1| digest.update(text.as_bytes()))
+            .to_bytes();
+        assert_ne!(out.as_ref(), text.as_bytes());
+        assert_ne!(out.as_ref(), &Sha1::digest(text.as_bytes()).to_vec());
+        assert_eq!(out.as_ref(), expected);
 
-            let mut rng = ChaCha8Rng::from_seed([42; 32]);
-            let out2 = signing_key
-                .sign_digest_with_rng(&mut rng, |digest: &mut Sha1| digest.update(text.as_bytes()))
-                .to_bytes();
-            assert_eq!(out2.as_ref(), expected);
-        }
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let out2 = signing_key
+            .sign_digest_with_rng(&mut rng, |digest: &mut Sha1| digest.update(text.as_bytes()))
+            .to_bytes();
+        assert_eq!(out2.as_ref(), expected);
     }
 
-    #[test]
-    fn test_verify_pkcs1v15() {
+    #[rstest]
+    #[case(
+        "Test.\n",
+        hex!(
+            "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+            "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+        ),
+        true
+    )]
+    #[case(
+        "Test.\n",
+        hex!(
+            "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+            "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
+        ),
+        false
+    )]
+    fn test_verify_pkcs1v15(#[case] text: &str, #[case] sig: [u8; 64], #[case] expected: bool) {
         let priv_key = get_private_key();
-
-        let tests = [
-            (
-                "Test.\n",
-                hex!(
-                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
-                ),
-                true,
-            ),
-            (
-                "Test.\n",
-                hex!(
-                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
-                ),
-                false,
-            ),
-        ];
         let pub_key: RsaPublicKey = priv_key.into();
 
-        for (text, sig, expected) in &tests {
-            let digest = Sha1::digest(text.as_bytes()).to_vec();
+        let digest = Sha1::digest(text.as_bytes()).to_vec();
 
-            let result = pub_key.verify(Pkcs1v15Sign::new::<Sha1>(), &digest, sig);
-            match expected {
-                true => result.expect("failed to verify"),
-                false => {
-                    result.expect_err("expected verifying error");
-                }
+        let result = pub_key.verify(Pkcs1v15Sign::new::<Sha1>(), &digest, &sig);
+        match expected {
+            true => result.expect("failed to verify"),
+            false => {
+                result.expect_err("expected verifying error");
             }
         }
     }
 
-    #[test]
-    fn test_verify_pkcs1v15_signer() {
+    #[rstest]
+    #[case(
+        "Test.\n",
+        hex!(
+            "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+            "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+        ),
+        true
+    )]
+    #[case(
+        "Test.\n",
+        hex!(
+            "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+            "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
+        ),
+        false
+    )]
+    fn test_verify_pkcs1v15_signer(
+        #[case] text: &str,
+        #[case] sig: [u8; 64],
+        #[case] expected: bool,
+    ) {
         let priv_key = get_private_key();
 
-        let tests = [
-            (
-                "Test.\n",
-                hex!(
-                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
-                ),
-                true,
-            ),
-            (
-                "Test.\n",
-                hex!(
-                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
-                ),
-                false,
-            ),
-        ];
         let pub_key: RsaPublicKey = priv_key.into();
         let verifying_key = VerifyingKey::<Sha1>::new(pub_key);
 
-        for (text, sig, expected) in &tests {
-            let result = verifying_key.verify(
-                text.as_bytes(),
-                &Signature::try_from(sig.as_slice()).unwrap(),
-            );
-            match expected {
-                true => result.expect("failed to verify"),
-                false => {
-                    result.expect_err("expected verifying error");
-                }
+        let result = verifying_key.verify(
+            text.as_bytes(),
+            &Signature::try_from(sig.as_slice()).unwrap(),
+        );
+        match expected {
+            true => result.expect("failed to verify"),
+            false => {
+                result.expect_err("expected verifying error");
             }
         }
     }
 
-    #[test]
-    fn test_verify_pkcs1v15_digest_signer() {
+    #[rstest]
+    #[case(
+        "Test.\n",
+        hex!(
+            "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+            "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
+        ),
+        true
+    )]
+    #[case(
+        "Test.\n",
+        hex!(
+            "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
+            "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
+        ),
+        false
+    )]
+    fn test_verify_pkcs1v15_digest_signer(
+        #[case] text: &str,
+        #[case] sig: [u8; 64],
+        #[case] expected: bool,
+    ) {
         let priv_key = get_private_key();
 
-        let tests = [
-            (
-                "Test.\n",
-                hex!(
-                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362ae"
-                ),
-                true,
-            ),
-            (
-                "Test.\n",
-                hex!(
-                    "a4f3fa6ea93bcdd0c57be020c1193ecbfd6f200a3d95c409769b029578fa0e33"
-                    "6ad9a347600e40d3ae823b8c7e6bad88cc07c1d54c3a1523cbbb6d58efc362af"
-                ),
-                false,
-            ),
-        ];
         let pub_key: RsaPublicKey = priv_key.into();
         let verifying_key = VerifyingKey::new(pub_key);
 
-        for (text, sig, expected) in &tests {
-            let result = verifying_key.verify_digest(
-                |digest: &mut Sha1| {
-                    digest.update(text.as_bytes());
-                    Ok(())
-                },
-                &Signature::try_from(sig.as_slice()).unwrap(),
-            );
-            match expected {
-                true => result.expect("failed to verify"),
-                false => {
-                    result.expect_err("expected verifying error");
-                }
+        let result = verifying_key.verify_digest(
+            |digest: &mut Sha1| {
+                digest.update(text.as_bytes());
+                Ok(())
+            },
+            &Signature::try_from(sig.as_slice()).unwrap(),
+        );
+        match expected {
+            true => result.expect("failed to verify"),
+            false => {
+                result.expect_err("expected verifying error");
             }
         }
     }

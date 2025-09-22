@@ -266,6 +266,7 @@ mod test {
     use hex_literal::hex;
     use pkcs1::DecodeRsaPrivateKey;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+    use rstest::rstest;
     use sha1::{Digest, Sha1};
     use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
     use signature::{DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, Verifier};
@@ -296,321 +297,293 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         RsaPrivateKey::from_pkcs1_pem(pem).unwrap()
     }
 
-    #[test]
-    fn test_verify_pss() {
+    #[rstest]
+    #[case(
+        "test\n",
+        hex!(
+            "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+            "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
+        ),
+        true,
+    )]
+    #[case(
+        "test\n",
+        hex!(
+            "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+            "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
+        ),
+        false,
+    )]
+    fn test_verify_pss(#[case] text: &str, #[case] sig: [u8; 64], #[case] expected: bool) {
         let priv_key = get_private_key();
-
-        let tests = [
-            (
-                "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
-                ),
-                true,
-            ),
-            (
-                "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
-                ),
-                false,
-            ),
-        ];
         let pub_key: RsaPublicKey = priv_key.into();
 
-        for (text, sig, expected) in &tests {
-            let digest = Sha1::digest(text.as_bytes()).to_vec();
-            let result = pub_key.verify(Pss::new::<Sha1>(), &digest, sig);
+        let digest = Sha1::digest(text.as_bytes()).to_vec();
+        let result = pub_key.verify(Pss::new::<Sha1>(), &digest, &sig);
 
-            match expected {
-                true => result.expect("failed to verify"),
-                false => {
-                    result.expect_err("expected verifying error");
-                }
+        match expected {
+            true => result.expect("failed to verify"),
+            false => {
+                result.expect_err("expected verifying error");
             }
         }
     }
 
-    #[test]
-    fn test_verify_pss_signer() {
+    #[rstest]
+    #[case(
+        "test\n",
+        hex!(
+            "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+            "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
+        ),
+        true,
+    )]
+    #[case(
+        "test\n",
+        hex!(
+            "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+            "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
+        ),
+        false,
+    )]
+    fn test_verify_pss_signer(#[case] text: &str, #[case] sig: [u8; 64], #[case] expected: bool) {
         let priv_key = get_private_key();
-
-        let tests = [
-            (
-                "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
-                ),
-                true,
-            ),
-            (
-                "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
-                ),
-                false,
-            ),
-        ];
         let pub_key: RsaPublicKey = priv_key.into();
         let verifying_key: VerifyingKey<Sha1> = VerifyingKey::new(pub_key);
 
-        for (text, sig, expected) in &tests {
-            let result = verifying_key.verify(
-                text.as_bytes(),
-                &Signature::try_from(sig.as_slice()).unwrap(),
-            );
-            match expected {
-                true => result.expect("failed to verify"),
-                false => {
-                    result.expect_err("expected verifying error");
-                }
+        let result = verifying_key.verify(
+            text.as_bytes(),
+            &Signature::try_from(sig.as_slice()).unwrap(),
+        );
+        match expected {
+            true => result.expect("failed to verify"),
+            false => {
+                result.expect_err("expected verifying error");
             }
         }
     }
 
-    #[test]
-    fn test_verify_pss_digest_signer() {
+    #[rstest]
+    #[case(
+        "test\n",
+        hex!(
+            "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+            "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
+        ),
+        true,
+    )]
+    #[case(
+        "test\n",
+        hex!(
+            "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+            "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
+        ),
+        false,
+    )]
+    fn test_verify_pss_digest_signer(
+        #[case] text: &str,
+        #[case] sig: [u8; 64],
+        #[case] expected: bool,
+    ) {
         let priv_key = get_private_key();
-
-        let tests = [
-            (
-                "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
-                ),
-                true,
-            ),
-            (
-                "test\n",
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
-                ),
-                false,
-            ),
-        ];
         let pub_key: RsaPublicKey = priv_key.into();
         let verifying_key = VerifyingKey::new(pub_key);
 
-        for (text, sig, expected) in &tests {
-            let result = verifying_key.verify_digest(
-                |digest: &mut Sha1| {
-                    digest.update(text.as_bytes());
-                    Ok(())
-                },
-                &Signature::try_from(sig.as_slice()).unwrap(),
-            );
-            match expected {
-                true => result.expect("failed to verify"),
-                false => {
-                    result.expect_err("expected verifying error");
-                }
+        let result = verifying_key.verify_digest(
+            |digest: &mut Sha1| {
+                digest.update(text.as_bytes());
+                Ok(())
+            },
+            &Signature::try_from(sig.as_slice()).unwrap(),
+        );
+        match expected {
+            true => result.expect("failed to verify"),
+            false => {
+                result.expect_err("expected verifying error");
             }
         }
     }
 
-    #[test]
-    fn test_sign_and_verify_roundtrip() {
+    #[rstest]
+    #[case("test\n")]
+    fn test_sign_and_verify_roundtrip(#[case] test: &str) {
         let priv_key = get_private_key();
 
-        let tests = ["test\n"];
         let rng = ChaCha8Rng::from_seed([42; 32]);
 
-        for test in &tests {
-            let digest = Sha1::digest(test.as_bytes()).to_vec();
-            let sig = priv_key
-                .sign_with_rng(&mut rng.clone(), Pss::new::<Sha1>(), &digest)
-                .expect("failed to sign");
+        let digest = Sha1::digest(test.as_bytes()).to_vec();
+        let sig = priv_key
+            .sign_with_rng(&mut rng.clone(), Pss::new::<Sha1>(), &digest)
+            .expect("failed to sign");
 
-            priv_key
-                .to_public_key()
-                .verify(Pss::new::<Sha1>(), &digest, &sig)
-                .expect("failed to verify");
-        }
+        priv_key
+            .to_public_key()
+            .verify(Pss::new::<Sha1>(), &digest, &sig)
+            .expect("failed to verify");
     }
 
-    #[test]
-    fn test_sign_blinded_and_verify_roundtrip() {
+    #[rstest]
+    #[case("test\n")]
+    fn test_sign_blinded_and_verify_roundtrip(#[case] test: &str) {
         let priv_key = get_private_key();
 
-        let tests = ["test\n"];
         let rng = ChaCha8Rng::from_seed([42; 32]);
 
-        for test in &tests {
-            let digest = Sha1::digest(test.as_bytes()).to_vec();
-            let sig = priv_key
-                .sign_with_rng(&mut rng.clone(), Pss::new_blinded::<Sha1>(), &digest)
-                .expect("failed to sign");
+        let digest = Sha1::digest(test.as_bytes()).to_vec();
+        let sig = priv_key
+            .sign_with_rng(&mut rng.clone(), Pss::new_blinded::<Sha1>(), &digest)
+            .expect("failed to sign");
 
-            priv_key
-                .to_public_key()
-                .verify(Pss::new::<Sha1>(), &digest, &sig)
-                .expect("failed to verify");
-        }
+        priv_key
+            .to_public_key()
+            .verify(Pss::new::<Sha1>(), &digest, &sig)
+            .expect("failed to verify");
     }
 
-    #[test]
-    fn test_sign_and_verify_roundtrip_signer() {
+    #[rstest]
+    #[case("test\n")]
+    fn test_sign_and_verify_roundtrip_signer(#[case] test: &str) {
         let priv_key = get_private_key();
 
-        let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = SigningKey::<Sha1>::new(priv_key);
         let verifying_key = signing_key.verifying_key();
 
-        for test in &tests {
-            let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
-            verifying_key
-                .verify(test.as_bytes(), &sig)
-                .expect("failed to verify");
-        }
+        let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
+        verifying_key
+            .verify(test.as_bytes(), &sig)
+            .expect("failed to verify");
     }
 
-    #[test]
-    fn test_sign_and_verify_roundtrip_blinded_signer() {
+    #[rstest]
+    #[case("test\n")]
+    fn test_sign_and_verify_roundtrip_blinded_signer(#[case] test: &str) {
         let priv_key = get_private_key();
 
-        let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
         let verifying_key = signing_key.verifying_key();
 
-        for test in &tests {
-            let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
-            verifying_key
-                .verify(test.as_bytes(), &sig)
-                .expect("failed to verify");
-        }
+        let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
+        verifying_key
+            .verify(test.as_bytes(), &sig)
+            .expect("failed to verify");
     }
 
-    #[test]
-    fn test_sign_and_verify_roundtrip_digest_signer() {
+    #[rstest]
+    #[case("test\n")]
+    fn test_sign_and_verify_roundtrip_digest_signer(#[case] test: &str) {
         let priv_key = get_private_key();
 
-        let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = SigningKey::new(priv_key);
         let verifying_key = signing_key.verifying_key();
 
-        for test in &tests {
-            let sig = signing_key
-                .sign_digest_with_rng(&mut rng, |digest: &mut Sha1| digest.update(test.as_bytes()));
+        let sig = signing_key
+            .sign_digest_with_rng(&mut rng, |digest: &mut Sha1| digest.update(test.as_bytes()));
 
-            verifying_key
-                .verify_digest(
-                    |digest: &mut Sha1| {
-                        digest.update(test.as_bytes());
-                        Ok(())
-                    },
-                    &sig,
-                )
-                .expect("failed to verify");
-        }
+        verifying_key
+            .verify_digest(
+                |digest: &mut Sha1| {
+                    digest.update(test.as_bytes());
+                    Ok(())
+                },
+                &sig,
+            )
+            .expect("failed to verify");
     }
 
-    #[test]
-    fn test_sign_and_verify_roundtrip_blinded_digest_signer() {
+    #[rstest]
+    #[case("test\n")]
+    fn test_sign_and_verify_roundtrip_blinded_digest_signer(#[case] test: &str) {
         let priv_key = get_private_key();
 
-        let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
         let verifying_key = signing_key.verifying_key();
 
-        for test in &tests {
-            let sig = signing_key
-                .sign_digest_with_rng(&mut rng, |digest: &mut Sha1| digest.update(test.as_bytes()));
+        let sig = signing_key
+            .sign_digest_with_rng(&mut rng, |digest: &mut Sha1| digest.update(test.as_bytes()));
 
-            verifying_key
-                .verify_digest(
-                    |digest: &mut Sha1| {
-                        digest.update(test.as_bytes());
-                        Ok(())
-                    },
-                    &sig,
-                )
-                .expect("failed to verify");
-        }
+        verifying_key
+            .verify_digest(
+                |digest: &mut Sha1| {
+                    digest.update(test.as_bytes());
+                    Ok(())
+                },
+                &sig,
+            )
+            .expect("failed to verify");
     }
 
-    #[test]
-    fn test_verify_pss_hazmat() {
+    #[rstest]
+    #[case(                
+        "test\n",
+        hex!(
+            "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+            "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
+        ),
+        true
+    )]
+    #[case(                
+        "test\n",
+        hex!(
+            "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
+            "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
+        ),
+        false
+    )]
+    fn test_verify_pss_hazmat(#[case] text: &str, #[case] sig: [u8; 64], #[case] expected: bool) {
+        let text = Sha1::digest(text);
         let priv_key = get_private_key();
 
-        let tests = [
-            (
-                Sha1::digest("test\n"),
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962f"
-                ),
-                true,
-            ),
-            (
-                Sha1::digest("test\n"),
-                hex!(
-                    "6f86f26b14372b2279f79fb6807c49889835c204f71e38249b4c5601462da8ae"
-                    "30f26ffdd9c13f1c75eee172bebe7b7c89f2f1526c722833b9737d6c172a962e"
-                ),
-                false,
-            ),
-        ];
         let pub_key: RsaPublicKey = priv_key.into();
         let verifying_key = VerifyingKey::<Sha1>::new(pub_key);
 
-        for (text, sig, expected) in &tests {
-            let result = verifying_key
-                .verify_prehash(text.as_ref(), &Signature::try_from(sig.as_slice()).unwrap());
-            match expected {
-                true => result.expect("failed to verify"),
-                false => {
-                    result.expect_err("expected verifying error");
-                }
+        let result = verifying_key
+            .verify_prehash(text.as_ref(), &Signature::try_from(sig.as_slice()).unwrap());
+        match expected {
+            true => result.expect("failed to verify"),
+            false => {
+                result.expect_err("expected verifying error");
             }
         }
     }
 
-    #[test]
-    fn test_sign_and_verify_pss_hazmat() {
+    #[rstest]
+    #[case("test\n")]
+    fn test_sign_and_verify_pss_hazmat(#[case] test: &str) {
+        let test = &Sha1::digest(test);
         let priv_key = get_private_key();
 
-        let tests = [Sha1::digest("test\n")];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = SigningKey::<Sha1>::new(priv_key);
         let verifying_key = signing_key.verifying_key();
 
-        for test in &tests {
-            let sig = signing_key
-                .sign_prehash_with_rng(&mut rng, test)
-                .expect("failed to sign");
-            verifying_key
-                .verify_prehash(test, &sig)
-                .expect("failed to verify");
-        }
+        let sig = signing_key
+            .sign_prehash_with_rng(&mut rng, test)
+            .expect("failed to sign");
+        verifying_key
+            .verify_prehash(test, &sig)
+            .expect("failed to verify");
     }
 
-    #[test]
-    fn test_sign_and_verify_pss_blinded_hazmat() {
+    #[rstest]
+    #[case("test\n")]
+    fn test_sign_and_verify_pss_blinded_hazmat(#[case] test: &str) {
         let priv_key = get_private_key();
 
-        let tests = [Sha1::digest("test\n")];
+        let test = &Sha1::digest(test);
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let signing_key = BlindedSigningKey::<Sha1>::new(priv_key);
         let verifying_key = signing_key.verifying_key();
 
-        for test in &tests {
-            let sig = signing_key
-                .sign_prehash_with_rng(&mut rng, test)
-                .expect("failed to sign");
-            verifying_key
-                .verify_prehash(test, &sig)
-                .expect("failed to verify");
-        }
+        let sig = signing_key
+            .sign_prehash_with_rng(&mut rng, test)
+            .expect("failed to sign");
+        verifying_key
+            .verify_prehash(test, &sig)
+            .expect("failed to verify");
     }
 
     #[test]
@@ -634,13 +607,13 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         }
     }
 
-    #[test]
     // Tests the case where the salt length used for signing differs from the default length
     // while the verifier uses auto-detection.
-    fn test_sign_and_verify_pss_differing_salt_len() {
+    #[rstest]
+    #[case("test\n")]
+    fn test_sign_and_verify_pss_differing_salt_len(#[case] test: &str) {
         let priv_key = get_private_key();
 
-        let tests = ["test\n"];
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
 
         // signing keys using different salt lengths
@@ -659,13 +632,11 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         // verifying key uses default salt length strategy
         let verifying_key = VerifyingKey::<Sha1>::new_with_auto_salt_len(priv_key.to_public_key());
 
-        for test in tests {
-            for signing_key in &signing_keys {
-                let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
-                verifying_key
-                    .verify(test.as_bytes(), &sig)
-                    .expect("verification to succeed");
-            }
+        for signing_key in &signing_keys {
+            let sig = signing_key.sign_with_rng(&mut rng, test.as_bytes());
+            verifying_key
+                .verify(test.as_bytes(), &sig)
+                .expect("verification to succeed");
         }
     }
 }

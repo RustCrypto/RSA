@@ -30,6 +30,7 @@ sha1 = { version = "0.11.0-rc.2", optional = true, default-features = false, fea
 spki = { version = "0.8.0-rc.4", optional = true, default-features = false, features = ["alloc"] }
 sha2 = { version = "0.11.0-rc.2", optional = true, default-features = false, features = ["oid"] }
 serde = { version = "1.0.184", optional = true, default-features = false, features = ["derive"] }
+rstest = "0.26.1"
 
 [dev-dependencies]
 base64ct = { version = "1", features = ["alloc"] }
