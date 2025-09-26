@@ -54,12 +54,6 @@ checksum = "c08606f8c3cbf4ce6ec8e28fb0014a2c086708fe954eaa885384a6165172e7e8"
 
 [[package]]
 name = "base16ct"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c7f02d4ea65f2c1853089ffd8d2787bdbc63de2f0d29dedbcf8ccdfa0ccd4cf"
-
-[[package]]
-name = "base16ct"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8b59d472eab27ade8d770dcb11da7201c11234bef9f82ce7aa517be028d462b"
@@ -158,7 +152,7 @@ checksum = "e0bfcfbe68dec4e49b4e93da8f091ce39556549554905fcb07308f6eeefae46c"
 dependencies = [
  "num-traits",
  "rand_core",
- "serdect 0.4.1",
+ "serdect",
  "subtle",
  "zeroize",
 ]
@@ -676,7 +670,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_test",
- "serdect 0.3.0",
+ "serdect",
  "sha1",
  "sha2",
  "sha3",
@@ -836,21 +830,11 @@ dependencies = [
 
 [[package]]
 name = "serdect"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f42f67da2385b51a5f9652db9c93d78aeaf7610bf5ec366080b6de810604af53"
-dependencies = [
- "base16ct 0.2.0",
- "serde",
-]
-
-[[package]]
-name = "serdect"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3ef0e35b322ddfaecbc60f34ab448e157e48531288ee49fafbb053696b8ffe2"
 dependencies = [
- "base16ct 0.3.0",
+ "base16ct",
  "serde",
 ]
 
