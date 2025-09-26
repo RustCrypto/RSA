@@ -46,6 +46,7 @@ sha3 = { version = "0.11.0-rc.2", default-features = false, features = ["oid"] }
 hex = { version = "0.4.3", features = ["serde"] }
 serde_json = "1.0.138"
 serde = { version = "1.0.184", features = ["derive"] }
+rstest = "0.26.1"
 
 [[bench]]
 name = "key"
