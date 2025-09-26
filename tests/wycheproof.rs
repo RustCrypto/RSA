@@ -149,7 +149,9 @@ impl Drop for Summary {
 // #[case("rsa_signature_8192_sha512_test.json")] TODO: needs disabling of maxsize
 fn test_rsa_pkcs1_verify(#[case] file: &str) {
     let path = format!("thirdparty/wycheproof/testvectors_v1/{file}");
-    let data_file = File::open(&path).expect("failed to open data file");
+    let data_file = File::open(&path)
+        .expect("failed to open data file (try running `git submodule update --init`)");
+
     println!("Loading file: {path}");
 
     let tests: TestFile = serde_json::from_reader(data_file).expect("invalid test JSON");
@@ -203,7 +205,9 @@ fn test_rsa_pkcs1_verify(#[case] file: &str) {
 #[case("rsa_pss_misc_test.json")]
 fn test_rsa_pss_verify(#[case] file: &str) {
     let path = format!("thirdparty/wycheproof/testvectors_v1/{file}");
-    let data_file = File::open(&path).expect("failed to open data file");
+    let data_file = File::open(&path)
+        .expect("failed to open data file (try running `git submodule update --init`)");
+
     println!("Loading file: {path}");
 
     let tests: TestFile = serde_json::from_reader(data_file).expect("invalid test JSON");
