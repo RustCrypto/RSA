@@ -372,7 +372,7 @@ where
     let h0 = hash.finalize_reset();
 
     // 14. If H = H', output "consistent." Otherwise, output "inconsistent."
-    if (salt_valid & h0.ct_eq(h)).into() {
+    if (salt_valid & h0.as_slice().ct_eq(h)).into() {
         Ok(())
     } else {
         Err(Error::Verification)
