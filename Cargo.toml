@@ -20,7 +20,7 @@ digest = { version = "0.11.0-rc.1", default-features = false, features = ["alloc
 rand_core = { version = "0.9", default-features = false }
 signature = { version = "3.0.0-rc.4", default-features = false, features = ["alloc", "digest", "rand_core"] }
 subtle = { version = "2.6.1", default-features = false }
-zeroize = { version = "1.5", features = ["alloc"] }
+zeroize = { version = "1.8", features = ["alloc"] }
 
 # optional dependencies
 pkcs1 = { version = "0.8.0-rc.3", optional = true, default-features = false, features = ["alloc", "pem"] }
