@@ -465,6 +465,13 @@ impl RsaPrivateKey {
         Self::from_components(n.get(), public_exponent, d, primes)
     }
 
+    /// Get the public key from the private key.
+    ///
+    /// Specific alternative to [`AsRef::as_ref`].
+    pub fn as_public_key(&self) -> &RsaPublicKey {
+        &self.pubkey_components
+    }
+
     /// Get the public key from the private key, cloning `n` and `e`.
     ///
     /// Generally this is not needed since `RsaPrivateKey` implements the `PublicKey` trait,
