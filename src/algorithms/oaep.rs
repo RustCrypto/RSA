@@ -3,7 +3,7 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use digest::{Digest, DynDigest, FixedOutputReset};
+use digest::{Digest, FixedOutputReset};
 use rand_core::TryCryptoRng;
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use zeroize::Zeroizing;
@@ -57,22 +57,27 @@ fn encrypt_internal<R: TryCryptoRng + ?Sized, MGF: FnMut(&mut [u8], &mut [u8])>(
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-pub(crate) fn oaep_encrypt<R: TryCryptoRng + ?Sized>(
+pub(crate) fn oaep_encrypt<R, D, MGD>(
     rng: &mut R,
     msg: &[u8],
-    digest: &mut dyn DynDigest,
-    mgf_digest: &mut dyn DynDigest,
+    digest: &mut D,
+    mgf_digest: &mut MGD,
     label: Option<Box<[u8]>>,
     k: usize,
-) -> Result<Zeroizing<Vec<u8>>> {
-    let h_size = digest.output_size();
+) -> Result<Zeroizing<Vec<u8>>>
+where
+    R: TryCryptoRng + ?Sized,
+    D: Digest + FixedOutputReset,
+    MGD: Digest + FixedOutputReset,
+{
+    let h_size = <D as Digest>::output_size();
 
     let label = label.unwrap_or_default();
     if label.len() as u64 >= MAX_LABEL_LEN {
         return Err(Error::LabelTooLong);
     }
 
-    digest.update(&label);
+    Digest::update(digest, &label);
     let p_hash = digest.finalize_reset();
 
     encrypt_internal(rng, msg, &p_hash, h_size, k, |seed, db| {
@@ -89,16 +94,17 @@ pub(crate) fn oaep_encrypt<R: TryCryptoRng + ?Sized>(
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-pub(crate) fn oaep_encrypt_digest<
-    R: TryCryptoRng + ?Sized,
-    D: Digest,
-    MGD: Digest + FixedOutputReset,
->(
+pub(crate) fn oaep_encrypt_digest<R, D, MGD>(
     rng: &mut R,
     msg: &[u8],
     label: Option<Box<[u8]>>,
     k: usize,
-) -> Result<Zeroizing<Vec<u8>>> {
+) -> Result<Zeroizing<Vec<u8>>>
+where
+    R: TryCryptoRng + ?Sized,
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+{
     let h_size = <D as Digest>::output_size();
 
     let label = label.unwrap_or_default();
@@ -126,21 +132,25 @@ pub(crate) fn oaep_encrypt_digest<
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-pub(crate) fn oaep_decrypt(
+pub(crate) fn oaep_decrypt<D, MGD>(
     em: &mut [u8],
-    digest: &mut dyn DynDigest,
-    mgf_digest: &mut dyn DynDigest,
+    digest: &mut D,
+    mgf_digest: &mut MGD,
     label: Option<Box<[u8]>>,
     k: usize,
-) -> Result<Vec<u8>> {
-    let h_size = digest.output_size();
+) -> Result<Vec<u8>>
+where
+    D: Digest + FixedOutputReset,
+    MGD: Digest + FixedOutputReset,
+{
+    let h_size = <D as Digest>::output_size();
 
     let label = label.unwrap_or_default();
     if label.len() as u64 >= MAX_LABEL_LEN {
         return Err(Error::Decryption);
     }
 
-    digest.update(&label);
+    Digest::update(digest, &label);
 
     let expected_p_hash = digest.finalize_reset();
 
@@ -168,11 +178,15 @@ pub(crate) fn oaep_decrypt(
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-pub(crate) fn oaep_decrypt_digest<D: Digest, MGD: Digest + FixedOutputReset>(
+pub(crate) fn oaep_decrypt_digest<D, MGD>(
     em: &mut [u8],
     label: Option<Box<[u8]>>,
     k: usize,
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>>
+where
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+{
     let h_size = <D as Digest>::output_size();
 
     let label = label.unwrap_or_default();

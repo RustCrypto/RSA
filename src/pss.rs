@@ -19,11 +19,11 @@ pub use self::{
     verifying_key::VerifyingKey,
 };
 
-use alloc::{boxed::Box, vec::Vec};
+use alloc::vec::Vec;
 use core::fmt::{self, Debug};
 use crypto_bigint::BoxedUint;
 
-use digest::{Digest, DynDigest, FixedOutputReset};
+use digest::{Digest, FixedOutputReset};
 use rand_core::TryCryptoRng;
 
 use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
@@ -43,54 +43,67 @@ use {
 };
 
 /// Digital signatures using PSS padding.
-pub struct Pss {
+pub struct Pss<D> {
     /// Create blinded signatures.
     pub blinded: bool,
 
     /// Digest type to use.
-    pub digest: Box<dyn DynDigest + Send + Sync>,
+    pub digest: D,
 
     /// Salt length.
     /// Required for signing, optional for verifying.
     pub salt_len: Option<usize>,
 }
 
-impl Pss {
+impl<D> Default for Pss<D>
+where
+    D: Digest,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<D> Pss<D>
+where
+    D: Digest,
+{
     /// New PSS padding for the given digest.
     /// Digest output size is used as a salt length.
-    pub fn new<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
-        Self::new_with_salt::<T>(<T as Digest>::output_size())
+    pub fn new() -> Self {
+        Self::new_with_salt(<D as Digest>::output_size())
     }
 
     /// New PSS padding for the given digest with a salt value of the given length.
-    pub fn new_with_salt<T: 'static + Digest + DynDigest + Send + Sync>(len: usize) -> Self {
+    pub fn new_with_salt(len: usize) -> Self {
         Self {
             blinded: false,
-            digest: Box::new(T::new()),
+            digest: D::new(),
             salt_len: Some(len),
         }
     }
 
     /// New PSS padding for blinded signatures (RSA-BSSA) for the given digest.
     /// Digest output size is used as a salt length.
-    pub fn new_blinded<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
-        Self::new_blinded_with_salt::<T>(<T as Digest>::output_size())
+    pub fn new_blinded() -> Self {
+        Self::new_blinded_with_salt(<D as Digest>::output_size())
     }
 
     /// New PSS padding for blinded signatures (RSA-BSSA) for the given digest
     /// with a salt value of the given length.
-    pub fn new_blinded_with_salt<T: 'static + Digest + DynDigest + Send + Sync>(
-        len: usize,
-    ) -> Self {
+    pub fn new_blinded_with_salt(len: usize) -> Self {
         Self {
             blinded: true,
-            digest: Box::new(T::new()),
+            digest: D::new(),
             salt_len: Some(len),
         }
     }
 }
 
-impl SignatureScheme for Pss {
+impl<D> SignatureScheme for Pss<D>
+where
+    D: Digest + FixedOutputReset,
+{
     fn sign<Rng: TryCryptoRng + ?Sized>(
         mut self,
         rng: Option<&mut Rng>,
@@ -103,7 +116,7 @@ impl SignatureScheme for Pss {
             priv_key,
             hashed,
             self.salt_len.expect("salt_len to be Some"),
-            &mut *self.digest,
+            &mut self.digest,
         )
     }
 
@@ -113,13 +126,13 @@ impl SignatureScheme for Pss {
             hashed,
             &BoxedUint::from_be_slice_vartime(sig),
             sig.len(),
-            &mut *self.digest,
+            &mut self.digest,
             self.salt_len,
         )
     }
 }
 
-impl Debug for Pss {
+impl<D> Debug for Pss<D> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("PSS")
             .field("blinded", &self.blinded)
@@ -129,14 +142,17 @@ impl Debug for Pss {
     }
 }
 
-pub(crate) fn verify(
+pub(crate) fn verify<D>(
     pub_key: &RsaPublicKey,
     hashed: &[u8],
     sig: &BoxedUint,
     sig_len: usize,
-    digest: &mut dyn DynDigest,
+    digest: &mut D,
     salt_len: Option<usize>,
-) -> Result<()> {
+) -> Result<()>
+where
+    D: Digest + FixedOutputReset,
+{
     if sig_len != pub_key.size() {
         return Err(Error::Verification);
     }
@@ -170,27 +186,35 @@ where
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. The opts argument may be nil, in which case sensible
 /// defaults are used.
-pub(crate) fn sign<T: TryCryptoRng + ?Sized>(
+pub(crate) fn sign<T, D>(
     rng: &mut T,
     blind: bool,
     priv_key: &RsaPrivateKey,
     hashed: &[u8],
     salt_len: usize,
-    digest: &mut dyn DynDigest,
-) -> Result<Vec<u8>> {
+    digest: &mut D,
+) -> Result<Vec<u8>>
+where
+    T: TryCryptoRng + ?Sized,
+    D: Digest + FixedOutputReset,
+{
     let mut salt = vec![0; salt_len];
     rng.try_fill_bytes(&mut salt[..]).map_err(|_| Error::Rng)?;
 
     sign_pss_with_salt(blind.then_some(rng), priv_key, hashed, &salt, digest)
 }
 
-pub(crate) fn sign_digest<T: TryCryptoRng + ?Sized, D: Digest + FixedOutputReset>(
+pub(crate) fn sign_digest<T, D>(
     rng: &mut T,
     blind: bool,
     priv_key: &RsaPrivateKey,
     hashed: &[u8],
     salt_len: usize,
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>>
+where
+    T: TryCryptoRng + ?Sized,
+    D: Digest + FixedOutputReset,
+{
     let mut salt = vec![0; salt_len];
     rng.try_fill_bytes(&mut salt[..]).map_err(|_| Error::Rng)?;
 
@@ -202,13 +226,17 @@ pub(crate) fn sign_digest<T: TryCryptoRng + ?Sized, D: Digest + FixedOutputReset
 /// Note that hashed must be the result of hashing the input message using the
 /// given hash function. salt is a random sequence of bytes whose length will be
 /// later used to verify the signature.
-fn sign_pss_with_salt<T: TryCryptoRng + ?Sized>(
+fn sign_pss_with_salt<T, D>(
     blind_rng: Option<&mut T>,
     priv_key: &RsaPrivateKey,
     hashed: &[u8],
     salt: &[u8],
-    digest: &mut dyn DynDigest,
-) -> Result<Vec<u8>> {
+    digest: &mut D,
+) -> Result<Vec<u8>>
+where
+    T: TryCryptoRng + ?Sized,
+    D: Digest + FixedOutputReset,
+{
     let em_bits = priv_key.n().bits() - 1;
 
     let em = emsa_pss_encode(hashed, em_bits as _, salt, digest)?;
@@ -218,12 +246,16 @@ fn sign_pss_with_salt<T: TryCryptoRng + ?Sized>(
     uint_to_zeroizing_be_pad(raw, priv_key.size())
 }
 
-fn sign_pss_with_salt_digest<T: TryCryptoRng + ?Sized, D: Digest + FixedOutputReset>(
+fn sign_pss_with_salt_digest<T, D>(
     blind_rng: Option<&mut T>,
     priv_key: &RsaPrivateKey,
     hashed: &[u8],
     salt: &[u8],
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>>
+where
+    T: TryCryptoRng + ?Sized,
+    D: Digest + FixedOutputReset,
+{
     let em_bits = priv_key.n().bits() - 1;
     let em = emsa_pss_encode_digest::<D>(hashed, em_bits as _, salt)?;
 
@@ -319,7 +351,7 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         let pub_key: RsaPublicKey = priv_key.into();
 
         let digest = Sha1::digest(text.as_bytes()).to_vec();
-        let result = pub_key.verify(Pss::new::<Sha1>(), &digest, &sig);
+        let result = pub_key.verify(Pss::<Sha1>::new(), &digest, &sig);
 
         match expected {
             true => result.expect("failed to verify"),
@@ -413,12 +445,12 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
 
         let digest = Sha1::digest(test.as_bytes()).to_vec();
         let sig = priv_key
-            .sign_with_rng(&mut rng.clone(), Pss::new::<Sha1>(), &digest)
+            .sign_with_rng(&mut rng.clone(), Pss::<Sha1>::new(), &digest)
             .expect("failed to sign");
 
         priv_key
             .to_public_key()
-            .verify(Pss::new::<Sha1>(), &digest, &sig)
+            .verify(Pss::<Sha1>::new(), &digest, &sig)
             .expect("failed to verify");
     }
 
@@ -431,12 +463,12 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
 
         let digest = Sha1::digest(test.as_bytes()).to_vec();
         let sig = priv_key
-            .sign_with_rng(&mut rng.clone(), Pss::new_blinded::<Sha1>(), &digest)
+            .sign_with_rng(&mut rng.clone(), Pss::<Sha1>::new_blinded(), &digest)
             .expect("failed to sign");
 
         priv_key
             .to_public_key()
-            .verify(Pss::new::<Sha1>(), &digest, &sig)
+            .verify(Pss::<Sha1>::new(), &digest, &sig)
             .expect("failed to verify");
     }
 
@@ -597,12 +629,12 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
 
             let digest = Sha1::digest(plaintext.as_bytes()).to_vec();
             let sig = priv_key
-                .sign_with_rng(&mut rng, Pss::new::<Sha1>(), &digest)
+                .sign_with_rng(&mut rng, Pss::<Sha1>::new(), &digest)
                 .expect("failed to sign");
 
             priv_key
                 .to_public_key()
-                .verify(Pss::new::<Sha1>(), &digest, &sig)
+                .verify(Pss::<Sha1>::new(), &digest, &sig)
                 .expect("failed to verify");
         }
     }
