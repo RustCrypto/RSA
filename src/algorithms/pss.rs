@@ -10,20 +10,23 @@
 //! [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 
 use alloc::vec::Vec;
-use digest::{Digest, DynDigest, FixedOutputReset};
+use digest::{Digest, FixedOutputReset};
 use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 use super::mgf::{mgf1_xor, mgf1_xor_digest};
 use crate::errors::{Error, Result};
 
-pub(crate) fn emsa_pss_encode(
+pub(crate) fn emsa_pss_encode<D>(
     m_hash: &[u8],
     em_bits: usize,
     salt: &[u8],
-    hash: &mut dyn DynDigest,
-) -> Result<Vec<u8>> {
+    hash: &mut D,
+) -> Result<Vec<u8>>
+where
+    D: Digest + FixedOutputReset,
+{
     // See [1], section 9.1.1
-    let h_len = hash.output_size();
+    let h_len = <D as Digest>::output_size();
     let s_len = salt.len();
     let em_len = em_bits.div_ceil(8);
 
@@ -59,9 +62,9 @@ pub(crate) fn emsa_pss_encode(
     // 6.  Let H = Hash(M'), an octet string of length h_len.
     let prefix = [0u8; 8];
 
-    hash.update(&prefix);
-    hash.update(m_hash);
-    hash.update(salt);
+    Digest::update(hash, prefix);
+    Digest::update(hash, m_hash);
+    Digest::update(hash, salt);
 
     let hashed = hash.finalize_reset();
     h.copy_from_slice(&hashed);
@@ -267,17 +270,20 @@ fn emsa_pss_get_salt_len(db: &[u8], em_len: usize, h_len: usize) -> (usize, Choi
     (result_len as usize, final_valid)
 }
 
-pub(crate) fn emsa_pss_verify(
+pub(crate) fn emsa_pss_verify<D>(
     m_hash: &[u8],
     em: &mut [u8],
     s_len: Option<usize>,
-    hash: &mut dyn DynDigest,
+    hash: &mut D,
     key_bits: usize,
-) -> Result<()> {
+) -> Result<()>
+where
+    D: Digest + FixedOutputReset,
+{
     let em_bits = key_bits - 1;
     let em_len = em_bits.div_ceil(8);
     let key_len = key_bits.div_ceil(8);
-    let h_len = hash.output_size();
+    let h_len = <D as Digest>::output_size();
 
     let em = &mut em[key_len - em_len..];
 
@@ -308,13 +314,13 @@ pub(crate) fn emsa_pss_verify(
     // 13. Let H' = Hash(M'), an octet string of length hLen.
     let prefix = [0u8; 8];
 
-    hash.update(&prefix[..]);
-    hash.update(m_hash);
-    hash.update(salt);
+    Digest::update(hash, &prefix[..]);
+    Digest::update(hash, m_hash);
+    Digest::update(hash, salt);
     let h0 = hash.finalize_reset();
 
     // 14. If H = H', output "consistent." Otherwise, output "inconsistent."
-    if (salt_valid & h0.ct_eq(h)).into() {
+    if (salt_valid & h0.as_slice().ct_eq(h)).into() {
         Ok(())
     } else {
         Err(Error::Verification)

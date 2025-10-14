@@ -1,11 +1,14 @@
 //! Mask generation function common to both PSS and OAEP padding
 
-use digest::{Digest, DynDigest, FixedOutputReset};
+use digest::{Digest, FixedOutputReset};
 
 /// Mask generation function.
 ///
 /// Panics if out is larger than 2**32. This is in accordance with RFC 8017 - PKCS #1 B.2.1
-pub(crate) fn mgf1_xor(out: &mut [u8], digest: &mut dyn DynDigest, seed: &[u8]) {
+pub(crate) fn mgf1_xor<D>(out: &mut [u8], digest: &mut D, seed: &[u8])
+where
+    D: Digest + FixedOutputReset,
+{
     let mut counter = [0u8; 4];
     let mut i = 0;
 
@@ -17,7 +20,7 @@ pub(crate) fn mgf1_xor(out: &mut [u8], digest: &mut dyn DynDigest, seed: &[u8]) 
         digest_input[0..seed.len()].copy_from_slice(seed);
         digest_input[seed.len()..].copy_from_slice(&counter);
 
-        digest.update(digest_input.as_slice());
+        Digest::update(digest, digest_input.as_slice());
         let digest_output = &*digest.finalize_reset();
         let mut j = 0;
         loop {

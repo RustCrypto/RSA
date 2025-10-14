@@ -14,7 +14,7 @@ use alloc::vec::Vec;
 use core::fmt;
 use crypto_bigint::BoxedUint;
 
-use digest::{Digest, DynDigest, FixedOutputReset};
+use digest::{Digest, FixedOutputReset};
 use rand_core::TryCryptoRng;
 
 use crate::algorithms::oaep::*;
@@ -35,18 +35,30 @@ use crate::traits::{PaddingScheme, PublicKeyParts};
 ///
 /// A prominent example is the [`AndroidKeyStore`](https://developer.android.com/guide/topics/security/cryptography#oaep-mgf1-digest).
 /// It uses SHA-1 for `mgf_digest` and a user-chosen SHA flavour for `digest`.
-pub struct Oaep {
+pub struct Oaep<D, MGD = D> {
     /// Digest type to use.
-    pub digest: Box<dyn DynDigest + Send + Sync>,
+    pub digest: D,
 
     /// Digest to use for Mask Generation Function (MGF).
-    pub mgf_digest: Box<dyn DynDigest + Send + Sync>,
+    pub mgf_digest: MGD,
 
     /// Optional label.
     pub label: Option<Box<[u8]>>,
 }
 
-impl Oaep {
+impl<D> Default for Oaep<D>
+where
+    D: Digest + FixedOutputReset,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<D> Oaep<D>
+where
+    D: Digest + FixedOutputReset,
+{
     /// Create a new OAEP `PaddingScheme`, using `T` as the hash function for both the default (empty) label and for MGF1.
     ///
     /// # Example
@@ -64,28 +76,32 @@ impl Oaep {
     ///
     /// let mut rng = rand::thread_rng();
     /// let key = RsaPublicKey::new(n, e).unwrap();
-    /// let padding = Oaep::new::<Sha256>();
+    /// let padding = Oaep::<Sha256>::new();
     /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();
     /// ```
-    pub fn new<T: 'static + Digest + DynDigest + Send + Sync>() -> Self {
+    pub fn new() -> Self {
         Self {
-            digest: Box::new(T::new()),
-            mgf_digest: Box::new(T::new()),
+            digest: D::new(),
+            mgf_digest: D::new(),
             label: None,
         }
     }
 
     /// Create a new OAEP `PaddingScheme` with an associated `label`, using `T` as the hash function for both the label and for MGF1.
-    pub fn new_with_label<T: 'static + Digest + DynDigest + Send + Sync, S: Into<Box<[u8]>>>(
-        label: S,
-    ) -> Self {
+    pub fn new_with_label<S: Into<Box<[u8]>>>(label: S) -> Self {
         Self {
-            digest: Box::new(T::new()),
-            mgf_digest: Box::new(T::new()),
+            digest: D::new(),
+            mgf_digest: D::new(),
             label: Some(label.into()),
         }
     }
+}
 
+impl<D, MGD> Oaep<D, MGD>
+where
+    D: Digest + FixedOutputReset,
+    MGD: Digest + FixedOutputReset,
+{
     /// Create a new OAEP `PaddingScheme`, using `T` as the hash function for the default (empty) label, and `U` as the hash function for MGF1.
     /// If a label is needed use `PaddingScheme::new_oaep_with_label` or `PaddingScheme::new_oaep_with_mgf_hash_with_label`.
     ///
@@ -104,37 +120,32 @@ impl Oaep {
     ///
     /// let mut rng = rand::thread_rng();
     /// let key = RsaPublicKey::new(n, e).unwrap();
-    /// let padding = Oaep::new_with_mgf_hash::<Sha256, Sha1>();
+    /// let padding = Oaep::<Sha256, Sha1>::new_with_mgf_hash();
     /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();
     /// ```
-    pub fn new_with_mgf_hash<
-        T: 'static + Digest + DynDigest + Send + Sync,
-        U: 'static + Digest + DynDigest + Send + Sync,
-    >() -> Self {
+    pub fn new_with_mgf_hash() -> Self {
         Self {
-            digest: Box::new(T::new()),
-            mgf_digest: Box::new(U::new()),
+            digest: D::new(),
+            mgf_digest: MGD::new(),
             label: None,
         }
     }
 
     /// Create a new OAEP `PaddingScheme` with an associated `label`, using `T` as the hash function for the label, and `U` as the hash function for MGF1.
-    pub fn new_with_mgf_hash_and_label<
-        T: 'static + Digest + DynDigest + Send + Sync,
-        U: 'static + Digest + DynDigest + Send + Sync,
-        S: Into<Box<[u8]>>,
-    >(
-        label: S,
-    ) -> Self {
+    pub fn new_with_mgf_hash_and_label<S: Into<Box<[u8]>>>(label: S) -> Self {
         Self {
-            digest: Box::new(T::new()),
-            mgf_digest: Box::new(U::new()),
+            digest: D::new(),
+            mgf_digest: MGD::new(),
             label: Some(label.into()),
         }
     }
 }
 
-impl PaddingScheme for Oaep {
+impl<D, MGD> PaddingScheme for Oaep<D, MGD>
+where
+    D: Digest + FixedOutputReset,
+    MGD: Digest + FixedOutputReset,
+{
     fn decrypt<Rng: TryCryptoRng + ?Sized>(
         mut self,
         rng: Option<&mut Rng>,
@@ -145,8 +156,8 @@ impl PaddingScheme for Oaep {
             rng,
             priv_key,
             ciphertext,
-            &mut *self.digest,
-            &mut *self.mgf_digest,
+            &mut self.digest,
+            &mut self.mgf_digest,
             self.label,
         )
     }
@@ -161,14 +172,14 @@ impl PaddingScheme for Oaep {
             rng,
             pub_key,
             msg,
-            &mut *self.digest,
-            &mut *self.mgf_digest,
+            &mut self.digest,
+            &mut self.mgf_digest,
             self.label,
         )
     }
 }
 
-impl fmt::Debug for Oaep {
+impl<D, MGD> fmt::Debug for Oaep<D, MGD> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("OAEP")
             .field("digest", &"...")
@@ -186,14 +197,19 @@ impl fmt::Debug for Oaep {
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-fn encrypt<R: TryCryptoRng + ?Sized>(
+fn encrypt<R, D, MGD>(
     rng: &mut R,
     pub_key: &RsaPublicKey,
     msg: &[u8],
-    digest: &mut dyn DynDigest,
-    mgf_digest: &mut dyn DynDigest,
+    digest: &mut D,
+    mgf_digest: &mut MGD,
     label: Option<Box<[u8]>>,
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>>
+where
+    R: TryCryptoRng + ?Sized,
+    D: Digest + FixedOutputReset,
+    MGD: Digest + FixedOutputReset,
+{
     key::check_public(pub_key)?;
 
     let em = oaep_encrypt(rng, msg, digest, mgf_digest, label, pub_key.size())?;
@@ -209,12 +225,17 @@ fn encrypt<R: TryCryptoRng + ?Sized>(
 /// `2 + (2 * hash.size())`.
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
-fn encrypt_digest<R: TryCryptoRng + ?Sized, D: Digest, MGD: Digest + FixedOutputReset>(
+fn encrypt_digest<R, D, MGD>(
     rng: &mut R,
     pub_key: &RsaPublicKey,
     msg: &[u8],
     label: Option<Box<[u8]>>,
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>>
+where
+    R: TryCryptoRng + ?Sized,
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+{
     key::check_public(pub_key)?;
 
     let em = oaep_encrypt_digest::<_, D, MGD>(rng, msg, label, pub_key.size())?;
@@ -236,14 +257,19 @@ fn encrypt_digest<R: TryCryptoRng + ?Sized, D: Digest, MGD: Digest + FixedOutput
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-fn decrypt<R: TryCryptoRng + ?Sized>(
+fn decrypt<R, D, MGD>(
     rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
-    digest: &mut dyn DynDigest,
-    mgf_digest: &mut dyn DynDigest,
+    digest: &mut D,
+    mgf_digest: &mut MGD,
     label: Option<Box<[u8]>>,
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>>
+where
+    R: TryCryptoRng + ?Sized,
+    D: Digest + FixedOutputReset,
+    MGD: Digest + FixedOutputReset,
+{
     if ciphertext.len() != priv_key.size() {
         return Err(Error::Decryption);
     }
@@ -269,12 +295,17 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
 ///
 /// [PKCS#1 OAEP]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[inline]
-fn decrypt_digest<R: TryCryptoRng + ?Sized, D: Digest, MGD: Digest + FixedOutputReset>(
+fn decrypt_digest<R, D, MGD>(
     rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
     label: Option<Box<[u8]>>,
-) -> Result<Vec<u8>> {
+) -> Result<Vec<u8>>
+where
+    R: TryCryptoRng + ?Sized,
+    D: Digest,
+    MGD: Digest + FixedOutputReset,
+{
     key::check_public(priv_key)?;
 
     if ciphertext.len() != priv_key.size() {
@@ -296,7 +327,7 @@ mod tests {
     use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 
     use crypto_bigint::BoxedUint;
-    use digest::{Digest, DynDigest, FixedOutputReset};
+    use digest::{Digest, FixedOutputReset};
     use rand_chacha::{
         rand_core::{RngCore, SeedableRng},
         ChaCha8Rng,
@@ -378,9 +409,7 @@ mod tests {
         }
     }
 
-    fn do_test_encrypt_decrypt_oaep<D: 'static + Digest + DynDigest + Send + Sync>(
-        prk: &RsaPrivateKey,
-    ) {
+    fn do_test_encrypt_decrypt_oaep<D: Digest + FixedOutputReset>(prk: &RsaPrivateKey) {
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
 
         let k = prk.size();
@@ -397,10 +426,10 @@ mod tests {
             let pub_key: RsaPublicKey = prk.into();
 
             let ciphertext = if let Some(ref label) = label {
-                let padding = Oaep::new_with_label::<D, _>(label.clone());
+                let padding = Oaep::<D>::new_with_label(label.clone());
                 pub_key.encrypt(&mut rng, padding, &input).unwrap()
             } else {
-                let padding = Oaep::new::<D>();
+                let padding = Oaep::<D>::new();
                 pub_key.encrypt(&mut rng, padding, &input).unwrap()
             };
 
@@ -408,9 +437,9 @@ mod tests {
             let blind: bool = rng.next_u32() < (1 << 31);
 
             let padding = if let Some(label) = label {
-                Oaep::new_with_label::<D, Box<[u8]>>(label)
+                Oaep::<D>::new_with_label::<Box<[u8]>>(label)
             } else {
-                Oaep::new::<D>()
+                Oaep::<D>::new()
             };
 
             let plaintext = if blind {
@@ -424,8 +453,8 @@ mod tests {
     }
 
     fn do_test_oaep_with_different_hashes<
-        D: 'static + Digest + DynDigest + Send + Sync,
-        U: 'static + Digest + DynDigest + Send + Sync,
+        D: Digest + FixedOutputReset,
+        U: Digest + FixedOutputReset,
     >(
         prk: &RsaPrivateKey,
     ) {
@@ -445,10 +474,10 @@ mod tests {
             let pub_key: RsaPublicKey = prk.into();
 
             let ciphertext = if let Some(ref label) = label {
-                let padding = Oaep::new_with_mgf_hash_and_label::<D, U, _>(label.clone());
+                let padding = Oaep::<D, U>::new_with_mgf_hash_and_label::<_>(label.clone());
                 pub_key.encrypt(&mut rng, padding, &input).unwrap()
             } else {
-                let padding = Oaep::new_with_mgf_hash::<D, U>();
+                let padding = Oaep::<D, U>::new_with_mgf_hash();
                 pub_key.encrypt(&mut rng, padding, &input).unwrap()
             };
 
@@ -456,9 +485,9 @@ mod tests {
             let blind: bool = rng.next_u32() < (1 << 31);
 
             let padding = if let Some(label) = label {
-                Oaep::new_with_mgf_hash_and_label::<D, U, _>(label)
+                Oaep::<D, U>::new_with_mgf_hash_and_label::<_>(label)
             } else {
-                Oaep::new_with_mgf_hash::<D, U>()
+                Oaep::<D, U>::new_with_mgf_hash()
             };
 
             let plaintext = if blind {
@@ -477,13 +506,13 @@ mod tests {
         let priv_key = get_private_key();
         let pub_key: RsaPublicKey = (&priv_key).into();
         let ciphertext = pub_key
-            .encrypt(&mut rng, Oaep::new::<Sha1>(), "a_plain_text".as_bytes())
+            .encrypt(&mut rng, Oaep::<Sha1>::new(), "a_plain_text".as_bytes())
             .unwrap();
         assert!(
             priv_key
                 .decrypt_blinded(
                     &mut rng,
-                    Oaep::new_with_label::<Sha1, _>("label".as_bytes()),
+                    Oaep::<Sha1>::new_with_label::<_>("label".as_bytes()),
                     &ciphertext,
                 )
                 .is_err(),

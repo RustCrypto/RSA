@@ -34,12 +34,12 @@
 //!
 //! // Encrypt
 //! let data = b"hello world";
-//! let padding = Oaep::new::<Sha256>();
+//! let padding = Oaep::<Sha256>::new();
 //! let enc_data = public_key.encrypt(&mut rng, padding, &data[..]).expect("failed to encrypt");
 //! assert_ne!(&data[..], &enc_data[..]);
 //!
 //! // Decrypt
-//! let padding = Oaep::new::<Sha256>();
+//! let padding = Oaep::<Sha256>::new();
 //! let dec_data = private_key.decrypt(padding, &enc_data).expect("failed to decrypt");
 //! assert_eq!(&data[..], &dec_data[..]);
 //! ```
