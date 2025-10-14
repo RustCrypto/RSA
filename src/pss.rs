@@ -295,9 +295,10 @@ mod test {
     use crate::{RsaPrivateKey, RsaPublicKey};
 
     use crate::traits::PublicKeyParts;
+    use chacha20::ChaCha8Rng;
     use hex_literal::hex;
     use pkcs1::DecodeRsaPrivateKey;
-    use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+    use rand_core::SeedableRng;
     use rstest::rstest;
     use sha1::{Digest, Sha1};
     use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
@@ -441,11 +442,11 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
     fn test_sign_and_verify_roundtrip(#[case] test: &str) {
         let priv_key = get_private_key();
 
-        let rng = ChaCha8Rng::from_seed([42; 32]);
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
 
         let digest = Sha1::digest(test.as_bytes()).to_vec();
         let sig = priv_key
-            .sign_with_rng(&mut rng.clone(), Pss::<Sha1>::new(), &digest)
+            .sign_with_rng(&mut rng, Pss::<Sha1>::new(), &digest)
             .expect("failed to sign");
 
         priv_key
@@ -459,11 +460,11 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
     fn test_sign_blinded_and_verify_roundtrip(#[case] test: &str) {
         let priv_key = get_private_key();
 
-        let rng = ChaCha8Rng::from_seed([42; 32]);
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
 
         let digest = Sha1::digest(test.as_bytes()).to_vec();
         let sig = priv_key
-            .sign_with_rng(&mut rng.clone(), Pss::<Sha1>::new_blinded(), &digest)
+            .sign_with_rng(&mut rng, Pss::<Sha1>::new_blinded(), &digest)
             .expect("failed to sign");
 
         priv_key

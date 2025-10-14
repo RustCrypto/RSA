@@ -14,11 +14,11 @@ rust-version = "1.85"
 
 [dependencies]
 const-oid = { version = "0.10", default-features = false }
-crypto-bigint = { version = "0.7.0-rc.8", default-features = false, features = ["zeroize", "alloc"] }
+crypto-bigint = { version = "0.7.0-rc.10", default-features = false, features = ["zeroize", "alloc"] }
 crypto-primes = { version = "0.7.0-pre.2", default-features = false }
 digest = { version = "0.11.0-rc.1", default-features = false, features = ["alloc", "oid"] }
-rand_core = { version = "0.9", default-features = false }
-signature = { version = "3.0.0-rc.4", default-features = false, features = ["alloc", "digest", "rand_core"] }
+rand_core = { version = "0.10.0-rc.2", default-features = false }
+signature = { version = "3.0.0-rc.5", default-features = false, features = ["alloc", "digest", "rand_core"] }
 subtle = { version = "2.6.1", default-features = false }
 zeroize = { version = "1.8", features = ["alloc"] }
 
@@ -30,6 +30,7 @@ sha1 = { version = "0.11.0-rc.2", optional = true, default-features = false, fea
 spki = { version = "0.8.0-rc.4", optional = true, default-features = false, features = ["alloc"] }
 sha2 = { version = "0.11.0-rc.2", optional = true, default-features = false, features = ["oid"] }
 serde = { version = "1.0.184", optional = true, default-features = false, features = ["derive"] }
+rand = { version = "0.10.0-rc.1", optional = true, default-features = false }
 
 [dev-dependencies]
 base64ct = { version = "1", features = ["alloc"] }
@@ -37,9 +38,9 @@ hex-literal = "1"
 proptest = "1"
 serde_test = "1.0.89"
 rand_xorshift = "0.4"
-rand_chacha = "0.9"
-rand = "0.9"
-rand_core = { version = "0.9.1", default-features = false }
+chacha20 = { version = "0.10.0-rc.3", default-features = false, features = ["rng"] }
+rand = "0.10.0-rc.1"
+rand_core = { version = "0.10.0-rc.2", default-features = false }
 sha1 = { version = "0.11.0-rc.2", default-features = false, features = ["oid"] }
 sha2 = { version = "0.11.0-rc.2", default-features = false, features = ["oid"] }
 sha3 = { version = "0.11.0-rc.2", default-features = false, features = ["oid"] }
@@ -55,10 +56,10 @@ name = "key"
 default = ["std", "encoding"]
 encoding = ["dep:pkcs1", "dep:pkcs8", "dep:spki"]
 hazmat = []
-os_rng = ["rand_core/os_rng", "crypto-bigint/rand_core"]
+os_rng = ["crypto-bigint/rand_core", "rand/os_rng"]
 serde = ["encoding", "dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pkcs5 = ["pkcs8/encryption"]
-std = ["pkcs1?/std", "pkcs8?/std", "rand_core/std", "crypto-bigint/rand"]
+std = ["pkcs1?/std", "pkcs8?/std", "crypto-bigint/rand"]
 
 [package.metadata.docs.rs]
 features = ["std", "serde", "hazmat", "sha2"]
@@ -69,3 +70,6 @@ opt-level = 2
 
 [profile.bench]
 debug = true
+
+[patch.crates-io]
+crypto-primes = { git = "https://github.com/baloo/crypto-primes.git", branch = "baloo/rand_core/0.10.0-rc.2" }
