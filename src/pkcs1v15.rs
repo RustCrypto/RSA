@@ -142,7 +142,7 @@ fn encrypt<R: CryptoRngCore + ?Sized>(
     pub_key: &RsaPublicKey,
     msg: &[u8],
 ) -> Result<Vec<u8>> {
-    key::check_public(pub_key)?;
+    key::check_public_with_max_size(pub_key, pub_key.max_size)?;
 
     let em = pkcs1v15_encrypt_pad(rng, msg, pub_key.size())?;
     let int = Zeroizing::new(BigUint::from_bytes_be(&em));
@@ -164,7 +164,7 @@ fn decrypt<R: CryptoRngCore + ?Sized>(
     priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
 ) -> Result<Vec<u8>> {
-    key::check_public(priv_key)?;
+    key::check_public_with_max_size(priv_key,priv_key.pubkey_components.max_size)?;
 
     let em = rsa_decrypt_and_check(priv_key, rng, &BigUint::from_bytes_be(ciphertext))?;
     let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;

@@ -32,6 +32,9 @@ pub struct RsaPublicKey {
     ///
     /// Typically 0x10001 (65537)
     e: BigUint,
+
+    /// The size limit given at creation time
+    pub(crate) max_size: usize,
 }
 
 /// Represents a whole RSA key, public and private parts.
@@ -39,7 +42,7 @@ pub struct RsaPublicKey {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RsaPrivateKey {
     /// Public components of the private key.
-    pubkey_components: RsaPublicKey,
+    pub(crate) pubkey_components: RsaPublicKey,
     /// Private exponent
     pub(crate) d: BigUint,
     /// Prime factors of N, contains >= 2 elements.
@@ -127,7 +130,11 @@ impl From<&RsaPrivateKey> for RsaPublicKey {
     fn from(private_key: &RsaPrivateKey) -> Self {
         let n = private_key.n().clone();
         let e = private_key.e().clone();
-        RsaPublicKey { n, e }
+        RsaPublicKey {
+            n,
+            e,
+            max_size: Self::MAX_SIZE,
+        }
     }
 }
 
@@ -183,7 +190,7 @@ impl RsaPublicKey {
 
     /// Create a new public key from its components.
     pub fn new_with_max_size(n: BigUint, e: BigUint, max_size: usize) -> Result<Self> {
-        let k = Self { n, e };
+        let k = Self { n, e, max_size };
         check_public_with_max_size(&k, max_size)?;
         Ok(k)
     }
@@ -195,7 +202,7 @@ impl RsaPublicKey {
     /// Most applications should use [`RsaPublicKey::new`] or
     /// [`RsaPublicKey::new_with_max_size`] instead.
     pub fn new_unchecked(n: BigUint, e: BigUint) -> Self {
-        Self { n, e }
+        Self { n, e,max_size:Self::MAX_SIZE }
     }
 }
 
@@ -263,13 +270,13 @@ impl RsaPrivateKey {
         }
 
         let mut k = RsaPrivateKey {
-            pubkey_components: RsaPublicKey { n, e },
+            pubkey_components: RsaPublicKey { n, e, max_size: 8192 }, // FIXME: take parameter?
             d,
             primes,
             precomputed: None,
         };
 
-        // Alaways validate the key, to ensure precompute can't fail
+        // Always validate the key, to ensure precompute can't fail
         k.validate()?;
 
         // precompute when possible, ignore error otherwise.
@@ -385,7 +392,7 @@ impl RsaPrivateKey {
     /// Performs basic sanity checks on the key.
     /// Returns `Ok(())` if everything is good, otherwise an appropriate error.
     pub fn validate(&self) -> Result<()> {
-        check_public(self)?;
+        check_public_with_max_size(self, self.pubkey_components.max_size)?;
 
         // Check that Πprimes == n.
         let mut m = BigUint::one();
@@ -498,7 +505,10 @@ pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
 
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
-fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize) -> Result<()> {
+pub(crate) fn check_public_with_max_size(
+    public_key: &impl PublicKeyParts,
+    max_size: usize,
+) -> Result<()> {
     if public_key.n().bits() > max_size {
         return Err(Error::ModulusTooLarge);
     }
