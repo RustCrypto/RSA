@@ -32,9 +32,6 @@ pub struct RsaPublicKey {
     ///
     /// Typically 0x10001 (65537)
     e: BigUint,
-
-    /// The size limit given at creation time
-    pub(crate) max_size: usize,
 }
 
 /// Represents a whole RSA key, public and private parts.
@@ -42,7 +39,7 @@ pub struct RsaPublicKey {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct RsaPrivateKey {
     /// Public components of the private key.
-    pub(crate) pubkey_components: RsaPublicKey,
+    pubkey_components: RsaPublicKey,
     /// Private exponent
     pub(crate) d: BigUint,
     /// Prime factors of N, contains >= 2 elements.
@@ -130,11 +127,7 @@ impl From<&RsaPrivateKey> for RsaPublicKey {
     fn from(private_key: &RsaPrivateKey) -> Self {
         let n = private_key.n().clone();
         let e = private_key.e().clone();
-        RsaPublicKey {
-            n,
-            e,
-            max_size: Self::MAX_SIZE,
-        }
+        RsaPublicKey { n, e }
     }
 }
 
@@ -190,8 +183,8 @@ impl RsaPublicKey {
 
     /// Create a new public key from its components.
     pub fn new_with_max_size(n: BigUint, e: BigUint, max_size: usize) -> Result<Self> {
-        let k = Self { n, e, max_size };
-        check_public_with_max_size(&k, max_size)?;
+        let k = Self { n, e };
+        check_public_with_max_size(&k, Some(max_size))?;
         Ok(k)
     }
 
@@ -202,7 +195,7 @@ impl RsaPublicKey {
     /// Most applications should use [`RsaPublicKey::new`] or
     /// [`RsaPublicKey::new_with_max_size`] instead.
     pub fn new_unchecked(n: BigUint, e: BigUint) -> Self {
-        Self { n, e,max_size:Self::MAX_SIZE }
+        Self { n, e }
     }
 }
 
@@ -270,7 +263,7 @@ impl RsaPrivateKey {
         }
 
         let mut k = RsaPrivateKey {
-            pubkey_components: RsaPublicKey { n, e, max_size: 8192 }, // FIXME: take parameter?
+            pubkey_components: RsaPublicKey { n, e },
             d,
             primes,
             precomputed: None,
@@ -392,7 +385,7 @@ impl RsaPrivateKey {
     /// Performs basic sanity checks on the key.
     /// Returns `Ok(())` if everything is good, otherwise an appropriate error.
     pub fn validate(&self) -> Result<()> {
-        check_public_with_max_size(self, self.pubkey_components.max_size)?;
+        check_public(self)?;
 
         // Check that Πprimes == n.
         let mut m = BigUint::one();
@@ -500,17 +493,19 @@ impl PrivateKeyParts for RsaPrivateKey {
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
 pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
-    check_public_with_max_size(public_key, RsaPublicKey::MAX_SIZE)
+    check_public_with_max_size(public_key, None)
 }
 
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
-pub(crate) fn check_public_with_max_size(
+fn check_public_with_max_size(
     public_key: &impl PublicKeyParts,
-    max_size: usize,
+    max_size: Option<usize>,
 ) -> Result<()> {
-    if public_key.n().bits() > max_size {
-        return Err(Error::ModulusTooLarge);
+    if let Some(max_size) = max_size {
+        if public_key.n().bits() > max_size {
+            return Err(Error::ModulusTooLarge);
+        }
     }
 
     let e = public_key
