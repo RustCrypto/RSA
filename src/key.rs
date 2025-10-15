@@ -184,7 +184,7 @@ impl RsaPublicKey {
     /// Create a new public key from its components.
     pub fn new_with_max_size(n: BigUint, e: BigUint, max_size: usize) -> Result<Self> {
         let k = Self { n, e };
-        check_public_with_max_size(&k, max_size)?;
+        check_public_with_max_size(&k, Some(max_size))?;
         Ok(k)
     }
 
@@ -269,7 +269,7 @@ impl RsaPrivateKey {
             precomputed: None,
         };
 
-        // Alaways validate the key, to ensure precompute can't fail
+        // Always validate the key, to ensure precompute can't fail
         k.validate()?;
 
         // precompute when possible, ignore error otherwise.
@@ -493,14 +493,19 @@ impl PrivateKeyParts for RsaPrivateKey {
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
 pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
-    check_public_with_max_size(public_key, RsaPublicKey::MAX_SIZE)
+    check_public_with_max_size(public_key, None)
 }
 
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
-fn check_public_with_max_size(public_key: &impl PublicKeyParts, max_size: usize) -> Result<()> {
-    if public_key.n().bits() > max_size {
-        return Err(Error::ModulusTooLarge);
+fn check_public_with_max_size(
+    public_key: &impl PublicKeyParts,
+    max_size: Option<usize>,
+) -> Result<()> {
+    if let Some(max_size) = max_size {
+        if public_key.n().bits() > max_size {
+            return Err(Error::ModulusTooLarge);
+        }
     }
 
     let e = public_key
