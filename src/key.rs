@@ -228,7 +228,7 @@ impl RsaPublicKey {
 
     /// Create a new public key from its components.
     pub fn new_with_max_size(n: BoxedUint, e: BoxedUint, max_size: usize) -> Result<Self> {
-        check_public_with_max_size(&n, &e, max_size)?;
+        check_public_with_max_size(&n, &e, Some(max_size))?;
 
         let n_odd = Odd::new(n.clone())
             .into_option()
@@ -673,14 +673,16 @@ impl PrivateKeyParts for RsaPrivateKey {
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
 pub fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
-    check_public_with_max_size(public_key.n(), public_key.e(), RsaPublicKey::MAX_SIZE)
+    check_public_with_max_size(public_key.n(), public_key.e(), None)
 }
 
 /// Check that the public key is well formed and has an exponent within acceptable bounds.
 #[inline]
-fn check_public_with_max_size(n: &BoxedUint, e: &BoxedUint, max_size: usize) -> Result<()> {
-    if n.bits_vartime() as usize > max_size {
-        return Err(Error::ModulusTooLarge);
+fn check_public_with_max_size(n: &BoxedUint, e: &BoxedUint, max_size: Option<usize>) -> Result<()> {
+    if let Some(max_size) = max_size {
+        if n.bits_vartime() as usize > max_size {
+            return Err(Error::ModulusTooLarge);
+        }
     }
 
     if e >= n || n.is_even().into() || n.is_zero().into() {
