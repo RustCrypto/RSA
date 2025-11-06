@@ -680,7 +680,6 @@ name = "rsa"
 version = "0.10.0-rc.9"
 dependencies = [
  "base64ct",
- "chacha20",
  "const-oid",
  "crypto-bigint",
  "crypto-primes",

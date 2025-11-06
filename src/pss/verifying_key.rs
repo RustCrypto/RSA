@@ -246,7 +246,7 @@ mod tests {
     fn test_serde() {
         use super::*;
         use crate::RsaPrivateKey;
-        use chacha20::ChaCha8Rng;
+        use rand::rngs::ChaCha8Rng;
         use rand_core::SeedableRng;
         use serde_test::{assert_tokens, Configure, Token};
         use sha2::Sha256;

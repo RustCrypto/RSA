@@ -295,9 +295,9 @@ mod test {
     use crate::{RsaPrivateKey, RsaPublicKey};
 
     use crate::traits::PublicKeyParts;
-    use chacha20::ChaCha8Rng;
     use hex_literal::hex;
     use pkcs1::DecodeRsaPrivateKey;
+    use rand::rngs::ChaCha8Rng;
     use rand_core::SeedableRng;
     use rstest::rstest;
     use sha1::{Digest, Sha1};

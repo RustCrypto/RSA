@@ -253,8 +253,8 @@ mod tests {
         SignatureEncoding, Signer, Verifier,
     };
     use base64ct::{Base64, Encoding};
-    use chacha20::ChaCha8Rng;
     use hex_literal::hex;
+    use rand::rngs::ChaCha8Rng;
     use rand_core::{RngCore, SeedableRng};
     use rstest::rstest;
     use sha1::{Digest, Sha1};

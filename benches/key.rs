@@ -3,9 +3,9 @@
 extern crate test;
 
 use base64ct::{Base64, Encoding};
-use chacha20::ChaCha8Rng;
 use crypto_bigint::BoxedUint;
 use hex_literal::hex;
+use rand::rngs::ChaCha8Rng;
 use rand_core::SeedableRng;
 use rsa::{Pkcs1v15Encrypt, Pkcs1v15Sign, RsaPrivateKey};
 use sha2::{Digest, Sha256};
