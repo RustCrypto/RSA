@@ -2,8 +2,8 @@
 
 #![cfg(feature = "hazmat")]
 
+use chacha20::ChaCha8Rng;
 use proptest::prelude::*;
-use rand_chacha::ChaCha8Rng;
 use rand_core::SeedableRng;
 use rsa::{
     pkcs1v15,

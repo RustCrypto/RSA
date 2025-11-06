@@ -29,7 +29,7 @@ use {
 
 #[cfg(feature = "os_rng")]
 use {
-    rand_core::OsRng,
+    rand::rngs::OsRng,
     signature::{hazmat::PrehashSigner, MultipartSigner, Signer},
 };
 
@@ -326,7 +326,8 @@ mod tests {
     fn test_serde() {
         use super::*;
         use crate::RsaPrivateKey;
-        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+        use chacha20::ChaCha8Rng;
+        use rand_core::SeedableRng;
         use serde_test::{assert_tokens, Configure, Token};
         use sha2::Sha256;
 

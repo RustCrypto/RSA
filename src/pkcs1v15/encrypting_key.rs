@@ -34,7 +34,8 @@ mod tests {
     fn test_serde() {
         use super::*;
         use crate::RsaPrivateKey;
-        use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
+        use chacha20::ChaCha8Rng;
+        use rand_core::SeedableRng;
         use serde_test::{assert_tokens, Configure, Token};
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
