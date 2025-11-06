@@ -187,7 +187,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chacha20::ChaCha8Rng;
+    use rand::rngs::ChaCha8Rng;
     use rand_core::SeedableRng;
 
     #[test]

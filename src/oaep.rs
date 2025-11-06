@@ -326,9 +326,9 @@ mod tests {
     use crate::traits::PublicKeyParts;
     use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 
-    use chacha20::ChaCha8Rng;
     use crypto_bigint::BoxedUint;
     use digest::{Digest, FixedOutputReset};
+    use rand::rngs::ChaCha8Rng;
     use rand_core::{RngCore, SeedableRng};
     use sha1::Sha1;
     use sha2::{Sha224, Sha256, Sha384, Sha512};

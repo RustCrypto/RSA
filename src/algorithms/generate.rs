@@ -134,7 +134,7 @@ fn generate_prime_with_rng<R: CryptoRng + ?Sized>(rng: &mut R, bit_length: u32) 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chacha20::ChaCha8Rng;
+    use rand::rngs::ChaCha8Rng;
     use rand_core::SeedableRng;
 
     const EXP: u64 = 65537;

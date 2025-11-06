@@ -754,8 +754,8 @@ mod tests {
     use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
     use crate::traits::{PrivateKeyParts, PublicKeyParts};
 
-    use chacha20::ChaCha8Rng;
     use hex_literal::hex;
+    use rand::rngs::ChaCha8Rng;
     use rand_core::SeedableRng;
 
     #[cfg(feature = "encoding")]
@@ -876,7 +876,7 @@ mod tests {
     #[test]
     #[cfg(all(feature = "hazmat", feature = "serde"))]
     fn test_serde() {
-        use chacha20::ChaCha8Rng;
+        use rand::rngs::ChaCha8Rng;
         use rand_core::SeedableRng;
         use serde_test::{assert_tokens, Configure, Token};
 
