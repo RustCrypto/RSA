@@ -11,6 +11,7 @@ keywords = ["rsa", "encryption", "security", "crypto"]
 categories = ["cryptography"]
 readme = "README.md"
 rust-version = "1.85"
+exclude = ["marvin_toolkit/", "thirdparty/"]
 
 [dependencies]
 const-oid = { version = "0.10", default-features = false }
