@@ -1,6 +1,6 @@
 [package]
 name = "rsa"
-version = "0.10.0-rc.9"
+version = "0.10.0-rc.10"
 authors = ["RustCrypto Developers", "dignifiedquire <dignifiedquire@gmail.com>"]
 edition = "2021"
 description = "Pure Rust RSA implementation"
@@ -37,7 +37,6 @@ base64ct = { version = "1", features = ["alloc"] }
 hex-literal = "1"
 proptest = "1"
 serde_test = "1.0.89"
-rand_xorshift = "0.4"
 rand = { version = "0.10.0-rc.1", features = ["chacha"] }
 rand_core = { version = "0.10.0-rc-2", default-features = false }
 sha1 = { version = "0.11.0-rc.3", default-features = false, features = ["oid"] }
