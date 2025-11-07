@@ -671,7 +671,7 @@ checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
 
 [[package]]
 name = "rsa"
-version = "0.10.0-rc.9"
+version = "0.10.0-rc.10"
 dependencies = [
  "base64ct",
  "const-oid",
@@ -685,7 +685,6 @@ dependencies = [
  "proptest",
  "rand 0.10.0-rc.1",
  "rand_core 0.10.0-rc-2",
- "rand_xorshift",
  "rstest",
  "serde",
  "serde_json",
