@@ -391,7 +391,7 @@ impl RsaPrivateKey {
         let mut m = BigUint::one();
         for prime in &self.primes {
             // Any primes ≤ 1 will cause divide-by-zero panics later.
-            if *prime < BigUint::one() {
+            if *prime <= BigUint::one() {
                 return Err(Error::InvalidPrime);
             }
             m *= prime;
@@ -538,7 +538,7 @@ mod tests {
     use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 
     use hex_literal::hex;
-    use num_traits::{FromPrimitive, ToPrimitive};
+    use num_traits::{FromPrimitive, ToPrimitive, Zero};
     use pkcs8::DecodePrivateKey;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 
@@ -840,5 +840,20 @@ mod tests {
         assert_eq!(key.dq(), ref_key.dq());
 
         assert_eq!(key.d(), ref_key.d());
+    }
+
+    #[test]
+    fn test_key_invalid_primes() {
+        let e = RsaPrivateKey::from_components(
+            BigUint::from_u64(239).unwrap(),
+            BigUint::from_u64(185).unwrap(),
+            BigUint::zero(),
+            vec![
+                BigUint::from_u64(1).unwrap(),
+                BigUint::from_u64(239).unwrap(),
+            ],
+        )
+        .unwrap_err();
+        assert_eq!(e, Error::InvalidPrime);
     }
 }
