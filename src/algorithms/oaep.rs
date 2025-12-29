@@ -3,9 +3,9 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
+use crypto_bigint::{Choice, CtEq, CtOption, CtSelect};
 use digest::{Digest, FixedOutputReset};
 use rand_core::TryCryptoRng;
-use subtle::{Choice, ConditionallySelectable, ConstantTimeEq, CtOption};
 use zeroize::Zeroizing;
 
 use super::mgf::{mgf1_xor, mgf1_xor_digest};
@@ -242,14 +242,14 @@ fn decrypt_inner<MGF: FnMut(&mut [u8], &mut [u8])>(
     //   looking_for_index: 1 if we are still looking for the 0x01
     //   index: the offset of the first 0x01 byte
     //   zero_before_one: 1 if we saw a non-zero byte before the 1
-    let mut looking_for_index = Choice::from(1u8);
+    let mut looking_for_index = Choice::TRUE;
     let mut index = 0u32;
-    let mut nonzero_before_one = Choice::from(0u8);
+    let mut nonzero_before_one = Choice::FALSE;
 
     for (i, el) in db.iter().skip(h_size).enumerate() {
         let equals0 = el.ct_eq(&0u8);
         let equals1 = el.ct_eq(&1u8);
-        index.conditional_assign(&(i as u32), looking_for_index & equals1);
+        index.ct_assign(&(i as u32), looking_for_index & equals1);
         looking_for_index &= !equals1;
         nonzero_before_one |= looking_for_index & !equals0;
     }

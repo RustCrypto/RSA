@@ -52,8 +52,9 @@ impl Hash for RsaPublicKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // Domain separator for RSA private keys
         state.write(b"RsaPublicKey");
-        Hash::hash(&self.n, state);
-        Hash::hash(&self.e, state);
+        // TODO(tarcieri): to match the `PartialEq` impl we should strip leading zeros
+        Hash::hash(&self.n.as_limbs(), state);
+        Hash::hash(&self.e.as_limbs(), state);
     }
 }
 

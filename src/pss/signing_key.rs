@@ -27,9 +27,9 @@ use {
     },
 };
 
-#[cfg(feature = "os_rng")]
+#[cfg(feature = "getrandom")]
 use {
-    rand::rngs::OsRng,
+    crypto_common::SysRng,
     signature::{hazmat::PrehashSigner, MultipartSigner, Signer},
 };
 
@@ -162,33 +162,33 @@ where
     }
 }
 
-#[cfg(feature = "os_rng")]
+#[cfg(feature = "getrandom")]
 impl<D> PrehashSigner<Signature> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
     fn sign_prehash(&self, prehash: &[u8]) -> signature::Result<Signature> {
-        self.sign_prehash_with_rng(&mut OsRng, prehash)
+        self.sign_prehash_with_rng(&mut SysRng, prehash)
     }
 }
 
-#[cfg(feature = "os_rng")]
+#[cfg(feature = "getrandom")]
 impl<D> Signer<Signature> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
     fn try_sign(&self, msg: &[u8]) -> signature::Result<Signature> {
-        self.try_sign_with_rng(&mut OsRng, msg)
+        self.try_sign_with_rng(&mut SysRng, msg)
     }
 }
 
-#[cfg(feature = "os_rng")]
+#[cfg(feature = "getrandom")]
 impl<D> MultipartSigner<Signature> for SigningKey<D>
 where
     D: Digest + FixedOutputReset,
 {
     fn try_multipart_sign(&self, msg: &[&[u8]]) -> signature::Result<Signature> {
-        self.try_multipart_sign_with_rng(&mut OsRng, msg)
+        self.try_multipart_sign_with_rng(&mut SysRng, msg)
     }
 }
 

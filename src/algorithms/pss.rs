@@ -10,8 +10,8 @@
 //! [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 
 use alloc::vec::Vec;
+use crypto_bigint::{Choice, CtEq, CtSelect};
 use digest::{Digest, FixedOutputReset};
-use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 
 use super::mgf::{mgf1_xor, mgf1_xor_digest};
 use crate::errors::{Error, Result};
@@ -225,9 +225,7 @@ fn emsa_pss_verify_salt(db: &[u8], em_len: usize, s_len: usize, h_len: usize) ->
     //     position is "position 1") does not have hexadecimal value 0x01,
     //     output "inconsistent" and stop.
     let (zeroes, rest) = db.split_at(em_len - h_len - s_len - 2);
-    let valid: Choice = zeroes
-        .iter()
-        .fold(Choice::from(1u8), |a, e| a & e.ct_eq(&0x00));
+    let valid: Choice = zeroes.iter().fold(Choice::TRUE, |a, e| a & e.ct_eq(&0x00));
 
     valid & rest[0].ct_eq(&0x01)
 }
@@ -240,8 +238,8 @@ fn emsa_pss_get_salt_len(db: &[u8], em_len: usize, h_len: usize) -> (usize, Choi
     let max_scan_len = em_len - h_len - 2;
 
     let mut separator_pos = 0u32;
-    let mut found_separator = Choice::from(0u8);
-    let mut padding_valid = Choice::from(1u8);
+    let mut found_separator = Choice::FALSE;
+    let mut padding_valid = Choice::TRUE;
 
     // Single forward scan to find separator and validate padding
     for i in 0..=max_scan_len {
@@ -252,9 +250,8 @@ fn emsa_pss_get_salt_len(db: &[u8], em_len: usize, h_len: usize) -> (usize, Choi
 
         // Update separator position if we found one and haven't found one before
         let should_update_pos = is_separator & !found_separator;
-        separator_pos = u32::conditional_select(&separator_pos, &i, should_update_pos);
-        found_separator =
-            Choice::conditional_select(&found_separator, &Choice::from(1u8), should_update_pos);
+        separator_pos = u32::ct_select(&separator_pos, &i, should_update_pos);
+        found_separator = Choice::ct_select(&found_separator, &Choice::TRUE, should_update_pos);
 
         // Padding is invalid if we see a non-zero, non-separator byte before finding separator
         let corrupts_padding = is_invalid & !found_separator;
@@ -265,7 +262,7 @@ fn emsa_pss_get_salt_len(db: &[u8], em_len: usize, h_len: usize) -> (usize, Choi
     let final_valid = found_separator & padding_valid;
 
     // Return 0 length on failure
-    let result_len = u32::conditional_select(&0u32, &salt_len, final_valid);
+    let result_len = u32::ct_select(&0u32, &salt_len, final_valid);
 
     (result_len as usize, final_valid)
 }

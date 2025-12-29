@@ -51,8 +51,8 @@ jobs:
         with:
           toolchain: ${{ matrix.rust }}
       - uses: RustCrypto/actions/cargo-hack-install@master
-      - run: cargo hack test --release --feature-powerset --exclude-features os_rng,serde
-      - run: cargo test --release --features os_rng
+      - run: cargo hack test --release --feature-powerset --exclude-features getrandom,serde
+      - run: cargo test --release --features getrandom
       - run: cargo test --release --features serde
 
   minimal-versions:
@@ -66,7 +66,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - run: cargo update -Z minimal-versions
       - uses: dtolnay/rust-toolchain@stable
-      - run: cargo test --release --features os_rng,serde,pkcs5
+      - run: cargo test --release --features getrandom,serde,pkcs5
 
   nightly:
     runs-on: ubuntu-latest

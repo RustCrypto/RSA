@@ -184,7 +184,7 @@ fn blind<R: TryCryptoRng + ?Sized, K: PublicKeyParts>(
     let mut r: BoxedUint = BoxedUint::one_with_precision(bits);
     let mut ir: Option<BoxedUint> = None;
     while ir.is_none() {
-        r = BoxedUint::try_random_mod(rng, key.n()).map_err(|_| Error::Rng)?;
+        r = BoxedUint::try_random_mod_vartime(rng, key.n()).map_err(|_| Error::Rng)?;
         if r.is_zero().into() {
             r = BoxedUint::one_with_precision(bits);
         }
