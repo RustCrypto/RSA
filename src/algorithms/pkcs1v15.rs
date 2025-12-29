@@ -8,9 +8,9 @@
 
 use alloc::vec::Vec;
 use const_oid::AssociatedOid;
+use crypto_bigint::{Choice, CtEq, CtSelect};
 use digest::Digest;
 use rand_core::TryCryptoRng;
-use subtle::{Choice, ConditionallySelectable, ConstantTimeEq};
 use zeroize::Zeroizing;
 
 use crate::errors::{Error, Result};
@@ -99,8 +99,8 @@ fn decrypt_inner(em: Vec<u8>, k: usize) -> Result<(u8, Vec<u8>, u32)> {
 
     for (i, el) in em.iter().enumerate().skip(2) {
         let equals0 = el.ct_eq(&0u8);
-        index.conditional_assign(&(i as u32), Choice::from(looking_for_index) & equals0);
-        looking_for_index.conditional_assign(&0u8, equals0);
+        index.ct_assign(&(i as u32), Choice::new(looking_for_index) & equals0);
+        looking_for_index.ct_assign(&0u8, equals0);
     }
 
     // The PS padding must be at least 8 bytes long, and it starts two
@@ -109,12 +109,12 @@ fn decrypt_inner(em: Vec<u8>, k: usize) -> Result<(u8, Vec<u8>, u32)> {
     // Ref: https://github.com/dalek-cryptography/subtle/issues/20
     // This is currently copy & paste from the constant time impl in
     // go, but very likely not sufficient.
-    let valid_ps = Choice::from((((2i32 + 8i32 - index as i32 - 1i32) >> 31) & 1) as u8);
+    let valid_ps = Choice::new((((2i32 + 8i32 - index as i32 - 1i32) >> 31) & 1) as u8);
     let valid =
-        first_byte_is_zero & second_byte_is_two & Choice::from(!looking_for_index & 1) & valid_ps;
-    index = u32::conditional_select(&0, &(index + 1), valid);
+        first_byte_is_zero & second_byte_is_two & Choice::new(!looking_for_index & 1) & valid_ps;
+    index = u32::ct_select(&0, &(index + 1), valid);
 
-    Ok((valid.unwrap_u8(), em, index))
+    Ok((valid.to_u8(), em, index))
 }
 
 #[inline]
@@ -155,7 +155,8 @@ pub(crate) fn pkcs1v15_sign_unpad(prefix: &[u8], hashed: &[u8], em: &[u8], k: us
         ok &= el.ct_eq(&0xff)
     }
 
-    if ok.unwrap_u8() != 1 {
+    // TODO(tarcieri): avoid branching here by e.g. using a pseudorandom rejection symbol
+    if !ok.to_bool() {
         return Err(Error::Verification);
     }
 

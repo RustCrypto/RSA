@@ -2,14 +2,13 @@
 
 #![cfg(feature = "encoding")]
 
-use crypto_bigint::BoxedUint;
+use crypto_bigint::{BoxedUint, CtEq};
 use hex_literal::hex;
 use rsa::{
     pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},
     traits::{PrivateKeyParts, PublicKeyParts},
     RsaPrivateKey, RsaPublicKey,
 };
-use subtle::ConstantTimeEq;
 
 #[cfg(feature = "encoding")]
 use rsa::pkcs1::LineEnding;

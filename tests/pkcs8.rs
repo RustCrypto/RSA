@@ -2,7 +2,7 @@
 
 #![cfg(feature = "encoding")]
 
-use crypto_bigint::BoxedUint;
+use crypto_bigint::{BoxedUint, CtEq};
 use hex_literal::hex;
 use rsa::{
     pkcs1v15,
@@ -12,7 +12,6 @@ use rsa::{
     RsaPrivateKey, RsaPublicKey,
 };
 use sha2::Sha256;
-use subtle::ConstantTimeEq;
 
 #[cfg(feature = "encoding")]
 use rsa::pkcs8::LineEnding;
