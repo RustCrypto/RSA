@@ -70,5 +70,5 @@ opt-level = 2
 debug = true
 
 [patch.crates-io]
-crypto-primes = { git = "https://github.com/tarcieri/crypto-primes", branch = "crypto-bigint/v0.7.0-rc.12" }
+crypto-primes = { git = "https://github.com/tarcieri/crypto-primes", branch = "crypto-bigint/v0.7.0-rc.13" }
 rand = { git = "https://github.com/rust-random/rand" }

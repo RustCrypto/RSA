@@ -189,7 +189,7 @@ dependencies = [
 [[package]]
 name = "crypto-primes"
 version = "0.7.0-dev"
-source = "git+https://github.com/tarcieri/crypto-primes?branch=crypto-bigint%2Fv0.7.0-rc.12#a96b3c9e40db97dfd3df73d9368ff096292fcb16"
+source = "git+https://github.com/tarcieri/crypto-primes?branch=crypto-bigint%2Fv0.7.0-rc.13#f98697886371aa15446ca53ef5b9e9e44efbabf8"
 dependencies = [
  "crypto-bigint",
  "libm",
