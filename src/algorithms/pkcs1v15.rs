@@ -94,13 +94,13 @@ fn decrypt_inner(em: Vec<u8>, k: usize) -> Result<(u8, Vec<u8>, u32)> {
     // octets, followed by a 0, followed by the message.
     //   looking_for_index: 1 iff we are still looking for the zero.
     //   index: the offset of the first zero byte.
-    let mut looking_for_index = 1u8;
+    let mut looking_for_index = Choice::TRUE;
     let mut index = 0u32;
 
     for (i, el) in em.iter().enumerate().skip(2) {
         let equals0 = el.ct_eq(&0u8);
-        index.ct_assign(&(i as u32), Choice::new(looking_for_index) & equals0);
-        looking_for_index.ct_assign(&0u8, equals0);
+        index.ct_assign(&(i as u32), looking_for_index & equals0);
+        looking_for_index &= !equals0;
     }
 
     // The PS padding must be at least 8 bytes long, and it starts two
@@ -109,9 +109,8 @@ fn decrypt_inner(em: Vec<u8>, k: usize) -> Result<(u8, Vec<u8>, u32)> {
     // Ref: https://github.com/dalek-cryptography/subtle/issues/20
     // This is currently copy & paste from the constant time impl in
     // go, but very likely not sufficient.
-    let valid_ps = Choice::new((((2i32 + 8i32 - index as i32 - 1i32) >> 31) & 1) as u8);
-    let valid =
-        first_byte_is_zero & second_byte_is_two & Choice::new(!looking_for_index & 1) & valid_ps;
+    let valid_ps = Choice::from_u8_lsb((((2i32 + 8i32 - index as i32 - 1i32) >> 31) & 1) as u8);
+    let valid = first_byte_is_zero & second_byte_is_two & !looking_for_index & valid_ps;
     index = u32::ct_select(&0, &(index + 1), valid);
 
     Ok((valid.to_u8(), em, index))
