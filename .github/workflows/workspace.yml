@@ -44,8 +44,7 @@ jobs:
       - uses: RustCrypto/actions/cargo-cache@master
       - uses: dtolnay/rust-toolchain@master
         with:
-          # We need Nightly for doc_auto_cfg
-          toolchain: nightly-2025-02-22
+          toolchain: stable
       - uses: Swatinem/rust-cache@v2
       - env:
           RUSTDOCFLAGS: "-Dwarnings --cfg docsrs"

@@ -61,7 +61,6 @@ std = ["pkcs1?/std", "pkcs8?/std"]
 
 [package.metadata.docs.rs]
 features = ["std", "serde", "hazmat", "sha2"]
-rustdoc-args = ["--cfg", "docsrs"]
 
 [profile.dev]
 opt-level = 2
