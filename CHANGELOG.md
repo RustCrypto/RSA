@@ -4,6 +4,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.10 (2026-01-06)
+### Fixed
+- do not panic on a prime being 1 when loading a secret key ([#624])
+
+[#624]: https://github.com/RustCrypto/RSA/pull/624
+
+
 ## 0.9.9 (2025-11-13)
 ### Fixed
 - Support for cryptographic operations with larger keys ([#594])
