@@ -45,10 +45,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-      - env:
-          RUSTDOCFLAGS: "-Dwarnings --cfg docsrs"
-        run: cargo doc --no-deps --features std,serde,hazmat,sha2
+      - run: cargo doc --no-deps --all-features
 
   typos:
     runs-on: ubuntu-latest
