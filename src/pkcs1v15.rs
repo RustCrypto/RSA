@@ -160,7 +160,67 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
     let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
-    pkcs1v15_encrypt_unpad(em, priv_key.size())
+    pkcs1v15_encrypt_unpad(em.to_vec(), priv_key.size())
+}
+
+/// Decrypts a plaintext using RSA and PKCS#1 v1.5 padding with implicit rejection.
+///
+/// This function implements the implicit rejection mechanism as described in
+/// [IETF draft-irtf-cfrg-rsa-guidance](https://datatracker.ietf.org/doc/draft-irtf-cfrg-rsa-guidance/).
+/// Instead of returning an error on invalid padding, it returns a deterministic
+/// synthetic plaintext derived from the ciphertext, preventing Bleichenbacher/Marvin
+/// timing attacks.
+///
+/// # Arguments
+/// * `rng` - Optional RNG for RSA blinding (recommended for additional side-channel protection)
+/// * `priv_key` - The RSA private key
+/// * `ciphertext` - The ciphertext to decrypt
+/// * `expected_len` - The expected length of the plaintext (e.g., 48 for TLS premaster secret)
+///
+/// # Returns
+/// Either the actual plaintext (if padding was valid and length matches) or a
+/// synthetic plaintext of `expected_len` bytes.
+#[cfg(feature = "implicit-rejection")]
+#[inline]
+pub(crate) fn decrypt_implicit_rejection<R: TryCryptoRng + ?Sized>(
+    rng: Option<&mut R>,
+    priv_key: &RsaPrivateKey,
+    ciphertext: &[u8],
+    expected_len: usize,
+) -> Result<Vec<u8>> {
+    use crate::algorithms::pad::uint_to_be_pad;
+    use crate::traits::PrivateKeyParts;
+
+    key::check_public(priv_key)?;
+
+    // Derive the implicit rejection key from the private key components
+    let d_bytes = uint_to_be_pad(priv_key.d().clone(), priv_key.size())?;
+    let prime_bytes: Vec<Vec<u8>> = priv_key
+        .primes()
+        .iter()
+        .map(|p| {
+            let bits = p.bits();
+            let byte_len = ((bits + 7) / 8) as usize;
+            uint_to_be_pad(p.clone(), byte_len)
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let prime_refs: Vec<&[u8]> = prime_bytes.iter().map(|v| v.as_slice()).collect();
+
+    let key_hash = derive_implicit_rejection_key(&d_bytes, &prime_refs);
+
+    // Perform RSA decryption with optional blinding for additional side-channel protection
+    let ciphertext_uint = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
+    let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext_uint)?;
+    let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
+
+    // Use implicit rejection unpadding
+    Ok(pkcs1v15_encrypt_unpad_implicit_rejection(
+        em.to_vec(),
+        priv_key.size(),
+        ciphertext,
+        &key_hash,
+        expected_len,
+    ))
 }
 
 /// Calculates the signature of hashed using
@@ -651,5 +711,370 @@ mod tests {
         verifying_key
             .verify_prehash(msg, &Signature::try_from(expected_sig.as_slice()).unwrap())
             .expect("failed to verify");
+    }
+
+    #[cfg(feature = "implicit-rejection")]
+    mod implicit_rejection_tests {
+        use super::*;
+        use crate::traits::ImplicitRejectionDecryptor;
+
+        #[test]
+        fn test_implicit_rejection_valid_ciphertext() {
+            // Test that valid ciphertext decrypts correctly with implicit rejection
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
+            let priv_key = get_private_key();
+            let pub_key: RsaPublicKey = priv_key.clone().into();
+
+            let plaintext = b"hello world";
+            let ciphertext = encrypt(&mut rng, &pub_key, plaintext).unwrap();
+
+            let decrypting_key = DecryptingKey::new(priv_key);
+            let decrypted = decrypting_key
+                .decrypt_implicit_rejection(&ciphertext, plaintext.len())
+                .unwrap();
+
+            assert_eq!(decrypted, plaintext);
+        }
+
+        #[test]
+        fn test_implicit_rejection_invalid_ciphertext() {
+            // Test that invalid ciphertext returns synthetic message (not an error)
+            let priv_key = get_private_key();
+            let decrypting_key = DecryptingKey::new(priv_key.clone());
+
+            // Create an invalid ciphertext (random garbage)
+            let invalid_ciphertext = vec![0x42u8; priv_key.size()];
+            let expected_len = 48; // TLS premaster secret length
+
+            // Should NOT return an error - that would leak timing information
+            let result = decrypting_key.decrypt_implicit_rejection(&invalid_ciphertext, expected_len);
+            assert!(result.is_ok());
+
+            let synthetic = result.unwrap();
+            assert_eq!(synthetic.len(), expected_len);
+        }
+
+        #[test]
+        fn test_implicit_rejection_deterministic() {
+            // Test that the same invalid ciphertext always produces the same synthetic message
+            let priv_key = get_private_key();
+            let decrypting_key = DecryptingKey::new(priv_key.clone());
+
+            let invalid_ciphertext = vec![0x42u8; priv_key.size()];
+            let expected_len = 48;
+
+            let result1 = decrypting_key
+                .decrypt_implicit_rejection(&invalid_ciphertext, expected_len)
+                .unwrap();
+            let result2 = decrypting_key
+                .decrypt_implicit_rejection(&invalid_ciphertext, expected_len)
+                .unwrap();
+
+            assert_eq!(result1, result2, "Synthetic message should be deterministic");
+        }
+
+        #[test]
+        fn test_implicit_rejection_different_ciphertexts() {
+            // Test that different invalid ciphertexts produce different synthetic messages
+            let priv_key = get_private_key();
+            let decrypting_key = DecryptingKey::new(priv_key.clone());
+
+            let invalid_ciphertext1 = vec![0x42u8; priv_key.size()];
+            let invalid_ciphertext2 = vec![0x43u8; priv_key.size()];
+            let expected_len = 48;
+
+            let result1 = decrypting_key
+                .decrypt_implicit_rejection(&invalid_ciphertext1, expected_len)
+                .unwrap();
+            let result2 = decrypting_key
+                .decrypt_implicit_rejection(&invalid_ciphertext2, expected_len)
+                .unwrap();
+
+            assert_ne!(
+                result1, result2,
+                "Different ciphertexts should produce different synthetic messages"
+            );
+        }
+
+        #[test]
+        fn test_implicit_rejection_length_mismatch() {
+            // Test that valid padding but wrong length returns synthetic message
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
+            let priv_key = get_private_key();
+            let pub_key: RsaPublicKey = priv_key.clone().into();
+
+            let plaintext = b"hello"; // 5 bytes
+            let ciphertext = encrypt(&mut rng, &pub_key, plaintext).unwrap();
+
+            let decrypting_key = DecryptingKey::new(priv_key);
+
+            // Request different length than actual plaintext
+            let result = decrypting_key
+                .decrypt_implicit_rejection(&ciphertext, 48) // Request 48 bytes, not 5
+                .unwrap();
+
+            // Should get synthetic message of requested length
+            assert_eq!(result.len(), 48);
+            // Should NOT be the original plaintext (padded or otherwise)
+            assert_ne!(&result[..5], plaintext);
+        }
+
+        #[test]
+        fn test_implicit_rejection_blinded() {
+            // Test that blinded decryption works correctly
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
+            let priv_key = get_private_key();
+            let pub_key: RsaPublicKey = priv_key.clone().into();
+
+            let plaintext = b"hello world";
+            let ciphertext = encrypt(&mut rng, &pub_key, plaintext).unwrap();
+
+            let decrypting_key = DecryptingKey::new(priv_key);
+
+            // Blinded decryption should produce same result as non-blinded
+            let result_blinded = decrypting_key
+                .decrypt_implicit_rejection_blinded(&mut rng, &ciphertext, plaintext.len())
+                .unwrap();
+
+            assert_eq!(result_blinded, plaintext);
+        }
+
+        #[test]
+        fn test_implicit_rejection_blinded_invalid() {
+            // Test that blinded decryption of invalid ciphertext returns synthetic message
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
+            let priv_key = get_private_key();
+            let decrypting_key = DecryptingKey::new(priv_key.clone());
+
+            let invalid_ciphertext = vec![0x42u8; priv_key.size()];
+            let expected_len = 48;
+
+            // Blinded and non-blinded should produce same synthetic message
+            // (since synthetic is derived from ciphertext, not affected by blinding)
+            let result_blinded = decrypting_key
+                .decrypt_implicit_rejection_blinded(&mut rng, &invalid_ciphertext, expected_len)
+                .unwrap();
+            let result_non_blinded = decrypting_key
+                .decrypt_implicit_rejection(&invalid_ciphertext, expected_len)
+                .unwrap();
+
+            assert_eq!(result_blinded.len(), expected_len);
+            assert_eq!(result_blinded, result_non_blinded);
+        }
+    }
+
+    /// Test vectors based on IETF draft-irtf-cfrg-rsa-guidance-06 Appendix B
+    /// behavior (not exact vectors due to key dependency).
+    /// <https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-rsa-guidance-06#appendix-B.1>
+    #[cfg(all(test, feature = "implicit-rejection"))]
+    mod ietf_behavior_tests {
+        use super::*;
+        use crate::traits::ImplicitRejectionDecryptor;
+
+        /// Test valid ciphertext - should return correct plaintext
+        #[test]
+        fn test_valid_ciphertext_decrypts_correctly() {
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
+            let priv_key = get_private_key();
+            let pub_key: RsaPublicKey = priv_key.clone().into();
+
+            // Test with various message lengths like IETF B.1.2
+            let plaintext = b"lorem ipsum dolor sit amet";
+            let ciphertext = encrypt(&mut rng, &pub_key, plaintext).unwrap();
+
+            let decrypting_key = DecryptingKey::new(priv_key);
+            let result = decrypting_key
+                .decrypt_implicit_rejection(&ciphertext, plaintext.len())
+                .unwrap();
+
+            assert_eq!(result, plaintext);
+        }
+
+        /// Test empty message - like IETF B.1.3
+        #[test]
+        fn test_valid_empty_message() {
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
+            let priv_key = get_private_key();
+            let pub_key: RsaPublicKey = priv_key.clone().into();
+
+            let plaintext = b"";
+            let ciphertext = encrypt(&mut rng, &pub_key, plaintext).unwrap();
+
+            let decrypting_key = DecryptingKey::new(priv_key);
+            let result = decrypting_key
+                .decrypt_implicit_rejection(&ciphertext, 0)
+                .unwrap();
+
+            assert_eq!(result.len(), 0);
+        }
+
+        /// Test invalid ciphertext returns synthetic - like IETF B.1.5
+        #[test]
+        fn test_invalid_ciphertext_returns_synthetic() {
+            let priv_key = get_private_key();
+            let decrypting_key = DecryptingKey::new(priv_key.clone());
+
+            // Random invalid ciphertext
+            let invalid_ciphertext = vec![0x42u8; priv_key.size()];
+
+            // Should NOT return error - that would leak information
+            let result = decrypting_key.decrypt_implicit_rejection(&invalid_ciphertext, 0);
+            assert!(result.is_ok());
+        }
+
+        /// Test that synthetic message is deterministic - critical for security
+        /// Referenced in IETF Section 7.3 Security Analysis
+        #[test]
+        fn test_synthetic_is_deterministic() {
+            let priv_key = get_private_key();
+            let decrypting_key = DecryptingKey::new(priv_key.clone());
+
+            let invalid_ciphertext = vec![0x42u8; priv_key.size()];
+
+            let result1 = decrypting_key
+                .decrypt_implicit_rejection(&invalid_ciphertext, 11)
+                .unwrap();
+            let result2 = decrypting_key
+                .decrypt_implicit_rejection(&invalid_ciphertext, 11)
+                .unwrap();
+            let result3 = decrypting_key
+                .decrypt_implicit_rejection(&invalid_ciphertext, 11)
+                .unwrap();
+
+            assert_eq!(result1, result2);
+            assert_eq!(result2, result3);
+        }
+
+        /// Test different invalid ciphertexts produce different synthetic messages
+        /// This ensures the PRF is working correctly
+        #[test]
+        fn test_different_ciphertexts_different_synthetics() {
+            let priv_key = get_private_key();
+            let decrypting_key = DecryptingKey::new(priv_key.clone());
+
+            let invalid1 = vec![0x42u8; priv_key.size()];
+            let invalid2 = vec![0x43u8; priv_key.size()];
+            let invalid3 = vec![0x44u8; priv_key.size()];
+
+            let result1 = decrypting_key
+                .decrypt_implicit_rejection(&invalid1, 11)
+                .unwrap();
+            let result2 = decrypting_key
+                .decrypt_implicit_rejection(&invalid2, 11)
+                .unwrap();
+            let result3 = decrypting_key
+                .decrypt_implicit_rejection(&invalid3, 11)
+                .unwrap();
+
+            assert_ne!(result1, result2);
+            assert_ne!(result2, result3);
+            assert_ne!(result1, result3);
+        }
+
+        /// Test wrong expected length returns synthetic - like IETF behavior
+        /// When correct padding but wrong length, should return synthetic
+        #[test]
+        fn test_wrong_length_returns_synthetic() {
+            let mut rng = ChaCha8Rng::from_seed([42; 32]);
+            let priv_key = get_private_key();
+            let pub_key: RsaPublicKey = priv_key.clone().into();
+
+            let plaintext = b"hello"; // 5 bytes
+            let ciphertext = encrypt(&mut rng, &pub_key, plaintext).unwrap();
+
+            let decrypting_key = DecryptingKey::new(priv_key);
+
+            // Request wrong length
+            let result = decrypting_key
+                .decrypt_implicit_rejection(&ciphertext, 48)
+                .unwrap();
+
+            assert_eq!(result.len(), 48);
+            assert_ne!(&result[..5], plaintext);
+        }
+
+        /// Test that ciphertext starting with zero byte still works
+        /// Like IETF B.1.4
+        #[test]
+        fn test_ciphertext_leading_zero() {
+            // Generate ciphertexts until we get one starting with 0x00
+            let mut rng = ChaCha8Rng::from_seed([100; 32]);
+            let priv_key = get_private_key();
+            let pub_key: RsaPublicKey = priv_key.clone().into();
+
+            let plaintext = b"test message";
+
+            // Try to find a ciphertext starting with 0x00 (rare but possible)
+            // If not found, just ensure we can decrypt normally
+            for seed_offset in 0u8..=255 {
+                let mut rng = ChaCha8Rng::from_seed([seed_offset; 32]);
+                let ciphertext = encrypt(&mut rng, &pub_key, plaintext).unwrap();
+
+                let decrypting_key = DecryptingKey::new(priv_key.clone());
+                let result = decrypting_key
+                    .decrypt_implicit_rejection(&ciphertext, plaintext.len())
+                    .unwrap();
+
+                assert_eq!(result, plaintext);
+
+                // If we found one starting with 0x00, we've tested the edge case
+                if ciphertext[0] == 0x00 {
+                    break;
+                }
+            }
+        }
+
+        /// Test various synthetic message lengths
+        #[test]
+        fn test_various_synthetic_lengths() {
+            let priv_key = get_private_key();
+            let decrypting_key = DecryptingKey::new(priv_key.clone());
+
+            let invalid_ciphertext = vec![0x55u8; priv_key.size()];
+
+            // Test different lengths like IETF test vectors cover
+            for len in [0, 1, 10, 11, 26, 48, 100, 200] {
+                let result = decrypting_key
+                    .decrypt_implicit_rejection(&invalid_ciphertext, len)
+                    .unwrap();
+                assert_eq!(result.len(), len);
+            }
+        }
+
+        /// Test that API matches IETF Section 8 "Safe API" requirements
+        /// No errors returned for invalid padding, only for publicly invalid (e.g., ciphertext too large)
+        #[test]
+        fn test_safe_api_no_padding_errors() {
+            let priv_key = get_private_key();
+            let decrypting_key = DecryptingKey::new(priv_key.clone());
+
+            // Various "invalid" ciphertexts that would fail padding checks
+            // Note: Ciphertexts must be < N (the modulus), so we use values that
+            // are valid RSA inputs but will have invalid PKCS#1 v1.5 padding after decryption.
+            // Values like 0x00...00 or very large values may be rejected before decryption
+            // as a public check (not a timing side-channel).
+            let test_cases: Vec<Vec<u8>> = vec![
+                vec![0x42; priv_key.size()], // Random pattern - valid ciphertext range
+                vec![0x21; priv_key.size()], // Another random pattern
+                vec![0x55; priv_key.size()], // Yet another pattern
+                {
+                    // Sequential bytes starting at non-zero to avoid 0 mod N
+                    let mut v = vec![0x01u8; priv_key.size()];
+                    for (i, b) in v.iter_mut().enumerate() {
+                        *b = ((i + 1) & 0xFF) as u8;
+                    }
+                    v
+                },
+            ];
+
+            for ciphertext in test_cases {
+                // None of these should return an error - that would be the Bleichenbacher oracle!
+                let result = decrypting_key.decrypt_implicit_rejection(&ciphertext, 48);
+                assert!(
+                    result.is_ok(),
+                    "Implicit rejection should never return padding errors"
+                );
+            }
+        }
     }
 }

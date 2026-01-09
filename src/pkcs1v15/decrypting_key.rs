@@ -10,6 +10,9 @@ use rand_core::CryptoRng;
 use serde::{Deserialize, Serialize};
 use zeroize::ZeroizeOnDrop;
 
+#[cfg(feature = "implicit-rejection")]
+use crate::traits::ImplicitRejectionDecryptor;
+
 /// Decryption key for PKCS#1 v1.5 decryption as described in [RFC8017 § 7.2].
 ///
 /// [RFC8017 § 7.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.2
@@ -39,6 +42,22 @@ impl RandomizedDecryptor for DecryptingKey {
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
         decrypt(Some(rng), &self.inner, ciphertext)
+    }
+}
+
+#[cfg(feature = "implicit-rejection")]
+impl ImplicitRejectionDecryptor for DecryptingKey {
+    fn decrypt_implicit_rejection(&self, ciphertext: &[u8], expected_len: usize) -> Result<Vec<u8>> {
+        super::decrypt_implicit_rejection::<DummyRng>(None, &self.inner, ciphertext, expected_len)
+    }
+
+    fn decrypt_implicit_rejection_blinded<R: CryptoRng + ?Sized>(
+        &self,
+        rng: &mut R,
+        ciphertext: &[u8],
+        expected_len: usize,
+    ) -> Result<Vec<u8>> {
+        super::decrypt_implicit_rejection(Some(rng), &self.inner, ciphertext, expected_len)
     }
 }
 
