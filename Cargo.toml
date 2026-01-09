@@ -59,8 +59,10 @@ getrandom = ["crypto-bigint/getrandom", "crypto-common"]
 serde = ["encoding", "dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pkcs5 = ["pkcs8/encryption"]
 std = ["pkcs1?/std", "pkcs8?/std"]
+sha1 = ["dep:sha1"]
+sha2 = ["dep:sha2"]
 # Implicit rejection for PKCS#1 v1.5 decryption (Marvin attack mitigation)
-implicit-rejection = ["dep:hmac", "dep:sha2"]
+implicit-rejection = ["dep:hmac", "sha2"]
 
 [package.metadata.docs.rs]
 features = ["std", "serde", "hazmat", "sha2"]
