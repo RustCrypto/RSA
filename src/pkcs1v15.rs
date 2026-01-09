@@ -747,7 +747,8 @@ mod tests {
             let expected_len = 48; // TLS premaster secret length
 
             // Should NOT return an error - that would leak timing information
-            let result = decrypting_key.decrypt_implicit_rejection(&invalid_ciphertext, expected_len);
+            let result =
+                decrypting_key.decrypt_implicit_rejection(&invalid_ciphertext, expected_len);
             assert!(result.is_ok());
 
             let synthetic = result.unwrap();
@@ -770,7 +771,10 @@ mod tests {
                 .decrypt_implicit_rejection(&invalid_ciphertext, expected_len)
                 .unwrap();
 
-            assert_eq!(result1, result2, "Synthetic message should be deterministic");
+            assert_eq!(
+                result1, result2,
+                "Synthetic message should be deterministic"
+            );
         }
 
         #[test]

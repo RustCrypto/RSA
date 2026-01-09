@@ -47,7 +47,11 @@ impl RandomizedDecryptor for DecryptingKey {
 
 #[cfg(feature = "implicit-rejection")]
 impl ImplicitRejectionDecryptor for DecryptingKey {
-    fn decrypt_implicit_rejection(&self, ciphertext: &[u8], expected_len: usize) -> Result<Vec<u8>> {
+    fn decrypt_implicit_rejection(
+        &self,
+        ciphertext: &[u8],
+        expected_len: usize,
+    ) -> Result<Vec<u8>> {
         super::decrypt_implicit_rejection::<DummyRng>(None, &self.inner, ciphertext, expected_len)
     }
 

@@ -52,7 +52,8 @@ pub trait ImplicitRejectionDecryptor {
     /// # Returns
     /// Either the actual plaintext (if padding was valid) or a synthetic plaintext
     /// of `expected_len` bytes.
-    fn decrypt_implicit_rejection(&self, ciphertext: &[u8], expected_len: usize) -> Result<Vec<u8>>;
+    fn decrypt_implicit_rejection(&self, ciphertext: &[u8], expected_len: usize)
+        -> Result<Vec<u8>>;
 
     /// Decrypt the ciphertext with implicit rejection and RSA blinding.
     ///
