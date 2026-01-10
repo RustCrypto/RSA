@@ -154,7 +154,9 @@ pub(crate) fn implicit_rejection_prf(
         let remaining = output_len - result.len();
         let take = core::cmp::min(remaining, block.len());
         result.extend_from_slice(&block[..take]);
-        counter += 1;
+        counter = counter
+            .checked_add(1)
+            .expect("implicit rejection PRF counter overflow");
     }
 
     result
