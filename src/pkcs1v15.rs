@@ -1002,7 +1002,6 @@ mod tests {
         #[test]
         fn test_ciphertext_leading_zero() {
             // Generate ciphertexts until we get one starting with 0x00
-            let mut rng = ChaCha8Rng::from_seed([100; 32]);
             let priv_key = get_private_key();
             let pub_key: RsaPublicKey = priv_key.clone().into();
 
