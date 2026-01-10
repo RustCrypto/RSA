@@ -231,12 +231,14 @@ pub(crate) fn pkcs1v15_encrypt_unpad_implicit_rejection(
 
     // Constant-time selection between real and synthetic message
     let mut result = vec![0u8; expected_len];
+    let decrypted_len = decrypted.len();
+    debug_assert!(decrypted_len > 0);
     for (i, out_byte) in result.iter_mut().enumerate() {
-        let real_byte = if (index as usize + i) < decrypted.len() {
-            decrypted[index as usize + i]
-        } else {
-            0u8
-        };
+        // Use branchless, in-bounds indexing to avoid timing side channels.
+        // For valid messages, index as usize + i < decrypted_len, so the modulo
+        // does not change the effective index.
+        let idx = (index as usize + i) % decrypted_len;
+        let real_byte = decrypted[idx];
         let synthetic_byte = synthetic[i];
         *out_byte = u8::ct_select(&synthetic_byte, &real_byte, use_real);
     }
