@@ -45,13 +45,17 @@ pub trait ImplicitRejectionDecryptor {
     /// The caller cannot distinguish between valid and invalid ciphertexts
     /// based on the return value or timing.
     ///
+    /// Note: This method may still return errors for invalid keys, malformed
+    /// ciphertexts (e.g., wrong size), or RSA operation failures. Only padding
+    /// validation errors are suppressed via implicit rejection.
+    ///
     /// # Arguments
     /// * `ciphertext` - The RSA ciphertext to decrypt
     /// * `expected_len` - The expected length of the plaintext (e.g., 48 for TLS premaster secret)
     ///
     /// # Returns
-    /// Either the actual plaintext (if padding was valid) or a synthetic plaintext
-    /// of `expected_len` bytes.
+    /// Either the actual plaintext (if padding was valid and length matches `expected_len`)
+    /// or a synthetic plaintext of `expected_len` bytes.
     fn decrypt_implicit_rejection(&self, ciphertext: &[u8], expected_len: usize)
         -> Result<Vec<u8>>;
 
@@ -61,14 +65,18 @@ pub trait ImplicitRejectionDecryptor {
     /// with the provided RNG for additional side-channel protection against power analysis
     /// and electromagnetic attacks on the modular exponentiation.
     ///
+    /// Note: This method may still return errors for invalid keys, malformed
+    /// ciphertexts (e.g., wrong size), or RSA operation failures. Only padding
+    /// validation errors are suppressed via implicit rejection.
+    ///
     /// # Arguments
     /// * `rng` - Random number generator for blinding
     /// * `ciphertext` - The RSA ciphertext to decrypt
     /// * `expected_len` - The expected length of the plaintext (e.g., 48 for TLS premaster secret)
     ///
     /// # Returns
-    /// Either the actual plaintext (if padding was valid) or a synthetic plaintext
-    /// of `expected_len` bytes.
+    /// Either the actual plaintext (if padding was valid and length matches `expected_len`)
+    /// or a synthetic plaintext of `expected_len` bytes.
     fn decrypt_implicit_rejection_blinded<R: CryptoRng + ?Sized>(
         &self,
         rng: &mut R,
