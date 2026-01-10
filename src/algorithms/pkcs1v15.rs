@@ -170,9 +170,9 @@ pub(crate) fn derive_implicit_rejection_key(d: &[u8], primes: &[&[u8]]) -> [u8; 
     const KEY_LABEL: &[u8] = b"implicit rejection key";
 
     // Concatenate d and all primes as the HMAC key material
-    let mut key_material = Zeroizing::new(
-        Vec::with_capacity(d.len() + primes.iter().map(|p| p.len()).sum::<usize>()),
-    );
+    let mut key_material = Zeroizing::new(Vec::with_capacity(
+        d.len() + primes.iter().map(|p| p.len()).sum::<usize>(),
+    ));
     key_material.extend_from_slice(d);
     for prime in primes {
         key_material.extend_from_slice(prime);
