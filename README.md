@@ -68,8 +68,8 @@ See the [open security issues] on our issue tracker for other known problems.
 
 ~~Notably the implementation of [modular exponentiation is not constant time],
 but timing variability is masked using [random blinding], a commonly used
-technique.~~ This crate is vulnerable to the [Marvin Attack] which could enable
-private key recovery by a network attacker (see [RUSTSEC-2023-0071]).
+technique.~~ ~~This crate is vulnerable to the [Marvin Attack] which could enable
+private key recovery by a network attacker (see [RUSTSEC-2023-0071])~~.
 
 You can follow our work on mitigating this issue in [#390].
 
