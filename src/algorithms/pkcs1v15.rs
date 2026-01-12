@@ -16,11 +16,11 @@ use zeroize::Zeroizing;
 use crate::errors::{Error, Result};
 
 #[cfg(feature = "implicit-rejection")]
-use digest::KeyInit;
-#[cfg(feature = "implicit-rejection")]
-use hmac::{Hmac, Mac};
-#[cfg(feature = "implicit-rejection")]
-use sha2::Sha256;
+use {
+    digest::KeyInit,
+    hmac::{Hmac, Mac},
+    sha2::Sha256
+};
 
 /// Fills the provided slice with random values, which are guaranteed
 /// to not be zero.
