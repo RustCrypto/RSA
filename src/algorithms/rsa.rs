@@ -84,12 +84,12 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
             // m1 = c^dP mod p
             let p_wide = p_params.modulus().resize_unchecked(c.bits_precision());
             let c_mod_dp = (&c % p_wide.as_nz_ref()).resize_unchecked(dp.bits_precision());
-            let cp = BoxedMontyForm::new(c_mod_dp, p_params.clone());
+            let cp = BoxedMontyForm::new(c_mod_dp, p_params);
             let mut m1 = cp.pow(dp);
             // m2 = c^dQ mod q
             let q_wide = q_params.modulus().resize_unchecked(c.bits_precision());
             let c_mod_dq = (&c % q_wide.as_nz_ref()).resize_unchecked(dq.bits_precision());
-            let cq = BoxedMontyForm::new(c_mod_dq, q_params.clone());
+            let cq = BoxedMontyForm::new(c_mod_dq, q_params);
             let m2 = cq.pow(dq).retrieve();
 
             // Note that since `p` and `q` may have different `bits_precision`,
@@ -106,7 +106,7 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
                 Ordering::Greater => (&m2).resize_unchecked(p_params.bits_precision()),
                 Ordering::Equal => m2.clone(),
             };
-            let m2r = BoxedMontyForm::new(m2_mod_p, p_params.clone());
+            let m2r = BoxedMontyForm::new(m2_mod_p, p_params);
             m1 -= &m2r;
 
             // precomputed: qInv = (1/q) mod p
@@ -197,7 +197,7 @@ fn blind<R: TryCryptoRng + ?Sized, K: PublicKeyParts>(
         // r^e (mod n)
         let mut rpowe = pow_mod_params(&r, key.e(), n_params);
         // c * r^e (mod n)
-        let c = mul_mod_params(c, &rpowe, n_params);
+        let c = c.mul_mod(&rpowe, n_params.modulus().as_nz_ref());
         rpowe.zeroize();
 
         c
@@ -225,7 +225,7 @@ fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: &BoxedMontyParams) ->
         "invalid n_params"
     );
 
-    mul_mod_params(m, unblinder, n_params)
+    m.mul_mod(unblinder, n_params.modulus().as_nz_ref())
 }
 
 /// Computes `base.pow_mod(exp, n)` with precomputed `n_params`.
@@ -237,15 +237,7 @@ fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: &BoxedMontyParams
 fn reduce_vartime(n: &BoxedUint, p: &BoxedMontyParams) -> BoxedMontyForm {
     let modulus = p.modulus().as_nz_ref().clone();
     let n_reduced = n.rem_vartime(&modulus).resize_unchecked(p.bits_precision());
-    BoxedMontyForm::new(n_reduced, p.clone())
-}
-
-/// Computes `lhs.mul_mod(rhs, n)` with precomputed `n_params`.
-fn mul_mod_params(lhs: &BoxedUint, rhs: &BoxedUint, n_params: &BoxedMontyParams) -> BoxedUint {
-    // TODO: nicer api in crypto-bigint?
-    let lhs = BoxedMontyForm::new(lhs.clone(), n_params.clone());
-    let rhs = BoxedMontyForm::new(rhs.clone(), n_params.clone());
-    (lhs * rhs).retrieve()
+    BoxedMontyForm::new(n_reduced, p)
 }
 
 /// The following (deterministic) algorithm also recovers the prime factors `p` and `q` of a modulus `n`, given the
@@ -300,7 +292,7 @@ pub fn recover_primes(
 
     // 4. Let ϒ be the positive square root of b^2 – 4n; if ϒ is not an integer,
     //    then output an error indicator, and exit without further processing.
-    let y = b_squared_minus_four_n.sqrt();
+    let y = b_squared_minus_four_n.floor_sqrt();
 
     let y_squared = y.square();
     let sqrt_is_whole_number = y_squared == b_squared_minus_four_n;

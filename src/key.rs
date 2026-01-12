@@ -525,7 +525,7 @@ impl RsaPrivateKey {
             Ordering::Equal => &q % NonZero::new(p.clone()).expect("`p` is non-zero"),
         };
 
-        let q_mod_p = BoxedMontyForm::new(q_mod_p, p_params.clone());
+        let q_mod_p = BoxedMontyForm::new(q_mod_p, &p_params);
         let qinv = q_mod_p.invert().into_option().ok_or(Error::InvalidPrime)?;
 
         debug_assert_eq!(dp.bits_precision(), p.bits_precision());
