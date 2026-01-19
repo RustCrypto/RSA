@@ -1,6 +1,6 @@
 //! PKCS#8 encoding tests
 
-#![cfg(feature = "encoding")]
+#![cfg(all(feature = "alloc", feature = "encoding"))]
 
 use crypto_bigint::{BoxedUint, CtEq};
 use hex_literal::hex;

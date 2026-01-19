@@ -1,3 +1,4 @@
+#![cfg(feature = "alloc")]
 // simple but prevent regression - see https://github.com/RustCrypto/RSA/issues/329
 #[cfg(feature = "encoding")]
 #[test]
