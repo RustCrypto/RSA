@@ -22,8 +22,8 @@
 //!
 //! Note: requires `sha2` feature of `rsa` crate is enabled.
 //!
-#![cfg_attr(feature = "sha2", doc = "```")]
-#![cfg_attr(not(feature = "sha2"), doc = "```ignore")]
+#![cfg_attr(all(feature = "sha2", feature = "alloc"), doc = "```")]
+#![cfg_attr(any(not(feature = "sha2"), not(feature = "alloc")), doc = "```ignore")]
 //! use rsa::{RsaPrivateKey, RsaPublicKey, Oaep, sha2::Sha256};
 //!
 //! let mut rng = rand::thread_rng();
@@ -45,7 +45,8 @@
 //! ```
 //!
 //! ## PKCS#1 v1.5 encryption
-//! ```
+#![cfg_attr(feature = "alloc", doc = "```")]
+#![cfg_attr(not(feature = "alloc"), doc = "```ignore")]
 //! use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
 //!
 //! let mut rng = rand::thread_rng();
@@ -68,8 +69,8 @@
 //!
 //! Note: requires `sha2` feature of `rsa` crate is enabled.
 //!
-#![cfg_attr(feature = "sha2", doc = "```")]
-#![cfg_attr(not(feature = "sha2"), doc = "```ignore")]
+#![cfg_attr(all(feature = "sha2", feature = "alloc"), doc = "```")]
+#![cfg_attr(any(not(feature = "sha2"), not(feature = "alloc")), doc = "```ignore")]
 //! use rsa::RsaPrivateKey;
 //! use rsa::pkcs1v15::{SigningKey, VerifyingKey};
 //! use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier};
@@ -95,8 +96,8 @@
 //!
 //! Note: requires `sha2` feature of `rsa` crate is enabled.
 //!
-#![cfg_attr(feature = "sha2", doc = "```")]
-#![cfg_attr(not(feature = "sha2"), doc = "```ignore")]
+#![cfg_attr(all(feature = "sha2", feature = "alloc"), doc = "```")]
+#![cfg_attr(any(not(feature = "sha2"), not(feature = "alloc")), doc = "```ignore")]
 //! use rsa::RsaPrivateKey;
 //! use rsa::pss::{BlindedSigningKey, VerifyingKey};
 //! use rsa::signature::{Keypair,RandomizedSigner, SignatureEncoding, Verifier};
@@ -143,7 +144,8 @@
 //!
 //! ### Example
 //!
-//! ```
+#![cfg_attr(feature = "alloc", doc = "```")]
+#![cfg_attr(not(feature = "alloc"), doc = "```ignore")]
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # #[cfg(all(feature = "encoding", feature = "std"))]
 //! # {
@@ -187,7 +189,8 @@
 //!
 //! ### Example
 //!
-//! ```
+#![cfg_attr(feature = "alloc", doc = "```")]
+#![cfg_attr(not(feature = "alloc"), doc = "```ignore")]
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! # #[cfg(all(feature = "encoding", feature = "std"))]
 //! # {
@@ -218,24 +221,36 @@
 #[cfg(doctest)]
 pub struct ReadmeDoctests;
 
+#[cfg(feature = "alloc")]
 #[macro_use]
 extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
+#[cfg(feature = "alloc")]
 pub use crypto_bigint::BoxedUint;
 pub use rand_core;
+#[cfg(feature = "alloc")]
 pub use signature;
 
+#[cfg(feature = "alloc")]
 mod algorithms;
+#[cfg(feature = "alloc")]
 pub mod errors;
+#[cfg(feature = "alloc")]
 pub mod oaep;
+#[cfg(feature = "alloc")]
 pub mod pkcs1v15;
+#[cfg(feature = "alloc")]
 pub mod pss;
+#[cfg(feature = "alloc")]
 pub mod traits;
 
+#[cfg(feature = "alloc")]
 mod dummy_rng;
+#[cfg(feature = "alloc")]
 mod encoding;
+#[cfg(feature = "alloc")]
 mod key;
 
 #[cfg(feature = "encoding")]
@@ -245,6 +260,7 @@ pub use pkcs8;
 #[cfg(feature = "sha2")]
 pub use sha2;
 
+#[cfg(feature = "alloc")]
 pub use crate::{
     errors::{Error, Result},
     key::{RsaPrivateKey, RsaPublicKey},
@@ -254,5 +270,5 @@ pub use crate::{
     traits::keys::CrtValue,
 };
 
-#[cfg(feature = "hazmat")]
+#[cfg(all(feature = "alloc", feature = "hazmat"))]
 pub mod hazmat;
