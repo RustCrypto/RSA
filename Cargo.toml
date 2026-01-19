@@ -15,21 +15,21 @@ exclude = ["marvin_toolkit/", "thirdparty/"]
 
 [dependencies]
 const-oid = { version = "0.10", default-features = false }
-crypto-bigint = { version = "0.7.0-rc.16", default-features = false, features = ["zeroize", "alloc"] }
+crypto-bigint = { version = "0.7.0-rc.16", default-features = false, features = ["zeroize"] }
 crypto-primes = { version = "0.7.0-pre.6", default-features = false }
-digest = { version = "0.11.0-rc.4", default-features = false, features = ["alloc", "oid"] }
+digest = { version = "0.11.0-rc.4", default-features = false, features = ["oid"] }
 rand_core = { version = "0.10.0-rc-2", default-features = false }
-signature = { version = "3.0.0-rc.5", default-features = false, features = ["alloc", "digest", "rand_core"] }
-zeroize = { version = "1.8", features = ["alloc"] }
+signature = { version = "3.0.0-rc.5", default-features = false, features = ["digest", "rand_core"] }
+zeroize = { version = "1.8" }
 
 # optional dependencies
 crypto-common = { version = "0.2.0-rc.8", optional = true, features = ["getrandom"] }
-pkcs1 = { version = "0.8.0-rc.3", optional = true, default-features = false, features = ["alloc", "pem"] }
-pkcs8 = { version = "0.11.0-rc.8", optional = true, default-features = false, features = ["alloc", "pem"] }
+pkcs1 = { version = "0.8.0-rc.3", optional = true, default-features = false, features = ["pem"] }
+pkcs8 = { version = "0.11.0-rc.8", optional = true, default-features = false, features = ["pem"] }
 serdect = { version = "0.4", optional = true }
 sha1 = { version = "0.11.0-rc.3", optional = true, default-features = false, features = ["oid"] }
 sha2 = { version = "0.11.0-rc.3", optional = true, default-features = false, features = ["oid"] }
-spki = { version = "0.8.0-rc.4", optional = true, default-features = false, features = ["alloc"] }
+spki = { version = "0.8.0-rc.4", optional = true, default-features = false }
 serde = { version = "1.0.184", optional = true, default-features = false, features = ["derive"] }
 
 [dev-dependencies]
@@ -51,16 +51,17 @@ rstest = "0.26.1"
 name = "key"
 
 [features]
-default = ["std", "encoding"]
+default = ["std", "alloc", "encoding"]
 encoding = ["dep:pkcs1", "dep:pkcs8", "dep:spki"]
 hazmat = []
 getrandom = ["crypto-bigint/getrandom", "crypto-common"]
 serde = ["encoding", "dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pkcs5 = ["pkcs8/encryption"]
-std = ["pkcs1?/std", "pkcs8?/std"]
+alloc = ["crypto-bigint/alloc", "digest/alloc", "pkcs1?/alloc", "pkcs8?/alloc", "signature/alloc", "spki?/alloc", "zeroize/alloc"]
+std = ["alloc", "pkcs1?/std", "pkcs8?/std"]
 
 [package.metadata.docs.rs]
-features = ["std", "serde", "hazmat", "sha2"]
+features = ["std", "alloc", "serde", "hazmat", "sha2"]
 
 [profile.dev]
 opt-level = 2
