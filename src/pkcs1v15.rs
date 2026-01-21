@@ -31,6 +31,140 @@ use crate::errors::{Error, Result};
 use crate::key::{self, RsaPrivateKey, RsaPublicKey};
 use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
 
+#[cfg(not(feature = "getrandom"))]
+use crate::dummy_rng::DummyRng;
+#[cfg(feature = "getrandom")]
+use crypto_common::getrandom::SysRng;
+
+impl RsaPublicKey {
+    /// Perform PKCS#1v1.5 encryption, encrypting the given `plaintext` message with this public
+    /// key.
+    #[cfg(feature = "getrandom")]
+    pub fn pkcs1v15_encrypt(&self, plaintext: &[u8]) -> Result<Vec<u8>> {
+        self.pkcs1v15_encrypt_with_rng(&mut SysRng, plaintext)
+    }
+
+    /// Perform PKCS#1v1.5 encryption, obtaining randomness from the provided RNG.
+    pub fn pkcs1v15_encrypt_with_rng<Rng>(&self, rng: &mut Rng, plaintext: &[u8]) -> Result<Vec<u8>>
+    where
+        Rng: TryCryptoRng + ?Sized,
+    {
+        encrypt(rng, self, plaintext)
+    }
+
+    /// Verify the given message after first hashing it with the [`Digest`] algorithm specified by
+    /// `D`.
+    pub fn pkcs1v15_verify<D>(&self, msg: &[u8], sig: &[u8]) -> Result<()>
+    where
+        D: Digest + AssociatedOid,
+    {
+        let hash = D::digest(msg);
+        self.pkcs1v15_verify_prehash::<D>(&hash, sig)
+    }
+
+    /// Verify the hash of a message computed using the [`Digest`] algorithm  specified by `D`.
+    pub fn pkcs1v15_verify_prehash<D>(&self, hash: &[u8], sig: &[u8]) -> Result<()>
+    where
+        D: Digest + AssociatedOid,
+    {
+        if hash.len() != <D as Digest>::output_size() {
+            return Err(Error::InputNotHashed);
+        }
+
+        let prefix = pkcs1v15_generate_prefix::<D>();
+        let sig = BoxedUint::from_be_slice_vartime(sig);
+        verify(self, &prefix, hash, &sig)
+    }
+}
+
+impl RsaPrivateKey {
+    /// Perform PKCS#1v1.5 decryption, decrypting the given `ciphertext` message with this private
+    /// key.
+    pub fn pkcs1v15_decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
+        #[cfg(feature = "getrandom")]
+        {
+            self.pkcs1v15_decrypt_with_rng(&mut SysRng, ciphertext)
+        }
+        #[cfg(not(feature = "getrandom"))]
+        {
+            decrypt(Option::<&mut DummyRng>::None, self, ciphertext)
+        }
+    }
+
+    /// Perform PKCS#1v1.5 decryption, blinding the operation with the provided RNG.
+    pub fn pkcs1v15_decrypt_with_rng<Rng>(
+        &self,
+        rng: &mut Rng,
+        ciphertext: &[u8],
+    ) -> Result<Vec<u8>>
+    where
+        Rng: TryCryptoRng + ?Sized,
+    {
+        decrypt(Some(rng), self, ciphertext)
+    }
+
+    /// Sign the given message after first hashing it with the [`Digest`] algorithm specified by
+    /// `D`.
+    pub fn pkcs1v15_sign<D>(&self, msg: &[u8]) -> Result<Vec<u8>>
+    where
+        D: Digest + AssociatedOid,
+    {
+        let hash = D::digest(msg);
+        self.pkcs1v15_sign_prehash::<D>(&hash)
+    }
+
+    /// Sign the given message after first hashing it with the [`Digest`] algorithm specified by
+    /// `D`.
+    pub fn pkcs1v15_sign_prehash<D>(&self, hash: &[u8]) -> Result<Vec<u8>>
+    where
+        D: Digest + AssociatedOid,
+    {
+        #[cfg(feature = "getrandom")]
+        {
+            self.pkcs1v15_sign_prehash_with_rng::<D, _>(&mut SysRng, hash)
+        }
+        #[cfg(not(feature = "getrandom"))]
+        {
+            if hash.len() != <D as Digest>::output_size() {
+                return Err(Error::InputNotHashed);
+            }
+
+            let prefix = pkcs1v15_generate_prefix::<D>();
+            sign(Option::<&mut DummyRng>::None, self, &prefix, hash)
+        }
+    }
+
+    /// Sign the given message after first hashing it with the [`Digest`] algorithm specified by
+    /// `D`.
+    pub fn pkcs1v15_sign_with_rng<D, Rng>(&self, rng: &mut Rng, msg: &[u8]) -> Result<Vec<u8>>
+    where
+        D: Digest + AssociatedOid,
+        Rng: TryCryptoRng + ?Sized,
+    {
+        let hash = D::digest(msg);
+        self.pkcs1v15_sign_prehash_with_rng::<D, Rng>(rng, &hash)
+    }
+
+    /// Sign the resulting hash of a message after first hashing it with the [`Digest`] algorithm
+    /// specified by `D`.
+    pub fn pkcs1v15_sign_prehash_with_rng<D, Rng>(
+        &self,
+        rng: &mut Rng,
+        hash: &[u8],
+    ) -> Result<Vec<u8>>
+    where
+        D: Digest + AssociatedOid,
+        Rng: TryCryptoRng + ?Sized,
+    {
+        if hash.len() != <D as Digest>::output_size() {
+            return Err(Error::InputNotHashed);
+        }
+
+        let prefix = pkcs1v15_generate_prefix::<D>();
+        sign(Some(rng), self, &prefix, hash)
+    }
+}
+
 /// Encryption using PKCS#1 v1.5 padding.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Pkcs1v15Encrypt;
