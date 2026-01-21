@@ -45,6 +45,12 @@
 //! ```
 //!
 //! ## PKCS#1 v1.5 encryption
+//!
+//! <div class="warning">
+//! <b>Warning:</b>
+//! See security notes in the <code><a href="./pkcs1v15/index.html">pkcs1v15</a></code> module.
+//! </div>
+//!
 //! ```
 //! use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
 //!
@@ -65,6 +71,11 @@
 //! ```
 //!
 //! ## PKCS#1 v1.5 signatures
+//!
+//! <div class="warning">
+//! <b>Warning:</b>
+//! See security notes in the <code><a href="./pkcs1v15/index.html">pkcs1v15</a></code> module.
+//! </div>
 //!
 //! Note: requires `sha2` feature of `rsa` crate is enabled.
 //!
