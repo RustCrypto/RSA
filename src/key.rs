@@ -4,7 +4,9 @@ use core::fmt;
 use core::hash::{Hash, Hasher};
 
 use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
-use crypto_bigint::{BoxedUint, Integer, NonZero, Odd, Resize};
+use crypto_bigint::{
+    BoxedUint, Integer, Monty, NonZero, Odd, Resize, Unsigned, U2048, U3072, U4096,
+};
 use rand_core::CryptoRng;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 #[cfg(feature = "serde")]
@@ -27,17 +29,27 @@ use crate::traits::{PaddingScheme, SignatureScheme};
 
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone)]
-pub struct RsaPublicKey {
+pub struct GenericRsaPublicKey<U: Unsigned> {
     /// Modulus: product of prime numbers `p` and `q`
-    n: NonZero<BoxedUint>,
+    n: NonZero<U>,
     /// Public exponent: power to which a plaintext message is raised in
     /// order to encrypt it.
     ///
     /// Typically `0x10001` (`65537`)
-    e: BoxedUint,
+    e: U,
 
-    n_params: BoxedMontyParams,
+    n_params: <U::Monty as Monty>::Params,
 }
+
+/// RSA private key using dynamically sized heap-allocated integers for backing storage.
+pub type RsaPublicKey = GenericRsaPublicKey<BoxedUint>;
+
+/// RSA-2048 public key (stack-allocated).
+pub type Rsa2048PublicKey = GenericRsaPublicKey<U2048>;
+/// RSA-3072 public key (stack-allocated).
+pub type Rsa3072PublicKey = GenericRsaPublicKey<U3072>;
+/// RSA-4096 public key (stack-allocated).
+pub type Rsa4096PublicKey = GenericRsaPublicKey<U4096>;
 
 impl Eq for RsaPublicKey {}
 
@@ -60,16 +72,26 @@ impl Hash for RsaPublicKey {
 
 /// Represents a whole RSA key, public and private parts.
 #[derive(Clone)]
-pub struct RsaPrivateKey {
+pub struct GenericRsaPrivateKey<U: Unsigned + Zeroize> {
     /// Public components of the private key.
-    pubkey_components: RsaPublicKey,
+    pubkey_components: GenericRsaPublicKey<U>,
     /// Private exponent
-    pub(crate) d: BoxedUint,
+    pub(crate) d: U,
     /// Prime factors of N, contains >= 2 elements.
-    pub(crate) primes: Vec<BoxedUint>,
+    pub(crate) primes: Vec<U>,
     /// Precomputed values to speed up private operations
-    pub(crate) precomputed: Option<PrecomputedValues>,
+    pub(crate) precomputed: Option<GenericPrecomputedValues<U>>,
 }
+
+/// RSA private key using dynamically sized heap-allocated integers for backing storage.
+pub type RsaPrivateKey = GenericRsaPrivateKey<BoxedUint>;
+
+/// RSA-2048 private key (stack-allocated).
+pub type Rsa2048PrivateKey = GenericRsaPrivateKey<U2048>;
+/// RSA-3072 private key (stack-allocated).
+pub type Rsa3072PrivateKey = GenericRsaPrivateKey<U3072>;
+/// RSA-4096 private key (stack-allocated).
+pub type Rsa4096PrivateKey = GenericRsaPrivateKey<U4096>;
 
 impl fmt::Debug for RsaPrivateKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -111,46 +133,41 @@ impl Hash for RsaPrivateKey {
     }
 }
 
-impl Drop for RsaPrivateKey {
+impl<U: Unsigned + Zeroize> Drop for GenericRsaPrivateKey<U> {
     fn drop(&mut self) {
         self.d.zeroize();
         self.primes.zeroize();
-        self.precomputed.zeroize();
     }
 }
 
 impl ZeroizeOnDrop for RsaPrivateKey {}
 
 #[derive(Clone)]
-pub(crate) struct PrecomputedValues {
+pub(crate) struct GenericPrecomputedValues<U: Unsigned + Zeroize> {
     /// D mod (P-1)
-    pub(crate) dp: BoxedUint,
+    pub(crate) dp: U,
     /// D mod (Q-1)
-    pub(crate) dq: BoxedUint,
+    pub(crate) dq: U,
     /// Q^-1 mod P
-    pub(crate) qinv: BoxedMontyForm,
+    pub(crate) qinv: U::Monty,
 
     /// Montgomery params for `p`
-    pub(crate) p_params: BoxedMontyParams,
+    pub(crate) p_params: <U::Monty as Monty>::Params,
     /// Montgomery params for `q`
-    pub(crate) q_params: BoxedMontyParams,
+    pub(crate) q_params: <U::Monty as Monty>::Params,
 }
+
+pub(crate) type PrecomputedValues = GenericPrecomputedValues<BoxedUint>;
 
 impl ZeroizeOnDrop for PrecomputedValues {}
 
-impl Zeroize for PrecomputedValues {
-    fn zeroize(&mut self) {
+impl<U: Unsigned + Zeroize> Drop for GenericPrecomputedValues<U> {
+    fn drop(&mut self) {
         self.dp.zeroize();
         self.dq.zeroize();
         // TODO: once these have landed in crypto-bigint
         // self.p_params.zeroize();
         // self.q_params.zeroize();
-    }
-}
-
-impl Drop for PrecomputedValues {
-    fn drop(&mut self) {
-        self.zeroize();
     }
 }
 

@@ -247,7 +247,10 @@ pub use sha2;
 
 pub use crate::{
     errors::{Error, Result},
-    key::{RsaPrivateKey, RsaPublicKey},
+    key::{
+        Rsa2048PrivateKey, Rsa2048PublicKey, Rsa3072PrivateKey, Rsa3072PublicKey,
+        Rsa4096PrivateKey, Rsa4096PublicKey, RsaPrivateKey, RsaPublicKey,
+    },
     oaep::Oaep,
     pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign},
     pss::Pss,
