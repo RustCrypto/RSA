@@ -712,6 +712,7 @@ dependencies = [
  "digest",
  "hex",
  "hex-literal",
+ "hmac",
  "pkcs1",
  "pkcs8",
  "proptest",

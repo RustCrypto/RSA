@@ -27,6 +27,64 @@ pub trait RandomizedDecryptor {
     ) -> Result<Vec<u8>>;
 }
 
+/// Decrypt with implicit rejection to prevent Bleichenbacher/Marvin timing attacks.
+///
+/// Instead of returning an error on invalid PKCS#1 v1.5 padding, this trait
+/// returns a deterministic synthetic message derived from the ciphertext using
+/// a PRF keyed by the private key. This prevents timing side-channels that could
+/// leak information about padding validity.
+///
+/// See [IETF draft-irtf-cfrg-rsa-guidance](https://datatracker.ietf.org/doc/draft-irtf-cfrg-rsa-guidance/)
+/// for the specification of implicit rejection.
+#[cfg(feature = "implicit-rejection")]
+pub trait ImplicitRejectionDecryptor {
+    /// Decrypt the ciphertext with implicit rejection.
+    ///
+    /// This method **never fails** due to padding errors. On invalid padding,
+    /// it returns a deterministic synthetic plaintext derived from the ciphertext.
+    /// The caller cannot distinguish between valid and invalid ciphertexts
+    /// based on the return value or timing.
+    ///
+    /// Note: This method may still return errors for invalid keys, malformed
+    /// ciphertexts (e.g., wrong size), or RSA operation failures. Only padding
+    /// validation errors are suppressed via implicit rejection.
+    ///
+    /// # Arguments
+    /// * `ciphertext` - The RSA ciphertext to decrypt
+    /// * `expected_len` - The expected length of the plaintext (e.g., 48 for TLS premaster secret)
+    ///
+    /// # Returns
+    /// Either the actual plaintext (if padding was valid and length matches `expected_len`)
+    /// or a synthetic plaintext of `expected_len` bytes.
+    fn decrypt_implicit_rejection(&self, ciphertext: &[u8], expected_len: usize)
+        -> Result<Vec<u8>>;
+
+    /// Decrypt the ciphertext with implicit rejection and RSA blinding.
+    ///
+    /// Same as [`decrypt_implicit_rejection`](Self::decrypt_implicit_rejection), but uses RSA blinding
+    /// with the provided RNG for additional side-channel protection against power analysis
+    /// and electromagnetic attacks on the modular exponentiation.
+    ///
+    /// Note: This method may still return errors for invalid keys, malformed
+    /// ciphertexts (e.g., wrong size), or RSA operation failures. Only padding
+    /// validation errors are suppressed via implicit rejection.
+    ///
+    /// # Arguments
+    /// * `rng` - Random number generator for blinding
+    /// * `ciphertext` - The RSA ciphertext to decrypt
+    /// * `expected_len` - The expected length of the plaintext (e.g., 48 for TLS premaster secret)
+    ///
+    /// # Returns
+    /// Either the actual plaintext (if padding was valid and length matches `expected_len`)
+    /// or a synthetic plaintext of `expected_len` bytes.
+    fn decrypt_implicit_rejection_blinded<R: CryptoRng + ?Sized>(
+        &self,
+        rng: &mut R,
+        ciphertext: &[u8],
+        expected_len: usize,
+    ) -> Result<Vec<u8>>;
+}
+
 /// Encryption keypair with an associated encryption key.
 pub trait EncryptingKeypair {
     /// Encrypting key type for this keypair.

@@ -15,6 +15,13 @@ use zeroize::Zeroizing;
 
 use crate::errors::{Error, Result};
 
+#[cfg(feature = "implicit-rejection")]
+use {
+    digest::KeyInit,
+    hmac::{Hmac, Mac},
+    sha2::Sha256
+};
+
 /// Fills the provided slice with random values, which are guaranteed
 /// to not be zero.
 #[inline]
@@ -114,6 +121,131 @@ fn decrypt_inner(em: Vec<u8>, k: usize) -> Result<(u8, Vec<u8>, u32)> {
     index = u32::ct_select(&0, &(index + 1), valid);
 
     Ok((valid.to_u8(), em, index))
+}
+
+/// Implicit Rejection PRF as specified in IETF draft-irtf-cfrg-rsa-guidance.
+///
+/// Generates a deterministic synthetic plaintext from the ciphertext and private key
+/// when padding validation fails. This prevents timing side-channels.
+///
+/// PRF(key, label || ciphertext) where:
+/// - key = HMAC-SHA256(d || p || q, "implicit rejection key")
+/// - label = "implicit rejection PKCS#1 v1.5 ciphertext"
+#[cfg(feature = "implicit-rejection")]
+pub(crate) fn implicit_rejection_prf(
+    key_hash: &[u8; 32],
+    ciphertext: &[u8],
+    output_len: usize,
+) -> Vec<u8> {
+    const LABEL: &[u8] = b"implicit rejection PKCS#1 v1.5 ciphertext";
+
+    // Use HMAC-SHA256 in counter mode to generate enough output bytes
+    let mut result = Vec::with_capacity(output_len);
+    let mut counter: u32 = 0;
+
+    while result.len() < output_len {
+        let mut mac =
+            Hmac::<Sha256>::new_from_slice(key_hash).expect("HMAC can accept any key length");
+        mac.update(&counter.to_be_bytes());
+        mac.update(LABEL);
+        mac.update(ciphertext);
+        let block = mac.finalize().into_bytes();
+
+        let remaining = output_len - result.len();
+        let take = core::cmp::min(remaining, block.len());
+        result.extend_from_slice(&block[..take]);
+        counter = counter
+            .checked_add(1)
+            .expect("implicit rejection PRF counter overflow");
+    }
+
+    result
+}
+
+/// Derive a key for implicit rejection PRF from the private key components.
+///
+/// key = HMAC-SHA256(d || p || q, "implicit rejection key")
+#[cfg(feature = "implicit-rejection")]
+pub(crate) fn derive_implicit_rejection_key(d: &[u8], primes: &[&[u8]]) -> [u8; 32] {
+    const KEY_LABEL: &[u8] = b"implicit rejection key";
+
+    // Concatenate d and all primes as the HMAC key material
+    let mut key_material = Zeroizing::new(Vec::with_capacity(
+        d.len() + primes.iter().map(|p| p.len()).sum::<usize>(),
+    ));
+    key_material.extend_from_slice(d);
+    for prime in primes {
+        key_material.extend_from_slice(prime);
+    }
+
+    let mut mac = Hmac::<Sha256>::new_from_slice(key_material.as_ref())
+        .expect("HMAC can accept any key length");
+    mac.update(KEY_LABEL);
+    let result = mac.finalize().into_bytes();
+
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&result);
+    key
+}
+
+/// Removes the encryption padding scheme from PKCS#1 v1.5 with implicit rejection.
+///
+/// Instead of returning an error on invalid padding, this function returns a
+/// deterministic synthetic message derived from the ciphertext. This prevents
+/// Bleichenbacher/Marvin timing attacks.
+///
+/// # Arguments
+/// * `em` - The decrypted (but still padded) message
+/// * `k` - The key size in bytes
+/// * `ciphertext` - The original ciphertext (used to derive synthetic message)
+/// * `key_hash` - Pre-computed HMAC key derived from private key
+/// * `expected_len` - The expected plaintext length
+///
+/// # Returns
+/// Either the actual plaintext or a synthetic plaintext of `expected_len` bytes
+#[cfg(feature = "implicit-rejection")]
+#[inline]
+pub(crate) fn pkcs1v15_encrypt_unpad_implicit_rejection(
+    em: Vec<u8>,
+    k: usize,
+    ciphertext: &[u8],
+    key_hash: &[u8; 32],
+    expected_len: usize,
+) -> Vec<u8> {
+    // Generate synthetic message first (constant time - always computed)
+    let synthetic = implicit_rejection_prf(key_hash, ciphertext, expected_len);
+
+    // Validate padding in constant time
+    let (valid, decrypted, index) = match decrypt_inner(em, k) {
+        Ok(result) => result,
+        Err(_) => {
+            // If k < 11, return synthetic (this is a non-timing-sensitive check)
+            return synthetic;
+        }
+    };
+
+    // Check if the message length matches expected_len
+    let msg_len = k.saturating_sub(index as usize);
+    let len_matches = Choice::from_u8_lsb((msg_len == expected_len) as u8);
+
+    // Combine validity: padding must be valid AND length must match
+    let use_real = Choice::from_u8_lsb(valid) & len_matches;
+
+    // Constant-time selection between real and synthetic message
+    let mut result = vec![0u8; expected_len];
+    let decrypted_len = decrypted.len();
+    debug_assert!(decrypted_len > 0);
+    for (i, out_byte) in result.iter_mut().enumerate() {
+        // Use branchless, in-bounds indexing to avoid timing side channels.
+        // For valid messages, index as usize + i < decrypted_len, so the modulo
+        // does not change the effective index.
+        let idx = (index as usize + i) % decrypted_len;
+        let real_byte = decrypted[idx];
+        let synthetic_byte = synthetic[i];
+        *out_byte = u8::ct_select(&synthetic_byte, &real_byte, use_real);
+    }
+
+    result
 }
 
 #[inline]

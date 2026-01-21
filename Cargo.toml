@@ -24,6 +24,7 @@ zeroize = { version = "1.8", features = ["alloc"] }
 
 # optional dependencies
 crypto-common = { version = "0.2.0-rc.8", optional = true, features = ["getrandom"] }
+hmac = { version = "0.13.0-rc.0", optional = true, default-features = false }
 pkcs1 = { version = "0.8.0-rc.3", optional = true, default-features = false, features = ["alloc", "pem"] }
 pkcs8 = { version = "0.11.0-rc.9", optional = true, default-features = false, features = ["alloc", "pem"] }
 serdect = { version = "0.4", optional = true }
@@ -58,6 +59,10 @@ getrandom = ["crypto-bigint/getrandom", "crypto-common"]
 serde = ["encoding", "dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pkcs5 = ["pkcs8/encryption"]
 std = ["pkcs1?/std", "pkcs8?/std"]
+sha1 = ["dep:sha1"]
+sha2 = ["dep:sha2"]
+# Implicit rejection for PKCS#1 v1.5 decryption (Marvin attack mitigation)
+implicit-rejection = ["dep:hmac", "sha2"]
 
 [package.metadata.docs.rs]
 features = ["std", "serde", "hazmat", "sha2"]
