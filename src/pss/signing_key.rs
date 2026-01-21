@@ -29,7 +29,7 @@ use {
 
 #[cfg(feature = "getrandom")]
 use {
-    crypto_common::SysRng,
+    crypto_common::getrandom::SysRng,
     signature::{hazmat::PrehashSigner, MultipartSigner, Signer},
 };
 
