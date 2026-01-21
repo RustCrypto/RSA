@@ -15,17 +15,17 @@ exclude = ["marvin_toolkit/", "thirdparty/"]
 
 [dependencies]
 const-oid = { version = "0.10", default-features = false }
-crypto-bigint = { version = "0.7.0-rc.16", default-features = false, features = ["zeroize", "alloc"] }
-crypto-primes = { version = "0.7.0-pre.6", default-features = false }
+crypto-bigint = { version = "0.7.0-rc.20", default-features = false, features = ["zeroize", "alloc"] }
+crypto-primes = { version = "0.7.0-pre.7", default-features = false }
 digest = { version = "0.11.0-rc.4", default-features = false, features = ["alloc", "oid"] }
-rand_core = { version = "0.10.0-rc-2", default-features = false }
+rand_core = { version = "0.10.0-rc-5", default-features = false }
 signature = { version = "3.0.0-rc.5", default-features = false, features = ["alloc", "digest", "rand_core"] }
 zeroize = { version = "1.8", features = ["alloc"] }
 
 # optional dependencies
 crypto-common = { version = "0.2.0-rc.8", optional = true, features = ["getrandom"] }
 pkcs1 = { version = "0.8.0-rc.3", optional = true, default-features = false, features = ["alloc", "pem"] }
-pkcs8 = { version = "0.11.0-rc.8", optional = true, default-features = false, features = ["alloc", "pem"] }
+pkcs8 = { version = "0.11.0-rc.9", optional = true, default-features = false, features = ["alloc", "pem"] }
 serdect = { version = "0.4", optional = true }
 sha1 = { version = "0.11.0-rc.3", optional = true, default-features = false, features = ["oid"] }
 sha2 = { version = "0.11.0-rc.3", optional = true, default-features = false, features = ["oid"] }
@@ -37,8 +37,8 @@ base64ct = { version = "1", features = ["alloc"] }
 hex-literal = "1"
 proptest = "1"
 serde_test = "1.0.89"
-rand = { version = "0.10.0-rc.5", features = ["chacha"] }
-rand_core = { version = "0.10.0-rc-3", default-features = false }
+rand = { version = "0.10.0-rc.7", features = ["chacha"] }
+rand_core = { version = "0.10.0-rc-5", default-features = false }
 sha1 = { version = "0.11.0-rc.3", default-features = false, features = ["oid"] }
 sha2 = { version = "0.11.0-rc.3", default-features = false, features = ["oid"] }
 sha3 = { version = "0.11.0-rc.3", default-features = false, features = ["oid"] }
@@ -67,6 +67,3 @@ opt-level = 2
 
 [profile.bench]
 debug = true
-
-[patch.crates-io]
-rand = { git = "https://github.com/rust-random/rand" }

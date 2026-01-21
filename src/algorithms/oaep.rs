@@ -3,7 +3,7 @@
 use alloc::boxed::Box;
 use alloc::vec::Vec;
 
-use crypto_bigint::{Choice, CtEq, CtOption, CtSelect};
+use crypto_bigint::{Choice, CtAssign, CtEq, CtOption};
 use digest::{Digest, FixedOutputReset};
 use rand_core::TryCryptoRng;
 use zeroize::Zeroizing;
