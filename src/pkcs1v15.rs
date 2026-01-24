@@ -1,5 +1,25 @@
 //! PKCS#1 v1.5 support as described in [RFC8017 § 8.2].
 //!
+//! <div class="warning">
+//! <b>Warning</b>
+//!
+//! PKCS#1 v1.5 padding has a longstanding history of issues generally classed as
+//! [Bleichenbacher Attacks] which were originally discovered in 1998 but keep reappearing in
+//! various forms again and again over the course of decades, including most recently in the 2023
+//! [Marvin Attack], which the `rsa` crate is [still vulnerable] to.
+//!
+//! These attacks can result in complete plaintext recovery for encryption, or signature forgery,
+//! leading to a total failure of either confidentiality or integrity.
+//!
+//! Unless explicitly needed for compatibility reasons, we recommend against using PKCS#1 v1.5,
+//! and suggest using [PSS][`super::pss`] or [OAEP][`super::oaep`] instead (if there is a
+//! requirement to use RSA).
+//! </div>
+//!
+//! [Bleichenbacher Attacks]: https://en.wikipedia.org/wiki/Adaptive_chosen-ciphertext_attack#Practical_attacks
+//! [Marvin Attack]: https://people.redhat.com/~hkario/marvin/
+//! [still vulnerable]: https://github.com/RustCrypto/RSA/issues/626
+//!
 //! # Usage
 //!
 //! See [code example in the toplevel rustdoc](../index.html#pkcs1-v15-signatures).
