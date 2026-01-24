@@ -275,7 +275,7 @@ mod tests {
     use base64ct::{Base64, Encoding};
     use hex_literal::hex;
     use rand::rngs::ChaCha8Rng;
-    use rand_core::{RngCore, SeedableRng};
+    use rand_core::{Rng, SeedableRng};
     use rstest::rstest;
     use sha1::{Digest, Sha1};
     use sha2::Sha256;

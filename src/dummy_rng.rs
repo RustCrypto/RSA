@@ -1,12 +1,12 @@
 use core::convert::Infallible;
-use rand_core::{TryCryptoRng, TryRngCore};
+use rand_core::{TryCryptoRng, TryRng};
 
 /// This is a dummy RNG for cases when we need a concrete RNG type
 /// which does not get used.
 #[derive(Copy, Clone)]
 pub(crate) struct DummyRng;
 
-impl TryRngCore for DummyRng {
+impl TryRng for DummyRng {
     type Error = Infallible;
     fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
         unimplemented!();
