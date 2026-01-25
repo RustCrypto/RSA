@@ -552,8 +552,9 @@ dependencies = [
 
 [[package]]
 name = "pkcs5"
-version = "0.8.0-rc.12"
-source = "git+https://github.com/RustCrypto/formats#7368fd50e14a5a53dc552914a4585ed964417da4"
+version = "0.8.0-rc.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c5a777c6e26664bc9504b3ce3f6133f8f20d9071f130a4f9fcbd3186959d8dd6"
 dependencies = [
  "aes",
  "aes-gcm",
@@ -568,8 +569,9 @@ dependencies = [
 
 [[package]]
 name = "pkcs8"
-version = "0.11.0-rc.9"
-source = "git+https://github.com/RustCrypto/formats#7368fd50e14a5a53dc552914a4585ed964417da4"
+version = "0.11.0-rc.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b226d2cc389763951db8869584fd800cbbe2962bf454e2edeb5172b31ee99774"
 dependencies = [
  "der",
  "pkcs5",
@@ -971,9 +973,9 @@ dependencies = [
 
 [[package]]
 name = "signature"
-version = "3.0.0-rc.8"
+version = "3.0.0-rc.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c04b70a14ee5f15e2e0c785a5fdb2e9a51138dfe13ba3cf8eab037a9e60b1879"
+checksum = "0ad0ce3b3f8efd7406f22e2ca5d02be21cdf3b3d1d53ab141f784de8965c7c7e"
 dependencies = [
  "digest",
  "rand_core 0.10.0-rc-6",
