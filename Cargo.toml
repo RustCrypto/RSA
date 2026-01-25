@@ -16,7 +16,7 @@ exclude = ["marvin_toolkit/", "thirdparty/"]
 [dependencies]
 const-oid = { version = "0.10", default-features = false }
 crypto-bigint = { version = "0.7.0-rc.22", default-features = false, features = ["zeroize", "alloc"] }
-crypto-primes = { version = "0.7.0-pre.7", default-features = false }
+crypto-primes = { version = "0.7.0-pre.8", default-features = false }
 digest = { version = "0.11.0-rc.7", default-features = false, features = ["alloc", "oid"] }
 rand_core = { version = "0.10.0-rc-6", default-features = false }
 signature = { version = "3.0.0-rc.9", default-features = false, features = ["alloc", "digest", "rand_core"] }
@@ -67,9 +67,6 @@ opt-level = 2
 
 [profile.bench]
 debug = true
-
-[patch.crates-io.crypto-primes]
-git = "https://github.com/entropyxyz/crypto-primes"
 
 [patch.crates-io.rand]
 git = "https://github.com/rust-random/rand"
