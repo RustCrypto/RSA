@@ -69,8 +69,7 @@ opt-level = 2
 debug = true
 
 [patch.crates-io.crypto-primes]
-git = "https://github.com/tarcieri/crypto-primes"
-branch = "crypto-bigint/v0.7.0-rc.22"
+git = "https://github.com/entropyxyz/crypto-primes"
 
 [patch.crates-io.pkcs5]
 git = "https://github.com/RustCrypto/formats"
