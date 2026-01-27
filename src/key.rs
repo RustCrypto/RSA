@@ -339,20 +339,16 @@ impl RsaPrivateKey {
         )
     }
 
-    /// Constructs an RSA key pair from individual components:
+    /// Private helper function that constructs an RSA key pair from components
+    /// WITHOUT performing any validation or precomputation.
     ///
-    /// - `n`: RSA modulus
-    /// - `e`: public exponent (i.e. encrypting exponent)
-    /// - `d`: private exponent (i.e. decrypting exponent)
-    /// - `primes`: prime factors of `n`: typically two primes `p` and `q`. More than two primes can
-    ///   be provided for multiprime RSA, however this is generally not recommended. If no `primes`
-    ///   are provided, a prime factor recovery algorithm will be employed to attempt to recover the
-    ///   factors (as described in [NIST SP 800-56B Revision 2] Appendix C.2). This algorithm only
-    ///   works if there are just two prime factors `p` and `q` (as opposed to multiprime), and `e`
-    ///   is between 2^16 and 2^256.
+    /// This is the shared implementation used by `from_components` and
+    /// `from_components_with_large_exponent`.
     ///
-    ///  [NIST SP 800-56B Revision 2]: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf
-    pub fn from_components(
+    /// Callers are responsible for:
+    /// 1. Validating the key (to ensure precomputation won't fail)
+    /// 2. Calling precompute() after validation
+    fn from_components_inner(
         n: BoxedUint,
         e: BoxedUint,
         d: BoxedUint,
@@ -398,7 +394,7 @@ impl RsaPrivateKey {
             })
             .collect();
 
-        let mut k = RsaPrivateKey {
+        let k = RsaPrivateKey {
             pubkey_components: RsaPublicKey {
                 n: n_c,
                 e,
@@ -408,6 +404,65 @@ impl RsaPrivateKey {
             primes,
             precomputed: None,
         };
+
+        Ok(k)
+    }
+
+    /// Constructs an RSA key pair from individual components, accepting exponents outside
+    /// the normal size bounds.
+    ///
+    /// See [`RsaPrivateKey::from_components`] for an explanation on the parameters.
+    ///
+    /// # ⚠️ Warning: Hazmat!
+    ///
+    /// This method accepts public exponents outside the standard bounds (2 ≤ e ≤ 2^33-1),
+    /// but still performs full cryptographic validation to ensure the key is mathematically
+    /// correct (i.e., verifies that de ≡ 1 mod λ(n)).
+    ///
+    /// **Note:** This method is dangerous as it can be used as a DOS vector if used with
+    /// untrusted input https://www.imperialviolet.org/2012/03/17/rsados.html
+    ///
+    /// This is intended for interoperating with systems that use non-standard exponents
+    /// or loading legacy keys. Use [`RsaPrivateKey::from_components`] for standard key
+    /// construction.
+    #[cfg(feature = "hazmat")]
+    pub fn from_components_with_large_exponent(
+        n: BoxedUint,
+        e: BoxedUint,
+        d: BoxedUint,
+        primes: Vec<BoxedUint>,
+    ) -> Result<RsaPrivateKey> {
+        let mut k = Self::from_components_inner(n, e, d, primes)?;
+
+        // Validate everything except exponent size bounds (to ensure precompute can't fail)
+        validate_skip_exponent_size(&k)?;
+
+        // Precompute when possible, ignore error otherwise.
+        k.precompute().ok();
+
+        Ok(k)
+    }
+
+    /// Constructs an RSA key pair from individual components:
+    ///
+    /// - `n`: RSA modulus
+    /// - `e`: public exponent (i.e. encrypting exponent)
+    /// - `d`: private exponent (i.e. decrypting exponent)
+    /// - `primes`: prime factors of `n`: typically two primes `p` and `q`. More than two primes can
+    ///   be provided for multiprime RSA, however this is generally not recommended. If no `primes`
+    ///   are provided, a prime factor recovery algorithm will be employed to attempt to recover the
+    ///   factors (as described in [NIST SP 800-56B Revision 2] Appendix C.2). This algorithm only
+    ///   works if there are just two prime factors `p` and `q` (as opposed to multiprime), and `e`
+    ///   is between 2^16 and 2^256.
+    ///
+    ///  [NIST SP 800-56B Revision 2]: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf
+    pub fn from_components(
+        n: BoxedUint,
+        e: BoxedUint,
+        d: BoxedUint,
+        primes: Vec<BoxedUint>,
+    ) -> Result<RsaPrivateKey> {
+        let mut k = Self::from_components_inner(n, e, d, primes)?;
 
         // Always validate the key, to ensure precompute can't fail
         k.validate()?;
@@ -562,36 +617,7 @@ impl RsaPrivateKey {
     /// Returns `Ok(())` if everything is good, otherwise an appropriate error.
     pub fn validate(&self) -> Result<()> {
         check_public(self)?;
-
-        // Check that Πprimes == n.
-        let mut m = BoxedUint::one_with_precision(self.pubkey_components.n.bits_precision());
-        let one = BoxedUint::one();
-        for prime in &self.primes {
-            // Any primes ≤ 1 will cause divide-by-zero panics later.
-            if prime < &one {
-                return Err(Error::InvalidPrime);
-            }
-            m = m.wrapping_mul(prime);
-        }
-        if m != *self.pubkey_components.n {
-            return Err(Error::InvalidModulus);
-        }
-
-        // Check that de ≡ 1 mod p-1, for each prime.
-        // This implies that e is coprime to each p-1 as e has a multiplicative
-        // inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
-        // exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
-        // mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
-        let de = self.d.mul(&self.pubkey_components.e);
-
-        for prime in &self.primes {
-            let x = NonZero::new(prime.wrapping_sub(&BoxedUint::one())).unwrap();
-            let congruence = de.rem_vartime(&x);
-            if !bool::from(congruence.is_one()) {
-                return Err(Error::InvalidExponent);
-            }
-        }
-
+        validate_private_key_parts(self)?;
         Ok(())
     }
 
@@ -686,13 +712,7 @@ fn check_public_with_max_size(n: &BoxedUint, e: &BoxedUint, max_size: Option<usi
         }
     }
 
-    if e >= n || n.is_even().into() || n.is_zero().into() {
-        return Err(Error::InvalidModulus);
-    }
-
-    if e.is_even().into() {
-        return Err(Error::InvalidExponent);
-    }
+    check_public_skip_exponent_size(n, e)?;
 
     if e < &BoxedUint::from(RsaPublicKey::MIN_PUB_EXPONENT) {
         return Err(Error::PublicExponentTooSmall);
@@ -701,6 +721,76 @@ fn check_public_with_max_size(n: &BoxedUint, e: &BoxedUint, max_size: Option<usi
     if e > &BoxedUint::from(RsaPublicKey::MAX_PUB_EXPONENT) {
         return Err(Error::PublicExponentTooLarge);
     }
+
+    Ok(())
+}
+
+/// Check that the public key is well formed, skipping exponent size bounds checks.
+///
+/// This is used internally by both public validation functions and hazmat APIs.
+#[inline]
+fn check_public_skip_exponent_size(n: &BoxedUint, e: &BoxedUint) -> Result<()> {
+    if e >= n || n.is_even().into() || n.is_zero().into() {
+        return Err(Error::InvalidModulus);
+    }
+
+    if e.is_even().into() {
+        return Err(Error::InvalidExponent);
+    }
+
+    // Skip exponent size bounds checks
+    Ok(())
+}
+
+/// Helper function that validates the private key structure and cryptographic correctness.
+///
+/// This performs the structural and mathematical validation checks that are common to both
+/// `validate()` and `validate_skip_exponent_size()`.
+fn validate_private_key_parts(key: &RsaPrivateKey) -> Result<()> {
+    // Check that Πprimes == n.
+    let mut m = BoxedUint::one_with_precision(key.pubkey_components.n.bits_precision());
+    let one = BoxedUint::one();
+    for prime in &key.primes {
+        // Any primes ≤ 1 will cause divide-by-zero panics later.
+        if prime < &one {
+            return Err(Error::InvalidPrime);
+        }
+        m = m.wrapping_mul(prime);
+    }
+    if m != *key.pubkey_components.n {
+        return Err(Error::InvalidModulus);
+    }
+
+    // Check that de ≡ 1 mod p-1, for each prime.
+    // This implies that e is coprime to each p-1 as e has a multiplicative
+    // inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
+    // exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
+    // mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
+    let de = key.d.mul(&key.pubkey_components.e);
+
+    for prime in &key.primes {
+        let x = NonZero::new(prime.wrapping_sub(&BoxedUint::one())).unwrap();
+        let congruence = de.rem_vartime(&x);
+        if !bool::from(congruence.is_one()) {
+            return Err(Error::InvalidExponent);
+        }
+    }
+
+    Ok(())
+}
+
+/// Validate the private key structure and cryptographic correctness,
+/// skipping only the exponent size bounds checks.
+///
+/// This performs all the same checks as `RsaPrivateKey::validate()` except
+/// it doesn't verify that the exponent is within the standard bounds.
+#[cfg(feature = "hazmat")]
+fn validate_skip_exponent_size(key: &RsaPrivateKey) -> Result<()> {
+    // Check public key properties (without exponent size checks)
+    check_public_skip_exponent_size(key.pubkey_components.n.as_ref(), &key.pubkey_components.e)?;
+
+    // Perform common private key validation
+    validate_private_key_parts(key)?;
 
     Ok(())
 }
@@ -1113,5 +1203,97 @@ mod tests {
         assert_eq!(PrivateKeyParts::dq(&key), PrivateKeyParts::dq(&ref_key));
 
         assert_eq!(PrivateKeyParts::d(&key), PrivateKeyParts::d(&ref_key));
+    }
+
+    #[test]
+    #[cfg(feature = "hazmat")]
+    fn test_from_components_with_large_exponent() {
+        // Test that from_components_with_large_exponent accepts exponents outside normal bounds
+        // while from_components would reject them
+
+        use rand::rngs::ChaCha8Rng;
+        use rand_core::SeedableRng;
+
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+
+        // Use an exponent larger than the normal maximum (2^33 - 1)
+        let large_e = BoxedUint::from((1u64 << 34) + 1); // 2^34 + 1 (odd number)
+
+        // Generate a key with this large exponent
+        let components =
+            generate_multi_prime_key_with_exp(&mut rng, 2, 1024, large_e.clone()).unwrap();
+
+        // Extract components
+        let n = components.n.get().clone();
+        let d = components.d;
+        let primes = components.primes;
+
+        // from_components should fail with PublicExponentTooLarge
+        let result =
+            RsaPrivateKey::from_components(n.clone(), large_e.clone(), d.clone(), primes.clone());
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), Error::PublicExponentTooLarge);
+
+        // from_components_with_large_exponent should succeed
+        let key_with_large_exp = RsaPrivateKey::from_components_with_large_exponent(
+            n.clone(),
+            large_e.clone(),
+            d.clone(),
+            primes.clone(),
+        );
+        assert!(key_with_large_exp.is_ok());
+
+        let key_with_large_exp = key_with_large_exp.unwrap();
+        assert_eq!(PublicKeyParts::e(&key_with_large_exp), &large_e);
+        assert_eq!(PublicKeyParts::n(&key_with_large_exp).as_ref(), &n);
+        assert_eq!(PrivateKeyParts::d(&key_with_large_exp), &d);
+
+        // Verify that the key is still cryptographically valid (de ≡ 1 mod λ(n))
+        // by checking that validation with skip_exponent_size passes
+        assert!(validate_skip_exponent_size(&key_with_large_exp).is_ok());
+    }
+
+    #[test]
+    #[cfg(feature = "hazmat")]
+    fn test_from_components_with_small_exponent() {
+        // Test that from_components_with_large_exponent accepts exponents below normal minimum
+        // (despite the name, it works for any non-standard exponent size)
+
+        use rand::rngs::ChaCha8Rng;
+        use rand_core::SeedableRng;
+
+        let mut rng = ChaCha8Rng::from_seed([43; 32]);
+
+        // Use an exponent smaller than the normal minimum (2)
+        let small_e = BoxedUint::from(1u64); // This is odd, which is required
+
+        // Generate a key with this small exponent
+        let components =
+            generate_multi_prime_key_with_exp(&mut rng, 2, 1024, small_e.clone()).unwrap();
+
+        // Extract components
+        let n = components.n.get().clone();
+        let d = components.d;
+        let primes = components.primes;
+
+        // from_components should fail
+        let result =
+            RsaPrivateKey::from_components(n.clone(), small_e.clone(), d.clone(), primes.clone());
+        assert!(result.is_err());
+
+        // from_components_with_large_exponent should succeed
+        let key_with_small_exp = RsaPrivateKey::from_components_with_large_exponent(
+            n.clone(),
+            small_e.clone(),
+            d.clone(),
+            primes,
+        );
+        assert!(key_with_small_exp.is_ok());
+
+        let key_with_small_exp = key_with_small_exp.unwrap();
+        assert_eq!(PublicKeyParts::e(&key_with_small_exp), &small_e);
+
+        // Verify that the key is cryptographically valid
+        assert!(validate_skip_exponent_size(&key_with_small_exp).is_ok());
     }
 }
