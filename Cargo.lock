@@ -766,7 +766,7 @@ checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
 
 [[package]]
 name = "rsa"
-version = "0.10.0-rc.14"
+version = "0.10.0-rc.15"
 dependencies = [
  "base64ct",
  "const-oid",
