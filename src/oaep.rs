@@ -74,7 +74,7 @@ where
     /// let n = BoxedUint::from_be_slice(&n_bytes, 2048).unwrap();
     /// let e = BoxedUint::from_be_slice(&e_bytes, 32).unwrap();
     ///
-    /// let mut rng = rand::thread_rng();
+    /// let mut rng = rand::rng();
     /// let key = RsaPublicKey::new(n, e).unwrap();
     /// let padding = Oaep::<Sha256>::new();
     /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();
@@ -118,7 +118,7 @@ where
     /// let n = BoxedUint::from_be_slice(&n_bytes, 2048).unwrap();
     /// let e = BoxedUint::from_be_slice(&e_bytes, 32).unwrap();
     ///
-    /// let mut rng = rand::thread_rng();
+    /// let mut rng = rand::rng();
     /// let key = RsaPublicKey::new(n, e).unwrap();
     /// let padding = Oaep::<Sha256, Sha1>::new_with_mgf_hash();
     /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();

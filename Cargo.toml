@@ -37,7 +37,7 @@ base64ct = { version = "1", features = ["alloc"] }
 hex-literal = "1"
 proptest = "1"
 serde_test = "1.0.89"
-rand = { version = "0.10.0-rc.8", features = ["chacha"] }
+rand = { version = "0.10", features = ["chacha"] }
 rand_core = { version = "0.10", default-features = false }
 sha1 = { version = "0.11.0-rc.5", default-features = false, features = ["oid"] }
 sha2 = { version = "0.11.0-rc.5", default-features = false, features = ["oid"] }
@@ -67,6 +67,3 @@ opt-level = 2
 
 [profile.bench]
 debug = true
-
-[patch.crates-io.rand]
-git = "https://github.com/rust-random/rand"
