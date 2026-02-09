@@ -752,7 +752,7 @@ fn validate_private_key_parts(key: &RsaPrivateKey) -> Result<()> {
     let one = BoxedUint::one();
     for prime in &key.primes {
         // Any primes ≤ 1 will cause divide-by-zero panics later.
-        if prime < &one {
+        if prime <= &one {
             return Err(Error::InvalidPrime);
         }
         m = m.wrapping_mul(prime);
