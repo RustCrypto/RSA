@@ -270,6 +270,8 @@ where
     D: Digest + FixedOutputReset,
     MGD: Digest + FixedOutputReset,
 {
+    key::check_public(priv_key)?;
+
     if ciphertext.len() != priv_key.size() {
         return Err(Error::Decryption);
     }
@@ -607,6 +609,49 @@ mod tests {
                 .decrypt_with_rng(&mut rng, &ciphertext)
                 .is_err(),
             "decrypt should have failed on hash verification"
+        );
+    }
+
+    #[test]
+    #[cfg(feature = "hazmat")]
+    fn test_decrypt_oaep_rejects_invalid_key() {
+        use crate::algorithms::generate::generate_multi_prime_key_with_exp;
+        use crate::errors::Error;
+
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+
+        // Create a key with exponent larger than MAX_PUB_EXPONENT (2^33 - 1)
+        // using the hazmat API that skips exponent size validation.
+        let large_e = BoxedUint::from((1u64 << 34) + 1);
+        let components =
+            generate_multi_prime_key_with_exp(&mut rng, 2, 1024, large_e.clone()).unwrap();
+        let priv_key = RsaPrivateKey::from_components_with_large_exponent(
+            components.n.get(),
+            components.e,
+            components.d,
+            components.primes,
+        )
+        .unwrap();
+
+        let dummy_ciphertext = vec![0u8; priv_key.size()];
+
+        // Decryption via PaddingScheme (uses oaep::decrypt) must reject
+        // with PublicExponentTooLarge specifically — not a generic decryption error.
+        let result = priv_key.decrypt(Oaep::<Sha256>::new(), &dummy_ciphertext);
+        assert_eq!(
+            result.unwrap_err(),
+            Error::PublicExponentTooLarge,
+            "decrypt via PaddingScheme should reject a key with oversized exponent"
+        );
+
+        // Decryption via DecryptingKey (uses oaep::decrypt_digest) must also reject
+        // with the same specific error.
+        let decrypting_key = DecryptingKey::<Sha256>::new(priv_key);
+        let result = decrypting_key.decrypt(&dummy_ciphertext);
+        assert_eq!(
+            result.unwrap_err(),
+            Error::PublicExponentTooLarge,
+            "decrypt via DecryptingKey should reject a key with oversized exponent"
         );
     }
 }
