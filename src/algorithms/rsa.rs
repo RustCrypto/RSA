@@ -181,13 +181,10 @@ fn blind<R: TryCryptoRng + ?Sized, K: PublicKeyParts>(
     debug_assert_eq!(&key.n().clone().get(), n_params.modulus());
     let bits = key.n_bits_precision();
 
-    let mut r: BoxedUint = BoxedUint::one_with_precision(bits);
+    let mut r: BoxedUint = BoxedUint::zero_with_precision(bits);
     let mut ir: Option<BoxedUint> = None;
     while ir.is_none() {
         r = BoxedUint::try_random_mod_vartime(rng, key.n()).map_err(|_| Error::Rng)?;
-        if r.is_zero().into() {
-            r = BoxedUint::one_with_precision(bits);
-        }
 
         // r^-1 (mod n)
         ir = r.invert_mod(key.n()).into();
