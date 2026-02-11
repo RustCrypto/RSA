@@ -162,9 +162,9 @@ where
         return Err(Error::Decryption);
     }
 
-    let (out, index) = res.unwrap();
+    let index = res.unwrap();
 
-    Ok(out[index as usize..].to_vec())
+    Ok(em[index as usize..].to_vec())
 }
 
 ///Decrypts OAEP padding.
@@ -205,9 +205,9 @@ where
         return Err(Error::Decryption);
     }
 
-    let (out, index) = res.unwrap();
+    let index = res.unwrap();
 
-    Ok(out[index as usize..].to_vec())
+    Ok(em[index as usize..].to_vec())
 }
 
 /// Decrypts OAEP padding. It returns one or zero in valid that indicates whether the
@@ -219,7 +219,7 @@ fn decrypt_inner<MGF: FnMut(&mut [u8], &mut [u8])>(
     expected_p_hash: &[u8],
     k: usize,
     mut mgf: MGF,
-) -> Result<CtOption<(Vec<u8>, u32)>> {
+) -> Result<CtOption<u32>> {
     if k < 11 {
         return Err(Error::Decryption);
     }
@@ -256,8 +256,5 @@ fn decrypt_inner<MGF: FnMut(&mut [u8], &mut [u8])>(
 
     let valid = first_byte_is_zero & hash_are_equal & !nonzero_before_one & !looking_for_index;
 
-    Ok(CtOption::new(
-        (em.to_vec(), index + 2 + (h_size * 2) as u32),
-        valid,
-    ))
+    Ok(CtOption::new(index + 2 + (h_size * 2) as u32, valid))
 }
