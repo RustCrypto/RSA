@@ -379,7 +379,7 @@ impl RsaPrivateKey {
                 // Check that the product of primes matches the modulus.
                 // This also ensures that `bit_precision` of each prime is <= that of the modulus,
                 // and `bit_precision` of their product is >= that of the modulus.
-                if &primes.iter().fold(BoxedUint::one(), |acc, p| acc * p) != n_c.as_ref() {
+                if primes.iter().fold(BoxedUint::one(), |acc, p| acc * p) != n_c.as_ref() {
                     return Err(Error::InvalidModulus);
                 }
             }
@@ -555,12 +555,12 @@ impl RsaPrivateKey {
             .ok_or(Error::InvalidPrime)?;
         let q_params = BoxedMontyParams::new(q_odd);
 
-        let x = NonZero::new(p.wrapping_sub(&BoxedUint::one()))
+        let x = NonZero::new(p.wrapping_sub(BoxedUint::one()))
             .into_option()
             .ok_or(Error::InvalidPrime)?;
         let dp = d.rem_vartime(&x);
 
-        let x = NonZero::new(q.wrapping_sub(&BoxedUint::one()))
+        let x = NonZero::new(q.wrapping_sub(BoxedUint::one()))
             .into_option()
             .ok_or(Error::InvalidPrime)?;
         let dq = d.rem_vartime(&x);
@@ -769,7 +769,7 @@ fn validate_private_key_parts(key: &RsaPrivateKey) -> Result<()> {
     let de = key.d.mul(&key.pubkey_components.e);
 
     for prime in &key.primes {
-        let x = NonZero::new(prime.wrapping_sub(&BoxedUint::one())).unwrap();
+        let x = NonZero::new(prime.wrapping_sub(BoxedUint::one())).unwrap();
         let congruence = de.rem_vartime(&x);
         if !bool::from(congruence.is_one()) {
             return Err(Error::InvalidExponent);
