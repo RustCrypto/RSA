@@ -15,8 +15,8 @@ exclude = ["marvin_toolkit/", "thirdparty/"]
 
 [dependencies]
 const-oid = { version = "0.10", default-features = false }
-crypto-bigint = { version = "0.7.0-rc.26", default-features = false, features = ["zeroize", "alloc"] }
-crypto-primes = { version = "0.7.0-pre.8", default-features = false }
+crypto-bigint = { version = "0.7.0-rc.27", default-features = false, features = ["zeroize", "alloc"] }
+crypto-primes = { version = "0.7.0-pre.9", default-features = false }
 digest = { version = "0.11.0-rc.11", default-features = false, features = ["alloc", "oid"] }
 rand_core = { version = "0.10", default-features = false }
 signature = { version = "3.0.0-rc.10", default-features = false, features = ["alloc", "digest", "rand_core"] }
