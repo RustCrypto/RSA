@@ -51,7 +51,7 @@ rstest = "0.26.1"
 name = "key"
 
 [features]
-default = ["std", "encoding"]
+default = ["std", "encoding", "getrandom"]
 encoding = ["dep:pkcs1", "dep:pkcs8", "dep:spki"]
 hazmat = []
 getrandom = ["crypto-bigint/getrandom", "crypto-common"]
