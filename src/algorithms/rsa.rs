@@ -18,7 +18,8 @@ use crate::traits::keys::{PrivateKeyParts, PublicKeyParts};
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
 #[inline]
 pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BoxedUint) -> Result<BoxedUint> {
-    let res = pow_mod_params(m, key.e(), key.n_params());
+    let e = key.e();
+    let res = pow_mod_params_vartime_exp_bits(m, e, e.bits(), key.n_params());
     Ok(res)
 }
 
@@ -195,7 +196,8 @@ fn blind<R: TryCryptoRng + ?Sized, K: PublicKeyParts>(
 
     let blinded = {
         // r^e (mod n)
-        let mut rpowe = pow_mod_params(&r, key.e(), n_params);
+        let e = key.e();
+        let mut rpowe = pow_mod_params_vartime_exp_bits(&r, e, e.bits(), n_params);
         // c * r^e (mod n)
         let c = c.mul_mod(&rpowe, n_params.modulus().as_nz_ref());
         rpowe.zeroize();
@@ -232,6 +234,19 @@ fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: &BoxedMontyParams) ->
 fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: &BoxedMontyParams) -> BoxedUint {
     let base = reduce_vartime(base, n_params);
     base.pow(exp).retrieve()
+}
+
+/// Computes `base.pow_mod(exp, n)` with a bounded exponent and precomputed `n_params`.
+///
+/// The exponent bit length `exp_bits` may be leaked in the time pattern.
+fn pow_mod_params_vartime_exp_bits(
+    base: &BoxedUint,
+    exp: &BoxedUint,
+    exp_bits: u32,
+    n_params: &BoxedMontyParams,
+) -> BoxedUint {
+    let base = reduce_vartime(base, n_params);
+    base.pow_bounded_exp(exp, exp_bits).retrieve()
 }
 
 fn reduce_vartime(n: &BoxedUint, p: &BoxedMontyParams) -> BoxedMontyForm {
