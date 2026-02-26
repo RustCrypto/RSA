@@ -2,8 +2,10 @@
 
 use core::cmp::Ordering;
 
-use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
-use crypto_bigint::{BoxedUint, Gcd, NonZero, Odd, RandomMod, Resize};
+use crypto_bigint::{
+    modular::{BoxedMontyForm, BoxedMontyParams},
+    BoxedUint, ConcatenatingMul, ConcatenatingSquare, Gcd, NonZero, Odd, RandomMod, Resize,
+};
 use rand_core::TryCryptoRng;
 use zeroize::Zeroize;
 
@@ -116,7 +118,8 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
 
             // m = m2 + h.q
             let m2 = m2.try_resize(n.bits_precision()).ok_or(Error::Internal)?;
-            let hq = (h * q)
+            let hq = h
+                .concatenating_mul(&q)
                 .try_resize(n.bits_precision())
                 .ok_or(Error::Internal)?;
             m2.wrapping_add(&hq)
@@ -263,14 +266,14 @@ pub fn recover_primes(
     let d = d.resize_unchecked(d.bits_precision());
     let n = n.resize_unchecked(bits);
 
-    let a1 = d * e - &one;
+    let a1 = d.concatenating_mul(&e) - &one;
     let a2 = (n.as_ref() - &one).gcd(&a1);
-    let a = a1 * a2;
+    let a = a1.concatenating_mul(&a2);
     let n = n.resize_unchecked(a.bits_precision());
 
     // 2. Let m = floor(a /n) and r = a – m n, so that a = m n + r and 0 ≤ r < n.
     let m = &a / &n;
-    let r = a - &m * n.as_ref();
+    let r = a - m.concatenating_mul(&*n);
     let n = n.get();
 
     // 3. Let b = ( (n – r)/(m + 1) ) + 1; if b is not an integer or b^2 ≤ 4n, then output an error indicator,
@@ -282,8 +285,8 @@ pub fn recover_primes(
     let b = ((&n - &r) / NonZero::new(&m + &one).expect("adding one")) + one;
 
     let four = BoxedUint::from(4u32);
-    let four_n = &n * four;
-    let b_squared = b.square();
+    let four_n = n.concatenating_mul(&four);
+    let b_squared = b.concatenating_square();
 
     if b_squared <= four_n {
         return Err(Error::InvalidArguments);
@@ -294,7 +297,7 @@ pub fn recover_primes(
     //    then output an error indicator, and exit without further processing.
     let y = b_squared_minus_four_n.floor_sqrt();
 
-    let y_squared = y.square();
+    let y_squared = y.concatenating_square();
     let sqrt_is_whole_number = y_squared == b_squared_minus_four_n;
     if !sqrt_is_whole_number {
         return Err(Error::InvalidArguments);
@@ -315,7 +318,7 @@ pub(crate) fn compute_modulus(primes: &[BoxedUint]) -> Odd<BoxedUint> {
     let mut primes = primes.iter();
     let mut out = primes.next().expect("must at least be one prime").clone();
     for p in primes {
-        out *= p;
+        out = out.concatenating_mul(&p);
     }
     Odd::new(out).expect("modulus must be odd")
 }
@@ -334,7 +337,7 @@ pub(crate) fn compute_private_exponent_euler_totient(
     let mut totient = BoxedUint::one_with_precision(bits);
 
     for prime in primes {
-        totient *= prime - &BoxedUint::one();
+        totient = totient.concatenating_mul(&(prime - &BoxedUint::one()));
     }
     let exp = exp.resize_unchecked(totient.bits_precision());
 
@@ -367,7 +370,7 @@ pub(crate) fn compute_private_exponent_carmicheal(
 
     // LCM inlined
     let gcd = p1.gcd(&q1);
-    let lcm = p1 / NonZero::new(gcd).expect("gcd is non zero") * &q1;
+    let lcm = (p1 / NonZero::new(gcd).expect("gcd is non zero")).concatenating_mul(&q1);
     let exp = exp.resize_unchecked(lcm.bits_precision());
     if let Some(d) = exp.invert_mod(&NonZero::new(lcm).expect("non zero")).into() {
         Ok(d)

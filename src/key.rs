@@ -3,8 +3,10 @@ use core::cmp::Ordering;
 use core::fmt;
 use core::hash::{Hash, Hasher};
 
-use crypto_bigint::modular::{BoxedMontyForm, BoxedMontyParams};
-use crypto_bigint::{BoxedUint, Integer, NonZero, Odd, Resize};
+use crypto_bigint::{
+    modular::{BoxedMontyForm, BoxedMontyParams},
+    BoxedUint, ConcatenatingMul, Integer, NonZero, Odd, Resize,
+};
 use rand_core::CryptoRng;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 #[cfg(feature = "serde")]
@@ -379,7 +381,11 @@ impl RsaPrivateKey {
                 // Check that the product of primes matches the modulus.
                 // This also ensures that `bit_precision` of each prime is <= that of the modulus,
                 // and `bit_precision` of their product is >= that of the modulus.
-                if primes.iter().fold(BoxedUint::one(), |acc, p| acc * p) != n_c.as_ref() {
+                if primes
+                    .iter()
+                    .fold(BoxedUint::one(), |acc, p| acc.concatenating_mul(&p))
+                    != n_c.as_ref()
+                {
                     return Err(Error::InvalidModulus);
                 }
             }
@@ -766,7 +772,7 @@ fn validate_private_key_parts(key: &RsaPrivateKey) -> Result<()> {
     // inverse. Therefore e is coprime to lcm(p-1,q-1,r-1,...) =
     // exponent(ℤ/nℤ). It also implies that a^de ≡ a mod p as a^(p-1) ≡ 1
     // mod p. Thus a^de ≡ a mod n for all a coprime to n, as required.
-    let de = key.d.mul(&key.pubkey_components.e);
+    let de = key.d.concatenating_mul(&key.pubkey_components.e);
 
     for prime in &key.primes {
         let x = NonZero::new(prime.wrapping_sub(BoxedUint::one())).unwrap();
