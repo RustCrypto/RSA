@@ -56,7 +56,6 @@ jobs:
       - run: cargo test --release --features serde
 
   minimal-versions:
-    if: false # disabled until we remove pre-releases dependencies 
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
