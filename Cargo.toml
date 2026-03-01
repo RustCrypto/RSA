@@ -25,7 +25,7 @@ zeroize = { version = "1.8", features = ["alloc"] }
 # optional dependencies
 crypto-common = { version = "0.2", optional = true, features = ["getrandom"] }
 pkcs1 = { version = "0.8.0-rc.4", optional = true, default-features = false, features = ["alloc", "pem"] }
-pkcs8 = { version = "0.11.0-rc.10", optional = true, default-features = false, features = ["alloc", "pem"] }
+pkcs8 = { version = "0.11.0-rc.11", optional = true, default-features = false, features = ["alloc", "pem"] }
 serdect = { version = "0.4", optional = true }
 sha1 = { version = "0.11.0-rc.5", optional = true, default-features = false, features = ["oid"] }
 sha2 = { version = "0.11.0-rc.5", optional = true, default-features = false, features = ["oid"] }
