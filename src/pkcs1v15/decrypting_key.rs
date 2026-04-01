@@ -1,4 +1,4 @@
-use super::{decrypt, EncryptingKey};
+use super::EncryptingKey;
 use crate::{
     dummy_rng::DummyRng,
     traits::{Decryptor, EncryptingKeypair, RandomizedDecryptor},
@@ -28,7 +28,14 @@ impl DecryptingKey {
 
 impl Decryptor for DecryptingKey {
     fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        decrypt::<DummyRng>(None, &self.inner, ciphertext)
+        #[cfg(feature = "implicit_rejection")]
+        {
+            crate::pkcs1v15::decrypt_implicit_rejection::<DummyRng>(None, &self.inner, ciphertext)
+        }
+        #[cfg(not(feature = "implicit_rejection"))]
+        {
+            crate::pkcs1v15::decrypt::<DummyRng>(None, &self.inner, ciphertext)
+        }
     }
 }
 
@@ -38,7 +45,14 @@ impl RandomizedDecryptor for DecryptingKey {
         rng: &mut R,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
-        decrypt(Some(rng), &self.inner, ciphertext)
+        #[cfg(feature = "implicit_rejection")]
+        {
+            crate::pkcs1v15::decrypt_implicit_rejection::<R>(Some(rng), &self.inner, ciphertext)
+        }
+        #[cfg(not(feature = "implicit_rejection"))]
+        {
+            crate::pkcs1v15::decrypt::<R>(Some(rng), &self.inner, ciphertext)
+        }
     }
 }
 

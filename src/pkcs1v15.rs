@@ -37,6 +37,9 @@ pub use self::{
     signing_key::SigningKey, verifying_key::VerifyingKey,
 };
 
+#[cfg(feature = "implicit_rejection")]
+use crate::algorithms::pkcs1v15::{pkcs1v15_encrypt_unpad_implicit_rejection, KeyDerivationKey};
+
 use alloc::{boxed::Box, vec::Vec};
 use const_oid::AssociatedOid;
 use core::fmt::Debug;
@@ -49,6 +52,8 @@ use crate::algorithms::pkcs1v15::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
 use crate::key::{self, RsaPrivateKey, RsaPublicKey};
+#[cfg(feature = "implicit_rejection")]
+use crate::traits::PrivateKeyParts;
 use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
 
 /// Encryption using PKCS#1 v1.5 padding.
@@ -63,6 +68,32 @@ impl PaddingScheme for Pkcs1v15Encrypt {
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
         decrypt(rng, priv_key, ciphertext)
+    }
+
+    fn encrypt<Rng: TryCryptoRng + ?Sized>(
+        self,
+        rng: &mut Rng,
+        pub_key: &RsaPublicKey,
+        msg: &[u8],
+    ) -> Result<Vec<u8>> {
+        encrypt(rng, pub_key, msg)
+    }
+}
+
+/// Encryption using PKCS#1 v1.5 padding with implicit rejection.
+#[cfg(feature = "implicit_rejection")]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct Pkcs1v15EncryptImplicitRejection;
+
+#[cfg(feature = "implicit_rejection")]
+impl PaddingScheme for Pkcs1v15EncryptImplicitRejection {
+    fn decrypt<Rng: TryCryptoRng + ?Sized>(
+        self,
+        rng: Option<&mut Rng>,
+        priv_key: &RsaPrivateKey,
+        ciphertext: &[u8],
+    ) -> Result<Vec<u8>> {
+        decrypt_implicit_rejection(rng, priv_key, ciphertext)
     }
 
     fn encrypt<Rng: TryCryptoRng + ?Sized>(
@@ -181,6 +212,37 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
     let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
 
     pkcs1v15_encrypt_unpad(em, priv_key.size())
+}
+
+/// Decrypts plaintext using RSA and the PKCS#1 v1.5 padding scheme with implicit rejection.
+///
+/// If an `rng` is provided, RSA blinding is used to avoid timing side-channel attacks.
+///
+/// Unlike [`decrypt`], this function does not return an error if
+/// the padding is invalid. Instead, it deterministically generates and returns
+/// a replacement random message using a key-derivation function.
+/// As a result, callers cannot distinguish between valid and
+/// invalid paddings based on the output, thus reducing the risk of side-channel attacks.
+///
+/// See
+/// [draft-irtf-cfrg-rsa-guidance-08](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-rsa-guidance-08)
+#[cfg(feature = "implicit_rejection")]
+#[inline]
+fn decrypt_implicit_rejection<R: TryCryptoRng + ?Sized>(
+    rng: Option<&mut R>,
+    priv_key: &RsaPrivateKey,
+    ciphertext: &[u8],
+) -> Result<Vec<u8>> {
+    key::check_public(priv_key)?;
+
+    let k = priv_key.size();
+    let ct_boxed = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
+    let em = rsa_decrypt_and_check(priv_key, rng, &ct_boxed)?;
+    // TODO: Check the timing leakage in this function.
+    let em = uint_to_zeroizing_be_pad(em, k)?;
+
+    let kdk = KeyDerivationKey::derive(priv_key.d(), k, ciphertext)?;
+    pkcs1v15_encrypt_unpad_implicit_rejection(em, k, &kdk)
 }
 
 /// Calculates the signature of hashed using

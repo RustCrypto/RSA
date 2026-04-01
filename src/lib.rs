@@ -253,7 +253,7 @@ mod key;
 pub use pkcs1;
 #[cfg(feature = "encoding")]
 pub use pkcs8;
-#[cfg(feature = "sha2")]
+#[cfg(any(feature = "sha2", feature = "implicit_rejection"))]
 pub use sha2;
 
 pub use crate::{
@@ -264,6 +264,9 @@ pub use crate::{
     pss::Pss,
     traits::keys::CrtValue,
 };
+
+#[cfg(feature = "implicit_rejection")]
+pub use pkcs1v15::Pkcs1v15EncryptImplicitRejection;
 
 #[cfg(feature = "hazmat")]
 pub mod hazmat;
