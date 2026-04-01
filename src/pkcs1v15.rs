@@ -50,6 +50,7 @@ use crate::algorithms::pkcs1v15::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
 use crate::key::{self, RsaPrivateKey, RsaPublicKey};
+use crate::traits::PrivateKeyParts;
 use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
 
 /// Encryption using PKCS#1 v1.5 padding.
@@ -157,15 +158,18 @@ fn encrypt<R: TryCryptoRng + ?Sized>(
     Ok(i2osp(rsa_encrypt(pub_key, &int)?, pub_key.size()))
 }
 
-/// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5.
+/// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5 with implicit rejection.
 ///
 /// If an `rng` is passed, it uses RSA blinding to avoid timing side-channel attacks.
 ///
-/// Note that whether this function returns an error or not discloses secret
-/// information. If an attacker can cause this function to run repeatedly and
-/// learn whether each instance returned an error then they can decrypt and
-/// forge signatures as if they had the private key. See
-/// `decrypt_session_key` for a way of solving this problem.
+/// This function does not return an error if
+/// the padding is invalid. Instead, it deterministically generates and returns
+/// a replacement random message using a key-derivation function.
+/// As a result, callers cannot distinguish between valid and
+/// invalid paddings based on the output, thus reducing the risk of side-channel attacks.
+///
+/// See
+/// [draft-irtf-cfrg-rsa-guidance-10](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-rsa-guidance-10)
 #[inline]
 fn decrypt<R: TryCryptoRng + ?Sized>(
     rng: Option<&mut R>,
@@ -189,7 +193,7 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
     // Step 2c: EM = I2OSP(m, k), constant-time with respect to m.
     let em = i2osp_zeroizing(m, k);
 
-    pkcs1v15_encrypt_unpad(&em, k)
+    pkcs1v15_encrypt_unpad_implicit_rejection(em, k, priv_key.d(), ciphertext)
 }
 
 /// Calculates the signature of hashed using
@@ -253,22 +257,18 @@ mod oid {
         const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.5");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha224 {
         const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.14");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha256 {
         const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha384 {
         const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.12");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha512 {
         const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.13");
     }
