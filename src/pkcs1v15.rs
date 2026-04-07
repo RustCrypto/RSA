@@ -37,6 +37,8 @@ pub use self::{
     signing_key::SigningKey, verifying_key::VerifyingKey,
 };
 
+use crate::algorithms::pkcs1v15::{pkcs1v15_encrypt_unpad_implicit_rejection, KeyDerivationKey};
+
 use alloc::{boxed::Box, vec::Vec};
 use const_oid::AssociatedOid;
 use core::fmt::Debug;
@@ -49,6 +51,7 @@ use crate::algorithms::pkcs1v15::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
 use crate::key::{self, RsaPrivateKey, RsaPublicKey};
+use crate::traits::PrivateKeyParts;
 use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
 
 /// Encryption using PKCS#1 v1.5 padding.
@@ -62,7 +65,7 @@ impl PaddingScheme for Pkcs1v15Encrypt {
         priv_key: &RsaPrivateKey,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
-        decrypt(rng, priv_key, ciphertext)
+        decrypt_implicit_rejection(rng, priv_key, ciphertext)
     }
 
     fn encrypt<Rng: TryCryptoRng + ?Sized>(
@@ -159,28 +162,34 @@ fn encrypt<R: TryCryptoRng + ?Sized>(
     uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
-/// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5.
+/// Decrypts plaintext using RSA and the PKCS#1 v1.5 padding scheme with implicit rejection.
 ///
-/// If an `rng` is passed, it uses RSA blinding to avoid timing side-channel attacks.
+/// If an `rng` is provided, RSA blinding is used to avoid timing side-channel attacks.
 ///
-/// Note that whether this function returns an error or not discloses secret
-/// information. If an attacker can cause this function to run repeatedly and
-/// learn whether each instance returned an error then they can decrypt and
-/// forge signatures as if they had the private key. See
-/// `decrypt_session_key` for a way of solving this problem.
+/// This function does not return an error if
+/// the padding is invalid. Instead, it deterministically generates and returns
+/// a replacement random message using a key-derivation function.
+/// As a result, callers cannot distinguish between valid and
+/// invalid paddings based on the output, thus reducing the risk of side-channel attacks.
+///
+/// See
+/// [draft-irtf-cfrg-rsa-guidance-08](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-rsa-guidance-08)
 #[inline]
-fn decrypt<R: TryCryptoRng + ?Sized>(
+fn decrypt_implicit_rejection<R: TryCryptoRng + ?Sized>(
     rng: Option<&mut R>,
     priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
-    let ciphertext = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
-    let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
-    let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
+    let k = priv_key.size();
+    let ct_boxed = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
+    let em = rsa_decrypt_and_check(priv_key, rng, &ct_boxed)?;
+    // TODO: Check the timing leakage in this function.
+    let em = uint_to_zeroizing_be_pad(em, k)?;
 
-    pkcs1v15_encrypt_unpad(em, priv_key.size())
+    let kdk = KeyDerivationKey::derive(priv_key.d(), k, ciphertext)?;
+    pkcs1v15_encrypt_unpad_implicit_rejection(em, k, &kdk)
 }
 
 /// Calculates the signature of hashed using
@@ -237,25 +246,21 @@ mod oid {
             const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.5");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha224 {
         const OID: ObjectIdentifier =
             const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.14");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha256 {
         const OID: ObjectIdentifier =
             const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha384 {
         const OID: ObjectIdentifier =
             const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.12");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha512 {
         const OID: ObjectIdentifier =
             const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.13");
@@ -354,7 +359,7 @@ mod tests {
 
             let blind: bool = rng.next_u32() < (1u32 << 31);
             let blinder = if blind { Some(&mut rng) } else { None };
-            let plaintext = decrypt(blinder, &priv_key, &ciphertext).unwrap();
+            let plaintext = decrypt_implicit_rejection(blinder, &priv_key, &ciphertext).unwrap();
             assert_eq!(input, plaintext);
         }
     }

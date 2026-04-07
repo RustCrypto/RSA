@@ -8,12 +8,17 @@
 
 use alloc::vec::Vec;
 use const_oid::AssociatedOid;
-use crypto_bigint::{Choice, CtAssign, CtEq, CtSelect};
-use digest::Digest;
+use crypto_bigint::{BoxedUint, Choice, CtAssign, CtEq, CtGt, CtLt, CtSelect};
+use digest::{Digest, OutputSizeUser};
+use hmac::{Hmac, KeyInit, Mac};
 use rand_core::TryCryptoRng;
+use sha2::Sha256;
 use zeroize::Zeroizing;
 
-use crate::errors::{Error, Result};
+use crate::{
+    algorithms::pad::uint_to_zeroizing_be_pad,
+    errors::{Error, Result},
+};
 
 /// Fills the provided slice with random values, which are guaranteed
 /// to not be zero.
@@ -59,61 +64,185 @@ where
     Ok(em)
 }
 
-/// Removes the encryption padding scheme from PKCS#1 v1.5.
+/// Removes PKCS#1 v1.5 encryption padding with implicit rejection.
 ///
-/// Note that whether this function returns an error or not discloses secret
-/// information. If an attacker can cause this function to run repeatedly and
-/// learn whether each instance returned an error then they can decrypt and
-/// forge signatures as if they had the private key. See
-/// `decrypt_session_key` for a way of solving this problem.
-#[inline]
-pub(crate) fn pkcs1v15_encrypt_unpad(em: Vec<u8>, k: usize) -> Result<Vec<u8>> {
-    let (valid, out, index) = decrypt_inner(em, k)?;
-    if valid == 0 {
+/// This function does not return an error if
+/// the padding is invalid. Instead, it deterministically generates and returns
+/// a replacement random message using a key-derivation function.
+/// As a result, callers cannot distinguish between valid and
+/// invalid padding based on the output, thus preventing side-channel attacks.
+///
+/// See
+/// [draft-irtf-cfrg-rsa-guidance-08 § 7.2](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-rsa-guidance-08#section-7.2)
+pub(crate) fn pkcs1v15_encrypt_unpad_implicit_rejection(
+    em: Vec<u8>,
+    k: usize,
+    kdk: &KeyDerivationKey,
+) -> Result<Vec<u8>> {
+    const LENGTH_LABEL: &[u8] = b"length";
+    const MESSAGE_LABEL: &[u8] = b"message";
+
+    if k < 11 || k != em.len() {
         return Err(Error::Decryption);
     }
 
-    Ok(out[index as usize..].to_vec())
-}
+    // The maximum allowed message size is the modulus size minus 2 bytes
+    // and a minimum of 8 bytes for padding.
+    let max_length = u16::try_from(k - 10).map_err(|_| Error::Decryption)?;
 
-/// Removes the PKCS1v15 padding It returns one or zero in valid that indicates whether the
-/// plaintext was correctly structured. In either case, the plaintext is
-/// returned in em so that it may be read independently of whether it was valid
-/// in order to maintain constant memory access patterns. If the plaintext was
-/// valid then index contains the index of the original message in em.
-#[inline]
-fn decrypt_inner(em: Vec<u8>, k: usize) -> Result<(u8, Vec<u8>, u32)> {
-    if k < 11 {
+    // CL = IRPRF (KDK, "length", 256).
+    let rejection_lengths = kdk.prf(LENGTH_LABEL, 256)?;
+
+    // AM = IRPRF (KDK, "message", k).
+    let rejection_message = kdk.prf(MESSAGE_LABEL, k)?;
+
+    // Mask with 1s up to the most significant bit set in max_length.
+    // This ensures the mask covers all bits up to the highest bit set.
+    let mut mask = max_length;
+    mask |= mask >> 1;
+    mask |= mask >> 2;
+    mask |= mask >> 4;
+    mask |= mask >> 8;
+
+    // Select the rejection length from the prf output.
+    let rejection_length = rejection_lengths.chunks_exact(2).fold(0u16, |acc, el| {
+        let candidate_length = ((u16::from(el[0]) << 8) | u16::from(el[1])) & mask;
+        let less_than_max_length = candidate_length.ct_lt(&max_length);
+        acc.ct_select(&candidate_length, less_than_max_length)
+    });
+
+    let Some(rejection_msg_index) = k.checked_sub(usize::from(rejection_length)) else {
         return Err(Error::Decryption);
-    }
+    };
 
     let first_byte_is_zero = em[0].ct_eq(&0u8);
     let second_byte_is_two = em[1].ct_eq(&2u8);
 
-    // The remainder of the plaintext must be a string of non-zero random
-    // octets, followed by a 0, followed by the message.
-    //   looking_for_index: 1 iff we are still looking for the zero.
-    //   index: the offset of the first zero byte.
-    let mut looking_for_index = Choice::TRUE;
-    let mut index = 0u32;
+    // Indicates whether the zero byte has been found.
+    let mut found_zero_byte = Choice::FALSE;
+    // Padding | message separation index.
+    let mut zero_index: u32 = 0;
 
     for (i, el) in em.iter().enumerate().skip(2) {
         let equals0 = el.ct_eq(&0u8);
-        index.ct_assign(&(i as u32), looking_for_index & equals0);
-        looking_for_index &= !equals0;
+        zero_index.ct_assign(&(i as u32), !found_zero_byte & equals0);
+        found_zero_byte |= equals0;
     }
 
-    // The PS padding must be at least 8 bytes long, and it starts two
-    // bytes into em.
-    // TODO: WARNING: THIS MUST BE CONSTANT TIME CHECK:
-    // Ref: https://github.com/dalek-cryptography/subtle/issues/20
-    // This is currently copy & paste from the constant time impl in
-    // go, but very likely not sufficient.
-    let valid_ps = Choice::from_u8_lsb((((2i32 + 8i32 - index as i32 - 1i32) >> 31) & 1) as u8);
-    let valid = first_byte_is_zero & second_byte_is_two & !looking_for_index & valid_ps;
-    index = u32::ct_select(&0, &(index + 1), valid);
+    // Padding must be at least 8 bytes long, and it starts two bytes into the message.
+    let index_is_greater_than_prefix = zero_index.ct_gt(&9);
 
-    Ok((valid.to_u8(), em, index))
+    let valid =
+        first_byte_is_zero & second_byte_is_two & found_zero_byte & index_is_greater_than_prefix;
+
+    let real_message_index = zero_index.wrapping_add(1) as usize;
+
+    // Select either the rejection or real message depending on valid padding.
+    let message_index = rejection_msg_index.ct_select(&real_message_index, valid);
+    // At this stage, message_index does not directly reveal whether the padding check was successful,
+    // thus avoiding leaking information through the message length.
+    let mut output = vec![0u8; usize::from(max_length)];
+    for ((&em_byte, &syn_byte), out_byte) in em[message_index..]
+        .iter()
+        .zip(&rejection_message[message_index..])
+        .zip(output.iter_mut())
+    {
+        *out_byte = syn_byte.ct_select(&em_byte, valid);
+    }
+    output.truncate(em.len() - message_index);
+
+    Ok(output)
+}
+
+pub(crate) struct KeyDerivationKey(Zeroizing<[u8; 32]>);
+
+impl KeyDerivationKey {
+    /// Derives a key derivation key from the private key, the ciphertext, and the key length.
+    ///
+    /// ## Specifications
+    /// ```text
+    ///  
+    /// Input:
+    ///   d - RSA private exponent
+    ///   k - length in octets of the RSA modulus n
+    ///   ciphertext - the ciphertext
+    /// Output:
+    ///   KDK - the key derivation key
+    ///  
+    ///  D = I2OSP (d, k).
+    ///  DH = SHA256 (D)
+    ///  KDK = HMAC (DH, C, SHA256).
+    /// ```
+    ///
+    /// See:
+    /// [draft-irtf-cfrg-rsa-guidance-08 § 7.2.3](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-rsa-guidance-08#section-7.2)
+    #[inline]
+    pub fn derive(d: &BoxedUint, k: usize, ciphertext: &[u8]) -> Result<Self> {
+        if k < 11 {
+            return Err(Error::Decryption);
+        }
+
+        // D = I2OSP (d, k).
+        let d_padded = Zeroizing::new(uint_to_zeroizing_be_pad(d.clone(), k)?);
+
+        // DH = SHA256 (D).
+        let d_hash: Zeroizing<[u8; 32]> = Zeroizing::new(Sha256::digest(d_padded).into());
+
+        // KDK = HMAC-SHA256 (DH, C).
+        let mut mac =
+            Hmac::<Sha256>::new_from_slice(d_hash.as_ref()).map_err(|_| Error::Decryption)?;
+        if ciphertext.len() < k {
+            mac.update(&vec![0u8; k - ciphertext.len()]);
+        }
+        mac.update(ciphertext);
+        let kdk = mac.finalize();
+
+        Ok(Self(Zeroizing::new(kdk.into_bytes().into())))
+    }
+
+    /// Implements the pseudo-random function (PRF) to derive randomness for implicit rejection.
+    ///
+    /// ## Specifications
+    ///
+    /// ```text
+    /// IRPRF (KDK, label, length)
+    /// Input:
+    ///   KDK - the key derivation key
+    ///   label - a label making the output unique for a given KDK
+    ///   length - requested length of output in octets
+    /// Output: derived key, an octet string
+    /// ```
+    /// See:
+    /// [draft-irtf-cfrg-rsa-guidance-08 § 7.1] (https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-rsa-guidance-08#section-7.1)
+    #[inline]
+    fn prf(&self, label: &[u8], output_len: usize) -> Result<Vec<u8>> {
+        // bitLength = 2 octets
+        // throw an error if the output length bits does not fit into 2 octets
+        let bitlen_bytes = u16::try_from(output_len * 8)
+            .map_err(|_| Error::Decryption)?
+            .to_be_bytes();
+
+        let mut prf_output = vec![0u8; output_len];
+        for (chunk_idx, chunk) in prf_output
+            .chunks_mut(Hmac::<Sha256>::output_size())
+            .enumerate()
+        {
+            // I
+            let index = u16::try_from(chunk_idx).map_err(|_| Error::Decryption)?;
+
+            // P_i = I (2 octets) || label || bitLength (2 octets)
+            let mut hmac =
+                Hmac::<Sha256>::new_from_slice(self.0.as_ref()).map_err(|_| Error::Decryption)?;
+            hmac.update(&index.to_be_bytes());
+            hmac.update(label);
+            hmac.update(&bitlen_bytes);
+
+            // chunk_i = HMAC(KDK, P_i).
+            let chunk_data = hmac.finalize();
+            chunk.copy_from_slice(&chunk_data.as_bytes()[..chunk.len()]);
+        }
+        Ok(prf_output)
+    }
 }
 
 #[inline]
