@@ -8,20 +8,16 @@
 
 use alloc::vec::Vec;
 use const_oid::AssociatedOid;
-use crypto_bigint::{Choice, CtAssign, CtEq, CtSelect};
-use digest::Digest;
+use crypto_bigint::{BoxedUint, Choice, CtAssign, CtEq, CtGt, CtLt, CtSelect};
+use digest::{Digest, OutputSizeUser};
+use hmac::{Hmac, KeyInit, Mac};
 use rand_core::TryCryptoRng;
+use sha2::Sha256;
 use zeroize::Zeroizing;
 
-use crate::errors::{Error, Result};
-
-#[cfg(feature = "implicit_rejection")]
-use {
-    crate::algorithms::pad::uint_to_zeroizing_be_pad,
-    crypto_bigint::{BoxedUint, CtGt, CtLt},
-    digest::OutputSizeUser,
-    hmac::{Hmac, KeyInit, Mac},
-    sha2::Sha256,
+use crate::{
+    algorithms::pad::uint_to_zeroizing_be_pad,
+    errors::{Error, Result},
 };
 
 /// Fills the provided slice with random values, which are guaranteed
@@ -68,66 +64,9 @@ where
     Ok(em)
 }
 
-/// Removes the encryption padding scheme from PKCS#1 v1.5.
-///
-/// Note that whether this function returns an error or not discloses secret
-/// information. If an attacker can cause this function to run repeatedly and
-/// learn whether each instance returned an error then they can decrypt and
-/// forge signatures as if they had the private key. See
-/// `decrypt_session_key` for a way of solving this problem.
-#[inline]
-pub(crate) fn pkcs1v15_encrypt_unpad(em: Vec<u8>, k: usize) -> Result<Vec<u8>> {
-    let (valid, out, index) = decrypt_inner(em, k)?;
-    if valid == 0 {
-        return Err(Error::Decryption);
-    }
-
-    Ok(out[index as usize..].to_vec())
-}
-
-/// Removes the PKCS1v15 padding It returns one or zero in valid that indicates whether the
-/// plaintext was correctly structured. In either case, the plaintext is
-/// returned in em so that it may be read independently of whether it was valid
-/// in order to maintain constant memory access patterns. If the plaintext was
-/// valid then index contains the index of the original message in em.
-#[inline]
-fn decrypt_inner(em: Vec<u8>, k: usize) -> Result<(u8, Vec<u8>, u32)> {
-    if k < 11 {
-        return Err(Error::Decryption);
-    }
-
-    let first_byte_is_zero = em[0].ct_eq(&0u8);
-    let second_byte_is_two = em[1].ct_eq(&2u8);
-
-    // The remainder of the plaintext must be a string of non-zero random
-    // octets, followed by a 0, followed by the message.
-    //   looking_for_index: 1 iff we are still looking for the zero.
-    //   index: the offset of the first zero byte.
-    let mut looking_for_index = Choice::TRUE;
-    let mut index = 0u32;
-
-    for (i, el) in em.iter().enumerate().skip(2) {
-        let equals0 = el.ct_eq(&0u8);
-        index.ct_assign(&(i as u32), looking_for_index & equals0);
-        looking_for_index &= !equals0;
-    }
-
-    // The PS padding must be at least 8 bytes long, and it starts two
-    // bytes into em.
-    // TODO: WARNING: THIS MUST BE CONSTANT TIME CHECK:
-    // Ref: https://github.com/dalek-cryptography/subtle/issues/20
-    // This is currently copy & paste from the constant time impl in
-    // go, but very likely not sufficient.
-    let valid_ps = Choice::from_u8_lsb((((2i32 + 8i32 - index as i32 - 1i32) >> 31) & 1) as u8);
-    let valid = first_byte_is_zero & second_byte_is_two & !looking_for_index & valid_ps;
-    index = u32::ct_select(&0, &(index + 1), valid);
-
-    Ok((valid.to_u8(), em, index))
-}
-
 /// Removes PKCS#1 v1.5 encryption padding with implicit rejection.
 ///
-/// Unlike [`pkcs1v15_encrypt_unpad`], this function does not return an error if
+/// This function does not return an error if
 /// the padding is invalid. Instead, it deterministically generates and returns
 /// a replacement random message using a key-derivation function.
 /// As a result, callers cannot distinguish between valid and
@@ -135,7 +74,6 @@ fn decrypt_inner(em: Vec<u8>, k: usize) -> Result<(u8, Vec<u8>, u32)> {
 ///
 /// See
 /// [draft-irtf-cfrg-rsa-guidance-08 § 7.2](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-rsa-guidance-08#section-7.2)
-#[cfg(feature = "implicit_rejection")]
 pub(crate) fn pkcs1v15_encrypt_unpad_implicit_rejection(
     em: Vec<u8>,
     k: usize,
@@ -168,7 +106,7 @@ pub(crate) fn pkcs1v15_encrypt_unpad_implicit_rejection(
 
     // Select the rejection length from the prf output.
     let rejection_length = rejection_lengths.chunks_exact(2).fold(0u16, |acc, el| {
-        let candidate_length = (u16::from(el[0]) << 8 | u16::from(el[1])) & mask;
+        let candidate_length = ((u16::from(el[0]) << 8) | u16::from(el[1])) & mask;
         let less_than_max_length = candidate_length.ct_lt(&max_length);
         acc.ct_select(&candidate_length, less_than_max_length)
     });
@@ -216,10 +154,8 @@ pub(crate) fn pkcs1v15_encrypt_unpad_implicit_rejection(
     Ok(output)
 }
 
-#[cfg(feature = "implicit_rejection")]
 pub(crate) struct KeyDerivationKey(Zeroizing<[u8; 32]>);
 
-#[cfg(feature = "implicit_rejection")]
 impl KeyDerivationKey {
     /// Derives a key derivation key from the private key, the ciphertext, and the key length.
     ///

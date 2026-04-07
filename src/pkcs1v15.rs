@@ -37,7 +37,6 @@ pub use self::{
     signing_key::SigningKey, verifying_key::VerifyingKey,
 };
 
-#[cfg(feature = "implicit_rejection")]
 use crate::algorithms::pkcs1v15::{pkcs1v15_encrypt_unpad_implicit_rejection, KeyDerivationKey};
 
 use alloc::{boxed::Box, vec::Vec};
@@ -52,7 +51,6 @@ use crate::algorithms::pkcs1v15::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
 use crate::key::{self, RsaPrivateKey, RsaPublicKey};
-#[cfg(feature = "implicit_rejection")]
 use crate::traits::PrivateKeyParts;
 use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
 
@@ -61,32 +59,6 @@ use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
 pub struct Pkcs1v15Encrypt;
 
 impl PaddingScheme for Pkcs1v15Encrypt {
-    fn decrypt<Rng: TryCryptoRng + ?Sized>(
-        self,
-        rng: Option<&mut Rng>,
-        priv_key: &RsaPrivateKey,
-        ciphertext: &[u8],
-    ) -> Result<Vec<u8>> {
-        decrypt(rng, priv_key, ciphertext)
-    }
-
-    fn encrypt<Rng: TryCryptoRng + ?Sized>(
-        self,
-        rng: &mut Rng,
-        pub_key: &RsaPublicKey,
-        msg: &[u8],
-    ) -> Result<Vec<u8>> {
-        encrypt(rng, pub_key, msg)
-    }
-}
-
-/// Encryption using PKCS#1 v1.5 padding with implicit rejection.
-#[cfg(feature = "implicit_rejection")]
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct Pkcs1v15EncryptImplicitRejection;
-
-#[cfg(feature = "implicit_rejection")]
-impl PaddingScheme for Pkcs1v15EncryptImplicitRejection {
     fn decrypt<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: Option<&mut Rng>,
@@ -190,35 +162,11 @@ fn encrypt<R: TryCryptoRng + ?Sized>(
     uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
 }
 
-/// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5.
-///
-/// If an `rng` is passed, it uses RSA blinding to avoid timing side-channel attacks.
-///
-/// Note that whether this function returns an error or not discloses secret
-/// information. If an attacker can cause this function to run repeatedly and
-/// learn whether each instance returned an error then they can decrypt and
-/// forge signatures as if they had the private key. See
-/// `decrypt_session_key` for a way of solving this problem.
-#[inline]
-fn decrypt<R: TryCryptoRng + ?Sized>(
-    rng: Option<&mut R>,
-    priv_key: &RsaPrivateKey,
-    ciphertext: &[u8],
-) -> Result<Vec<u8>> {
-    key::check_public(priv_key)?;
-
-    let ciphertext = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
-    let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
-    let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
-
-    pkcs1v15_encrypt_unpad(em, priv_key.size())
-}
-
 /// Decrypts plaintext using RSA and the PKCS#1 v1.5 padding scheme with implicit rejection.
 ///
 /// If an `rng` is provided, RSA blinding is used to avoid timing side-channel attacks.
 ///
-/// Unlike [`decrypt`], this function does not return an error if
+/// This function does not return an error if
 /// the padding is invalid. Instead, it deterministically generates and returns
 /// a replacement random message using a key-derivation function.
 /// As a result, callers cannot distinguish between valid and
@@ -226,7 +174,6 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
 ///
 /// See
 /// [draft-irtf-cfrg-rsa-guidance-08](https://datatracker.ietf.org/doc/html/draft-irtf-cfrg-rsa-guidance-08)
-#[cfg(feature = "implicit_rejection")]
 #[inline]
 fn decrypt_implicit_rejection<R: TryCryptoRng + ?Sized>(
     rng: Option<&mut R>,
@@ -299,25 +246,21 @@ mod oid {
             const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.5");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha224 {
         const OID: ObjectIdentifier =
             const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.14");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha256 {
         const OID: ObjectIdentifier =
             const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha384 {
         const OID: ObjectIdentifier =
             const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.12");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha512 {
         const OID: ObjectIdentifier =
             const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.13");
@@ -416,7 +359,7 @@ mod tests {
 
             let blind: bool = rng.next_u32() < (1u32 << 31);
             let blinder = if blind { Some(&mut rng) } else { None };
-            let plaintext = decrypt(blinder, &priv_key, &ciphertext).unwrap();
+            let plaintext = decrypt_implicit_rejection(blinder, &priv_key, &ciphertext).unwrap();
             assert_eq!(input, plaintext);
         }
     }

@@ -3,10 +3,10 @@
 //!
 //! Vectors are stored in `examples/pkcs1v15_implicit_rfc/appendix_b.json`.
 
-#![cfg(all(feature = "implicit_rejection", feature = "encoding"))]
+#![cfg(feature = "encoding")]
 
 use pkcs8::DecodePrivateKey;
-use rsa::{traits::PublicKeyParts, Pkcs1v15EncryptImplicitRejection, RsaPrivateKey};
+use rsa::{traits::PublicKeyParts, Pkcs1v15Encrypt, RsaPrivateKey};
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -82,7 +82,7 @@ fn implicit_rejection_draft_irtf_cfrg_rsa_guidance() {
             assert_eq!(ct.len(), key.size(), "{} ciphertext length", case.id);
 
             let got = key
-                .decrypt(Pkcs1v15EncryptImplicitRejection, &ct)
+                .decrypt(Pkcs1v15Encrypt, &ct)
                 .unwrap_or_else(|e| panic!("{} decrypt: {e}", case.id));
             let want = expected_bytes(&case.expect);
             assert_eq!(got, want, "{}", case.id);
