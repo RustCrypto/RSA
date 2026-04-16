@@ -29,7 +29,7 @@ pkcs8 = { version = "0.11.0-rc.10", optional = true, default-features = false, f
 serdect = { version = "0.4", optional = true }
 sha1 = { version = "0.11", optional = true, default-features = false, features = ["oid"] }
 sha2 = { version = "0.11", optional = true, default-features = false, features = ["oid"] }
-spki = { version = "0.8.0-rc.4", optional = true, default-features = false, features = ["alloc"] }
+spki = { version = "0.8", optional = true, default-features = false, features = ["alloc"] }
 serde = { version = "1.0.184", optional = true, default-features = false, features = ["derive"] }
 
 [dev-dependencies]
