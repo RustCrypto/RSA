@@ -219,11 +219,11 @@ impl RsaPublicKey {
     pub const MAX_PUB_EXPONENT: u64 = (1 << 33) - 1;
 
     /// Maximum size of the modulus `n` in bits.
-    pub const MAX_SIZE: usize = 4096;
+    pub const MAX_SIZE: usize = 8192;
 
     /// Create a new public key from its components.
     ///
-    /// This function accepts public keys with a modulus size up to 4096-bits,
+    /// This function accepts public keys with a modulus size up to 8192-bits,
     /// i.e. [`RsaPublicKey::MAX_SIZE`].
     pub fn new(n: BoxedUint, e: BoxedUint) -> Result<Self> {
         Self::new_with_max_size(n, e, Self::MAX_SIZE)
@@ -1093,68 +1093,68 @@ mod tests {
     #[test]
     fn reject_oversized_private_key() {
         // -----BEGIN PUBLIC KEY-----
-        // MIIEIjANBgkqhkiG9w0BAQEFAAOCBA8AMIIECgKCBAEAkMBiB8qsNVXAsJR6Xoto
-        // H1r2rtZl/xzUK2tIfy99aPE489u+5tLxCQhQf+a89158vSDpr2/xwgK8w9u0Xpu2
-        // m7XRKjVMS0Y6UIINFoeTc87rVXT92Scr47kNVcGmSFXez4BSDpS+LKpWwXN+0AQu
-        // +cmcfdtsx2862iEbqQvq4PwKGQJOdOR0yldH8O4yeJK/buvIOXRHjb++vtQND/xi
-        // bFGAcd9WJqvaOG7tclhbZ277mbO6ER+y9Lj7AyO8ywybWqNeHaVPHMysPhT7HUWI
-        // 17m59i1OpuVwwEnvzDQQEUf9d5hUmkLYb5qQzuf6Ddnx/04QJCKAgkhyr9CXgnV6
-        // vEZ3PKtpicCHRxk7eqTEmgBlgwqH5vflRFV1iywQMXJnuRhzWOQaXl/vb8v4HIvF
-        // 4TatEZKqfzpbyScLIiYbPEAhHXKdZMd2zY8hkSbicifePApAZmuNpAxxJDZzphh7
-        // r4lD6t8MPT/RUAdtrZfihqaBhduFI6YeVIy6emg05M6YWvlUyer7nYGaPRS1JqD4
-        // 0v7xOtme5I8Qw6APiFPXhTqBK3occr7TgGb3V3lpC8Eq+esNHrji98R1fITkFXJW
-        // KdFcTWjBghPxiobUzMCFUrPIDJcWXeBzrARAryU+hXjEiFfzluXrps0B7RJQ/rLD
-        // LXeTn4vovUeHQVHa7YfoyWMy9pfqeVC+56LBK7SEIAvL0I3lrq5vIv+ZIuOAdbVg
-        // JiRy8DneCOk2LP3RnA8M0HSevYW93DiC+4h/l4ntjjiOfi6yRVOZ8WbVyXZ/83j4
-        // 6+pGWgvi0uMyb+btgOXjBQv7bGqdyHMc5Lqk5bF7ExETx51vKQMYCV4351caS6aX
-        // q16lYZATHgbTADEAZHdroDMJB+HMQaze9O6qU5ZO8wxxAjw89xry0dnoOQD/yA4H
-        // 7CRCo9vVDpV2hqIvHY9RI2T7cek28kmQpKvNvvK+ovmM138dHKViWULHk0fBRt7m
-        // 4wQ+tiL2PmJ/Tr8g1gVhM6S9D1XdE9z0KeDnODCWn1Q8sx2G2ah4ynnYQURDWcwO
-        // McAoP6bdJ7cCt+4F2tEsMPf4S/EwlnjvuNoQjvztxCPahYe9EnyggtQXyHJveIn7
-        // gDJsP6b93VB6x4QbLy5ch4DUhqDWginuKVeo7CTgDkq03j/IEaS1BHwreSDQceny
-        // +bYWONwV+4TMpGytKOHvU5288kmHbyZHdXuaXk8LLqbnqr30fa6Cbp4llCi9sH5a
-        // Kmi5jxQfVTe+elkMs7oVsLsVgkZS6NqPcOuEckAFijNqG223+IJoqvifCzO5Bdcs
-        // JTOLE+YaUYc8LUJwIaPykgcXmtMvQjeT8MCQ3aAlzkHfDpSvvICrXtqbGiaKolU6
-        // mQIDAQAB
+        // MIIEKjANBgkqhkiG9w0BAQEFAAOCBBcAMIIEEgKCBAkAqQn6O7pd9ioQJEOwS2sh
+        // nD2bM3+PaLovro+OKOE9t7jxrp+b9Xq81oeT6zN5u5yPewa+V08ZsAJQEbF9D5AM
+        // UZkHZc/sW/XAItC8CojQhHoCQfjOXZpONmGsQxnSJNgwLV5TDVKUApbQIPzIm9yD
+        // wOvl1yXIypaRINHzthz36ysHmaHlNVZZQ40BHVkOiUd+ws7W9U9vHN0QcaSHC8lH
+        // UEqb/Iyb0FSmZs+qbm4NXyaI90oloAFftOnt8VFbHfT/TXS0VwMyescxFsuvcuTr
+        // Xx8EYc9TuJThW22wBAFOK6SpftgtZ6i4WJqk0F8JrTwZ3TyhzKsPRwe8KeNmtmqY
+        // oaGiPj9lUOc928QzOyTETVd8pV7UpnaOe9Q4WHL0QmnXn61pCu4qpoLuK8jB+IO7
+        // xifRZHj3PMfsjJurZ4MF57LgpSrI60ekYNh1o6ViXODHQuzGxzTaF3n/7GITDBQX
+        // DRTlGuQH77hykxFqPclRGI0wxECPKasxpzjhiaTua9eipKedXB+o5XFyosnDt/X4
+        // Ygqxj/q2/18LPuQgFLqWRzsHd4TdVQyiq9xCmzIoGUjAPz1Q8cjIXRpUnp2rZQjE
+        // SCLeTjewrGNbjSMDUhdF5M2OBRmn7Q8XHHCUxT9fY/BZeydeE54KvEdEkomxkbXo
+        // hHKEmbWeEdhp78h04/xW364p1Nu9Y49w7gtO+9nmwKcpNJq32M6Qb0d2dQ3wJ0oI
+        // I9ml+n/DTna+IIwwbI8UOFEI4KZQzZaqmNv3TzGmpnocHK7eMyEtAUeQZUIGrPmr
+        // FQEmKZn9rkgr/2Hw8T20q7e0lE65Is69vTP2wXm17B5zKFYska41jJoZ6jIpbMOt
+        // uVPZV3SoGYM39Z4Ax3JaGZE0L/dQ6lJJhdFUACFIQXwNWqzd7srnvbym4hLqoPuM
+        // hjkUtTcv6YODEk7LB2FLDcymmH/zCL3w4VSi4+HyZZ13gM7Cz8WmkX4H+jeL0+Ja
+        // QyG1CzqV/HA78vUpJv/bb/J1+X1i/1HltLeTjteY4rBhVT1cxBoVBGQaCwindAs+
+        // Fjcp+8cAK+/3pMQghnkrGHzrx9YIYoOGXs4vQIMGngYaTa7aXAaft4fWjg4EeSjd
+        // rZwqqrPNuUcEuneFP9RPffj8f3vkhqCFgoVBfVM7ontu2d2nRu/hhAkgT13Uc68J
+        // dM2imBvHAo6DDUt6msWCAMOAEXYuO7aA+n3eettnBqtECoQAoCJdCHCebjIploMB
+        // XMLXyseGtLK9arI48hDvcxSlf7/1lkBB6LgNQmQJ7925TDipiYQIZ63f4d5Z2JCp
+        // W0vUkwzrH4iPb2hy+TBQSOw1kvjLyG/lHWjzDQa60xxVW9u59DxQueHsNEMHUORD
+        // 1oFXvFLe/AllAgMBAAE=
         // -----END PUBLIC KEY-----
 
         let n = BoxedUint::from_be_slice(
             &hex!(
-                "
-            90c06207caac3555c0b0947a5e8b681f5af6aed665ff1cd42b6b487f2f7d68f1
-            38f3dbbee6d2f10908507fe6bcf75e7cbd20e9af6ff1c202bcc3dbb45e9bb69b
-            b5d12a354c4b463a50820d16879373ceeb5574fdd9272be3b90d55c1a64855de
-            cf80520e94be2caa56c1737ed0042ef9c99c7ddb6cc76f3ada211ba90beae0fc
-            0a19024e74e474ca5747f0ee327892bf6eebc83974478dbfbebed40d0ffc626c
-            518071df5626abda386eed72585b676efb99b3ba111fb2f4b8fb0323bccb0c9b
-            5aa35e1da54f1cccac3e14fb1d4588d7b9b9f62d4ea6e570c049efcc34101147
-            fd7798549a42d86f9a90cee7fa0dd9f1ff4e10242280824872afd09782757abc
-            46773cab6989c08747193b7aa4c49a0065830a87e6f7e54455758b2c10317267
-            b9187358e41a5e5fef6fcbf81c8bc5e136ad1192aa7f3a5bc9270b22261b3c40
-            211d729d64c776cd8f219126e27227de3c0a40666b8da40c71243673a6187baf
-            8943eadf0c3d3fd150076dad97e286a68185db8523a61e548cba7a6834e4ce98
-            5af954c9eafb9d819a3d14b526a0f8d2fef13ad99ee48f10c3a00f8853d7853a
-            812b7a1c72bed38066f75779690bc12af9eb0d1eb8e2f7c4757c84e415725629
-            d15c4d68c18213f18a86d4ccc08552b3c80c97165de073ac0440af253e8578c4
-            8857f396e5eba6cd01ed1250feb2c32d77939f8be8bd47874151daed87e8c963
-            32f697ea7950bee7a2c12bb484200bcbd08de5aeae6f22ff9922e38075b56026
-            2472f039de08e9362cfdd19c0f0cd0749ebd85bddc3882fb887f9789ed8e388e
-            7e2eb2455399f166d5c9767ff378f8ebea465a0be2d2e3326fe6ed80e5e3050b
-            fb6c6a9dc8731ce4baa4e5b17b131113c79d6f290318095e37e7571a4ba697ab
-            5ea56190131e06d300310064776ba0330907e1cc41acdef4eeaa53964ef30c71
-            023c3cf71af2d1d9e83900ffc80e07ec2442a3dbd50e957686a22f1d8f512364
-            fb71e936f24990a4abcdbef2bea2f98cd77f1d1ca5625942c79347c146dee6e3
-            043eb622f63e627f4ebf20d6056133a4bd0f55dd13dcf429e0e73830969f543c
-            b31d86d9a878ca79d841444359cc0e31c0283fa6dd27b702b7ee05dad12c30f7
-            f84bf1309678efb8da108efcedc423da8587bd127ca082d417c8726f7889fb80
-            326c3fa6fddd507ac7841b2f2e5c8780d486a0d68229ee2957a8ec24e00e4ab4
-            de3fc811a4b5047c2b7920d071e9f2f9b61638dc15fb84cca46cad28e1ef539d
-            bcf249876f2647757b9a5e4f0b2ea6e7aabdf47dae826e9e259428bdb07e5a2a
-            68b98f141f5537be7a590cb3ba15b0bb15824652e8da8f70eb847240058a336a
-            1b6db7f88268aaf89f0b33b905d72c25338b13e61a51873c2d427021a3f29207
-            179ad32f423793f0c090dda025ce41df0e94afbc80ab5eda9b1a268aa2553a99"
+                "a909fa3bba5df62a102443b04b6b219c3d9b337f8f68ba2fae8f8e28e13db7b8
+                 f1ae9f9bf57abcd68793eb3379bb9c8f7b06be574f19b0025011b17d0f900c51
+                 990765cfec5bf5c022d0bc0a88d0847a0241f8ce5d9a4e3661ac4319d224d830
+                 2d5e530d52940296d020fcc89bdc83c0ebe5d725c8ca969120d1f3b61cf7eb2b
+                 0799a1e5355659438d011d590e89477ec2ced6f54f6f1cdd1071a4870bc94750
+                 4a9bfc8c9bd054a666cfaa6e6e0d5f2688f74a25a0015fb4e9edf1515b1df4ff
+                 4d74b45703327ac73116cbaf72e4eb5f1f0461cf53b894e15b6db004014e2ba4
+                 a97ed82d67a8b8589aa4d05f09ad3c19dd3ca1ccab0f4707bc29e366b66a98a1
+                 a1a23e3f6550e73ddbc4333b24c44d577ca55ed4a6768e7bd4385872f44269d7
+                 9fad690aee2aa682ee2bc8c1f883bbc627d16478f73cc7ec8c9bab678305e7b2
+                 e0a52ac8eb47a460d875a3a5625ce0c742ecc6c734da1779ffec62130c14170d
+                 14e51ae407efb87293116a3dc951188d30c4408f29ab31a738e189a4ee6bd7a2
+                 a4a79d5c1fa8e57172a2c9c3b7f5f8620ab18ffab6ff5f0b3ee42014ba96473b
+                 077784dd550ca2abdc429b32281948c03f3d50f1c8c85d1a549e9dab6508c448
+                 22de4e37b0ac635b8d2303521745e4cd8e0519a7ed0f171c7094c53f5f63f059
+                 7b275e139e0abc47449289b191b5e884728499b59e11d869efc874e3fc56dfae
+                 29d4dbbd638f70ee0b4efbd9e6c0a729349ab7d8ce906f4776750df0274a0823
+                 d9a5fa7fc34e76be208c306c8f14385108e0a650cd96aa98dbf74f31a6a67a1c
+                 1caede33212d014790654206acf9ab1501262999fdae482bff61f0f13db4abb7
+                 b4944eb922cebdbd33f6c179b5ec1e7328562c91ae358c9a19ea32296cc3adb9
+                 53d95774a8198337f59e00c7725a1991342ff750ea524985d154002148417c0d
+                 5aacddeecae7bdbca6e212eaa0fb8c863914b5372fe98383124ecb07614b0dcc
+                 a6987ff308bdf0e154a2e3e1f2659d7780cec2cfc5a6917e07fa378bd3e25a43
+                 21b50b3a95fc703bf2f52926ffdb6ff275f97d62ff51e5b4b7938ed798e2b061
+                 553d5cc41a1504641a0b08a7740b3e163729fbc7002beff7a4c42086792b187c
+                 ebc7d6086283865ece2f4083069e061a4daeda5c069fb787d68e0e047928ddad
+                 9c2aaab3cdb94704ba77853fd44f7df8fc7f7be486a0858285417d533ba27b6e
+                 d9dda746efe18409204f5dd473af0974cda2981bc7028e830d4b7a9ac58200c3
+                 8011762e3bb680fa7dde7adb6706ab440a8400a0225d08709e6e32299683015c
+                 c2d7cac786b4b2bd6ab238f210ef7314a57fbff5964041e8b80d426409efddb9
+                 4c38a989840867addfe1de59d890a95b4bd4930ceb1f888f6f6872f9305048ec
+                 3592f8cbc86fe51d68f30d06bad31c555bdbb9f43c50b9e1ec34430750e443d6
+                 8157bc52defc0965"
             ),
-            8192,
+            8256,
         )
         .unwrap();
 
