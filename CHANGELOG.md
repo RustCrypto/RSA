@@ -4,6 +4,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Changed
+
+- PKCS#1 v1.5 decryption now uses deterministic implicit rejection for
+  padding-invalid ciphertexts while preserving `Err` for publicly invalid
+  ciphertexts and non-padding failures.
+- SHA-256 is now an unconditional internal dependency for PKCS#1 v1.5 implicit
+  rejection. The public `sha2` feature remains for compatibility and continues
+  to gate the SHA-2 reexport and PKCS#1 v1.5 signature OID impls.
+
 ## 0.9.8 (2025-03-12)
 ### Added
 - Doc comments to specify the `rand` version ([#473])
