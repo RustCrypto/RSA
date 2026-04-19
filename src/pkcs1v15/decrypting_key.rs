@@ -12,6 +12,11 @@ use zeroize::ZeroizeOnDrop;
 
 /// Decryption key for PKCS#1 v1.5 decryption as described in [RFC8017 § 7.2].
 ///
+/// Padding-invalid ciphertexts return the deterministic rejection symbol
+/// produced by the shared PKCS#1 v1.5 decrypt path instead of a distinct
+/// padding error. Publicly invalid ciphertexts and non-padding failures still
+/// return `Err`.
+///
 /// [RFC8017 § 7.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.2
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -20,7 +25,7 @@ pub struct DecryptingKey {
 }
 
 impl DecryptingKey {
-    /// Create a new verifying key from an RSA public key.
+    /// Create a new decrypting key from an RSA private key.
     pub fn new(key: RsaPrivateKey) -> Self {
         Self { inner: key }
     }

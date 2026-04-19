@@ -18,7 +18,9 @@ const-oid = { version = "0.10", default-features = false }
 crypto-bigint = { version = "0.7", default-features = false, features = ["zeroize", "alloc"] }
 crypto-primes = { version = "0.7", default-features = false }
 digest = { version = "0.11", default-features = false, features = ["alloc", "oid"] }
+hmac = { version = "0.13", default-features = false }
 rand_core = { version = "0.10", default-features = false }
+sha2 = { version = "0.11", default-features = false, features = ["oid"] }
 signature = { version = "3.0.0-rc.10", default-features = false, features = ["alloc", "digest", "rand_core"] }
 zeroize = { version = "1.8", features = ["alloc"] }
 
@@ -28,7 +30,6 @@ pkcs1 = { version = "0.8.0-rc.4", optional = true, default-features = false, fea
 pkcs8 = { version = "0.11.0-rc.10", optional = true, default-features = false, features = ["alloc", "pem"] }
 serdect = { version = "0.4", optional = true }
 sha1 = { version = "0.11", optional = true, default-features = false, features = ["oid"] }
-sha2 = { version = "0.11", optional = true, default-features = false, features = ["oid"] }
 spki = { version = "0.8", optional = true, default-features = false, features = ["alloc"] }
 serde = { version = "1.0.184", optional = true, default-features = false, features = ["derive"] }
 
@@ -59,6 +60,7 @@ hazmat = []
 getrandom = ["crypto-bigint/getrandom", "crypto-common"]
 serde = ["encoding", "dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pkcs5 = ["pkcs8/encryption"]
+sha2 = []
 
 [package.metadata.docs.rs]
 features = ["std", "serde", "hazmat", "sha2"]

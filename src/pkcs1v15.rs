@@ -6,10 +6,14 @@
 //! PKCS#1 v1.5 padding has a longstanding history of issues generally classed as
 //! [Bleichenbacher Attacks] which were originally discovered in 1998 but keep reappearing in
 //! various forms again and again over the course of decades, including most recently in the 2023
-//! [Marvin Attack], which the `rsa` crate is [still vulnerable] to.
+//! [Marvin Attack].
 //!
 //! These attacks can result in complete plaintext recovery for encryption, or signature forgery,
 //! leading to a total failure of either confidentiality or integrity.
+//!
+//! This crate's PKCS#1 v1.5 decrypt path uses deterministic implicit rejection for
+//! padding-invalid but otherwise publicly valid ciphertexts so they no longer surface a distinct
+//! padding error. Publicly invalid ciphertexts and non-padding failures still return `Err`.
 //!
 //! Unless explicitly needed for compatibility reasons, we recommend against using PKCS#1 v1.5,
 //! and suggest using [PSS][`super::pss`] or [OAEP][`super::oaep`] instead (if there is a
@@ -18,7 +22,6 @@
 //!
 //! [Bleichenbacher Attacks]: https://en.wikipedia.org/wiki/Adaptive_chosen-ciphertext_attack#Practical_attacks
 //! [Marvin Attack]: https://people.redhat.com/~hkario/marvin/
-//! [still vulnerable]: https://github.com/RustCrypto/RSA/issues/626
 //!
 //! # Usage
 //!
@@ -44,12 +47,12 @@ use crypto_bigint::BoxedUint;
 use digest::Digest;
 use rand_core::TryCryptoRng;
 
-use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
+use crate::algorithms::pad::{i2osp_modulus_width, uint_to_be_pad, uint_to_zeroizing_be_pad};
 use crate::algorithms::pkcs1v15::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
 use crate::key::{self, RsaPrivateKey, RsaPublicKey};
-use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
+use crate::traits::{PaddingScheme, PrivateKeyParts, PublicKeyParts, SignatureScheme};
 
 /// Encryption using PKCS#1 v1.5 padding.
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -163,11 +166,17 @@ fn encrypt<R: TryCryptoRng + ?Sized>(
 ///
 /// If an `rng` is passed, it uses RSA blinding to avoid timing side-channel attacks.
 ///
-/// Note that whether this function returns an error or not discloses secret
-/// information. If an attacker can cause this function to run repeatedly and
-/// learn whether each instance returned an error then they can decrypt and
-/// forge signatures as if they had the private key. See
-/// `decrypt_session_key` for a way of solving this problem.
+/// Invalid PKCS#1 v1.5 padding no longer returns a distinct padding error.
+/// Instead, this function returns a deterministic pseudorandom rejection
+/// symbol derived from the private exponent and the provided ciphertext.
+///
+/// `Err` is still returned for publicly invalid ciphertexts, such as wrong
+/// ciphertext length or ciphertext representatives outside the RSA modulus,
+/// and for non-padding failures such as blinding RNG failure or CRT
+/// verification failure.
+///
+/// PKCS#1 v1.5 encryption remains a legacy compatibility mode. Prefer OAEP
+/// for new designs.
 #[inline]
 fn decrypt<R: TryCryptoRng + ?Sized>(
     rng: Option<&mut R>,
@@ -176,11 +185,17 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
-    let ciphertext = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
-    let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
-    let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
+    let k = priv_key.size();
+    if k < 11 || ciphertext.len() != k {
+        return Err(Error::Decryption);
+    }
 
-    pkcs1v15_encrypt_unpad(em, priv_key.size())
+    let ciphertext_int = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())
+        .map_err(|_| Error::Decryption)?;
+    let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext_int)?;
+    let em = i2osp_modulus_width(&em, k);
+
+    pkcs1v15_encrypt_unpad(em.as_slice(), priv_key.d(), ciphertext)
 }
 
 /// Calculates the signature of hashed using
