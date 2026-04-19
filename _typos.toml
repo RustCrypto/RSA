@@ -1,0 +1,2 @@
+[files]
+extend-exclude = ["tests/examples/pkcs1v15_ir/cases.json"]
