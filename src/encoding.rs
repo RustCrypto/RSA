@@ -227,7 +227,7 @@ impl EncodePublicKey for RsaPublicKey {
 fn pkcs1_error_to_pkcs8(error: pkcs1::Error) -> pkcs8::Error {
     match error {
         pkcs1::Error::Asn1(e) => pkcs8::Error::Asn1(e),
-        _ => pkcs8::Error::KeyMalformed,
+        _ => pkcs8::KeyError::Invalid.into(),
     }
 }
 
