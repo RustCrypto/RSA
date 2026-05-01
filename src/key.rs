@@ -1302,4 +1302,28 @@ mod tests {
         // Verify that the key is cryptographically valid
         assert!(validate_skip_exponent_size(&key_with_small_exp).is_ok());
     }
+
+    /// Regression test for CVE-2026-21895 / GHSA-9c48-w39g-hm26.
+    ///
+    /// Loading a secret key whose prime factor is `1` must be rejected with
+    /// `Error::InvalidPrime` rather than panicking via a divide-by-zero in
+    /// the validation/precompute path.
+    ///
+    /// Adapted from the test added in upstream commit 2926c91bef (PR #624);
+    /// the original used `num-bigint` `BigUint` types, this version uses
+    /// `crypto-bigint` `BoxedUint` and goes through
+    /// `from_components_with_large_exponent` so the small (out-of-range) `e`
+    /// can be supplied verbatim from the original test.
+    #[test]
+    #[cfg(feature = "hazmat")]
+    fn test_key_invalid_primes() {
+        let e = RsaPrivateKey::from_components_with_large_exponent(
+            BoxedUint::from(239u64),
+            BoxedUint::from(185u64),
+            BoxedUint::from(0u64),
+            vec![BoxedUint::from(1u64), BoxedUint::from(239u64)],
+        )
+        .unwrap_err();
+        assert_eq!(e, Error::InvalidPrime);
+    }
 }
