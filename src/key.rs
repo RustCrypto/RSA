@@ -216,6 +216,21 @@ impl RsaPublicKey {
     pub const MIN_PUB_EXPONENT: u64 = 2;
 
     /// Maximum value of the public exponent `e`.
+    ///
+    /// Very large public exponents are a potential denial-of-service vector (a.k.a. "RSADoS")
+    /// because they increase the amount of work required for e.g. signature verification. See:
+    ///
+    /// <https://www.imperialviolet.org/2012/03/17/rsados.html>
+    ///
+    /// The particular constant below has been chosen to align with *ring* where this value was
+    /// selected based on the history of this particular issue, API compatibility concerns, and
+    /// benchmark-driven evaluation. See RustCrypto/RSA#155.
+    ///
+    /// If for some reason you have a legitimate reason to use keys with public exponents larger
+    /// than this value, use the special APIs:
+    ///
+    /// - [`RsaPublicKey::new_with_large_exp`]
+    /// - [`RsaPrivateKey::from_components_with_large_exponent`]
     pub const MAX_PUB_EXPONENT: u64 = (1 << 33) - 1;
 
     /// Maximum size of the modulus `n` in bits.
