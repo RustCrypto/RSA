@@ -185,7 +185,6 @@ fn decrypt_implicit_rejection<R: TryCryptoRng + ?Sized>(
     let k = priv_key.size();
     let ct_boxed = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
     let em = rsa_decrypt_and_check(priv_key, rng, &ct_boxed)?;
-    // TODO: Check the timing leakage in this function.
     let em = uint_to_zeroizing_be_pad(em, k)?;
 
     let kdk = KeyDerivationKey::derive(priv_key.d(), k, ciphertext)?;
