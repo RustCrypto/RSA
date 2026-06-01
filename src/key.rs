@@ -628,8 +628,20 @@ impl RsaPrivateKey {
     }
 
     /// Decrypt the given message.
+    ///
+    /// By default this blinds the decryption using the operating system RNG, so
+    /// the modular exponentiation is not run unblinded. Builds without an OS RNG
+    /// (`no_std` without the `getrandom` feature) fall back to an unblinded
+    /// decryption; use [`RsaPrivateKey::decrypt_blinded`] with an explicit RNG there.
     pub fn decrypt<P: PaddingScheme>(&self, padding: P, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        padding.decrypt(Option::<&mut DummyRng>::None, self, ciphertext)
+        #[cfg(feature = "getrandom")]
+        {
+            padding.decrypt(Some(&mut crypto_common::getrandom::SysRng), self, ciphertext)
+        }
+        #[cfg(not(feature = "getrandom"))]
+        {
+            padding.decrypt(Option::<&mut DummyRng>::None, self, ciphertext)
+        }
     }
 
     /// Decrypt the given message.

@@ -1,10 +1,11 @@
 use super::EncryptingKey;
 use crate::{
-    dummy_rng::DummyRng,
     pkcs1v15::decrypt_implicit_rejection,
     traits::{Decryptor, EncryptingKeypair, RandomizedDecryptor},
     Result, RsaPrivateKey,
 };
+#[cfg(not(feature = "getrandom"))]
+use crate::dummy_rng::DummyRng;
 use alloc::vec::Vec;
 use rand_core::CryptoRng;
 #[cfg(feature = "serde")]
@@ -29,7 +30,20 @@ impl DecryptingKey {
 
 impl Decryptor for DecryptingKey {
     fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        decrypt_implicit_rejection::<DummyRng>(None, &self.inner, ciphertext)
+        // Blind by default via the OS RNG so the modexp is not run unblinded;
+        // fall back to unblinded only when no OS RNG is available.
+        #[cfg(feature = "getrandom")]
+        {
+            decrypt_implicit_rejection(
+                Some(&mut crypto_common::getrandom::SysRng),
+                &self.inner,
+                ciphertext,
+            )
+        }
+        #[cfg(not(feature = "getrandom"))]
+        {
+            decrypt_implicit_rejection::<DummyRng>(None, &self.inner, ciphertext)
+        }
     }
 }
 

@@ -1,9 +1,10 @@
 use super::decrypt_digest;
 use crate::{
-    dummy_rng::DummyRng,
     traits::{Decryptor, RandomizedDecryptor},
     Result, RsaPrivateKey,
 };
+#[cfg(not(feature = "getrandom"))]
+use crate::dummy_rng::DummyRng;
 use alloc::{boxed::Box, vec::Vec};
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset};
@@ -60,7 +61,21 @@ where
     MGD: Digest + FixedOutputReset,
 {
     fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        decrypt_digest::<DummyRng, D, MGD>(None, &self.inner, ciphertext, self.label.clone())
+        // Blind by default via the OS RNG so the modexp is not run unblinded;
+        // fall back to unblinded only when no OS RNG is available.
+        #[cfg(feature = "getrandom")]
+        {
+            decrypt_digest::<_, D, MGD>(
+                Some(&mut crypto_common::getrandom::SysRng),
+                &self.inner,
+                ciphertext,
+                self.label.clone(),
+            )
+        }
+        #[cfg(not(feature = "getrandom"))]
+        {
+            decrypt_digest::<DummyRng, D, MGD>(None, &self.inner, ciphertext, self.label.clone())
+        }
     }
 }
 
