@@ -12,10 +12,9 @@ use crate::{
 use core::convert::{TryFrom, TryInto};
 use crypto_bigint::{BoxedUint, NonZero, Resize};
 use pkcs8::{
-    der::{asn1::OctetStringRef, Decode},
+    der::{asn1::AsUintRef, asn1::OctetStringRef, Decode},
     Document, EncodePrivateKey, EncodePublicKey, ObjectIdentifier, SecretDocument,
 };
-use spki::der::asn1::UintLike;
 use zeroize::Zeroizing;
 
 /// ObjectID for the RSA PSS keys
@@ -39,7 +38,7 @@ impl pkcs1::DecodeRsaPublicKey for RsaPublicKey {
     }
 }
 
-impl<U: UintLike> TryFrom<pkcs1::RsaPrivateKey<U>> for RsaPrivateKey {
+impl<U: AsUintRef> TryFrom<pkcs1::RsaPrivateKey<U>> for RsaPrivateKey {
     type Error = pkcs1::Error;
 
     fn try_from(pkcs1_key: pkcs1::RsaPrivateKey<U>) -> pkcs1::Result<RsaPrivateKey> {
@@ -50,39 +49,41 @@ impl<U: UintLike> TryFrom<pkcs1::RsaPrivateKey<U>> for RsaPrivateKey {
             return Err(pkcs1::Error::Version);
         }
 
-        let bits =
-            u32::try_from(pkcs1_key.modulus.as_uint_bytes().len()).map_err(|_| KeyMalformed)? * 8;
+        let bits = u32::try_from(pkcs1_key.modulus.as_uint_ref().as_bytes().len())
+            .map_err(|_| KeyMalformed)?
+            * 8;
 
-        let n = uint_from_slice(pkcs1_key.modulus.as_uint_bytes(), bits)?;
-        let bits_e = u32::try_from(pkcs1_key.public_exponent.as_uint_bytes().len())
+        let n = uint_from_slice(pkcs1_key.modulus.as_uint_ref().as_bytes(), bits)?;
+        let bits_e = u32::try_from(pkcs1_key.public_exponent.as_uint_ref().as_bytes().len())
             .map_err(|_| pkcs1::Error::KeyMalformed)?
             * 8;
-        let e = uint_from_slice(pkcs1_key.public_exponent.as_uint_bytes(), bits_e)?;
+        let e = uint_from_slice(pkcs1_key.public_exponent.as_uint_ref().as_bytes(), bits_e)?;
         let e = Option::from(e).ok_or(KeyMalformed)?;
 
-        let d = uint_from_slice(pkcs1_key.private_exponent.as_uint_bytes(), bits)?;
-        let prime1 = uint_from_slice(pkcs1_key.prime1.as_uint_bytes(), bits)?;
-        let prime2 = uint_from_slice(pkcs1_key.prime2.as_uint_bytes(), bits)?;
+        let d = uint_from_slice(pkcs1_key.private_exponent.as_uint_ref().as_bytes(), bits)?;
+        let prime1 = uint_from_slice(pkcs1_key.prime1.as_uint_ref().as_bytes(), bits)?;
+        let prime2 = uint_from_slice(pkcs1_key.prime2.as_uint_ref().as_bytes(), bits)?;
         let primes = vec![prime1, prime2];
 
         RsaPrivateKey::from_components(n, e, d, primes).map_err(|_| KeyMalformed)
     }
 }
 
-impl<U: UintLike> TryFrom<pkcs1::RsaPublicKey<U>> for RsaPublicKey {
+impl<U: AsUintRef> TryFrom<pkcs1::RsaPublicKey<U>> for RsaPublicKey {
     type Error = pkcs1::Error;
 
     fn try_from(pkcs1_key: pkcs1::RsaPublicKey<U>) -> pkcs1::Result<Self> {
         use pkcs1::Error::KeyMalformed;
 
-        let bits =
-            u32::try_from(pkcs1_key.modulus.as_uint_bytes().len()).map_err(|_| KeyMalformed)? * 8;
-        let n = uint_from_slice(pkcs1_key.modulus.as_uint_bytes(), bits)?;
-
-        let bits_e = u32::try_from(pkcs1_key.public_exponent.as_uint_bytes().len())
+        let bits = u32::try_from(pkcs1_key.modulus.as_uint_ref().as_bytes().len())
             .map_err(|_| KeyMalformed)?
             * 8;
-        let e = uint_from_slice(pkcs1_key.public_exponent.as_uint_bytes(), bits_e)?;
+        let n = uint_from_slice(pkcs1_key.modulus.as_uint_ref().as_bytes(), bits)?;
+
+        let bits_e = u32::try_from(pkcs1_key.public_exponent.as_uint_ref().as_bytes().len())
+            .map_err(|_| KeyMalformed)?
+            * 8;
+        let e = uint_from_slice(pkcs1_key.public_exponent.as_uint_ref().as_bytes(), bits_e)?;
 
         RsaPublicKey::new(n, e).map_err(|_| KeyMalformed)
     }
