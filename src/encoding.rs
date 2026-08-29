@@ -15,6 +15,7 @@ use pkcs8::{
     der::{asn1::OctetStringRef, Decode},
     Document, EncodePrivateKey, EncodePublicKey, ObjectIdentifier, SecretDocument,
 };
+use spki::der::asn1::UintLike;
 use zeroize::Zeroizing;
 
 /// ObjectID for the RSA PSS keys
@@ -28,7 +29,7 @@ fn uint_from_slice(data: &[u8], bits: u32) -> pkcs1::Result<BoxedUint> {
 
 impl pkcs1::DecodeRsaPrivateKey for RsaPrivateKey {
     fn from_pkcs1_der(bytes: &[u8]) -> pkcs1::Result<Self> {
-        pkcs1::RsaPrivateKey::from_der(bytes)?.try_into()
+        pkcs1::RsaPrivateKeyRef::from_der(bytes)?.try_into()
     }
 }
 
@@ -38,10 +39,10 @@ impl pkcs1::DecodeRsaPublicKey for RsaPublicKey {
     }
 }
 
-impl TryFrom<pkcs1::RsaPrivateKey<'_>> for RsaPrivateKey {
+impl<U: UintLike> TryFrom<pkcs1::RsaPrivateKey<U>> for RsaPrivateKey {
     type Error = pkcs1::Error;
 
-    fn try_from(pkcs1_key: pkcs1::RsaPrivateKey<'_>) -> pkcs1::Result<RsaPrivateKey> {
+    fn try_from(pkcs1_key: pkcs1::RsaPrivateKey<U>) -> pkcs1::Result<RsaPrivateKey> {
         use pkcs1::Error::KeyMalformed;
 
         // Multi-prime RSA keys not currently supported
@@ -49,37 +50,39 @@ impl TryFrom<pkcs1::RsaPrivateKey<'_>> for RsaPrivateKey {
             return Err(pkcs1::Error::Version);
         }
 
-        let bits = u32::try_from(pkcs1_key.modulus.as_bytes().len()).map_err(|_| KeyMalformed)? * 8;
+        let bits =
+            u32::try_from(pkcs1_key.modulus.as_uint_bytes().len()).map_err(|_| KeyMalformed)? * 8;
 
-        let n = uint_from_slice(pkcs1_key.modulus.as_bytes(), bits)?;
-        let bits_e = u32::try_from(pkcs1_key.public_exponent.as_bytes().len())
+        let n = uint_from_slice(pkcs1_key.modulus.as_uint_bytes(), bits)?;
+        let bits_e = u32::try_from(pkcs1_key.public_exponent.as_uint_bytes().len())
             .map_err(|_| pkcs1::Error::KeyMalformed)?
             * 8;
-        let e = uint_from_slice(pkcs1_key.public_exponent.as_bytes(), bits_e)?;
+        let e = uint_from_slice(pkcs1_key.public_exponent.as_uint_bytes(), bits_e)?;
         let e = Option::from(e).ok_or(KeyMalformed)?;
 
-        let d = uint_from_slice(pkcs1_key.private_exponent.as_bytes(), bits)?;
-        let prime1 = uint_from_slice(pkcs1_key.prime1.as_bytes(), bits)?;
-        let prime2 = uint_from_slice(pkcs1_key.prime2.as_bytes(), bits)?;
+        let d = uint_from_slice(pkcs1_key.private_exponent.as_uint_bytes(), bits)?;
+        let prime1 = uint_from_slice(pkcs1_key.prime1.as_uint_bytes(), bits)?;
+        let prime2 = uint_from_slice(pkcs1_key.prime2.as_uint_bytes(), bits)?;
         let primes = vec![prime1, prime2];
 
         RsaPrivateKey::from_components(n, e, d, primes).map_err(|_| KeyMalformed)
     }
 }
 
-impl TryFrom<pkcs1::RsaPublicKeyRef<'_>> for RsaPublicKey {
+impl<U: UintLike> TryFrom<pkcs1::RsaPublicKey<U>> for RsaPublicKey {
     type Error = pkcs1::Error;
 
-    fn try_from(pkcs1_key: pkcs1::RsaPublicKeyRef<'_>) -> pkcs1::Result<Self> {
+    fn try_from(pkcs1_key: pkcs1::RsaPublicKey<U>) -> pkcs1::Result<Self> {
         use pkcs1::Error::KeyMalformed;
 
-        let bits = u32::try_from(pkcs1_key.modulus.as_bytes().len()).map_err(|_| KeyMalformed)? * 8;
-        let n = uint_from_slice(pkcs1_key.modulus.as_bytes(), bits)?;
+        let bits =
+            u32::try_from(pkcs1_key.modulus.as_uint_bytes().len()).map_err(|_| KeyMalformed)? * 8;
+        let n = uint_from_slice(pkcs1_key.modulus.as_uint_bytes(), bits)?;
 
-        let bits_e = u32::try_from(pkcs1_key.public_exponent.as_bytes().len())
+        let bits_e = u32::try_from(pkcs1_key.public_exponent.as_uint_bytes().len())
             .map_err(|_| KeyMalformed)?
             * 8;
-        let e = uint_from_slice(pkcs1_key.public_exponent.as_bytes(), bits_e)?;
+        let e = uint_from_slice(pkcs1_key.public_exponent.as_uint_bytes(), bits_e)?;
 
         RsaPublicKey::new(n, e).map_err(|_| KeyMalformed)
     }
@@ -174,7 +177,7 @@ impl TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for RsaPrivateKey {
     fn try_from(private_key_info: pkcs8::PrivateKeyInfoRef<'_>) -> pkcs8::Result<Self> {
         verify_algorithm_id(&private_key_info.algorithm)?;
 
-        pkcs1::RsaPrivateKey::try_from(private_key_info.private_key)
+        pkcs1::RsaPrivateKeyRef::try_from(private_key_info.private_key)
             .and_then(TryInto::try_into)
             .map_err(pkcs1_error_to_pkcs8)
     }

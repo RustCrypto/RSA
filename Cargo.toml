@@ -71,5 +71,6 @@ debug = true
 
 
 [patch.crates-io]
-# pkcs1: split RsaPublicKey into RsaPublicKeyRef and RsaPublicKeyOwned - #2411
-pkcs1 = { git = "https://github.com/RustCrypto/formats.git", rev = "0072dd7246ce370e7b89047b1389f44b67ab63b7" }
+# pkcs1: split der objects into *Ref and *Owned - #2411
+pkcs1 = { git = "https://github.com/dishmaker/formats.git", rev = "db210a5ca227116471c6970d09afbde352bbce17" }
+der = { git = "https://github.com/dishmaker/formats.git", rev = "db210a5ca227116471c6970d09afbde352bbce17" }
