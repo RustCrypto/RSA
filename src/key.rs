@@ -144,9 +144,9 @@ impl Zeroize for PrecomputedValues {
     fn zeroize(&mut self) {
         self.dp.zeroize();
         self.dq.zeroize();
-        // TODO: once these have landed in crypto-bigint
-        // self.p_params.zeroize();
-        // self.q_params.zeroize();
+        self.qinv.zeroize();
+        self.p_params.zeroize();
+        self.q_params.zeroize();
     }
 }
 
