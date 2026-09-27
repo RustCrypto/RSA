@@ -67,13 +67,13 @@ where
 /// forge signatures as if they had the private key. See
 /// `decrypt_session_key` for a way of solving this problem.
 #[inline]
-pub(crate) fn pkcs1v15_encrypt_unpad(em: Vec<u8>, k: usize) -> Result<Vec<u8>> {
-    let (valid, out, index) = decrypt_inner(em, k)?;
+pub(crate) fn pkcs1v15_encrypt_unpad(em: &[u8], k: usize) -> Result<Vec<u8>> {
+    let (valid, index) = decrypt_inner(em, k)?;
     if valid == 0 {
         return Err(Error::Decryption);
     }
 
-    Ok(out[index as usize..].to_vec())
+    Ok(em[index as usize..].to_vec())
 }
 
 /// Removes the PKCS1v15 padding It returns one or zero in valid that indicates whether the
@@ -82,8 +82,8 @@ pub(crate) fn pkcs1v15_encrypt_unpad(em: Vec<u8>, k: usize) -> Result<Vec<u8>> {
 /// in order to maintain constant memory access patterns. If the plaintext was
 /// valid then index contains the index of the original message in em.
 #[inline]
-fn decrypt_inner(em: Vec<u8>, k: usize) -> Result<(u8, Vec<u8>, u32)> {
-    if k < 11 {
+fn decrypt_inner(em: &[u8], k: usize) -> Result<(u8, u32)> {
+    if k < 11 && em.len() != k {
         return Err(Error::Decryption);
     }
 
@@ -113,7 +113,7 @@ fn decrypt_inner(em: Vec<u8>, k: usize) -> Result<(u8, Vec<u8>, u32)> {
     let valid = first_byte_is_zero & second_byte_is_two & !looking_for_index & valid_ps;
     index = u32::ct_select(&0, &(index + 1), valid);
 
-    Ok((valid.to_u8(), em, index))
+    Ok((valid.to_u8(), index))
 }
 
 #[inline]
