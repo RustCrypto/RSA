@@ -41,7 +41,7 @@ pub(crate) fn uint_to_be_pad(input: BoxedUint, padded_len: usize) -> Result<Vec<
 
 /// Converts input to the new vector of the given length, using BE and with 0s left padded.
 ///
-/// For secret values: every intermediate buffer, including the returned one, is zeroized on
+/// For secret values: every intermediate buffer, including the returned one, is zeroized on drop.
 #[inline]
 pub(crate) fn uint_to_zeroizing_be_pad(
     input: BoxedUint,

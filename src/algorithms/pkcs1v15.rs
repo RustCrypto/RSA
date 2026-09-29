@@ -83,7 +83,7 @@ pub(crate) fn pkcs1v15_encrypt_unpad(em: &[u8], k: usize) -> Result<Vec<u8>> {
 /// valid then index contains the index of the original message in em.
 #[inline]
 fn decrypt_inner(em: &[u8], k: usize) -> Result<(u8, u32)> {
-    if k < 11 && em.len() != k {
+    if k < 11 || em.len() != k {
         return Err(Error::Decryption);
     }
 
