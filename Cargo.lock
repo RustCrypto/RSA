@@ -223,8 +223,9 @@ dependencies = [
 
 [[package]]
 name = "der"
-version = "0.8.1"
-source = "git+https://github.com/dishmaker/formats.git?rev=fead111c91c645b45e3526414700165d836a940b#fead111c91c645b45e3526414700165d836a940b"
+version = "0.8.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a878c850e9e421b20262e9b41f9c860e4785fa07541c266b62ff9d1ef998a80a"
 dependencies = [
  "const-oid",
  "pem-rfc7468",
@@ -487,8 +488,9 @@ checksum = "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd"
 
 [[package]]
 name = "pkcs1"
-version = "0.8.0-rc.4"
-source = "git+https://github.com/dishmaker/formats.git?rev=fead111c91c645b45e3526414700165d836a940b#fead111c91c645b45e3526414700165d836a940b"
+version = "0.8.0-rc.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f485dbafe293ea6ccaa7d82bc591651a796eb8a9aec3df040b057b706073dbc3"
 dependencies = [
  "der",
  "spki",
@@ -930,8 +932,9 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "spki"
-version = "0.8.0"
-source = "git+https://github.com/dishmaker/formats.git?rev=fead111c91c645b45e3526414700165d836a940b#fead111c91c645b45e3526414700165d836a940b"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7ef958a98b9d5da290cfc78946e9f3e61e1e62a18db0d92cac0b83cc161491a9"
 dependencies = [
  "base64ct",
  "der",
