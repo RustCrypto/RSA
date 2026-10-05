@@ -68,3 +68,10 @@ opt-level = 2
 
 [profile.bench]
 debug = true
+
+
+[patch.crates-io]
+# pkcs1: split der objects into *Ref and *Owned - #2411
+pkcs1 = { git = "https://github.com/dishmaker/formats.git", rev = "fead111c91c645b45e3526414700165d836a940b" }
+spki = { git = "https://github.com/dishmaker/formats.git", rev = "fead111c91c645b45e3526414700165d836a940b" }
+der = { git = "https://github.com/dishmaker/formats.git", rev = "fead111c91c645b45e3526414700165d836a940b" }
