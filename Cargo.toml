@@ -24,7 +24,7 @@ zeroize = { version = "1.8", features = ["alloc"] }
 
 # optional dependencies
 crypto-common = { version = "0.2", optional = true, features = ["getrandom"] }
-pkcs1 = { version = "0.8.0-rc.4", optional = true, default-features = false, features = ["alloc", "pem"] }
+pkcs1 = { version = "0.8.0-rc.5", optional = true, default-features = false, features = ["alloc", "pem"] }
 pkcs8 = { version = "0.11", optional = true, default-features = false, features = ["alloc", "pem"] }
 serdect = { version = "0.4", optional = true }
 sha1 = { version = "0.11", optional = true, default-features = false, features = ["oid"] }
@@ -68,10 +68,3 @@ opt-level = 2
 
 [profile.bench]
 debug = true
-
-
-[patch.crates-io]
-# pkcs1: split der objects into *Ref and *Owned - #2411
-pkcs1 = { git = "https://github.com/dishmaker/formats.git", rev = "fead111c91c645b45e3526414700165d836a940b" }
-spki = { git = "https://github.com/dishmaker/formats.git", rev = "fead111c91c645b45e3526414700165d836a940b" }
-der = { git = "https://github.com/dishmaker/formats.git", rev = "fead111c91c645b45e3526414700165d836a940b" }
