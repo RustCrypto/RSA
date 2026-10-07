@@ -18,7 +18,6 @@ use {
 #[cfg(feature = "encoding")]
 use {
     super::get_pss_signature_algo_id,
-    crate::encoding::verify_algorithm_id,
     const_oid::AssociatedOid,
     pkcs8::{EncodePrivateKey, SecretDocument},
     spki::{
@@ -275,7 +274,6 @@ where
     type Error = pkcs8::Error;
 
     fn try_from(private_key_info: pkcs8::PrivateKeyInfoRef<'_>) -> pkcs8::Result<Self> {
-        verify_algorithm_id(&private_key_info.algorithm)?;
         RsaPrivateKey::try_from(private_key_info).map(Self::new)
     }
 }
