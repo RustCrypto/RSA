@@ -184,7 +184,7 @@ where
     D: Digest + AssociatedOid,
 {
     fn signature_algorithm_identifier(&self) -> spki::Result<AlgorithmIdentifierOwned> {
-        get_pss_signature_algo_id::<D>(self.salt_len as u8)
+        get_pss_signature_algo_id::<D>(self.salt_len)
     }
 }
 

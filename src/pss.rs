@@ -39,7 +39,10 @@ use {
     crate::encoding::ID_RSASSA_PSS,
     const_oid::AssociatedOid,
     pkcs1::RsaPssParams,
-    spki::{der::Any, AlgorithmIdentifierOwned},
+    spki::{
+        der::{Any, ErrorKind},
+        AlgorithmIdentifierOwned,
+    },
 };
 
 /// Digital signatures using PSS padding.
@@ -272,15 +275,16 @@ pub fn get_default_pss_signature_algo_id<D>() -> spki::Result<AlgorithmIdentifie
 where
     D: Digest + AssociatedOid,
 {
-    let salt_len: u8 = <D as Digest>::output_size() as u8;
-    get_pss_signature_algo_id::<D>(salt_len)
+    get_pss_signature_algo_id::<D>(<D as Digest>::output_size())
 }
 
 #[cfg(feature = "encoding")]
-fn get_pss_signature_algo_id<D>(salt_len: u8) -> spki::Result<AlgorithmIdentifierOwned>
+fn get_pss_signature_algo_id<D>(salt_len: usize) -> spki::Result<AlgorithmIdentifierOwned>
 where
     D: Digest + AssociatedOid,
 {
+    // RsaPssParams encodes salt_len in a single byte; reject rather than truncate.
+    let salt_len = u8::try_from(salt_len).map_err(|_| ErrorKind::Overflow.to_error())?;
     let pss_params = RsaPssParams::new::<D>(salt_len);
 
     Ok(AlgorithmIdentifierOwned {
@@ -671,5 +675,25 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
                 .verify(test.as_bytes(), &sig)
                 .expect("verification to succeed");
         }
+    }
+
+    // A salt length that does not fit in a byte must be rejected, not truncated (#703).
+    #[test]
+    fn signature_algorithm_identifier_rejects_oversized_salt_len() {
+        use spki::DynSignatureAlgorithmIdentifier;
+
+        let priv_key = get_private_key();
+
+        // largest value that fits in a byte
+        let ok_key = SigningKey::<Sha1>::new_with_salt_len(priv_key.clone(), 255);
+        assert!(ok_key.signature_algorithm_identifier().is_ok());
+
+        // would wrap to 0
+        let bad_key = SigningKey::<Sha1>::new_with_salt_len(priv_key.clone(), 256);
+        assert!(bad_key.signature_algorithm_identifier().is_err());
+
+        // blinded key uses the same path
+        let bad_blinded = BlindedSigningKey::<Sha1>::new_with_salt_len(priv_key, 256);
+        assert!(bad_blinded.signature_algorithm_identifier().is_err());
     }
 }
