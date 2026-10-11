@@ -39,7 +39,10 @@ use {
     crate::encoding::ID_RSASSA_PSS,
     const_oid::AssociatedOid,
     pkcs1::RsaPssParams,
-    spki::{der::Any, AlgorithmIdentifierOwned},
+    spki::{
+        der::{Any, ErrorKind, Tag},
+        AlgorithmIdentifierOwned,
+    },
 };
 
 /// Digital signatures using PSS padding.
@@ -272,15 +275,22 @@ pub fn get_default_pss_signature_algo_id<D>() -> spki::Result<AlgorithmIdentifie
 where
     D: Digest + AssociatedOid,
 {
-    let salt_len: u8 = <D as Digest>::output_size() as u8;
+    let salt_len = <D as Digest>::output_size();
     get_pss_signature_algo_id::<D>(salt_len)
 }
 
 #[cfg(feature = "encoding")]
-fn get_pss_signature_algo_id<D>(salt_len: u8) -> spki::Result<AlgorithmIdentifierOwned>
+fn get_pss_signature_algo_id<D>(salt_len: usize) -> spki::Result<AlgorithmIdentifierOwned>
 where
     D: Digest + AssociatedOid,
 {
+    // `RsaPssParams::salt_len` is a `u8`, so a `salt_len` of 256 or more cannot be
+    // represented in the `AlgorithmIdentifier`. Silently truncating it with `as u8`
+    // would advertise a wrong salt length to verifiers, causing valid signatures to
+    // fail verification (see issue #703), so reject it instead.
+    let salt_len = u8::try_from(salt_len)
+        .map_err(|_| spki::der::Error::from(ErrorKind::Value { tag: Tag::Integer }))?;
+
     let pss_params = RsaPssParams::new::<D>(salt_len);
 
     Ok(AlgorithmIdentifierOwned {
@@ -291,6 +301,7 @@ where
 
 #[cfg(all(test, feature = "encoding"))]
 mod test {
+    use super::get_default_pss_signature_algo_id;
     use crate::pss::{BlindedSigningKey, Pss, Signature, SigningKey, VerifyingKey};
     use crate::{RsaPrivateKey, RsaPublicKey};
 
@@ -303,6 +314,7 @@ mod test {
     use sha1::{Digest, Sha1};
     use signature::hazmat::{PrehashVerifier, RandomizedPrehashSigner};
     use signature::{DigestVerifier, Keypair, RandomizedDigestSigner, RandomizedSigner, Verifier};
+    use spki::DynSignatureAlgorithmIdentifier;
 
     fn get_private_key() -> RsaPrivateKey {
         // In order to generate new test vectors you'll need the PEM form of this key:
@@ -671,5 +683,78 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
                 .verify(test.as_bytes(), &sig)
                 .expect("verification to succeed");
         }
+    }
+
+    /// `signature_algorithm_identifier()` must refuse a `salt_len` that does not fit
+    /// in the `u8` used by `RsaPssParams`, rather than silently truncating it and
+    /// advertising a wrong salt length to verifiers (see issue #703).
+    #[rstest]
+    #[case(255)]
+    #[case(128)]
+    fn test_pss_algo_id_salt_len_representable(#[case] salt_len: usize) {
+        use spki::der::Encode;
+
+        let priv_key = get_private_key();
+
+        let signing_key = SigningKey::<Sha1>::new_with_salt_len(priv_key.clone(), salt_len);
+        let blinded_signing_key =
+            BlindedSigningKey::<Sha1>::new_with_salt_len(priv_key.clone(), salt_len);
+
+        let algo_ids = [
+            signing_key
+                .signature_algorithm_identifier()
+                .expect("salt_len fits in a u8, so encoding must succeed"),
+            blinded_signing_key
+                .signature_algorithm_identifier()
+                .expect("salt_len fits in a u8, so encoding must succeed"),
+        ];
+        for algo_id in &algo_ids {
+            let params_bytes = algo_id
+                .parameters
+                .as_ref()
+                .expect("RSA-PSS AlgorithmIdentifier carries parameters")
+                .to_der()
+                .expect("parameters are DER-encodable");
+            let pss_params =
+                <pkcs1::RsaPssParamsOwned as spki::der::Decode>::from_der(&params_bytes)
+                    .expect("RSA-PSS parameters are DER-decodable");
+            assert_eq!(pss_params.salt_len as usize, salt_len);
+        }
+    }
+
+    #[rstest]
+    #[case(256)]
+    #[case(300)]
+    #[case(usize::MAX)]
+    fn test_pss_algo_id_salt_len_out_of_range(#[case] salt_len: usize) {
+        let priv_key = get_private_key();
+
+        let signing_key = SigningKey::<Sha1>::new_with_salt_len(priv_key.clone(), salt_len);
+        let blinded_signing_key = BlindedSigningKey::<Sha1>::new_with_salt_len(priv_key, salt_len);
+
+        signing_key
+            .signature_algorithm_identifier()
+            .expect_err("salt_len overflows the u8 in RsaPssParams, so encoding must fail");
+        blinded_signing_key
+            .signature_algorithm_identifier()
+            .expect_err("salt_len overflows the u8 in RsaPssParams, so encoding must fail");
+    }
+
+    /// The digest-size default salt length is unchanged by the `u8` validation.
+    #[test]
+    fn test_pss_algo_id_default_salt_len_unchanged() {
+        use spki::der::Encode;
+
+        let algo_id = get_default_pss_signature_algo_id::<Sha1>()
+            .expect("the default salt length must remain encodable");
+        let params_bytes = algo_id
+            .parameters
+            .as_ref()
+            .expect("RSA-PSS AlgorithmIdentifier carries parameters")
+            .to_der()
+            .expect("parameters are DER-encodable");
+        let pss_params = <pkcs1::RsaPssParamsOwned as spki::der::Decode>::from_der(&params_bytes)
+            .expect("RSA-PSS parameters are DER-decodable");
+        assert_eq!(pss_params.salt_len as usize, Sha1::output_size());
     }
 }
