@@ -157,7 +157,7 @@ where
         return Err(Error::Verification);
     }
     let raw = rsa_encrypt(pub_key, sig)?;
-    let mut em = uint_to_be_pad(raw, pub_key.size())?;
+    let mut em = uint_to_be_pad(raw, pub_key.size());
 
     emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits() as _)
 }
@@ -176,7 +176,7 @@ where
         return Err(Error::Verification);
     }
 
-    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
+    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size());
 
     emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits() as _)
 }
@@ -243,7 +243,7 @@ where
 
     let em = BoxedUint::from_be_slice(&em, priv_key.n_bits_precision())?;
     let raw = rsa_decrypt_and_check(priv_key, blind_rng, &em)?;
-    uint_to_be_pad(raw, priv_key.size())
+    Ok(uint_to_be_pad(raw, priv_key.size()))
 }
 
 fn sign_pss_with_salt_digest<T, D>(
@@ -260,10 +260,10 @@ where
     let em = emsa_pss_encode_digest::<D>(hashed, em_bits as _, salt)?;
 
     let em = BoxedUint::from_be_slice(&em, priv_key.n_bits_precision())?;
-    uint_to_be_pad(
+    Ok(uint_to_be_pad(
         rsa_decrypt_and_check(priv_key, blind_rng, &em)?,
         priv_key.size(),
-    )
+    ))
 }
 
 /// Returns the [`AlgorithmIdentifierOwned`] associated with PSS signature using a given digest.
