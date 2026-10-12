@@ -231,28 +231,43 @@ fn unblind(m: &BoxedUint, unblinder: &BoxedUint, n_params: &BoxedMontyParams) ->
 }
 
 /// Computes `base.pow_mod(exp, n)` with precomputed `n_params`.
+///
+/// Constant-time with respect to `base` and `exp`
 fn pow_mod_params(base: &BoxedUint, exp: &BoxedUint, n_params: &BoxedMontyParams) -> BoxedUint {
-    let base = reduce_vartime(base, n_params);
-    base.pow(exp).retrieve()
+    to_monty(base, n_params).pow(exp).retrieve()
 }
 
 /// Computes `base.pow_mod(exp, n)` with a bounded exponent and precomputed `n_params`.
 ///
-/// The exponent bit length `exp_bits` may be leaked in the time pattern.
+/// Constant-time with respect to `base`. The exponent bit length `exp_bits` may be leaked in the
+/// time pattern
 fn pow_mod_params_vartime_exp_bits(
     base: &BoxedUint,
     exp: &BoxedUint,
     exp_bits: u32,
     n_params: &BoxedMontyParams,
 ) -> BoxedUint {
-    let base = reduce_vartime(base, n_params);
-    base.pow_bounded_exp(exp, exp_bits).retrieve()
+    to_monty(base, n_params)
+        .pow_bounded_exp(exp, exp_bits)
+        .retrieve()
 }
 
-fn reduce_vartime(n: &BoxedUint, p: &BoxedMontyParams) -> BoxedMontyForm {
-    let modulus = p.modulus().as_nz_ref().clone();
-    let n_reduced = n.rem_vartime(&modulus).resize_unchecked(p.bits_precision());
-    BoxedMontyForm::new(n_reduced, p)
+// Converts `x` into Montgomery form modulo `p` in constant time with respect to `x`
+///
+/// This is on the private-key path: `rsa_decrypt_and_check` re-encrypts the unblinded plaintext
+/// to detect CRT faults, and the non-CRT decrypt path feeds the ciphertext through here. A
+/// variable-time remainder at this point leaks information about the plaintext (Marvin attack,
+/// CVE-2023-49092 / RUSTSEC-2023-0071)
+fn to_monty(x: &BoxedUint, p: &BoxedMontyParams) -> BoxedMontyForm {
+    let bits = p.bits_precision();
+    let x = if x.bits_precision() <= bits {
+        // Montgomery conversion computes REDC(x * R^2 mod N). For any x < R = 2^bits the product
+        // is < R * N, so REDC already yields a fully reduced result and no division is needed
+        x.resize_unchecked(bits)
+    } else {
+        x.rem(p.modulus().as_nz_ref()).resize_unchecked(bits)
+    };
+    BoxedMontyForm::new(x, p)
 }
 
 /// The following (deterministic) algorithm also recovers the prime factors `p` and `q` of a modulus `n`, given the
@@ -457,5 +472,48 @@ mod tests {
         }
         assert_eq!(p, p1);
         assert_eq!(q, q1);
+    }
+
+    #[test]
+    fn to_monty_matches_reference_reduction() {
+        use crypto_bigint::{Odd, Resize};
+
+        let n = Odd::new(
+            BoxedUint::from_be_hex(
+                concat!(
+                    "d397b84d98a4c26138ed1b695a8106ead91d553bf06041b62d3fdc50a041e222",
+                    "b8f4529689c1b82c5e71554f5dd69fa2f4b6158cf0dbeb57811a0fc327e1f28e",
+                    "74fe74d3bc166c1eabdc1b8b57b934ca8be5b00b4f29975bcc99acaf415b59bb",
+                    "28a6782bb41a2c3c2976b3c18dbadef62f00c6bb226640095096c0cc60d22fe7",
+                    "ef987d75c6a81b10d96bf292028af110dc7cc1bbc43d22adab379a0cd5d8078c",
+                    "c780ff5cd6209dea34c922cf784f7717e428d75b5aec8ff30e5f0141510766e2",
+                    "e0ab8d473c84e8710b2b98227c3db095337ad3452f19e2b9bfbccdd8148abf67",
+                    "76fa552775e6e75956e45229ae5a9c46949bab1e622f0e48f56524a84ed3483b"
+                ),
+                2048,
+            )
+            .unwrap(),
+        )
+        .unwrap();
+        let params = BoxedMontyParams::new(n.clone());
+        let nz = n.as_nz_ref();
+
+        let candidates = [
+            BoxedUint::zero_with_precision(2048),
+            BoxedUint::one_with_precision(2048),
+            n.as_ref() - &BoxedUint::one(),
+            n.as_ref().clone(),
+            n.as_ref().wrapping_add(BoxedUint::one()),
+            BoxedUint::max(2048),
+            BoxedUint::from(12345u64),
+            BoxedUint::max(4096),
+            BoxedUint::max(2048)
+                .resize(4096)
+                .wrapping_add(BoxedUint::one()),
+        ];
+        for x in candidates {
+            let expected = x.rem_vartime(nz).resize_unchecked(2048);
+            assert_eq!(to_monty(&x, &params).retrieve(), expected);
+        }
     }
 }
