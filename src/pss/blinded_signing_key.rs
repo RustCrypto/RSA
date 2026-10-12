@@ -50,6 +50,11 @@ where
 
     /// Create a new RSASSA-PSS signing key which produces "blinded"
     /// signatures with a salt of the given length.
+    ///
+    /// Note: salt lengths of 256 bytes or more are accepted for signing, but
+    /// [`signature_algorithm_identifier`](spki::DynSignatureAlgorithmIdentifier::signature_algorithm_identifier)
+    /// will return an error for them, as the resulting `RsaPssParams` cannot
+    /// represent such a salt length.
     pub fn new_with_salt_len(key: RsaPrivateKey, salt_len: usize) -> Self {
         Self {
             inner: key,
@@ -184,7 +189,7 @@ where
     D: Digest + AssociatedOid,
 {
     fn signature_algorithm_identifier(&self) -> spki::Result<AlgorithmIdentifierOwned> {
-        get_pss_signature_algo_id::<D>(self.salt_len as u8)
+        get_pss_signature_algo_id::<D>(self.salt_len)
     }
 }
 
