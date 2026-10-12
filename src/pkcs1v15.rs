@@ -156,7 +156,7 @@ fn encrypt<R: TryCryptoRng + ?Sized>(
 
     let em = pkcs1v15_encrypt_pad(rng, msg, pub_key.size())?;
     let int = BoxedUint::from_be_slice(&em, pub_key.n_bits_precision())?;
-    uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size())
+    Ok(uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size()))
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5.
@@ -177,13 +177,13 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
     key::check_public(priv_key)?;
 
     // RFC 8017 § 7.2.2 step 1
-    if ciphertext.len() != priv_key.size() {
+    if priv_key.size() < 11 || ciphertext.len() != priv_key.size() {
         return Err(Error::Decryption);
     }
 
     let ciphertext = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
-    let em = uint_to_zeroizing_be_pad(em, priv_key.size())?;
+    let em = uint_to_zeroizing_be_pad(em, priv_key.size());
 
     pkcs1v15_encrypt_unpad(&em, priv_key.size())
 }
@@ -212,7 +212,10 @@ fn sign<R: TryCryptoRng + ?Sized>(
 
     let em = BoxedUint::from_be_slice(&em, priv_key.n_bits_precision())?;
     // The signature itself is public; only the computation is secret
-    uint_to_be_pad(rsa_decrypt_and_check(priv_key, rng, &em)?, priv_key.size())
+    Ok(uint_to_be_pad(
+        rsa_decrypt_and_check(priv_key, rng, &em)?,
+        priv_key.size(),
+    ))
 }
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
@@ -223,7 +226,7 @@ fn verify(pub_key: &RsaPublicKey, prefix: &[u8], hashed: &[u8], sig: &BoxedUint)
         return Err(Error::Verification);
     }
 
-    let em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size())?;
+    let em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size());
 
     pkcs1v15_sign_unpad(prefix, hashed, &em, pub_key.size())
 }
@@ -395,18 +398,25 @@ mod tests {
     #[test]
     fn test_decrypt_pkcs1v15_rejects_wrong_length() {
         let priv_key = get_private_key();
-        let ct = Base64::decode_vec(
-                "arReP9DJtEVyV2Dg3dDp4c/PSk1O6lxkoJ8HcFupoRorBZG+7+1fDAwT1olNddFnQMjmkb8vxwmNMoTAT/BFjQ==",
-            )
-            .unwrap();
-        assert!(priv_key.decrypt(Pkcs1v15Encrypt, &ct).is_ok());
+        // The leading zero is part of the valid k-byte encoding. Dropping it preserves
+        // the ciphertext integer, so only the length check can reject the short form.
+        let ct = hex!(
+            "00a40774c6e201e41714d1ab89c245116ff8f0baada675f22a50c7b6c1210e"
+            "3d2c3b7c595462aa8cb9447c43ef7d50ebcf544789b19ca5c2a26daea72cf9dbde"
+        );
+        assert_eq!(priv_key.decrypt(Pkcs1v15Encrypt, &ct).unwrap(), b"x");
 
-        // RFC 8017 § 7.2.2 step 1: a ciphertext shorter than `k`, even if numerically valid,
-        // must be rejected
-        assert!(priv_key.decrypt(Pkcs1v15Encrypt, &ct[1..]).is_err());
+        // RFC 8017 § 7.2.2 step 1: a ciphertext shorter than `k` must be rejected.
+        assert_eq!(
+            priv_key.decrypt(Pkcs1v15Encrypt, &ct[1..]),
+            Err(Error::Decryption)
+        );
         let mut long = vec![0u8];
         long.extend_from_slice(&ct);
-        assert!(priv_key.decrypt(Pkcs1v15Encrypt, &long).is_err());
+        assert_eq!(
+            priv_key.decrypt(Pkcs1v15Encrypt, &long),
+            Err(Error::Decryption)
+        );
     }
 
     #[test]
