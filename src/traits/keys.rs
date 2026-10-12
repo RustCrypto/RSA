@@ -1,5 +1,6 @@
 //! Traits related to the key components
 
+use crate::key::SecretPrime;
 use alloc::boxed::Box;
 use crypto_bigint::{
     modular::{BoxedMontyForm, BoxedMontyParams},
@@ -48,6 +49,12 @@ pub trait PrivateKeyParts: PublicKeyParts {
     /// Returns the prime factors.
     fn primes(&self) -> &[BoxedUint];
 
+    /// Returns prime `p` if precomputed.
+    fn p(&self) -> Option<&SecretPrime>;
+
+    /// Returns prime `q` if precomputed.
+    fn q(&self) -> Option<&SecretPrime>;
+
     /// Returns the precomputed dp value, D mod (P-1)
     fn dp(&self) -> Option<&BoxedUint>;
 
@@ -59,12 +66,6 @@ pub trait PrivateKeyParts: PublicKeyParts {
 
     /// Returns an iterator over the CRT Values
     fn crt_values(&self) -> Option<&[CrtValue]>;
-
-    /// Returns the params for `p` if precomputed.
-    fn p_params(&self) -> Option<&BoxedMontyParams>;
-
-    /// Returns the params for `q` if precomputed.
-    fn q_params(&self) -> Option<&BoxedMontyParams>;
 }
 
 /// Contains the precomputed Chinese remainder theorem values.

@@ -27,6 +27,9 @@ use crate::errors::{Error, Result};
 use crate::traits::keys::{CrtValue, PrivateKeyParts, PublicKeyParts};
 use crate::traits::{PaddingScheme, SignatureScheme};
 
+/// Type we use for representing secret prime values.
+pub(crate) type SecretPrime = crypto_bigint::modular::MontyParams<BoxedUint>;
+
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone)]
 pub struct RsaPublicKey {
@@ -125,28 +128,26 @@ impl ZeroizeOnDrop for RsaPrivateKey {}
 
 #[derive(Clone)]
 pub(crate) struct PrecomputedValues {
+    /// Montgomery params for `p`
+    pub(crate) p: SecretPrime,
+    /// Montgomery params for `q`
+    pub(crate) q: SecretPrime,
     /// D mod (P-1)
     pub(crate) dp: BoxedUint,
     /// D mod (Q-1)
     pub(crate) dq: BoxedUint,
     /// Q^-1 mod P
     pub(crate) qinv: BoxedMontyForm,
-
-    /// Montgomery params for `p`
-    pub(crate) p_params: BoxedMontyParams,
-    /// Montgomery params for `q`
-    pub(crate) q_params: BoxedMontyParams,
 }
 
 impl ZeroizeOnDrop for PrecomputedValues {}
 
 impl Zeroize for PrecomputedValues {
     fn zeroize(&mut self) {
+        self.p.zeroize();
+        self.q.zeroize();
         self.dp.zeroize();
         self.dq.zeroize();
-        // TODO: once these have landed in crypto-bigint
-        // self.p_params.zeroize();
-        // self.q_params.zeroize();
     }
 }
 
@@ -610,14 +611,10 @@ impl RsaPrivateKey {
         debug_assert_eq!(p_params.bits_precision(), p.bits_precision());
         debug_assert_eq!(q_params.bits_precision(), q.bits_precision());
 
-        self.precomputed = Some(PrecomputedValues {
-            dp,
-            dq,
-            qinv,
-            p_params,
-            q_params,
-        });
-
+        // TODO(tarcieri): zeroize intermediate parameters
+        let p = p_params.as_ref().clone();
+        let q = q_params.as_ref().clone();
+        self.precomputed = Some(PrecomputedValues { p, q, dp, dq, qinv });
         Ok(())
     }
 
@@ -709,12 +706,12 @@ impl PrivateKeyParts for RsaPrivateKey {
         None
     }
 
-    fn p_params(&self) -> Option<&BoxedMontyParams> {
-        self.precomputed.as_ref().map(|p| &p.p_params)
+    fn p(&self) -> Option<&SecretPrime> {
+        self.precomputed.as_ref().map(|p| &p.p)
     }
 
-    fn q_params(&self) -> Option<&BoxedMontyParams> {
-        self.precomputed.as_ref().map(|p| &p.q_params)
+    fn q(&self) -> Option<&SecretPrime> {
+        self.precomputed.as_ref().map(|p| &p.q)
     }
 }
 

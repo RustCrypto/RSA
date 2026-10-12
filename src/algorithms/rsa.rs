@@ -69,14 +69,11 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
         priv_key.dp(),
         priv_key.dq(),
         priv_key.qinv(),
-        priv_key.p_params(),
-        priv_key.q_params(),
+        priv_key.p(),
+        priv_key.q(),
     ) {
-        (Some(dp), Some(dq), Some(qinv), Some(p_params), Some(q_params)) if !is_multiprime => {
+        (Some(dp), Some(dq), Some(qinv), Some(p), Some(q)) if !is_multiprime => {
             // We have the precalculated values needed for the CRT.
-
-            let p = &priv_key.primes()[0];
-            let q = &priv_key.primes()[1];
 
             // precomputed: dP = (1/e) mod (p-1) = d mod (p-1)
             // precomputed: dQ = (1/e) mod (q-1) = d mod (q-1)
@@ -84,15 +81,19 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
             // TODO: it may be faster to convert to and from Montgomery with prepared parameters
             // (modulo `p` and `q`) rather than calculating the remainder directly.
 
+            // TODO(tarcieri): zeroize intermediates
+            let p_params = BoxedMontyParams::from(p.clone());
+            let q_params = BoxedMontyParams::from(q.clone());
+
             // m1 = c^dP mod p
-            let p_wide = p_params.modulus().resize_unchecked(c.bits_precision());
+            let p_wide = p.modulus().resize_unchecked(c.bits_precision());
             let c_mod_dp = (&c % p_wide.as_nz_ref()).resize_unchecked(dp.bits_precision());
-            let cp = BoxedMontyForm::new(c_mod_dp, p_params);
+            let cp = BoxedMontyForm::new(c_mod_dp, &p_params);
             let mut m1 = cp.pow(dp);
             // m2 = c^dQ mod q
-            let q_wide = q_params.modulus().resize_unchecked(c.bits_precision());
+            let q_wide = q.modulus().resize_unchecked(c.bits_precision());
             let c_mod_dq = (&c % q_wide.as_nz_ref()).resize_unchecked(dq.bits_precision());
-            let cq = BoxedMontyForm::new(c_mod_dq, q_params);
+            let cq = BoxedMontyForm::new(c_mod_dq, &q_params);
             let m2 = cq.pow(dq).retrieve();
 
             // Note that since `p` and `q` may have different `bits_precision`,
@@ -101,7 +102,7 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
             // (m1 - m2) mod p = (m1 mod p) - (m2 mod p) mod p
             let m2_mod_p = match p_params.bits_precision().cmp(&q_params.bits_precision()) {
                 Ordering::Less => {
-                    let p_wide = NonZero::new(p.clone())
+                    let p_wide = NonZero::new(priv_key.primes()[0].clone())
                         .expect("`p` is non-zero")
                         .resize_unchecked(q_params.bits_precision());
                     (&m2 % p_wide).resize_unchecked(p_params.bits_precision())
@@ -109,7 +110,7 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
                 Ordering::Greater => (&m2).resize_unchecked(p_params.bits_precision()),
                 Ordering::Equal => m2.clone(),
             };
-            let m2r = BoxedMontyForm::new(m2_mod_p, p_params);
+            let m2r = BoxedMontyForm::new(m2_mod_p, &p_params);
             m1 -= &m2r;
 
             // precomputed: qInv = (1/q) mod p
@@ -120,7 +121,7 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
             // m = m2 + h.q
             let m2 = m2.try_resize(n.bits_precision()).ok_or(Error::Internal)?;
             let hq = h
-                .concatenating_mul(&q)
+                .concatenating_mul(&priv_key.primes()[1])
                 .try_resize(n.bits_precision())
                 .ok_or(Error::Internal)?;
             m2.wrapping_add(&hq)
