@@ -25,23 +25,39 @@ fn be_pad_into(bytes: &[u8], out: &mut [u8]) {
     out[start..].copy_from_slice(tail);
 }
 
-/// Converts input to the new vector of the given length, using BE and with 0s left padded.
+/// Integer-to-Octet-String Primitive (I2OSP) from [RFC8017 §4.1].
 ///
-/// `input` must fit in `padded_len` bytes.
+/// Converts `input` to exactly `padded_len` big-endian bytes, left-padded with zeros.
+/// `input` must fit in `padded_len` bytes. This is a caller-established precondition, checked by a
+/// debug assertion.
+///
+/// Use [`i2osp_zeroizing`] when encoding secret values.
+///
+/// [RFC8017 §4.1]: https://www.rfc-editor.org/rfc/rfc8017.html#section-4.1
 #[inline]
-pub(crate) fn uint_to_be_pad(input: BoxedUint, padded_len: usize) -> Vec<u8> {
+pub(crate) fn i2osp(input: BoxedUint, padded_len: usize) -> Vec<u8> {
     let mut out = vec![0u8; padded_len];
     be_pad_into(&input.to_be_bytes(), &mut out);
     out
 }
 
-/// Converts input to the new vector of the given length, using BE and with 0s left padded.
+/// Computes [`i2osp`] (Integer-to-Octet-String Primitive) with zeroization of the input and output
+/// buffers.
 ///
-/// `input` must fit in `padded_len` bytes.
+/// The input integer, temporary byte buffer, and returned vector are each zeroized on drop.
+/// The same input-width precondition as [`i2osp`] applies.
 ///
-/// For secret values: every intermediate buffer, including the returned one, is zeroized on drop.
+/// For RSA decryption, this computes `EM = I2OSP(m, k)`, where `padded_len` is `k`, the public
+/// modulus length in octets.
+///
+/// [draft-irtf-cfrg-rsa-guidance-10 §7.2] requires this conversion to be constant-time with respect
+/// to `m`. Serialization and copying in this function depend only on `padded_len` and the input's
+/// storage precision. To satisfy that requirement, callers must ensure that both widths are
+/// independent of `m`'s value.
+///
+/// [draft-irtf-cfrg-rsa-guidance-10 §7.2]: https://www.ietf.org/archive/id/draft-irtf-cfrg-rsa-guidance-10.html#section-7.2
 #[inline]
-pub(crate) fn uint_to_zeroizing_be_pad(input: BoxedUint, padded_len: usize) -> Zeroizing<Vec<u8>> {
+pub(crate) fn i2osp_zeroizing(input: BoxedUint, padded_len: usize) -> Zeroizing<Vec<u8>> {
     let input = Zeroizing::new(input);
     let bytes = Zeroizing::new(input.to_be_bytes());
     let mut out = Zeroizing::new(vec![0u8; padded_len]);
@@ -55,17 +71,17 @@ mod tests {
     #[test]
     fn be_pad() {
         let x = BoxedUint::from(0x0102u64);
-        let p = uint_to_be_pad(x.clone(), 16);
+        let p = i2osp(x.clone(), 16);
         assert_eq!(&p[..14], &[0u8; 14]);
         assert_eq!(&p[14..], &[1, 2]);
 
-        let p = uint_to_zeroizing_be_pad(x.clone(), 3);
+        let p = i2osp_zeroizing(x.clone(), 3);
         assert_eq!(&p[..], &[0, 1, 2]);
 
-        let p = uint_to_be_pad(x.clone(), 8);
+        let p = i2osp(x.clone(), 8);
         assert_eq!(&p[..], &[0, 0, 0, 0, 0, 0, 1, 2]);
 
-        let p = uint_to_be_pad(BoxedUint::zero_with_precision(128), 4);
+        let p = i2osp(BoxedUint::zero_with_precision(128), 4);
         assert_eq!(&p[..], &[0u8; 4]);
     }
 
@@ -73,6 +89,6 @@ mod tests {
     #[test]
     #[should_panic(expected = "integer exceeds output width")]
     fn be_pad_rejects_broken_precondition() {
-        uint_to_zeroizing_be_pad(BoxedUint::from(0x0102u64), 1);
+        i2osp_zeroizing(BoxedUint::from(0x0102u64), 1);
     }
 }

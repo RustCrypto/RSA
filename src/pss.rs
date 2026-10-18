@@ -26,7 +26,7 @@ use crypto_bigint::BoxedUint;
 use digest::{Digest, FixedOutputReset};
 use rand_core::TryCryptoRng;
 
-use crate::algorithms::pad::uint_to_be_pad;
+use crate::algorithms::pad::i2osp;
 use crate::algorithms::pss::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
@@ -157,7 +157,7 @@ where
         return Err(Error::Verification);
     }
     let raw = rsa_encrypt(pub_key, sig)?;
-    let mut em = uint_to_be_pad(raw, pub_key.size());
+    let mut em = i2osp(raw, pub_key.size());
 
     emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits() as _)
 }
@@ -176,7 +176,7 @@ where
         return Err(Error::Verification);
     }
 
-    let mut em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size());
+    let mut em = i2osp(rsa_encrypt(pub_key, sig)?, pub_key.size());
 
     emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits() as _)
 }
@@ -243,7 +243,7 @@ where
 
     let em = BoxedUint::from_be_slice(&em, priv_key.n_bits_precision())?;
     let raw = rsa_decrypt_and_check(priv_key, blind_rng, &em)?;
-    Ok(uint_to_be_pad(raw, priv_key.size()))
+    Ok(i2osp(raw, priv_key.size()))
 }
 
 fn sign_pss_with_salt_digest<T, D>(
@@ -260,7 +260,7 @@ where
     let em = emsa_pss_encode_digest::<D>(hashed, em_bits as _, salt)?;
 
     let em = BoxedUint::from_be_slice(&em, priv_key.n_bits_precision())?;
-    Ok(uint_to_be_pad(
+    Ok(i2osp(
         rsa_decrypt_and_check(priv_key, blind_rng, &em)?,
         priv_key.size(),
     ))

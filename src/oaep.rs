@@ -18,7 +18,7 @@ use digest::{Digest, FixedOutputReset};
 use rand_core::TryCryptoRng;
 
 use crate::algorithms::oaep::*;
-use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
+use crate::algorithms::pad::{i2osp, i2osp_zeroizing};
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
 use crate::key::{self, RsaPrivateKey, RsaPublicKey};
@@ -215,7 +215,7 @@ where
     let em = oaep_encrypt(rng, msg, digest, mgf_digest, label, pub_key.size())?;
 
     let int = BoxedUint::from_be_slice(&em, pub_key.n_bits_precision())?;
-    Ok(uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size()))
+    Ok(i2osp(rsa_encrypt(pub_key, &int)?, pub_key.size()))
 }
 
 /// Encrypts the given message with RSA and the padding scheme from
@@ -241,7 +241,7 @@ where
     let em = oaep_encrypt_digest::<_, D, MGD>(rng, msg, label, pub_key.size())?;
 
     let int = BoxedUint::from_be_slice(&em, pub_key.n_bits_precision())?;
-    Ok(uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size()))
+    Ok(i2osp(rsa_encrypt(pub_key, &int)?, pub_key.size()))
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from [PKCS#1 OAEP].
@@ -277,7 +277,7 @@ where
     let ciphertext = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
 
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
-    let mut em = uint_to_zeroizing_be_pad(em, priv_key.size());
+    let mut em = i2osp_zeroizing(em, priv_key.size());
 
     oaep_decrypt(&mut em, digest, mgf_digest, label, priv_key.size())
 }
@@ -314,7 +314,7 @@ where
 
     let ciphertext = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
-    let mut em = uint_to_zeroizing_be_pad(em, priv_key.size());
+    let mut em = i2osp_zeroizing(em, priv_key.size());
 
     oaep_decrypt_digest::<D, MGD>(&mut em, label, priv_key.size())
 }
