@@ -21,12 +21,11 @@ pub use self::{
 
 use alloc::vec::Vec;
 use core::fmt::{self, Debug};
-use crypto_bigint::BoxedUint;
 
 use digest::{Digest, FixedOutputReset};
 use rand_core::TryCryptoRng;
 
-use crate::algorithms::pad::i2osp;
+use crate::algorithms::pad::{i2osp, os2ip};
 use crate::algorithms::pss::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
@@ -148,8 +147,7 @@ where
     if sig.len() != pub_key.size() {
         return Err(Error::Verification);
     }
-    let s = BoxedUint::from_be_slice(sig, pub_key.n_bits_precision())
-        .map_err(|_| Error::Verification)?;
+    let s = os2ip(sig, pub_key.n_bits_precision()).map_err(|_| Error::Verification)?;
     let raw = rsa_encrypt(pub_key, &s)?;
     let mut em = i2osp(raw, pub_key.size());
 
@@ -168,8 +166,7 @@ where
     if sig.len() != pub_key.size() {
         return Err(Error::Verification);
     }
-    let s = BoxedUint::from_be_slice(sig, pub_key.n_bits_precision())
-        .map_err(|_| Error::Verification)?;
+    let s = os2ip(sig, pub_key.n_bits_precision()).map_err(|_| Error::Verification)?;
     if s >= *pub_key.n().as_ref() {
         return Err(Error::Verification);
     }
@@ -239,7 +236,7 @@ where
 
     let em = emsa_pss_encode(hashed, em_bits as _, salt, digest)?;
 
-    let em = BoxedUint::from_be_slice(&em, priv_key.n_bits_precision())?;
+    let em = os2ip(&em, priv_key.n_bits_precision())?;
     let raw = rsa_decrypt_and_check(priv_key, blind_rng, &em)?;
     Ok(i2osp(raw, priv_key.size()))
 }
@@ -257,7 +254,7 @@ where
     let em_bits = priv_key.n().bits() - 1;
     let em = emsa_pss_encode_digest::<D>(hashed, em_bits as _, salt)?;
 
-    let em = BoxedUint::from_be_slice(&em, priv_key.n_bits_precision())?;
+    let em = os2ip(&em, priv_key.n_bits_precision())?;
     Ok(i2osp(
         rsa_decrypt_and_check(priv_key, blind_rng, &em)?,
         priv_key.size(),
