@@ -4,7 +4,7 @@ use digest::{Digest, FixedOutputReset};
 
 /// Mask generation function.
 ///
-/// Panics if out is larger than 2**32. This is in accordance with RFC 8017 - PKCS #1 B.2.1
+/// Panics if out is larger than 2**32. This is in accordance with RFC8017 - PKCS #1 B.2.1
 pub(crate) fn mgf1_xor<D>(out: &mut [u8], digest: &mut D, seed: &[u8])
 where
     D: Digest + FixedOutputReset,
@@ -38,7 +38,7 @@ where
 
 /// Mask generation function.
 ///
-/// Panics if out is larger than 2**32. This is in accordance with RFC 8017 - PKCS #1 B.2.1
+/// Panics if out is larger than 2**32. This is in accordance with RFC8017 - PKCS #1 B.2.1
 pub(crate) fn mgf1_xor_digest<D>(out: &mut [u8], digest: &mut D, seed: &[u8])
 where
     D: Digest + FixedOutputReset,
