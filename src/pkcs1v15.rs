@@ -44,7 +44,7 @@ use crypto_bigint::BoxedUint;
 use digest::Digest;
 use rand_core::TryCryptoRng;
 
-use crate::algorithms::pad::{uint_to_be_pad, uint_to_zeroizing_be_pad};
+use crate::algorithms::pad::{i2osp, i2osp_zeroizing};
 use crate::algorithms::pkcs1v15::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
@@ -156,7 +156,7 @@ fn encrypt<R: TryCryptoRng + ?Sized>(
 
     let em = pkcs1v15_encrypt_pad(rng, msg, pub_key.size())?;
     let int = BoxedUint::from_be_slice(&em, pub_key.n_bits_precision())?;
-    Ok(uint_to_be_pad(rsa_encrypt(pub_key, &int)?, pub_key.size()))
+    Ok(i2osp(rsa_encrypt(pub_key, &int)?, pub_key.size()))
 }
 
 /// Decrypts a plaintext using RSA and the padding scheme from PKCS#1 v1.5.
@@ -183,7 +183,7 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
 
     let ciphertext = BoxedUint::from_be_slice(ciphertext, priv_key.n_bits_precision())?;
     let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
-    let em = uint_to_zeroizing_be_pad(em, priv_key.size());
+    let em = i2osp_zeroizing(em, priv_key.size());
 
     pkcs1v15_encrypt_unpad(&em, priv_key.size())
 }
@@ -212,7 +212,7 @@ fn sign<R: TryCryptoRng + ?Sized>(
 
     let em = BoxedUint::from_be_slice(&em, priv_key.n_bits_precision())?;
     // The signature itself is public; only the computation is secret
-    Ok(uint_to_be_pad(
+    Ok(i2osp(
         rsa_decrypt_and_check(priv_key, rng, &em)?,
         priv_key.size(),
     ))
@@ -226,7 +226,7 @@ fn verify(pub_key: &RsaPublicKey, prefix: &[u8], hashed: &[u8], sig: &BoxedUint)
         return Err(Error::Verification);
     }
 
-    let em = uint_to_be_pad(rsa_encrypt(pub_key, sig)?, pub_key.size());
+    let em = i2osp(rsa_encrypt(pub_key, sig)?, pub_key.size());
 
     pkcs1v15_sign_unpad(prefix, hashed, &em, pub_key.size())
 }
