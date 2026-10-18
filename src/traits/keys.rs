@@ -16,8 +16,10 @@ pub trait PublicKeyParts {
     /// Returns the public exponent of the key.
     fn e(&self) -> &BoxedUint;
 
-    /// Returns the modulus size in bytes. Raw signatures and ciphertexts for
-    /// or by this public key will have the same size.
+    /// Returns `k`, the modulus length in octets from RFC8017: `ceil(modBits / 8)`.
+    ///
+    /// Ciphertexts and signatures have this length, including any leading zero octets.
+    /// This may be smaller than the modulus's allocated storage width.
     fn size(&self) -> usize {
         (self.n().bits() as usize).div_ceil(8)
     }
@@ -25,7 +27,10 @@ pub trait PublicKeyParts {
     /// Returns the parameters for montgomery operations.
     fn n_params(&self) -> &BoxedMontyParams;
 
-    /// Returns precision (in bits) of `n`.
+    /// Returns the limb-aligned storage precision of `n` in bits.
+    ///
+    /// This can exceed the modulus bit length (`modBits` in RFC8017). Use this precision for
+    /// integer arithmetic and decoding representatives, and [`Self::size`] for wire encodings.
     fn n_bits_precision(&self) -> u32 {
         self.n().bits_precision()
     }

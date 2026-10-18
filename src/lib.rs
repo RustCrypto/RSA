@@ -220,7 +220,7 @@
 //! # }
 //! ```
 //!
-//! [RFC8017]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
+//! [RFC8017]: https://www.rfc-editor.org/rfc/rfc8017.html
 //!
 // TODO(tarcieri): figure out why rustdoc isn't rendering these links correctly
 //! [`pkcs8::DecodePublicKey`]: https://docs.rs/pkcs8/latest/pkcs8/trait.DecodePublicKey.html

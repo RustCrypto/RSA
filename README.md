@@ -8,7 +8,20 @@
 ![MSRV][msrv-image]
 [![Project Chat][chat-image]][chat-link]
 
-A portable RSA implementation in pure Rust.
+A portable RSA implementation in pure Rust, with encryption and signature schemes
+specified in [PKCS#1 v2.2 (RFC8017)][RFC8017].
+
+| Scheme | Purpose | Specification |
+| --- | --- | --- |
+| RSAES-OAEP | Encryption | [RFC8017 §7.1][RSAES-OAEP] |
+| RSAES-PKCS1-v1_5 | Encryption | [RFC8017 §7.2][RSAES-PKCS1-v1_5] |
+| RSASSA-PSS | Signatures | [RFC8017 §8.1][RSASSA-PSS] |
+| RSASSA-PKCS1-v1_5 | Signatures | [RFC8017 §8.2][RSASSA-PKCS1-v1_5] |
+
+PKCS#1 v1.5 encryption is provided for compatibility with legacy applications only.
+Prefer OAEP and PSS for new encryption applications.
+
+See the security warning below for known implementation vulnerabilities.
 
 ## Example
 
@@ -121,3 +134,9 @@ dual licensed as above, without any additional terms or conditions.
 [Marvin Attack]: https://people.redhat.com/~hkario/marvin/
 [RUSTSEC-2023-0071]: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
 [#390]: https://github.com/RustCrypto/RSA/issues/390
+
+[RFC8017]: https://www.rfc-editor.org/rfc/rfc8017.html
+[RSAES-OAEP]: https://www.rfc-editor.org/rfc/rfc8017.html#section-7.1
+[RSAES-PKCS1-v1_5]: https://www.rfc-editor.org/rfc/rfc8017.html#section-7.2
+[RSASSA-PSS]: https://www.rfc-editor.org/rfc/rfc8017.html#section-8.1
+[RSASSA-PKCS1-v1_5]: https://www.rfc-editor.org/rfc/rfc8017.html#section-8.2

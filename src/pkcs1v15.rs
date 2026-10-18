@@ -1,4 +1,5 @@
-//! PKCS#1 v1.5 support as described in [RFC8017 § 8.2].
+//! RSAES-PKCS1-v1_5 encryption ([RFC8017 § 7.2]) and RSASSA-PKCS1-v1_5 signatures
+//! ([RFC8017 § 8.2]).
 //!
 //! <div class="warning">
 //! <b>Warning</b>
@@ -24,6 +25,7 @@
 //!
 //! See [code example in the toplevel rustdoc](../index.html#pkcs1-v15-signatures).
 //!
+//! [RFC8017 § 7.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.2
 //! [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 
 mod decrypting_key;
@@ -176,7 +178,7 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
 
-    // RFC 8017 § 7.2.2 step 1
+    // RFC8017 § 7.2.2 step 1
     if priv_key.size() < 11 || ciphertext.len() != priv_key.size() {
         return Err(Error::Decryption);
     }
@@ -406,7 +408,7 @@ mod tests {
         );
         assert_eq!(priv_key.decrypt(Pkcs1v15Encrypt, &ct).unwrap(), b"x");
 
-        // RFC 8017 § 7.2.2 step 1: a ciphertext shorter than `k` must be rejected.
+        // RFC8017 § 7.2.2 step 1: a ciphertext shorter than `k` must be rejected.
         assert_eq!(
             priv_key.decrypt(Pkcs1v15Encrypt, &ct[1..]),
             Err(Error::Decryption)
