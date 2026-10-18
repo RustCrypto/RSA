@@ -272,17 +272,13 @@ pub(crate) fn emsa_pss_verify<D>(
     em: &mut [u8],
     s_len: Option<usize>,
     hash: &mut D,
-    key_bits: usize,
+    em_bits: usize,
 ) -> Result<()>
 where
     D: Digest + FixedOutputReset,
 {
-    let em_bits = key_bits - 1;
     let em_len = em_bits.div_ceil(8);
-    let key_len = key_bits.div_ceil(8);
     let h_len = <D as Digest>::output_size();
-
-    let em = &mut em[key_len - em_len..];
 
     let (db, h) = emsa_pss_verify_pre(m_hash, em, em_bits, s_len, h_len)?;
 
@@ -328,17 +324,13 @@ pub(crate) fn emsa_pss_verify_digest<D>(
     m_hash: &[u8],
     em: &mut [u8],
     s_len: Option<usize>,
-    key_bits: usize,
+    em_bits: usize,
 ) -> Result<()>
 where
     D: Digest + FixedOutputReset,
 {
-    let em_bits = key_bits - 1;
     let em_len = em_bits.div_ceil(8);
-    let key_len = key_bits.div_ceil(8);
     let h_len = <D as Digest>::output_size();
-
-    let em = &mut em[key_len - em_len..];
 
     let (db, h) = emsa_pss_verify_pre(m_hash, em, em_bits, s_len, h_len)?;
 
