@@ -42,7 +42,6 @@ pub use self::{
 use alloc::{boxed::Box, vec::Vec};
 use const_oid::AssociatedOid;
 use core::fmt::Debug;
-use crypto_bigint::BoxedUint;
 use digest::Digest;
 use rand_core::TryCryptoRng;
 
@@ -207,7 +206,7 @@ fn sign<R: TryCryptoRng + ?Sized>(
 ) -> Result<Vec<u8>> {
     let em = pkcs1v15_sign_pad(prefix, hashed, priv_key.size())?;
 
-    let em = BoxedUint::from_be_slice(&em, priv_key.n_bits_precision())?;
+    let em = os2ip(&em, priv_key.n_bits_precision())?;
     // The signature itself is public; only the computation is secret
     Ok(i2osp(
         rsa_decrypt_and_check(priv_key, rng, &em)?,
@@ -222,8 +221,7 @@ fn verify(pub_key: &RsaPublicKey, prefix: &[u8], hashed: &[u8], sig: &[u8]) -> R
     if sig.len() != pub_key.size() {
         return Err(Error::Verification);
     }
-    let s = BoxedUint::from_be_slice(sig, pub_key.n_bits_precision())
-        .map_err(|_| Error::Verification)?;
+    let s = os2ip(sig, pub_key.n_bits_precision()).map_err(|_| Error::Verification)?;
     if s >= *pub_key.n().as_ref() {
         return Err(Error::Verification);
     }
@@ -284,6 +282,7 @@ mod tests {
         SignatureEncoding, Signer, Verifier,
     };
     use base64ct::{Base64, Encoding};
+    use crypto_bigint::BoxedUint;
     use hex_literal::hex;
     use rand::rngs::ChaCha8Rng;
     use rand_core::{Rng, SeedableRng};
