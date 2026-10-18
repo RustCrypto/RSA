@@ -38,6 +38,7 @@ where
     D: Digest + AssociatedOid,
 {
     /// Create a new verifying key with a prefix for the digest `D`.
+    #[must_use]
     pub fn new(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
@@ -56,6 +57,7 @@ where
     /// ## Note: unprefixed signatures are uncommon
     ///
     /// In most cases you'll want to use [`VerifyingKey::new`] instead.
+    #[must_use]
     pub fn new_unprefixed(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
@@ -86,7 +88,7 @@ where
             &digest.finalize_fixed(),
             &signature.inner,
         )
-        .map_err(|e| e.into())
+        .map_err(Into::into)
     }
 }
 
@@ -95,7 +97,7 @@ where
     D: Digest,
 {
     fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
-        verify(&self.inner, &self.prefix, prehash, &signature.inner).map_err(|e| e.into())
+        verify(&self.inner, &self.prefix, prehash, &signature.inner).map_err(Into::into)
     }
 }
 
@@ -110,7 +112,7 @@ where
             &D::digest(msg),
             &signature.inner,
         )
-        .map_err(|e| e.into())
+        .map_err(Into::into)
     }
 }
 

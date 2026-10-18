@@ -29,6 +29,7 @@ where
     MGD: Digest + FixedOutputReset,
 {
     /// Create a new verifying key from an RSA public key.
+    #[must_use]
     pub fn new(key: RsaPublicKey) -> Self {
         Self {
             inner: key,

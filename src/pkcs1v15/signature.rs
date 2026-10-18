@@ -74,9 +74,9 @@ impl Display for Signature {
 
 #[cfg(feature = "serde")]
 impl Serialize for Signature {
-    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-        S: serdect::serde::Serializer,
+        S: serde::Serializer,
     {
         serdect::slice::serialize_hex_lower_or_bin(&self.to_bytes(), serializer)
     }
@@ -84,9 +84,9 @@ impl Serialize for Signature {
 
 #[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Signature {
-    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
-        D: serdect::serde::Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
         serdect::slice::deserialize_hex_or_bin_vec(deserializer)?
             .as_slice()

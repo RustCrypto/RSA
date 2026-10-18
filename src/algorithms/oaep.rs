@@ -246,6 +246,7 @@ fn decrypt_inner<MGF: FnMut(&mut [u8], &mut [u8])>(
     let mut index = 0u32;
     let mut nonzero_before_one = Choice::FALSE;
 
+    #[allow(clippy::cast_possible_truncation, reason = "TODO")]
     for (i, el) in db.iter().skip(h_size).enumerate() {
         let equals0 = el.ct_eq(&0u8);
         let equals1 = el.ct_eq(&1u8);
@@ -256,5 +257,6 @@ fn decrypt_inner<MGF: FnMut(&mut [u8], &mut [u8])>(
 
     let valid = first_byte_is_zero & hash_are_equal & !nonzero_before_one & !looking_for_index;
 
+    #[allow(clippy::cast_possible_truncation, reason = "TODO")]
     Ok(CtOption::new(index + 2 + (h_size * 2) as u32, valid))
 }

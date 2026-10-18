@@ -37,11 +37,13 @@ where
 {
     /// Create a new RSASSA-PSS verifying key.
     /// Digest output size is used as a salt length.
+    #[must_use]
     pub fn new(key: RsaPublicKey) -> Self {
         Self::new_with_salt_len(key, <D as Digest>::output_size())
     }
 
     /// Create a new RSASSA-PSS verifying key.
+    #[must_use]
     pub fn new_with_salt_len(key: RsaPublicKey, salt_len: usize) -> Self {
         Self {
             inner: key,
@@ -52,6 +54,7 @@ where
 
     /// Create a new RSASSA-PSS verifying key.
     /// Attempts to automatically detect the salt length.
+    #[must_use]
     pub fn new_with_auto_salt_len(key: RsaPublicKey) -> Self {
         Self {
             inner: key,
@@ -61,6 +64,7 @@ where
     }
 
     /// Return specified salt length for this key
+    #[must_use]
     pub fn salt_len(&self) -> Option<usize> {
         self.salt_len
     }
@@ -87,7 +91,7 @@ where
             &signature.inner,
             self.salt_len,
         )
-        .map_err(|e| e.into())
+        .map_err(Into::into)
     }
 }
 
@@ -97,7 +101,7 @@ where
 {
     fn verify_prehash(&self, prehash: &[u8], signature: &Signature) -> signature::Result<()> {
         verify_digest::<D>(&self.inner, prehash, &signature.inner, self.salt_len)
-            .map_err(|e| e.into())
+            .map_err(Into::into)
     }
 }
 
@@ -112,7 +116,7 @@ where
             &signature.inner,
             self.salt_len,
         )
-        .map_err(|e| e.into())
+        .map_err(Into::into)
     }
 }
 

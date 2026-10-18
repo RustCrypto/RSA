@@ -82,6 +82,12 @@ pub(crate) fn pkcs1v15_encrypt_unpad(em: &[u8], k: usize) -> Result<Vec<u8>> {
 /// in order to maintain constant memory access patterns. If the plaintext was
 /// valid then index contains the index of the original message in em.
 #[inline]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    clippy::cast_sign_loss,
+    reason = "TODO"
+)]
 fn decrypt_inner(em: &[u8], k: usize) -> Result<(u8, u32)> {
     if k < 11 || em.len() != k {
         return Err(Error::Decryption);
@@ -147,7 +153,7 @@ pub(crate) fn pkcs1v15_sign_unpad(prefix: &[u8], hashed: &[u8], em: &[u8], k: us
     ok &= em[k - t_len - 1].ct_eq(&0u8);
 
     for el in em.iter().skip(2).take(k - t_len - 3) {
-        ok &= el.ct_eq(&0xff)
+        ok &= el.ct_eq(&0xff);
     }
 
     // TODO(tarcieri): avoid branching here by e.g. using a pseudorandom rejection symbol
@@ -160,6 +166,7 @@ pub(crate) fn pkcs1v15_sign_unpad(prefix: &[u8], hashed: &[u8], em: &[u8], k: us
 
 /// prefix = 0x30 <oid_len + 8 + digest_len> 0x30 <oid_len + 4> 0x06 <oid_len> oid 0x05 0x00 0x04 <digest_len>
 #[inline]
+#[allow(clippy::cast_possible_truncation, reason = "TODO")]
 pub(crate) fn pkcs1v15_generate_prefix<D>() -> Vec<u8>
 where
     D: Digest + AssociatedOid,

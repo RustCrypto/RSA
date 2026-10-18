@@ -44,6 +44,7 @@ where
     D: Digest + AssociatedOid,
 {
     /// Create a new signing key with a prefix for the digest `D`.
+    #[must_use]
     pub fn new(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
@@ -53,6 +54,7 @@ where
     }
 
     /// Generate a new signing key with a prefix for the digest `D`.
+    #[allow(clippy::missing_errors_doc, reason = "TODO")]
     pub fn random<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
@@ -71,6 +73,7 @@ where
     /// ## Note: unprefixed signatures are uncommon
     ///
     /// In most cases you'll want to use [`SigningKey::new`].
+    #[must_use]
     pub fn new_unprefixed(key: RsaPrivateKey) -> Self {
         Self {
             inner: key,
@@ -80,6 +83,7 @@ where
     }
 
     /// Generate a new signing key with an empty prefix.
+    #[allow(clippy::missing_errors_doc, reason = "TODO")]
     pub fn random_unprefixed<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
@@ -310,7 +314,7 @@ where
 {
     fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
-        S: serdect::serde::Serializer,
+        S: serde::Serializer,
     {
         let der = self.to_pkcs8_der().map_err(ser::Error::custom)?;
         serdect::slice::serialize_hex_lower_or_bin(&der.as_bytes(), serializer)
@@ -324,7 +328,7 @@ where
 {
     fn deserialize<De>(deserializer: De) -> core::result::Result<Self, De::Error>
     where
-        De: serdect::serde::Deserializer<'de>,
+        De: serde::Deserializer<'de>,
     {
         let der_bytes = serdect::slice::deserialize_hex_or_bin_vec(deserializer)?;
         Self::from_pkcs8_der(&der_bytes).map_err(de::Error::custom)

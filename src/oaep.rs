@@ -78,6 +78,7 @@ where
     /// let padding = Oaep::<Sha256>::new();
     /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();
     /// ```
+    #[must_use]
     pub fn new() -> Self {
         Self {
             digest: D::new(),
@@ -122,6 +123,7 @@ where
     /// let padding = Oaep::<Sha256, Sha1>::new_with_mgf_hash();
     /// let encrypted_data = key.encrypt(&mut rng, padding, b"secret").unwrap();
     /// ```
+    #[must_use]
     pub fn new_with_mgf_hash() -> Self {
         Self {
             digest: D::new(),

@@ -21,6 +21,7 @@ pub struct DecryptingKey {
 
 impl DecryptingKey {
     /// Create a new verifying key from an RSA public key.
+    #[must_use]
     pub fn new(key: RsaPrivateKey) -> Self {
         Self { inner: key }
     }

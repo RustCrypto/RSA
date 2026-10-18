@@ -11,8 +11,8 @@ use crate::key::{RsaPrivateKey, RsaPublicKey};
 pub trait PaddingScheme {
     /// Decrypt the given message using the given private key.
     ///
-    /// If an `rng` is passed, it uses RSA blinding to help mitigate timing
-    /// side-channel attacks.
+    /// If an `rng` is passed, it uses RSA blinding to help mitigate timing side-channel attacks.
+    #[allow(clippy::missing_errors_doc, reason = "TODO")]
     fn decrypt<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: Option<&mut Rng>,
@@ -21,6 +21,7 @@ pub trait PaddingScheme {
     ) -> Result<Vec<u8>>;
 
     /// Encrypt the given message using the given public key.
+    #[allow(clippy::missing_errors_doc, reason = "TODO")]
     fn encrypt<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: &mut Rng,
@@ -32,6 +33,7 @@ pub trait PaddingScheme {
 /// Digital signature scheme.
 pub trait SignatureScheme {
     /// Sign the given digest.
+    #[allow(clippy::missing_errors_doc, reason = "TODO")]
     fn sign<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: Option<&mut Rng>,
@@ -45,5 +47,6 @@ pub trait SignatureScheme {
     /// passed in through `hash`.
     ///
     /// If the message is valid `Ok(())` is returned, otherwise an `Err` indicating failure.
+    #[allow(clippy::missing_errors_doc, reason = "TODO")]
     fn verify(self, pub_key: &RsaPublicKey, hashed: &[u8], sig: &[u8]) -> Result<()>;
 }

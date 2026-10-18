@@ -72,11 +72,13 @@ where
 {
     /// New PSS padding for the given digest.
     /// Digest output size is used as a salt length.
+    #[must_use]
     pub fn new() -> Self {
         Self::new_with_salt(<D as Digest>::output_size())
     }
 
     /// New PSS padding for the given digest with a salt value of the given length.
+    #[must_use]
     pub fn new_with_salt(len: usize) -> Self {
         Self {
             blinded: false,
@@ -87,12 +89,14 @@ where
 
     /// New PSS padding for blinded signatures (RSA-BSSA) for the given digest.
     /// Digest output size is used as a salt length.
+    #[must_use]
     pub fn new_blinded() -> Self {
         Self::new_blinded_with_salt(<D as Digest>::output_size())
     }
 
     /// New PSS padding for blinded signatures (RSA-BSSA) for the given digest
     /// with a salt value of the given length.
+    #[must_use]
     pub fn new_blinded_with_salt(len: usize) -> Self {
         Self {
             blinded: true,
@@ -106,6 +110,7 @@ impl<D> SignatureScheme for Pss<D>
 where
     D: Digest + FixedOutputReset,
 {
+    #[allow(clippy::unwrap_in_result, reason = "TODO")]
     fn sign<Rng: TryCryptoRng + ?Sized>(
         mut self,
         rng: Option<&mut Rng>,
@@ -279,6 +284,7 @@ where
 
 /// Returns the [`AlgorithmIdentifierOwned`] associated with PSS signature using a given digest.
 #[cfg(feature = "encoding")]
+#[allow(clippy::missing_errors_doc, reason = "TODO")]
 pub fn get_default_pss_signature_algo_id<D>() -> spki::Result<AlgorithmIdentifierOwned>
 where
     D: Digest + AssociatedOid,

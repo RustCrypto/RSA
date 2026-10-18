@@ -1,4 +1,5 @@
-// simple but prevent regression - see https://github.com/RustCrypto/RSA/issues/329
+//! PKCS#1 v1.5 tests.
+
 #[cfg(feature = "encoding")]
 #[test]
 fn signature_stringify() {

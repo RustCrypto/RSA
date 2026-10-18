@@ -1,6 +1,7 @@
 //! ⚠️ Low-level "hazmat" RSA functions.
 //!
-//! # ☢️️ WARNING: HAZARDOUS API ☢️
+//! <div class="warning">
+//! <b> ☢️️ WARNING: HAZARDOUS API ☢️</b>
 //!
 //! This module holds functions that apply RSA's core encryption and decryption
 //! primitives to raw data without adding or removing appropriate padding. A
@@ -10,5 +11,6 @@
 //!
 //! We do NOT recommend using it to implement any algorithm which has not
 //! received extensive peer review by cryptographers.
+//! </div>
 
 pub use crate::algorithms::rsa::{rsa_decrypt, rsa_decrypt_and_check, rsa_encrypt};
