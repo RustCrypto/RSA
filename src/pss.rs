@@ -144,13 +144,7 @@ pub(crate) fn verify<D>(
 where
     D: Digest + FixedOutputReset,
 {
-    if sig.len() != pub_key.size() {
-        return Err(Error::Verification);
-    }
-    let s = os2ip(sig, pub_key.n_bits_precision()).map_err(|_| Error::Verification)?;
-    let raw = rsa_encrypt(pub_key, &s)?;
-    let mut em = i2osp(raw, pub_key.size());
-
+    let mut em = decode_signature(pub_key, sig)?;
     emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits() as _)
 }
 
@@ -163,17 +157,25 @@ pub(crate) fn verify_digest<D>(
 where
     D: Digest + FixedOutputReset,
 {
-    if sig.len() != pub_key.size() {
+    let mut em = decode_signature(pub_key, sig)?;
+    emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits() as _)
+}
+
+/// Checks signature length and range before applying the public-key operation.
+fn decode_signature(pub_key: &RsaPublicKey, signature: &[u8]) -> Result<Vec<u8>> {
+    // Step 1: S must be exactly k octets, independently of integer storage precision.
+    if signature.len() != pub_key.size() {
         return Err(Error::Verification);
     }
-    let s = os2ip(sig, pub_key.n_bits_precision()).map_err(|_| Error::Verification)?;
+
+    // Steps 2a and 2b: s = OS2IP(S), m = RSAVP1((n, e), s).
+    let s = os2ip(signature, pub_key.n_bits_precision()).map_err(|_| Error::Verification)?;
     if s >= *pub_key.n().as_ref() {
         return Err(Error::Verification);
     }
+    let m = rsa_encrypt(pub_key, &s)?;
 
-    let mut em = i2osp(rsa_encrypt(pub_key, &s)?, pub_key.size());
-
-    emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits() as _)
+    Ok(i2osp(m, pub_key.size()))
 }
 
 /// SignPSS calculates the signature of hashed using RSASSA-PSS.
