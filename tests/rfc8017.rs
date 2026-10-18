@@ -7,7 +7,7 @@ use rsa::{
         hazmat::PrehashVerifier, DigestVerifier, RandomizedSigner, SignatureEncoding, Verifier,
     },
     traits::PublicKeyParts,
-    Pkcs1v15Sign, Pss, RsaPrivateKey, RsaPublicKey,
+    BoxedUint, Pkcs1v15Sign, Pss, RsaPrivateKey, RsaPublicKey,
 };
 use sha2::{Digest, Sha256};
 
@@ -117,4 +117,26 @@ fn signatures_require_exact_modulus_length() {
     check_pss(&public, message, &pss[1..], false);
     check_pkcs1v15(&public, message, &[], false);
     check_pss(&public, message, &[], false);
+}
+
+#[test]
+fn pss_rejects_out_of_range_signature_alias() {
+    const OUT_OF_RANGE: &[u8] = b"out-of-range signature representative";
+
+    let key = private_key();
+    let public = key.to_public_key();
+    let digest = Sha256::digest(OUT_OF_RANGE);
+    let mut rng = ChaCha8Rng::from_seed([7; 32]);
+    let bytes = key
+        .sign_with_rng(&mut rng, Pss::<Sha256>::new(), &digest)
+        .unwrap();
+
+    let s = BoxedUint::from_be_slice(&bytes, public.n_bits_precision()).unwrap();
+    let alias = s.wrapping_add(public.n().as_ref());
+    assert!(alias >= *public.n().as_ref());
+
+    // The 1025-bit modulus leaves enough space for s+n in the 129-octet signature.
+    let bytes = alias.to_be_bytes();
+    let bytes = &bytes[bytes.len() - public.size()..];
+    check_pss(&public, OUT_OF_RANGE, bytes, false);
 }
