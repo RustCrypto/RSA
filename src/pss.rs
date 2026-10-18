@@ -121,14 +121,7 @@ where
     }
 
     fn verify(mut self, pub_key: &RsaPublicKey, hashed: &[u8], sig: &[u8]) -> Result<()> {
-        verify(
-            pub_key,
-            hashed,
-            &BoxedUint::from_be_slice_vartime(sig),
-            sig.len(),
-            &mut self.digest,
-            self.salt_len,
-        )
+        verify(pub_key, hashed, sig, &mut self.digest, self.salt_len)
     }
 }
 
@@ -145,18 +138,19 @@ impl<D> Debug for Pss<D> {
 pub(crate) fn verify<D>(
     pub_key: &RsaPublicKey,
     hashed: &[u8],
-    sig: &BoxedUint,
-    sig_len: usize,
+    sig: &[u8],
     digest: &mut D,
     salt_len: Option<usize>,
 ) -> Result<()>
 where
     D: Digest + FixedOutputReset,
 {
-    if sig_len != pub_key.size() {
+    if sig.len() != pub_key.size() {
         return Err(Error::Verification);
     }
-    let raw = rsa_encrypt(pub_key, sig)?;
+    let s = BoxedUint::from_be_slice(sig, pub_key.n_bits_precision())
+        .map_err(|_| Error::Verification)?;
+    let raw = rsa_encrypt(pub_key, &s)?;
     let mut em = i2osp(raw, pub_key.size());
 
     emsa_pss_verify(hashed, &mut em, salt_len, digest, pub_key.n().bits() as _)
@@ -165,18 +159,22 @@ where
 pub(crate) fn verify_digest<D>(
     pub_key: &RsaPublicKey,
     hashed: &[u8],
-    sig: &BoxedUint,
+    sig: &[u8],
     salt_len: Option<usize>,
 ) -> Result<()>
 where
     D: Digest + FixedOutputReset,
 {
-    let n = pub_key.n();
-    if sig >= n.as_ref() || sig.bits_precision() != pub_key.n_bits_precision() {
+    if sig.len() != pub_key.size() {
+        return Err(Error::Verification);
+    }
+    let s = BoxedUint::from_be_slice(sig, pub_key.n_bits_precision())
+        .map_err(|_| Error::Verification)?;
+    if s >= *pub_key.n().as_ref() {
         return Err(Error::Verification);
     }
 
-    let mut em = i2osp(rsa_encrypt(pub_key, sig)?, pub_key.size());
+    let mut em = i2osp(rsa_encrypt(pub_key, &s)?, pub_key.size());
 
     emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, pub_key.n().bits() as _)
 }

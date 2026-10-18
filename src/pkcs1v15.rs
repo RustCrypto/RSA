@@ -136,12 +136,7 @@ impl SignatureScheme for Pkcs1v15Sign {
             }
         }
 
-        verify(
-            pub_key,
-            self.prefix.as_ref(),
-            hashed,
-            &BoxedUint::from_be_slice_vartime(sig),
-        )
+        verify(pub_key, self.prefix.as_ref(), hashed, sig)
     }
 }
 
@@ -222,13 +217,18 @@ fn sign<R: TryCryptoRng + ?Sized>(
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
 #[inline]
-fn verify(pub_key: &RsaPublicKey, prefix: &[u8], hashed: &[u8], sig: &BoxedUint) -> Result<()> {
-    let n = pub_key.n();
-    if sig >= n.as_ref() || sig.bits_precision() != pub_key.n_bits_precision() {
+fn verify(pub_key: &RsaPublicKey, prefix: &[u8], hashed: &[u8], sig: &[u8]) -> Result<()> {
+    // RFC8017 §8.2.2 steps 1 and 2: validate S before converting it to s.
+    if sig.len() != pub_key.size() {
+        return Err(Error::Verification);
+    }
+    let s = BoxedUint::from_be_slice(sig, pub_key.n_bits_precision())
+        .map_err(|_| Error::Verification)?;
+    if s >= *pub_key.n().as_ref() {
         return Err(Error::Verification);
     }
 
-    let em = i2osp(rsa_encrypt(pub_key, sig)?, pub_key.size());
+    let em = i2osp(rsa_encrypt(pub_key, &s)?, pub_key.size());
 
     pkcs1v15_sign_unpad(prefix, hashed, &em, pub_key.size())
 }

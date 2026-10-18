@@ -2,7 +2,6 @@
 
 use alloc::boxed::Box;
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
-use crypto_bigint::BoxedUint;
 use signature::SignatureEncoding;
 
 #[cfg(feature = "serde")]
@@ -18,7 +17,7 @@ use spki::{
 /// [RFC8017 § 8.2]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.2
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Signature {
-    pub(super) inner: BoxedUint,
+    pub(super) inner: Box<[u8]>,
 }
 
 impl SignatureEncoding for Signature {
@@ -37,14 +36,15 @@ impl TryFrom<&[u8]> for Signature {
 
     fn try_from(bytes: &[u8]) -> signature::Result<Self> {
         // TODO(tarcieri): max length restriction? (#350)
-        let inner = BoxedUint::from_be_slice_vartime(bytes);
-        Ok(Self { inner })
+        Ok(Self {
+            inner: bytes.into(),
+        })
     }
 }
 
 impl From<Signature> for Box<[u8]> {
     fn from(signature: Signature) -> Box<[u8]> {
-        signature.inner.to_be_bytes()
+        signature.inner
     }
 }
 
@@ -103,7 +103,7 @@ mod tests {
         use super::*;
         use serde_test::{assert_tokens, Configure, Token};
         let signature = Signature {
-            inner: BoxedUint::from(42u32),
+            inner: Box::new([0, 0, 0, 0, 0, 0, 0, 42]),
         };
 
         let tokens = [Token::Str("000000000000002a")];
