@@ -8,7 +8,7 @@
 
 use alloc::vec::Vec;
 use const_oid::AssociatedOid;
-use crypto_bigint::{Choice, CtAssign, CtEq, CtGt, CtSelect};
+use crypto_bigint::{Choice, CtAssign, CtEq, CtGt, CtOption};
 use digest::Digest;
 use rand_core::TryCryptoRng;
 use zeroize::Zeroizing;
@@ -68,30 +68,37 @@ where
 /// `decrypt_session_key` for a way of solving this problem.
 #[inline]
 pub(crate) fn pkcs1v15_encrypt_unpad(em: &[u8], k: usize) -> Result<Vec<u8>> {
-    let (valid, index) = decrypt_inner(em, k)?;
-    if valid == 0 {
+    if k < 11 || em.len() != k {
         return Err(Error::Decryption);
     }
+
+    // TODO(tarcieri): padding validity is exposed here until implicit rejection is implemented.
+    let index = decrypt_inner(em, k)
+        .into_option()
+        .ok_or(Error::Decryption)?;
 
     Ok(em[index as usize..].to_vec())
 }
 
-/// Removes the PKCS1v15 padding It returns one or zero in valid that indicates whether the
-/// plaintext was correctly structured. In either case, the plaintext is
-/// returned in em so that it may be read independently of whether it was valid
-/// in order to maintain constant memory access patterns. If the plaintext was
-/// valid then index contains the index of the original message in em.
+/// Checks EME-PKCS1-v1_5 encoding as described in [draft-irtf-cfrg-rsa-guidance-10 §7.2, step 4].
+///
+/// Returns the message's starting index in a [`CtOption`], present when the padding is valid.
+/// Scans all of `em` regardless of padding validity, leaving the encoded message available to
+/// the caller for subsequent message selection. Both the validity and index remain secret.
+///
+/// Callers must establish `k >= 11`, `em.len() == k`, and `k <= u32::MAX` before calling.
+/// These public length preconditions are checked by debug assertions.
+///
+/// [draft-irtf-cfrg-rsa-guidance-10 §7.2, step 4]: https://www.ietf.org/archive/id/draft-irtf-cfrg-rsa-guidance-10.html#section-7.2
 #[inline]
 #[allow(
     clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    clippy::cast_sign_loss,
-    reason = "TODO"
+    reason = "indices fit in u32 by the public length precondition"
 )]
-fn decrypt_inner(em: &[u8], k: usize) -> Result<(u8, u32)> {
-    if k < 11 || em.len() != k {
-        return Err(Error::Decryption);
-    }
+fn decrypt_inner(em: &[u8], k: usize) -> CtOption<u32> {
+    debug_assert!(k >= 11);
+    debug_assert_eq!(em.len(), k);
+    debug_assert!(u32::try_from(k).is_ok());
 
     let first_byte_is_zero = em[0].ct_eq(&0u8);
     let second_byte_is_two = em[1].ct_eq(&2u8);
@@ -113,9 +120,8 @@ fn decrypt_inner(em: &[u8], k: usize) -> Result<(u8, u32)> {
     // so the first zero separator must occur at offset 10 or later.
     let valid_ps = index.ct_gt(&9);
     let valid = first_byte_is_zero & second_byte_is_two & !looking_for_index & valid_ps;
-    index = u32::ct_select(&0, &(index + 1), valid);
 
-    Ok((valid.to_u8(), index))
+    CtOption::new(index + 1, valid)
 }
 
 #[inline]
@@ -212,5 +218,81 @@ mod tests {
         let message = vec![1u8; 4];
         let res = pkcs1v15_encrypt_pad(&mut rng, &message, k);
         assert_eq!(res, Err(Error::MessageTooLong));
+    }
+
+    #[test]
+    fn test_decrypt_inner_minimum_padding() {
+        let em = [0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 0, 42];
+        assert_eq!(decrypt_inner(&em, em.len()).into_option(), Some(11));
+        assert_eq!(pkcs1v15_encrypt_unpad(&em, em.len()).unwrap(), [42]);
+
+        // Seven PS octets must fail even when the total length is at least 11.
+        let em = [0, 2, 1, 2, 3, 4, 5, 6, 7, 0, 42];
+        assert!(decrypt_inner(&em, em.len()).is_none().to_bool());
+        assert_eq!(
+            pkcs1v15_encrypt_unpad(&em, em.len()),
+            Err(Error::Decryption)
+        );
+    }
+
+    #[test]
+    fn test_decrypt_inner_empty_message() {
+        let em = [0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 0];
+        assert_eq!(decrypt_inner(&em, em.len()).into_option(), Some(11));
+        assert!(pkcs1v15_encrypt_unpad(&em, em.len()).unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_decrypt_inner_missing_delimiter() {
+        let em = [0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        assert!(decrypt_inner(&em, em.len()).is_none().to_bool());
+        assert_eq!(
+            pkcs1v15_encrypt_unpad(&em, em.len()),
+            Err(Error::Decryption)
+        );
+    }
+
+    #[test]
+    fn test_decrypt_inner_invalid_header() {
+        for header in [[1, 2], [0, 1], [1, 1], [0, 0]] {
+            let mut em = [0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 0, 42];
+            em[..2].copy_from_slice(&header);
+            assert!(decrypt_inner(&em, em.len()).is_none().to_bool());
+            assert_eq!(
+                pkcs1v15_encrypt_unpad(&em, em.len()),
+                Err(Error::Decryption)
+            );
+        }
+    }
+
+    #[test]
+    fn test_decrypt_inner_first_delimiter() {
+        // Zeros in the message do not change its starting index.
+        let em = [0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 0, 42, 0, 43];
+        assert_eq!(decrypt_inner(&em, em.len()).into_option(), Some(11));
+        assert_eq!(pkcs1v15_encrypt_unpad(&em, em.len()).unwrap(), [42, 0, 43]);
+
+        // A later zero cannot rescue a PS that ended too early.
+        let em = [0, 2, 1, 2, 3, 4, 5, 6, 7, 0, 8, 0, 42];
+        assert!(decrypt_inner(&em, em.len()).is_none().to_bool());
+        assert_eq!(
+            pkcs1v15_encrypt_unpad(&em, em.len()),
+            Err(Error::Decryption)
+        );
+    }
+
+    #[test]
+    fn test_unpad_invalid_lengths() {
+        for k in 0..11 {
+            assert_eq!(
+                pkcs1v15_encrypt_unpad(&vec![0; k], k),
+                Err(Error::Decryption)
+            );
+        }
+
+        let em = [0, 2, 1, 2, 3, 4, 5, 6, 7, 8, 0, 42];
+        for k in [em.len() - 1, em.len() + 1] {
+            assert_eq!(pkcs1v15_encrypt_unpad(&em, k), Err(Error::Decryption));
+        }
     }
 }
