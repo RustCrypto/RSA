@@ -173,17 +173,23 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
     ciphertext: &[u8],
 ) -> Result<Vec<u8>> {
     key::check_public(priv_key)?;
+    let k = priv_key.size();
 
-    // RFC8017 § 7.2.2 step 1
-    if priv_key.size() < 11 || ciphertext.len() != priv_key.size() {
+    // RFC8017 §7.2.2 and draft-irtf-cfrg-rsa-guidance-10 §7.2, step 1.
+    if k < 11 || ciphertext.len() != k {
         return Err(Error::Decryption);
     }
 
-    let ciphertext = os2ip(ciphertext, priv_key.n_bits_precision())?;
-    let em = rsa_decrypt_and_check(priv_key, rng, &ciphertext)?;
-    let em = i2osp_zeroizing(em, priv_key.size());
+    // Step 2a: c = OS2IP(C).
+    let c = os2ip(ciphertext, priv_key.n_bits_precision())?;
 
-    pkcs1v15_encrypt_unpad(&em, priv_key.size())
+    // Step 2b: m = RSADP(K, c).
+    let m = rsa_decrypt_and_check(priv_key, rng, &c)?;
+
+    // Step 2c: EM = I2OSP(m, k), constant-time with respect to m.
+    let em = i2osp_zeroizing(m, k);
+
+    pkcs1v15_encrypt_unpad(&em, k)
 }
 
 /// Calculates the signature of hashed using
