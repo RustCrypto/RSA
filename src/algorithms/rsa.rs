@@ -22,11 +22,14 @@ use crate::traits::keys::{PrivateKeyParts, PublicKeyParts};
 /// The caller must check that the representative is less than `n` to implement either primitive;
 /// this function reduces out-of-range inputs modulo `n`.
 ///
-/// # ☢️️ WARNING: HAZARDOUS API ☢️
+/// <div class="warning">
+/// <b> ☢️️ WARNING: HAZARDOUS API ☢️</b>
 ///
 /// Use this function with great care! Raw RSA should never be used without an appropriate padding
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
+/// </div>
 #[inline]
+#[allow(clippy::missing_errors_doc, reason = "TODO")]
 pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BoxedUint) -> Result<BoxedUint> {
     let e = key.e();
     let res = pow_mod_params_vartime_exp_bits(m, e, e.bits(), key.n_params());
@@ -40,11 +43,14 @@ pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BoxedUint) -> Result<BoxedUin
 ///
 /// Returns a plaintext `BoxedUint`. Performs RSA blinding if an `Rng` is passed.
 ///
-/// # ☢️️ WARNING: HAZARDOUS API ☢️
+/// <div class="warning">
+/// <b> ☢️️ WARNING: HAZARDOUS API ☢️</b>
 ///
 /// Use this function with great care! Raw RSA should never be used without an appropriate padding
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
+/// </div>
 #[inline]
+#[allow(clippy::missing_errors_doc, reason = "TODO")]
 pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
     rng: Option<&mut R>,
     priv_key: &impl PrivateKeyParts,
@@ -160,11 +166,14 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
 ///
 /// `c` must have the same `bits_precision` as the RSA key modulus.
 ///
-/// # ☢️️ WARNING: HAZARDOUS API ☢️
+/// <div class="warning">
+/// <b> ☢️️ WARNING: HAZARDOUS API ☢️</b>
 ///
 /// Use this function with great care! Raw RSA should never be used without an appropriate padding
 /// or signature scheme. See the [module-level documentation][crate::hazmat] for more information.
+/// </div>
 #[inline]
+#[allow(clippy::missing_errors_doc, reason = "TODO")]
 pub fn rsa_decrypt_and_check<R: TryCryptoRng + ?Sized>(
     priv_key: &impl PrivateKeyParts,
     rng: Option<&mut R>,

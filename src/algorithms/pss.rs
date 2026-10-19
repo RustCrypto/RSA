@@ -207,6 +207,7 @@ fn emsa_pss_verify_pre<'a>(
     // 6. If the leftmost 8 * em_len - em_bits bits of the leftmost octet in
     //    maskedDB are not all equal to zero, output "inconsistent" and
     //    stop.
+    #[allow(clippy::cast_possible_truncation, reason = "TODO")]
     if db[0]
         & (0xFF_u8
             .checked_shl(8 - (8 * em_len - em_bits) as u32)
@@ -232,6 +233,7 @@ fn emsa_pss_verify_salt(db: &[u8], em_len: usize, s_len: usize, h_len: usize) ->
 
 /// Detect salt length by scanning DB for the 0x01 separator byte.
 /// Returns (s_len, valid) where s_len is 0 on failure.
+#[allow(clippy::cast_possible_truncation, reason = "TODO")]
 fn emsa_pss_get_salt_len(db: &[u8], em_len: usize, h_len: usize) -> (usize, Choice) {
     let em_len = em_len as u32;
     let h_len = h_len as u32;

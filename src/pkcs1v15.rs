@@ -91,6 +91,7 @@ impl Pkcs1v15Sign {
     ///
     /// The digest must have an [`AssociatedOid`]. Make sure to enable the `oid`
     /// feature of the relevant digest crate.
+    #[must_use]
     pub fn new<D>() -> Self
     where
         D: Digest + AssociatedOid,
@@ -104,6 +105,7 @@ impl Pkcs1v15Sign {
     /// Create new PKCS#1 v1.5 padding for computing an unprefixed signature.
     ///
     /// This sets `hash_len` to `None` and uses an empty `prefix`.
+    #[must_use]
     pub fn new_unprefixed() -> Self {
         Self {
             hash_len: None,
@@ -242,32 +244,27 @@ mod oid {
 
     #[cfg(feature = "sha1")]
     impl RsaSignatureAssociatedOid for sha1::Sha1 {
-        const OID: ObjectIdentifier =
-            const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.5");
+        const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.5");
     }
 
     #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha224 {
-        const OID: ObjectIdentifier =
-            const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.14");
+        const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.14");
     }
 
     #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha256 {
-        const OID: ObjectIdentifier =
-            const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
+        const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
     }
 
     #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha384 {
-        const OID: ObjectIdentifier =
-            const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.12");
+        const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.12");
     }
 
     #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha512 {
-        const OID: ObjectIdentifier =
-            const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.13");
+        const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.13");
     }
 }
 

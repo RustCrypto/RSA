@@ -1,3 +1,5 @@
+//! Key generation benchmark.
+
 #![feature(test)]
 
 extern crate test;

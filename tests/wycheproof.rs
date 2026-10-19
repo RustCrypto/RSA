@@ -218,7 +218,7 @@ fn test_rsa_pss_verify(#[case] file: &str) {
     for group in tests.groups {
         summary.group(&group);
 
-        let key = rsa::RsaPublicKey::from_pkcs1_der(&group.public_key_asn).unwrap();
+        let key = RsaPublicKey::from_pkcs1_der(&group.public_key_asn).unwrap();
         println!("key is {:?}", key);
 
         for test in group.tests {

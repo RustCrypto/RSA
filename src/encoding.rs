@@ -55,7 +55,7 @@ impl<U: AsUintRef> TryFrom<pkcs1::RsaPrivateKey<U>> for RsaPrivateKey {
 
         let n = uint_from_slice(pkcs1_key.modulus.as_uint_ref().as_bytes(), bits)?;
         let bits_e = u32::try_from(pkcs1_key.public_exponent.as_uint_ref().as_bytes().len())
-            .map_err(|_| pkcs1::Error::KeyMalformed)?
+            .map_err(|_| KeyMalformed)?
             * 8;
         let e = uint_from_slice(pkcs1_key.public_exponent.as_uint_ref().as_bytes(), bits_e)?;
         let e = Option::from(e).ok_or(KeyMalformed)?;
