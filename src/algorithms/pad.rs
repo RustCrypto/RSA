@@ -81,6 +81,7 @@ pub(crate) fn i2osp_zeroizing(input: BoxedUint, padded_len: usize) -> Zeroizing<
 ///
 /// [RFC8017 §4.2]: https://www.rfc-editor.org/rfc/rfc8017.html#section-4.2
 #[inline]
+#[allow(clippy::integer_division_remainder_used, reason = "debug")]
 pub(crate) fn os2ip(input: &[u8], bits_precision: u32) -> Result<BoxedUint> {
     debug_assert_eq!(bits_precision % crypto_bigint::Limb::BITS, 0);
     Ok(BoxedUint::from_be_slice(input, bits_precision)?)

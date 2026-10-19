@@ -1,5 +1,7 @@
 //! Generate prime components for the RSA Private Key
 
+#![allow(clippy::integer_division_remainder_used, reason = "TODO")]
+
 use alloc::vec::Vec;
 use crypto_bigint::{BoxedUint, Odd};
 use crypto_primes::{
