@@ -8,7 +8,7 @@
 
 use alloc::vec::Vec;
 use const_oid::AssociatedOid;
-use crypto_bigint::{Choice, CtAssign, CtEq, CtSelect};
+use crypto_bigint::{Choice, CtAssign, CtEq, CtGt, CtSelect};
 use digest::Digest;
 use rand_core::TryCryptoRng;
 use zeroize::Zeroizing;
@@ -103,13 +103,9 @@ fn decrypt_inner(em: &[u8], k: usize) -> Result<(u8, u32)> {
         looking_for_index &= !equals0;
     }
 
-    // The PS padding must be at least 8 bytes long, and it starts two
-    // bytes into em.
-    // TODO: WARNING: THIS MUST BE CONSTANT TIME CHECK:
-    // Ref: https://github.com/dalek-cryptography/subtle/issues/20
-    // This is currently copy & paste from the constant time impl in
-    // go, but very likely not sufficient.
-    let valid_ps = Choice::from_u8_lsb((((2i32 + 8i32 - index as i32 - 1i32) >> 31) & 1) as u8);
+    // PS starts at offset 2 and must contain at least 8 nonzero octets,
+    // so the first zero separator must occur at offset 10 or later.
+    let valid_ps = index.ct_gt(&9);
     let valid = first_byte_is_zero & second_byte_is_two & !looking_for_index & valid_ps;
     index = u32::ct_select(&0, &(index + 1), valid);
 
