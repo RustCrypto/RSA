@@ -18,10 +18,8 @@
 //!
 //! ## OAEP encryption
 //!
-//! Note: requires `sha2` feature of `rsa` crate is enabled.
 //!
-#![cfg_attr(feature = "sha2", doc = "```")]
-#![cfg_attr(not(feature = "sha2"), doc = "```ignore")]
+//! ```
 //! use rsa::{RsaPrivateKey, RsaPublicKey, Oaep, sha2::Sha256};
 //!
 //! let mut rng = rand::rng();
@@ -75,10 +73,8 @@
 //! See security notes in the <code><a href="./pkcs1v15/index.html">pkcs1v15</a></code> module.
 //! </div>
 //!
-//! Note: requires `sha2` feature of `rsa` crate is enabled.
 //!
-#![cfg_attr(feature = "sha2", doc = "```")]
-#![cfg_attr(not(feature = "sha2"), doc = "```ignore")]
+//! ```
 //! use rsa::RsaPrivateKey;
 //! use rsa::pkcs1v15::{SigningKey, VerifyingKey};
 //! use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier};
@@ -102,10 +98,8 @@
 //!
 //! ## PSS signatures
 //!
-//! Note: requires `sha2` feature of `rsa` crate is enabled.
 //!
-#![cfg_attr(feature = "sha2", doc = "```")]
-#![cfg_attr(not(feature = "sha2"), doc = "```ignore")]
+//! ```
 //! use rsa::RsaPrivateKey;
 //! use rsa::pss::{BlindedSigningKey, VerifyingKey};
 //! use rsa::signature::{Keypair,RandomizedSigner, SignatureEncoding, Verifier};
@@ -251,7 +245,6 @@ mod key;
 pub use pkcs1;
 #[cfg(feature = "encoding")]
 pub use pkcs8;
-#[cfg(feature = "sha2")]
 pub use sha2;
 
 pub use crate::{
