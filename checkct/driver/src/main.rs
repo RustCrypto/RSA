@@ -6,6 +6,9 @@ extern crate alloc;
 
 mod allocator;
 mod driver;
+// BINSEC 0.11.3 does not decode the RISC-V amoadd.w used by Arc::clone.
+#[cfg(not(target_arch = "riscv32"))]
+mod raw_rsa;
 
 // Compile the actual private helper without adding a public API for the harness.
 pub use rsa::errors;
