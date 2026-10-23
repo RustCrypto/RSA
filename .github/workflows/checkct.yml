@@ -1,0 +1,25 @@
+name: cargo-checkct
+
+on:
+  pull_request:
+    paths-ignore:
+      - README.md
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - README.md
+
+permissions:
+  contents: read
+
+jobs:
+  checkct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: Ledger-Donjon/cargo-checkct@85271e5ce9eab9ba895c62c8b5d4129810a635a0
+        with:
+          directory: .
+          timeout: 120
+          checks: control-flow,memory-access
