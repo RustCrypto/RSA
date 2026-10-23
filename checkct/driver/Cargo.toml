@@ -1,0 +1,15 @@
+[package]
+name = "driver"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[dependencies]
+checkct_macros = { path = "../checkct_macros" }
+rsa = { path = "../..", default-features = false }
+crypto-bigint = { version = "0.7", default-features = false, features = ["alloc", "zeroize"] }
+zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
+# RNG traits supplied by cargo-checkct's generated rng.rs.
+rand_core = "0.10"
+rand_core_09 = { package = "rand_core", version = "0.9" }
+rand_core_06 = { package = "rand_core", version = "0.6" }

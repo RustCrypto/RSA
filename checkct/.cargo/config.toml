@@ -1,0 +1,19 @@
+[build]
+# NOTE: can't test on Thumb-1 due to use of `Arc`
+target = [
+    "riscv32imac-unknown-none-elf",
+    "thumbv7em-none-eabihf",
+    "x86_64-unknown-linux-gnu",
+]
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = [
+    "-C", "linker=rust-lld",
+    "-C", "linker-flavor=ld.lld",
+    "-C", "relocation-model=static",
+]
+
+[unstable]
+unstable-options = true
+build-std = ["core", "alloc", "panic_abort"]
+build-std-features = ["compiler-builtins-mem"]
