@@ -51,7 +51,7 @@ pub trait PrivateKeyParts: PublicKeyParts {
     /// Returns the private exponent of the key.
     fn d(&self) -> &BoxedUint;
 
-    /// Returns the odd prime factors.
+    /// Returns the prime factors as [`Odd`].
     fn primes(&self) -> &[Odd<BoxedUint>];
 
     /// Returns prime `p` if precomputed.
