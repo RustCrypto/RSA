@@ -79,7 +79,7 @@ fn decode_rsa2048_priv_der() {
         1024,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[0].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[0].as_ref().ct_eq(&expected_prime)));
 
     let expected_prime = BoxedUint::from_be_slice(
         &hex!(
@@ -91,7 +91,7 @@ fn decode_rsa2048_priv_der() {
         1024,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[1].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[1].as_ref().ct_eq(&expected_prime)));
 
     let _ = pkcs1v15::SigningKey::<Sha256>::from_pkcs8_der(RSA_2048_PRIV_DER).unwrap();
 }
@@ -163,7 +163,7 @@ fn decode_rsa2048_pss_priv_der() {
         1024,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[0].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[0].as_ref().ct_eq(&expected_prime)));
 
     let expected_prime = BoxedUint::from_be_slice(
         &hex!(
@@ -175,7 +175,7 @@ fn decode_rsa2048_pss_priv_der() {
         1024,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[1].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[1].as_ref().ct_eq(&expected_prime)));
 
     let _ = pss::SigningKey::<Sha256>::from_pkcs8_der(RSA_2048_PSS_PRIV_DER).unwrap();
 }
@@ -270,7 +270,7 @@ fn decode_rsa2048_priv_pem() {
         1024,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[0].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[0].as_ref().ct_eq(&expected_prime)));
 
     let expected_prime = BoxedUint::from_be_slice(
         &hex!(
@@ -282,7 +282,7 @@ fn decode_rsa2048_priv_pem() {
         1024,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[1].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[1].as_ref().ct_eq(&expected_prime)));
 
     let _ = pkcs1v15::SigningKey::<Sha256>::from_pkcs8_pem(RSA_2048_PRIV_PEM).unwrap();
 }

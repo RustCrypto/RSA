@@ -5,7 +5,7 @@ use checkct_macros::checkct;
 use core::hint::black_box;
 use crypto_bigint::{
     modular::{BoxedMontyForm, BoxedMontyParams, MontyParams},
-    BoxedUint, NonZero,
+    BoxedUint, NonZero, Odd,
 };
 use rsa::{
     hazmat::rsa_decrypt,
@@ -69,7 +69,7 @@ impl PrivateKeyParts for NonCrtKey {
         &self.d
     }
 
-    fn primes(&self) -> &[BoxedUint] {
+    fn primes(&self) -> &[Odd<BoxedUint>] {
         &[]
     }
 
