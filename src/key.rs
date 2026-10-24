@@ -38,7 +38,7 @@ pub struct RsaPublicKey {
     /// Public exponent: power to which a plaintext message is raised in
     /// order to encrypt it.
     ///
-    /// Typically `0x10001` (`65537`)
+    /// The recommended value is `0x10001` (`65537`).
     e: BoxedUint,
 
     n_params: BoxedMontyParams,
@@ -71,7 +71,7 @@ pub struct RsaPrivateKey {
     /// Private exponent
     pub(crate) d: BoxedUint,
     /// Prime factors of N, contains >= 2 elements.
-    pub(crate) primes: Vec<BoxedUint>,
+    pub(crate) primes: Vec<Odd<BoxedUint>>,
     /// Precomputed values to speed up private operations
     pub(crate) precomputed: Option<PrecomputedValues>,
 }
@@ -424,9 +424,11 @@ impl RsaPrivateKey {
             .into_iter()
             .map(|p| {
                 let p_bits = p.bits();
-                p.resize_unchecked(p_bits)
+                Odd::new(p.resize_unchecked(p_bits))
+                    .into_option()
+                    .ok_or(Error::InvalidPrime)
             })
-            .collect();
+            .collect::<Result<Vec<_>>>()?;
 
         let k = RsaPrivateKey {
             pubkey_components: RsaPublicKey {
@@ -589,14 +591,8 @@ impl RsaPrivateKey {
         let p = self.primes[0].clone();
         let q = self.primes[1].clone();
 
-        let p_odd = Odd::new(p.clone())
-            .into_option()
-            .ok_or(Error::InvalidPrime)?;
-        let p_params = BoxedMontyParams::new(p_odd);
-        let q_odd = Odd::new(q.clone())
-            .into_option()
-            .ok_or(Error::InvalidPrime)?;
-        let q_params = BoxedMontyParams::new(q_odd);
+        let p_params = BoxedMontyParams::new(p.clone());
+        let q_params = BoxedMontyParams::new(q.clone());
 
         let x = NonZero::new(p.wrapping_sub(BoxedUint::one()))
             .into_option()
@@ -611,16 +607,10 @@ impl RsaPrivateKey {
         // Note that since `p` and `q` may have different `bits_precision`,
         // so we have to equalize them to calculate the remainder.
         let q_mod_p = match p.bits_precision().cmp(&q.bits_precision()) {
-            Ordering::Less => (&q
-                % NonZero::new(p.clone())
-                    .expect("`p` is non-zero")
-                    .resize_unchecked(q.bits_precision()))
-            .resize_unchecked(p.bits_precision()),
-            Ordering::Greater => {
-                (&q).resize_unchecked(p.bits_precision())
-                    % &NonZero::new(p.clone()).expect("`p` is non-zero")
-            }
-            Ordering::Equal => &q % NonZero::new(p.clone()).expect("`p` is non-zero"),
+            Ordering::Less => (q.as_ref() % p.as_nz_ref().resize_unchecked(q.bits_precision()))
+                .resize_unchecked(p.bits_precision()),
+            Ordering::Greater => q.as_ref().resize_unchecked(p.bits_precision()) % p.as_nz_ref(),
+            Ordering::Equal => q.as_ref() % p.as_nz_ref(),
         };
 
         let q_mod_p = BoxedMontyForm::new(q_mod_p, &p_params);
@@ -649,8 +639,7 @@ impl RsaPrivateKey {
     pub fn crt_coefficient(&self) -> Option<BoxedUint> {
         let p = &self.primes[0];
         let q = &self.primes[1];
-        // TODO: maybe store primes as `NonZero`?
-        Option::from(q.invert_mod(&NonZero::new(p.clone()).expect("prime")))
+        Option::from(q.invert_odd_mod(p))
     }
 
     /// Performs basic sanity checks on the key.
@@ -713,7 +702,7 @@ impl PrivateKeyParts for RsaPrivateKey {
         &self.d
     }
 
-    fn primes(&self) -> &[BoxedUint] {
+    fn primes(&self) -> &[Odd<BoxedUint>] {
         &self.primes
     }
 
@@ -797,10 +786,10 @@ fn validate_private_key_parts(key: &RsaPrivateKey) -> Result<()> {
     let one = BoxedUint::one();
     for prime in &key.primes {
         // Any primes ≤ 1 will cause divide-by-zero panics later.
-        if prime <= &one {
+        if prime.as_ref() <= &one {
             return Err(Error::InvalidPrime);
         }
-        m = m.wrapping_mul(prime);
+        m = m.wrapping_mul(prime.as_ref());
     }
     if m != *key.pubkey_components.n {
         return Err(Error::InvalidModulus);
@@ -1212,7 +1201,10 @@ mod tests {
         let ref_key = RsaPrivateKey::from_pkcs8_der(RSA_2048_PRIV_DER).unwrap();
         assert_eq!(ref_key.validate(), Ok(()));
 
-        let primes = PrivateKeyParts::primes(&ref_key).to_vec();
+        let primes: Vec<_> = PrivateKeyParts::primes(&ref_key)
+            .iter()
+            .map(|p| p.as_ref().clone())
+            .collect();
 
         let exp = PublicKeyParts::e(&ref_key);
         let key = RsaPrivateKey::from_primes(primes, exp.clone())
@@ -1235,7 +1227,10 @@ mod tests {
         let ref_key = RsaPrivateKey::from_pkcs8_der(RSA_2048_SP800_PRIV_DER).unwrap();
         assert_eq!(ref_key.validate(), Ok(()));
 
-        let primes = PrivateKeyParts::primes(&ref_key).to_vec();
+        let primes: Vec<_> = PrivateKeyParts::primes(&ref_key)
+            .iter()
+            .map(|p| p.as_ref().clone())
+            .collect();
         let exp = PublicKeyParts::e(&ref_key);
 
         let key = RsaPrivateKey::from_p_q(primes[0].clone(), primes[1].clone(), exp.clone())

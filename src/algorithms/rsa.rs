@@ -119,8 +119,8 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
             // (m1 - m2) mod p = (m1 mod p) - (m2 mod p) mod p
             let m2_mod_p = match p_params.bits_precision().cmp(&q_params.bits_precision()) {
                 Ordering::Less => {
-                    let p_wide = NonZero::new(priv_key.primes()[0].clone())
-                        .expect("`p` is non-zero")
+                    let p_wide = priv_key.primes()[0]
+                        .as_nz_ref()
                         .resize_unchecked(q_params.bits_precision());
                     (&m2 % p_wide).resize_unchecked(p_params.bits_precision())
                 }
@@ -138,7 +138,7 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
             // m = m2 + h.q
             let m2 = m2.try_resize(n.bits_precision()).ok_or(Error::Internal)?;
             let hq = h
-                .concatenating_mul(&priv_key.primes()[1])
+                .concatenating_mul(priv_key.primes()[1].as_ref())
                 .try_resize(n.bits_precision())
                 .ok_or(Error::Internal)?;
             m2.wrapping_add(&hq)

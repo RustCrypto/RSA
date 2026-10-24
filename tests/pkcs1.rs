@@ -91,7 +91,7 @@ fn decode_rsa2048_priv_der() {
         1024,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[0].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[0].as_ref().ct_eq(&expected_prime)));
 
     let expected_prime = BoxedUint::from_be_slice(
         &hex!(
@@ -103,7 +103,7 @@ fn decode_rsa2048_priv_der() {
         1024,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[1].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[1].as_ref().ct_eq(&expected_prime)));
 }
 
 #[test]
@@ -170,7 +170,7 @@ fn decode_rsa4096_priv_der() {
         2048,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[0].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[0].as_ref().ct_eq(&expected_prime)));
 
     let expected_prime = BoxedUint::from_be_slice(
         &hex!(
@@ -186,7 +186,7 @@ fn decode_rsa4096_priv_der() {
         2048,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[1].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[1].as_ref().ct_eq(&expected_prime)));
 }
 
 #[test]
@@ -317,7 +317,7 @@ fn decode_rsa2048_priv_pem() {
         1024,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[0].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[0].as_ref().ct_eq(&expected_prime)));
 
     let expected_prime = BoxedUint::from_be_slice(
         &hex!(
@@ -329,7 +329,7 @@ fn decode_rsa2048_priv_pem() {
         1024,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[1].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[1].as_ref().ct_eq(&expected_prime)));
 }
 
 #[test]
@@ -398,7 +398,7 @@ fn decode_rsa4096_priv_pem() {
         2048,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[0].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[0].as_ref().ct_eq(&expected_prime)));
 
     let expected_prime = BoxedUint::from_be_slice(
         &hex!(
@@ -414,7 +414,7 @@ fn decode_rsa4096_priv_pem() {
         2048,
     )
     .unwrap();
-    assert!(bool::from(key.primes()[1].ct_eq(&expected_prime)));
+    assert!(bool::from(key.primes()[1].as_ref().ct_eq(&expected_prime)));
 }
 
 #[test]

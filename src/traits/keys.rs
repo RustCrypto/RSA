@@ -4,7 +4,7 @@ use crate::key::SecretPrime;
 use alloc::boxed::Box;
 use crypto_bigint::{
     modular::{BoxedMontyForm, BoxedMontyParams},
-    BoxedUint, NonZero,
+    BoxedUint, NonZero, Odd,
 };
 use zeroize::Zeroize;
 
@@ -51,8 +51,8 @@ pub trait PrivateKeyParts: PublicKeyParts {
     /// Returns the private exponent of the key.
     fn d(&self) -> &BoxedUint;
 
-    /// Returns the prime factors.
-    fn primes(&self) -> &[BoxedUint];
+    /// Returns the odd prime factors.
+    fn primes(&self) -> &[Odd<BoxedUint>];
 
     /// Returns prime `p` if precomputed.
     fn p(&self) -> Option<&SecretPrime>;

@@ -109,13 +109,13 @@ impl pkcs1::EncodeRsaPrivateKey for RsaPrivateKey {
 
         let exponent1 = Zeroizing::new(
             (self.d()
-                % NonZero::new((&self.primes[0]).resize_unchecked(bits) - &BoxedUint::one())
+                % NonZero::new(self.primes[0].as_ref().resize_unchecked(bits) - &BoxedUint::one())
                     .unwrap())
             .to_be_bytes(),
         );
         let exponent2 = Zeroizing::new(
             (self.d()
-                % NonZero::new((&self.primes[1]).resize_unchecked(bits) - &BoxedUint::one())
+                % NonZero::new(self.primes[1].as_ref().resize_unchecked(bits) - &BoxedUint::one())
                     .unwrap())
             .to_be_bytes(),
         );
