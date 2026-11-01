@@ -5,18 +5,18 @@
 // This implementation here is based on
 // <https://github.com/ctz/graviola/blob/main/graviola/tests/wycheproof.rs>
 
-use std::fs::File;
+use std::{fmt::Debug, fs::File};
 
 use pkcs1::DecodeRsaPublicKey;
-use rsa::{
-    pkcs1v15, pss,
-    signature::{Error as SignatureError, Verifier},
-    RsaPublicKey,
-};
+use pkcs8::DecodePrivateKey;
+use rsa::{pkcs1v15, pss, signature::Verifier, Oaep, RsaPrivateKey, RsaPublicKey};
 use rstest::rstest;
 use serde::Deserialize;
 use sha1::Sha1;
-use sha2::{Sha224, Sha256, Sha384, Sha512};
+use sha2::{
+    digest::{Digest, FixedOutputReset},
+    Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256,
+};
 
 #[derive(Deserialize, Debug)]
 struct TestFile {
@@ -33,6 +33,9 @@ struct TestGroup {
 
     #[serde(default, rename(deserialize = "publicKeyAsn"), with = "hex::serde")]
     public_key_asn: Vec<u8>,
+
+    #[serde(default, rename(deserialize = "privateKeyPkcs8"), with = "hex::serde")]
+    private_key_pkcs8: Vec<u8>,
 
     #[serde(default)]
     sha: String,
@@ -57,6 +60,10 @@ struct Test {
     msg: Vec<u8>,
     #[serde(default, with = "hex::serde")]
     sig: Vec<u8>,
+    #[serde(default, with = "hex::serde")]
+    ct: Vec<u8>,
+    #[serde(default, with = "hex::serde")]
+    label: Vec<u8>,
     result: ExpectedResult,
 }
 
@@ -86,7 +93,7 @@ impl Summary {
         }
     }
 
-    fn fail(&mut self, test: Test, res: Option<SignatureError>) {
+    fn fail(&mut self, test: Test, res: impl Debug) {
         if self.in_test {
             eprintln!(
                 "    failed: {}: expected {:?}, got {:?}",
@@ -267,6 +274,117 @@ fn test_rsa_pss_verify(#[case] file: &str) {
                     summary.fail(test, result.err());
                 }
             };
+        }
+    }
+}
+
+fn oaep_decrypt<D, MGD>(key: &RsaPrivateKey, label: &[u8], ct: &[u8]) -> rsa::Result<Vec<u8>>
+where
+    D: Digest + FixedOutputReset,
+    MGD: Digest + FixedOutputReset,
+{
+    if label.is_empty() {
+        key.decrypt(Oaep::<D, MGD>::new_with_mgf_hash(), ct)
+    } else {
+        key.decrypt(Oaep::<D, MGD>::new_with_mgf_hash_and_label(label), ct)
+    }
+}
+
+fn oaep_decrypt_with_mgf<D>(
+    mgf_sha: &str,
+    key: &RsaPrivateKey,
+    label: &[u8],
+    ct: &[u8],
+) -> rsa::Result<Vec<u8>>
+where
+    D: Digest + FixedOutputReset,
+{
+    match mgf_sha {
+        "SHA-1" => oaep_decrypt::<D, Sha1>(key, label, ct),
+        "SHA-224" => oaep_decrypt::<D, Sha224>(key, label, ct),
+        "SHA-256" => oaep_decrypt::<D, Sha256>(key, label, ct),
+        "SHA-384" => oaep_decrypt::<D, Sha384>(key, label, ct),
+        "SHA-512" => oaep_decrypt::<D, Sha512>(key, label, ct),
+        "SHA-512/224" => oaep_decrypt::<D, Sha512_224>(key, label, ct),
+        "SHA-512/256" => oaep_decrypt::<D, Sha512_256>(key, label, ct),
+        other => panic!("unhandled mgf sha {other:?}"),
+    }
+}
+
+#[rstest]
+#[case("rsa_oaep_2048_sha1_mgf1sha1_test.json")]
+#[case("rsa_oaep_2048_sha224_mgf1sha1_test.json")]
+#[case("rsa_oaep_2048_sha224_mgf1sha224_test.json")]
+#[case("rsa_oaep_2048_sha256_mgf1sha1_test.json")]
+#[case("rsa_oaep_2048_sha256_mgf1sha256_test.json")]
+#[case("rsa_oaep_2048_sha384_mgf1sha1_test.json")]
+#[case("rsa_oaep_2048_sha384_mgf1sha384_test.json")]
+#[case("rsa_oaep_2048_sha512_224_mgf1sha1_test.json")]
+#[case("rsa_oaep_2048_sha512_224_mgf1sha512_224_test.json")]
+#[case("rsa_oaep_2048_sha512_mgf1sha1_test.json")]
+#[case("rsa_oaep_2048_sha512_mgf1sha512_test.json")]
+#[case("rsa_oaep_3072_sha256_mgf1sha1_test.json")]
+#[case("rsa_oaep_3072_sha256_mgf1sha256_test.json")]
+#[case("rsa_oaep_3072_sha512_256_mgf1sha1_test.json")]
+#[case("rsa_oaep_3072_sha512_256_mgf1sha512_256_test.json")]
+#[case("rsa_oaep_3072_sha512_mgf1sha1_test.json")]
+#[case("rsa_oaep_3072_sha512_mgf1sha512_test.json")]
+#[case("rsa_oaep_4096_sha256_mgf1sha1_test.json")]
+#[case("rsa_oaep_4096_sha256_mgf1sha256_test.json")]
+#[case("rsa_oaep_4096_sha512_mgf1sha1_test.json")]
+#[case("rsa_oaep_4096_sha512_mgf1sha512_test.json")]
+#[case("rsa_oaep_misc_test.json")]
+fn test_rsa_oaep_decrypt(#[case] file: &str) {
+    let path = format!("thirdparty/wycheproof/testvectors_v1/{file}");
+    let data_file = File::open(&path)
+        .expect("failed to open data file (try running `git submodule update --init`)");
+
+    println!("Loading file: {path}");
+
+    let tests: TestFile = serde_json::from_reader(data_file).expect("invalid test JSON");
+
+    println!("{}:\n{}\n", tests.algorithm, tests.header.join(""));
+    let mut summary = Summary::new();
+
+    for group in tests.groups {
+        summary.group(&group);
+
+        let key = RsaPrivateKey::from_pkcs8_der(&group.private_key_pkcs8).unwrap();
+
+        for test in group.tests {
+            summary.start(&test);
+
+            let result = match group.sha.as_ref() {
+                "SHA-1" => {
+                    oaep_decrypt_with_mgf::<Sha1>(&group.mgf_sha, &key, &test.label, &test.ct)
+                }
+                "SHA-224" => {
+                    oaep_decrypt_with_mgf::<Sha224>(&group.mgf_sha, &key, &test.label, &test.ct)
+                }
+                "SHA-256" => {
+                    oaep_decrypt_with_mgf::<Sha256>(&group.mgf_sha, &key, &test.label, &test.ct)
+                }
+                "SHA-384" => {
+                    oaep_decrypt_with_mgf::<Sha384>(&group.mgf_sha, &key, &test.label, &test.ct)
+                }
+                "SHA-512" => {
+                    oaep_decrypt_with_mgf::<Sha512>(&group.mgf_sha, &key, &test.label, &test.ct)
+                }
+                "SHA-512/224" => {
+                    oaep_decrypt_with_mgf::<Sha512_224>(&group.mgf_sha, &key, &test.label, &test.ct)
+                }
+                "SHA-512/256" => {
+                    oaep_decrypt_with_mgf::<Sha512_256>(&group.mgf_sha, &key, &test.label, &test.ct)
+                }
+                other => panic!("unhandled sha {other:?}"),
+            };
+
+            match (test.result, &result) {
+                (ExpectedResult::Valid | ExpectedResult::Acceptable, Ok(msg))
+                    if *msg == test.msg => {}
+                (ExpectedResult::Invalid | ExpectedResult::Acceptable, Err(_err)) => {}
+                _ => summary.fail(test, result),
+            }
         }
     }
 }
