@@ -13,6 +13,10 @@ use zeroize::ZeroizeOnDrop;
 
 /// Decryption key for PKCS#1 v1.5 decryption as described in [RFC8017 § 7.2].
 ///
+/// Invalid padding returns deterministic synthetic plaintext using the implicit rejection algorithm
+/// documented on [`super::Pkcs1v15Encrypt`]. Successful decryption does not establish message
+/// authenticity.
+///
 /// [`Decryptor::decrypt`] uses the operating system RNG for blinding when the `getrandom`
 /// feature is enabled (the default). Otherwise, use [`RandomizedDecryptor::decrypt_with_rng`]
 /// to supply an RNG for blinding.
@@ -25,7 +29,7 @@ pub struct DecryptingKey {
 }
 
 impl DecryptingKey {
-    /// Create a new verifying key from an RSA public key.
+    /// Create a new decryption key from an RSA private key.
     #[must_use]
     pub fn new(key: RsaPrivateKey) -> Self {
         Self { inner: key }

@@ -6,6 +6,10 @@ extern crate alloc;
 
 mod allocator;
 mod driver;
+mod pkcs1v15;
+#[allow(dead_code)]
+#[path = "../../../src/algorithms/pkcs1v15/selection.rs"]
+mod selection;
 // BINSEC 0.11.3 does not decode the RISC-V amoadd.w used by Arc::clone.
 #[cfg(not(target_arch = "riscv32"))]
 mod raw_rsa;
