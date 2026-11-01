@@ -1,6 +1,7 @@
 use super::decrypt_digest;
+#[cfg(not(feature = "getrandom"))]
+use crate::dummy_rng::DummyRng;
 use crate::{
-    dummy_rng::DummyRng,
     traits::{Decryptor, RandomizedDecryptor},
     Result, RsaPrivateKey,
 };
@@ -13,6 +14,10 @@ use serde::{Deserialize, Serialize};
 use zeroize::ZeroizeOnDrop;
 
 /// Decryption key for PKCS#1 v1.5 decryption as described in [RFC8017 § 7.1].
+///
+/// [`Decryptor::decrypt`] uses the operating system RNG for blinding when the `getrandom`
+/// feature is enabled (the default). Otherwise, use [`RandomizedDecryptor::decrypt_with_rng`]
+/// to supply an RNG for blinding.
 ///
 /// [RFC8017 § 7.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-7.1
 #[derive(Debug, Clone)]
@@ -61,7 +66,19 @@ where
     MGD: Digest + FixedOutputReset,
 {
     fn decrypt(&self, ciphertext: &[u8]) -> Result<Vec<u8>> {
-        decrypt_digest::<DummyRng, D, MGD>(None, &self.inner, ciphertext, self.label.clone())
+        #[cfg(feature = "getrandom")]
+        {
+            decrypt_digest::<_, D, MGD>(
+                Some(&mut crypto_common::getrandom::SysRng),
+                &self.inner,
+                ciphertext,
+                self.label.clone(),
+            )
+        }
+        #[cfg(not(feature = "getrandom"))]
+        {
+            decrypt_digest::<DummyRng, D, MGD>(None, &self.inner, ciphertext, self.label.clone())
+        }
     }
 }
 
