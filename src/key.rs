@@ -781,6 +781,12 @@ fn check_public_skip_exponent_size(n: &BoxedUint, e: &BoxedUint) -> Result<()> {
 /// This performs the structural and mathematical validation checks that are common to both
 /// `validate()` and `validate_skip_exponent_size()`.
 fn validate_private_key_parts(key: &RsaPrivateKey) -> Result<()> {
+    // RFC8017 §3.2 requires `d < n`, even if a larger exponent satisfies the congruences below.
+    // Preserve the supplied d rather than reducing it.
+    if key.d >= key.n().as_ref() {
+        return Err(Error::InvalidExponent);
+    }
+
     // Check that Πprimes == n.
     let mut m = BoxedUint::one_with_precision(key.pubkey_components.n.bits_precision());
     let one = BoxedUint::one();
@@ -885,6 +891,24 @@ mod tests {
 
     #[cfg(feature = "encoding")]
     use pkcs8::DecodePrivateKey;
+
+    #[test]
+    fn private_exponent_range_and_identity() {
+        // For `e=17`, these exponents are equivalent modulo `lambda(n)=780`.
+        for (e, d) in [(17u64, 413u64), (17, 2753), (17, 5873), (497, 3233)] {
+            let result = RsaPrivateKey::from_components(
+                BoxedUint::from(3233u64),
+                BoxedUint::from(e),
+                BoxedUint::from(d),
+                vec![BoxedUint::from(61u64), BoxedUint::from(53u64)],
+            );
+            if d < 3233 {
+                assert_eq!(result.unwrap().d(), &BoxedUint::from(d));
+            } else {
+                assert_eq!(result, Err(Error::InvalidExponent));
+            }
+        }
+    }
 
     #[test]
     fn test_from_into() {
