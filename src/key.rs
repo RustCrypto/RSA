@@ -654,8 +654,12 @@ impl RsaPrivateKey {
     /// Decrypt the given message.
     ///
     /// With the `getrandom` feature (enabled by default), uses the operating system RNG for
-    /// RSA blinding. Without this feature, decryption is unblinded; use
-    /// [`Self::decrypt_blinded`] to supply an RNG explicitly.
+    /// RSA blinding. Without this feature, decryption is unblinded; use [`Self::decrypt_blinded`]
+    /// to supply an RNG explicitly.
+    ///
+    /// [`Pkcs1v15Encrypt`][crate::Pkcs1v15Encrypt] uses implicit rejection: invalid padding returns
+    /// deterministic synthetic plaintext, not an error. The enclosing protocol must authenticate
+    /// the returned message.
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
     pub fn decrypt<P: PaddingScheme>(&self, padding: P, ciphertext: &[u8]) -> Result<Vec<u8>> {
         #[cfg(feature = "getrandom")]
@@ -675,6 +679,9 @@ impl RsaPrivateKey {
     /// Decrypt the given message.
     ///
     /// Uses `rng` to blind the decryption process.
+    ///
+    /// [`Pkcs1v15Encrypt`][crate::Pkcs1v15Encrypt] has the same implicit-rejection
+    /// behavior as [`Self::decrypt`], independently of the blinding randomness.
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
     pub fn decrypt_blinded<R: CryptoRng + ?Sized, P: PaddingScheme>(
         &self,

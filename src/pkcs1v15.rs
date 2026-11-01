@@ -50,9 +50,19 @@ use crate::algorithms::pkcs1v15::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
 use crate::key::{self, RsaPrivateKey, RsaPublicKey};
-use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
+use crate::traits::{PaddingScheme, PrivateKeyParts, PublicKeyParts, SignatureScheme};
 
-/// Encryption using PKCS#1 v1.5 padding.
+/// Encryption using PKCS#1 v1.5 padding. Decryption uses implicit rejection from
+/// [draft-irtf-cfrg-rsa-guidance-10 §7.2].
+///
+/// Invalid padding returns a deterministic synthetic message instead of an error. `Ok` therefore
+/// does not establish padding validity or message authenticity; the enclosing protocol must
+/// authenticate the returned message.
+///
+/// Incorrect ciphertext lengths, representatives outside the modulus, unsupported modulus lengths
+/// (over `8191` octets), and operational failures still return errors.
+///
+/// [draft-irtf-cfrg-rsa-guidance-10 §7.2]: https://www.ietf.org/archive/id/draft-irtf-cfrg-rsa-guidance-10.html#section-7.2
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct Pkcs1v15Encrypt;
 
@@ -161,11 +171,8 @@ fn encrypt<R: TryCryptoRng + ?Sized>(
 ///
 /// If an `rng` is passed, it uses RSA blinding to avoid timing side-channel attacks.
 ///
-/// Note that whether this function returns an error or not discloses secret
-/// information. If an attacker can cause this function to run repeatedly and
-/// learn whether each instance returned an error then they can decrypt and
-/// forge signatures as if they had the private key. See
-/// `decrypt_session_key` for a way of solving this problem.
+/// Implements draft-irtf-cfrg-rsa-guidance-10 §7.2. Padding validity remains secret: only the final
+/// message and its selected length are returned.
 #[inline]
 fn decrypt<R: TryCryptoRng + ?Sized>(
     rng: Option<&mut R>,
@@ -180,23 +187,40 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
         return Err(Error::Decryption);
     }
 
-    // Step 2a: c = OS2IP(C).
+    // §7.1 encodes the IRPRF output's bit length in two octets. The stated 8192-octet endpoint is
+    // unrepresentable, so reject it rather than wrap to zero.
+    if k > 8191 {
+        return Err(Error::Decryption);
+    }
+
+    // Step 2.1: c = OS2IP(C).
     let c = os2ip(ciphertext, priv_key.n_bits_precision())?;
 
-    // Step 2b: m = RSADP(K, c).
+    // Step 2.2: m = RSADP(K, c), with blinding and the CRT fault check.
     let m = rsa_decrypt_and_check(priv_key, rng, &c)?;
 
-    // Step 2c: EM = I2OSP(m, k), constant-time with respect to m.
-    let em = i2osp_zeroizing(m, k);
+    // Step 2.3: EM = I2OSP(m, k), constant-time with respect to m.
+    let mut em = i2osp_zeroizing(m, k);
 
-    pkcs1v15_encrypt_unpad(&em, k)
+    // Step 3: derive KDK, CL, AM, and AL, even when EM has valid padding.
+    let kdk = implicit_rejection::KeyDerivationKey::derive(priv_key.d(), k, ciphertext)?;
+    let (am, al) = kdk.alternative_message(k)?;
+
+    // Step 4: EME-PKCS1-v1_5 decoding produces the secret check variable and L.
+    let (check, l) = eme_pkcs1v15_decode(&em, k);
+
+    // Step 5: select the message and its length without exposing check, AL, or L.
+    let length = select_message(&mut em, &am, al, l, check) as usize;
+
+    // The draft permits the final returned length to be public. Only after both buffers have been
+    // read and selected do we use that length for slicing.
+    Ok(em[k - length..].to_vec())
 }
 
-/// Calculates the signature of hashed using
-/// RSASSA-PKCS1-V1_5-SIGN from RSA PKCS#1 v1.5. Note that `hashed` must
-/// be the result of hashing the input message using the given hash
-/// function. If hash is `None`, hashed is signed directly. This isn't
-/// advisable except for interoperability.
+/// Calculates the signature of hashed using `RSASSA-PKCS1-V1_5-SIGN` from RSA PKCS#1 v1.5.
+/// Note that `hashed` must be the result of hashing the input message using the given hash
+/// function. If hash is `None`, hashed is signed directly. This isn't advisable except for
+/// interoperability.
 ///
 /// If `rng` is not `None` then RSA blinding will be used to avoid timing
 /// side-channel attacks.
@@ -253,22 +277,18 @@ mod oid {
         const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.5");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha224 {
         const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.14");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha256 {
         const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.11");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha384 {
         const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.12");
     }
 
-    #[cfg(feature = "sha2")]
     impl RsaSignatureAssociatedOid for sha2::Sha512 {
         const OID: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.13");
     }
@@ -420,6 +440,82 @@ mod tests {
         assert_eq!(
             priv_key.decrypt(Pkcs1v15Encrypt, &long),
             Err(Error::Decryption)
+        );
+    }
+
+    #[test]
+    fn implicit_rejection_preserves_public_errors() {
+        let tiny_key = RsaPrivateKey::from_components(
+            BoxedUint::from(3233u64),
+            BoxedUint::from(17u64),
+            BoxedUint::from(413u64),
+            vec![BoxedUint::from(61u64), BoxedUint::from(53u64)],
+        )
+        .unwrap();
+        assert_eq!(
+            tiny_key.decrypt(Pkcs1v15Encrypt, &[0; 2]),
+            Err(Error::Decryption)
+        );
+
+        let key = get_private_key();
+        let typed = DecryptingKey::new(key.clone());
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let k = key.size();
+        for ciphertext in [
+            vec![],
+            vec![0; k - 1],
+            vec![0; k + 1],
+            i2osp(key.n().as_ref().clone(), k),
+            vec![0xff; k],
+        ] {
+            assert_eq!(
+                key.decrypt(Pkcs1v15Encrypt, &ciphertext),
+                Err(Error::Decryption)
+            );
+            assert_eq!(
+                key.decrypt_blinded(&mut rng, Pkcs1v15Encrypt, &ciphertext),
+                Err(Error::Decryption)
+            );
+            assert_eq!(typed.decrypt(&ciphertext), Err(Error::Decryption));
+            assert_eq!(
+                typed.decrypt_with_rng(&mut rng, &ciphertext),
+                Err(Error::Decryption)
+            );
+        }
+
+        // c=0 is in range even though EM is entirely zero. Rejection must be
+        // implicit, deterministic, and independent of the blinding randomness.
+        let ciphertext = vec![0; k];
+        let expected = key.decrypt(Pkcs1v15Encrypt, &ciphertext).unwrap();
+        assert!(expected.len() <= k - 11);
+        assert_eq!(
+            typed.decrypt_with_rng(&mut rng, &ciphertext).unwrap(),
+            expected
+        );
+        assert_eq!(typed.decrypt(&ciphertext).unwrap(), expected);
+    }
+
+    #[test]
+    fn implicit_rejection_preserves_rng_errors() {
+        struct FailingRng;
+        impl rand_core::TryRng for FailingRng {
+            type Error = Error;
+            fn try_next_u32(&mut self) -> Result<u32> {
+                Err(Error::Rng)
+            }
+            fn try_next_u64(&mut self) -> Result<u64> {
+                Err(Error::Rng)
+            }
+            fn try_fill_bytes(&mut self, _: &mut [u8]) -> Result<()> {
+                Err(Error::Rng)
+            }
+        }
+        impl TryCryptoRng for FailingRng {}
+        let key = get_private_key();
+        let ciphertext = vec![0; key.size()];
+        assert_eq!(
+            Pkcs1v15Encrypt.decrypt(Some(&mut FailingRng), &key, &ciphertext),
+            Err(Error::Rng)
         );
     }
 
