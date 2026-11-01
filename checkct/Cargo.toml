@@ -1,7 +1,22 @@
-[workspace]
-members = ["driver"]
-resolver = "2"
+[package]
+name = "driver"
+version = "0.0.0"
+publish = false
+edition = "2024"
 
-[profile.release]
-debug = true
-panic = "abort"
+[[bin]]
+name = "driver"
+path = "driver/src/main.rs"
+test = false
+bench = false
+
+[dependencies]
+checkct_macros = { path = "checkct_macros" }
+rsa = { path = "..", default-features = false, features = ["hazmat"] }
+crypto-bigint = { workspace = true }
+zeroize = { workspace = true }
+
+# RNG traits supplied by cargo-checkct's generated rng.rs.
+rand_core = { workspace = true, default-features = true }
+rand_core_06 = { package = "rand_core", version = "0.6" }
+rand_core_09 = { package = "rand_core", version = "0.9" }
