@@ -17,3 +17,8 @@ rustflags = [
 unstable-options = true
 build-std = ["core", "alloc", "panic_abort"]
 build-std-features = ["compiler-builtins-mem"]
+
+# Apply these only to builds invoked from checkct/, not ordinary RSA builds.
+[profile.release]
+debug = true
+panic = "abort"

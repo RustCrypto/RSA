@@ -13,16 +13,27 @@ readme = "README.md"
 rust-version = "1.87"
 exclude = ["checkct/", "marvin_toolkit/", "thirdparty/"]
 
+[workspace]
+members = ["checkct", "checkct/checkct_macros"]
+default-members = ["."]
+exclude = ["marvin-toolkit"]
+resolver = "2"
+
+[workspace.dependencies]
+crypto-bigint = { version = "0.7.7", default-features = false, features = ["zeroize", "alloc"] }
+rand_core = { version = "0.10", default-features = false }
+zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
+
 [dependencies]
 const-oid = { version = "0.10", default-features = false }
-crypto-bigint = { version = "0.7.7", default-features = false, features = ["zeroize", "alloc"] }
+crypto-bigint = { workspace = true }
 crypto-primes = { version = "0.7", default-features = false }
 digest = { version = "0.11", default-features = false, features = ["alloc", "oid"] }
 hmac = { version = "0.13", default-features = false, features = ["zeroize"] }
-rand_core = { version = "0.10", default-features = false }
+rand_core = { workspace = true }
 sha2 = { version = "0.11", default-features = false, features = ["oid", "zeroize"] }
 signature = { version = "3", default-features = false, features = ["alloc", "digest", "rand_core"] }
-zeroize = { version = "1.8", features = ["alloc"] }
+zeroize = { workspace = true, default-features = true }
 
 # optional dependencies
 crypto-common = { version = "0.2", optional = true, features = ["getrandom"] }
@@ -39,7 +50,7 @@ hex-literal = "1"
 proptest = "1"
 serde_test = "1.0.89"
 rand = { version = "0.10", features = ["chacha"] }
-rand_core = { version = "0.10", default-features = false }
+rand_core = { workspace = true }
 sha1 = { version = "0.11", default-features = false, features = ["oid"] }
 sha3 = { version = "0.12", default-features = false, features = ["oid"] }
 hex = { version = "0.4.3", features = ["serde"] }
