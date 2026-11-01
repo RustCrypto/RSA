@@ -70,14 +70,12 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
     let mut ir = None;
 
     let n_params = priv_key.n_params();
-    let bits = d.bits_precision();
-
     let c = if let Some(rng) = rng {
         let (blinded, unblinder) = blind(rng, priv_key, c, n_params)?;
         ir = Some(unblinder);
-        blinded.try_resize(bits).ok_or(Error::Internal)?
+        blinded
     } else {
-        c.try_resize(bits).ok_or(Error::Internal)?
+        c.clone()
     };
 
     let is_multiprime = priv_key.primes().len() > 2;
