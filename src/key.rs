@@ -68,11 +68,11 @@ impl Hash for RsaPublicKey {
 pub struct RsaPrivateKey {
     /// Public components of the private key.
     pubkey_components: RsaPublicKey,
-    /// Private exponent
+    /// Private exponent.
     pub(crate) d: BoxedUint,
     /// Prime factors of N, contains >= 2 elements.
     pub(crate) primes: Vec<Odd<BoxedUint>>,
-    /// Precomputed values to speed up private operations
+    /// Precomputed values to speed up private operations.
     pub(crate) precomputed: Option<PrecomputedValues>,
 }
 
@@ -390,6 +390,12 @@ impl RsaPrivateKey {
         // to ensure optimal performance of arithmetic operations.
         let n_bits = n.bits_vartime();
         let n = n.resize_unchecked(n_bits);
+
+        // Use a public storage width even when the caller supplies a short or zero-padded `d`.
+        // Check for truncation before resizing so an oversized exponent cannot become valid.
+        let d = d
+            .try_resize(n.bits_precision())
+            .ok_or(Error::InvalidExponent)?;
 
         let n_params = BoxedMontyParams::new(n.clone());
         let n_c = NonZero::new(n.get())
@@ -948,8 +954,7 @@ mod tests {
         };
         let public_key: RsaPublicKey = private_key.into();
 
-        let n_limbs: &[u64] = PublicKeyParts::n(&public_key).as_ref().as_ref();
-        assert_eq!(n_limbs, &[101u64]);
+        assert_eq!(PublicKeyParts::n(&public_key).as_ref(), &raw_n);
         assert_eq!(PublicKeyParts::e(&public_key), &BoxedUint::from(200u64));
         assert_eq!(PublicKeyParts::e_bytes(&public_key), [200].into());
         assert_eq!(PublicKeyParts::n_bytes(&public_key), [101].into());
@@ -957,6 +962,11 @@ mod tests {
 
     fn test_key_basics(private_key: &RsaPrivateKey) {
         private_key.validate().expect("invalid private key");
+
+        assert_eq!(
+            private_key.d().bits_precision(),
+            private_key.n_bits_precision()
+        );
 
         assert!(
             PrivateKeyParts::d(private_key) < PublicKeyParts::n(private_key).as_ref(),
@@ -974,6 +984,66 @@ mod tests {
         let m3 = rsa_decrypt_and_check(private_key, Some(&mut rng), &c)
             .expect("unable to decrypt with blinding");
         assert_eq!(m, m3);
+    }
+
+    #[test]
+    fn private_component_widths() {
+        // A 65-bit modulus and a 61-bit private exponent. Minimal storage for `d` is narrower than
+        // storage for `n` on both 32-bit and 64-bit targets.
+        let n = BoxedUint::from(18_446_744_116_659_224_501u128);
+        let e = BoxedUint::from(65537u64);
+        let d = BoxedUint::from(1_721_699_869_695_564_833u64);
+        let p = BoxedUint::from(4_294_967_291u64);
+        let q = BoxedUint::from(4_294_967_311u64);
+
+        for input_bits in [64, 128, 256] {
+            for reverse in [false, true] {
+                let mut primes = vec![
+                    (&p).resize_unchecked(input_bits),
+                    (&q).resize_unchecked(input_bits),
+                ];
+
+                if reverse {
+                    primes.reverse();
+                }
+
+                let mut key = RsaPrivateKey::from_components(
+                    (&n).resize_unchecked(256),
+                    e.clone(),
+                    (&d).resize_unchecked(input_bits),
+                    primes,
+                )
+                .unwrap();
+                assert_eq!(key.d(), &d);
+
+                for clear_precomputed in [false, true] {
+                    if clear_precomputed {
+                        key.clear_precomputed();
+                    }
+                    test_key_basics(&key);
+
+                    // This representative does not fit in `d`'s original 64-bit buffer.
+                    // With odd `e` and `d`, both RSA operations fix `n-1`.
+                    let c = key.n().as_ref().wrapping_sub(BoxedUint::one());
+                    let m = rsa_decrypt_and_check::<ChaCha8Rng>(&key, None, &c).unwrap();
+                    assert_eq!(m, c);
+                }
+
+                key.precompute().unwrap();
+                test_key_basics(&key);
+            }
+        }
+
+        // Resizing must reject significant high bits instead of silently truncating them into the
+        // valid private exponent above.
+        let oversized = d
+            .resize_unchecked(256)
+            .wrapping_add(&(BoxedUint::one_with_precision(256) << 128));
+
+        assert_eq!(
+            RsaPrivateKey::from_components(n, e, oversized, vec![p, q]),
+            Err(Error::InvalidExponent)
+        );
     }
 
     macro_rules! key_generation {
