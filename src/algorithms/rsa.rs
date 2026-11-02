@@ -4,11 +4,11 @@
 //! `rsa_encrypt` performs modular exponentiation without checking the representative's range;
 //! callers implementing RSAEP or RSAVP1 must establish that the input is less than `n`.
 
-use core::cmp::Ordering;
+pub(crate) use super::reduction::to_monty;
 
 use crypto_bigint::{
-    modular::{BoxedMontyForm, BoxedMontyParams},
-    BoxedUint, ConcatenatingMul, ConcatenatingSquare, Gcd, NonZero, Odd, RandomMod, Resize,
+    modular::BoxedMontyParams, BoxedUint, ConcatenatingMul, ConcatenatingSquare, Gcd, NonZero, Odd,
+    RandomMod, Resize,
 };
 use rand_core::TryCryptoRng;
 use zeroize::Zeroize;
@@ -93,39 +93,19 @@ pub fn rsa_decrypt<R: TryCryptoRng + ?Sized>(
             // precomputed: dP = (1/e) mod (p-1) = d mod (p-1)
             // precomputed: dQ = (1/e) mod (q-1) = d mod (q-1)
 
-            // TODO: it may be faster to convert to and from Montgomery with prepared parameters
-            // (modulo `p` and `q`) rather than calculating the remainder directly.
-
             // TODO(tarcieri): zeroize intermediates
             let p_params = BoxedMontyParams::from(p.clone());
             let q_params = BoxedMontyParams::from(q.clone());
 
             // m1 = c^dP mod p
-            let p_wide = p.modulus().resize_unchecked(c.bits_precision());
-            let c_mod_dp = (&c % p_wide.as_nz_ref()).resize_unchecked(dp.bits_precision());
-            let cp = BoxedMontyForm::new(c_mod_dp, &p_params);
+            let cp = to_monty(&c, &p_params);
             let mut m1 = cp.pow(dp);
             // m2 = c^dQ mod q
-            let q_wide = q.modulus().resize_unchecked(c.bits_precision());
-            let c_mod_dq = (&c % q_wide.as_nz_ref()).resize_unchecked(dq.bits_precision());
-            let cq = BoxedMontyForm::new(c_mod_dq, &q_params);
+            let cq = to_monty(&c, &q_params);
             let m2 = cq.pow(dq).retrieve();
 
-            // Note that since `p` and `q` may have different `bits_precision`,
-            // it may be different for `m1` and `m2` as well.
-
-            // (m1 - m2) mod p = (m1 mod p) - (m2 mod p) mod p
-            let m2_mod_p = match p_params.bits_precision().cmp(&q_params.bits_precision()) {
-                Ordering::Less => {
-                    let p_wide = priv_key.primes()[0]
-                        .as_nz_ref()
-                        .resize_unchecked(q_params.bits_precision());
-                    (&m2 % p_wide).resize_unchecked(p_params.bits_precision())
-                }
-                Ordering::Greater => (&m2).resize_unchecked(p_params.bits_precision()),
-                Ordering::Equal => m2.clone(),
-            };
-            let m2r = BoxedMontyForm::new(m2_mod_p, &p_params);
+            // (m1 - m2) mod p, also supporting custom keys with unequal public widths.
+            let m2r = to_monty(&m2, &p_params);
             m1 -= &m2r;
 
             // precomputed: qInv = (1/q) mod p
@@ -269,24 +249,6 @@ fn pow_mod_params_vartime_exp_bits(
     to_monty(base, n_params)
         .pow_bounded_exp(exp, exp_bits)
         .retrieve()
-}
-
-// Converts `x` into Montgomery form modulo `p` in constant time with respect to `x`
-///
-/// This is on the private-key path: `rsa_decrypt_and_check` re-encrypts the unblinded plaintext
-/// to detect CRT faults, and the non-CRT decrypt path feeds the ciphertext through here. A
-/// variable-time remainder at this point leaks information about the plaintext (Marvin attack,
-/// CVE-2023-49092 / RUSTSEC-2023-0071)
-fn to_monty(x: &BoxedUint, p: &BoxedMontyParams) -> BoxedMontyForm {
-    let bits = p.bits_precision();
-    let x = if x.bits_precision() <= bits {
-        // Montgomery conversion computes REDC(x * R^2 mod N). For any x < R = 2^bits the product
-        // is < R * N, so REDC already yields a fully reduced result and no division is needed
-        x.resize_unchecked(bits)
-    } else {
-        x.rem(p.modulus().as_nz_ref()).resize_unchecked(bits)
-    };
-    BoxedMontyForm::new(x, p)
 }
 
 /// The following (deterministic) algorithm also recovers the prime factors `p` and `q` of a modulus `n`, given the

@@ -3,7 +3,8 @@
 use core::alloc::{GlobalAlloc, Layout};
 use core::ptr::{addr_of_mut, null_mut};
 
-const HEAP_SIZE: usize = 4096;
+// The CRT driver needs more temporary allocations than the non-CRT fixture.
+const HEAP_SIZE: usize = 65536;
 
 #[repr(align(64))]
 struct Heap([u8; HEAP_SIZE]);

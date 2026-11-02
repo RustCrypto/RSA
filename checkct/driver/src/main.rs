@@ -13,6 +13,9 @@ mod selection;
 // BINSEC 0.11.3 does not decode the RISC-V amoadd.w used by Arc::clone.
 #[cfg(not(target_arch = "riscv32"))]
 mod raw_rsa;
+#[allow(dead_code)]
+#[path = "../../../src/algorithms/reduction.rs"]
+mod reduction;
 
 // Compile the actual private helper without adding a public API for the harness.
 pub use rsa::errors;
