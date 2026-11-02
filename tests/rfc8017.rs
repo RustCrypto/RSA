@@ -1,13 +1,12 @@
 //! Regression tests for RFC8017 signature representation and verification boundaries.
 
-use rand::{rngs::ChaCha8Rng, SeedableRng};
+use rand::{SeedableRng, rngs::ChaCha8Rng};
 use rsa::{
-    pkcs1v15, pss,
+    BoxedUint, Pkcs1v15Sign, Pss, RsaPrivateKey, RsaPublicKey, pkcs1v15, pss,
     signature::{
-        hazmat::PrehashVerifier, DigestVerifier, RandomizedSigner, SignatureEncoding, Verifier,
+        DigestVerifier, RandomizedSigner, SignatureEncoding, Verifier, hazmat::PrehashVerifier,
     },
     traits::PublicKeyParts,
-    BoxedUint, Pkcs1v15Sign, Pss, RsaPrivateKey, RsaPublicKey,
 };
 use sha2::{Digest, Sha256};
 

@@ -122,10 +122,10 @@ mod tests {
     mod vectors {
         use super::*;
         use crate::{
+            RsaPrivateKey,
             algorithms::{pad::os2ip, pkcs1v15::eme_pkcs1v15_decode, rsa::rsa_decrypt_and_check},
             pkcs1v15::{DecryptingKey, Pkcs1v15Encrypt},
             traits::{Decryptor, PaddingScheme, PublicKeyParts, RandomizedDecryptor},
-            RsaPrivateKey,
         };
         use alloc::{collections::BTreeMap, string::String};
         use pkcs8::DecodePrivateKey;

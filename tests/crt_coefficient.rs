@@ -1,8 +1,8 @@
 //! Test explicit wide storage for unbalanced primes in both orders.
 
 use rsa::{
-    traits::{PrivateKeyParts, PublicKeyParts},
     BoxedUint, RsaPrivateKey,
+    traits::{PrivateKeyParts, PublicKeyParts},
 };
 
 fn key_and_coefficient(reverse: bool) -> (RsaPrivateKey, BoxedUint) {

@@ -1,11 +1,11 @@
-use super::{sign_digest, Signature, VerifyingKey};
+use super::{Signature, VerifyingKey, sign_digest};
 use crate::{Result, RsaPrivateKey};
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset, HashMarker, Update};
 use rand_core::{CryptoRng, TryCryptoRng};
 use signature::{
-    hazmat::RandomizedPrehashSigner, Keypair, RandomizedDigestSigner, RandomizedMultipartSigner,
-    RandomizedSigner,
+    Keypair, RandomizedDigestSigner, RandomizedMultipartSigner, RandomizedSigner,
+    hazmat::RandomizedPrehashSigner,
 };
 use zeroize::ZeroizeOnDrop;
 
@@ -15,14 +15,14 @@ use {
     const_oid::AssociatedOid,
     pkcs8::{EncodePrivateKey, SecretDocument},
     spki::{
-        der::AnyRef, AlgorithmIdentifierOwned, AlgorithmIdentifierRef,
-        AssociatedAlgorithmIdentifier, DynSignatureAlgorithmIdentifier,
+        AlgorithmIdentifierOwned, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
+        DynSignatureAlgorithmIdentifier, der::AnyRef,
     },
 };
 #[cfg(feature = "serde")]
 use {
     pkcs8::DecodePrivateKey,
-    serdect::serde::{de, ser, Deserialize, Serialize},
+    serdect::serde::{Deserialize, Serialize, de, ser},
 };
 
 /// Signing key for producing "blinded" RSASSA-PSS signatures as described in
@@ -294,7 +294,7 @@ mod tests {
         use super::*;
         use rand::rngs::ChaCha8Rng;
         use rand_core::SeedableRng;
-        use serde_test::{assert_tokens, Configure, Token};
+        use serde_test::{Configure, Token, assert_tokens};
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);

@@ -3,8 +3,8 @@
 use crate::key::SecretPrime;
 use alloc::boxed::Box;
 use crypto_bigint::{
-    modular::{BoxedMontyForm, BoxedMontyParams},
     BoxedUint, NonZero, Odd,
+    modular::{BoxedMontyForm, BoxedMontyParams},
 };
 use zeroize::Zeroize;
 

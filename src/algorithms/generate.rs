@@ -5,8 +5,9 @@
 use alloc::vec::Vec;
 use crypto_bigint::{BoxedUint, Odd};
 use crypto_primes::{
+    Flavor,
     hazmat::{SetBits, SmallFactorsSieveFactory},
-    is_prime, sieve_and_find, Flavor,
+    is_prime, sieve_and_find,
 };
 use rand_core::CryptoRng;
 

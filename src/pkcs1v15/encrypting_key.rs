@@ -1,5 +1,5 @@
 use super::encrypt;
-use crate::{traits::RandomizedEncryptor, Result, RsaPublicKey};
+use crate::{Result, RsaPublicKey, traits::RandomizedEncryptor};
 use alloc::vec::Vec;
 use rand_core::CryptoRng;
 #[cfg(feature = "serde")]
@@ -37,7 +37,7 @@ mod tests {
         use crate::RsaPrivateKey;
         use rand::rngs::ChaCha8Rng;
         use rand_core::SeedableRng;
-        use serde_test::{assert_tokens, Configure, Token};
+        use serde_test::{Configure, Token, assert_tokens};
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = RsaPrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key");

@@ -1,13 +1,13 @@
-use super::{pkcs1v15_generate_prefix, sign, Signature, VerifyingKey};
-use crate::{dummy_rng::DummyRng, Result, RsaPrivateKey};
+use super::{Signature, VerifyingKey, pkcs1v15_generate_prefix, sign};
+use crate::{Result, RsaPrivateKey, dummy_rng::DummyRng};
 use alloc::vec::Vec;
 use const_oid::AssociatedOid;
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutput, HashMarker, Update};
 use rand_core::{CryptoRng, TryCryptoRng};
 use signature::{
-    hazmat::PrehashSigner, DigestSigner, Keypair, MultipartSigner, RandomizedDigestSigner,
-    RandomizedMultipartSigner, RandomizedSigner, Signer,
+    DigestSigner, Keypair, MultipartSigner, RandomizedDigestSigner, RandomizedMultipartSigner,
+    RandomizedSigner, Signer, hazmat::PrehashSigner,
 };
 use zeroize::ZeroizeOnDrop;
 
@@ -16,14 +16,14 @@ use {
     super::oid,
     pkcs8::{EncodePrivateKey, SecretDocument},
     spki::{
-        der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier,
-        SignatureAlgorithmIdentifier,
+        AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier, SignatureAlgorithmIdentifier,
+        der::AnyRef,
     },
 };
 #[cfg(feature = "serde")]
 use {
     pkcs8::DecodePrivateKey,
-    serdect::serde::{de, ser, Deserialize, Serialize},
+    serdect::serde::{Deserialize, Serialize, de, ser},
 };
 
 /// Signing key for `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
@@ -344,7 +344,7 @@ mod tests {
         use crate::RsaPrivateKey;
         use rand::rngs::ChaCha8Rng;
         use rand_core::SeedableRng;
-        use serde_test::{assert_tokens, Configure, Token};
+        use serde_test::{Configure, Token, assert_tokens};
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
