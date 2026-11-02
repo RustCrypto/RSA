@@ -20,7 +20,7 @@ exclude = ["marvin-toolkit"]
 resolver = "2"
 
 [workspace.dependencies]
-crypto-bigint = { version = "0.7.7", default-features = false, features = ["zeroize", "alloc"] }
+crypto-bigint = { version = "0.7.10", default-features = false, features = ["zeroize", "alloc"] }
 rand_core = { version = "0.10", default-features = false }
 zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
 
@@ -37,7 +37,7 @@ zeroize = { workspace = true, default-features = true }
 
 # optional dependencies
 crypto-common = { version = "0.2", optional = true, features = ["getrandom"] }
-pkcs1 = { version = "0.8.0-rc.5", optional = true, default-features = false, features = ["alloc", "pem"] }
+pkcs1 = { version = "0.8", optional = true, default-features = false, features = ["alloc", "pem"] }
 pkcs8 = { version = "0.11", optional = true, default-features = false, features = ["alloc", "pem"] }
 serdect = { version = "0.4", optional = true }
 sha1 = { version = "0.11", optional = true, default-features = false, features = ["oid"] }
