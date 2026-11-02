@@ -238,7 +238,7 @@ pub mod traits;
 #[cfg(not(feature = "getrandom"))]
 mod dummy_rng;
 mod encoding;
-mod key;
+mod private_key;
 
 #[cfg(feature = "encoding")]
 pub use pkcs1;
@@ -248,9 +248,9 @@ pub use sha2;
 
 pub use crate::{
     errors::{Error, Result},
-    key::{RsaPrivateKey, RsaPublicKey},
     oaep::Oaep,
     pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign},
+    private_key::{RsaPrivateKey, RsaPublicKey},
     pss::Pss,
     traits::keys::CrtValue,
 };

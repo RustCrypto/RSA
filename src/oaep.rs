@@ -20,7 +20,7 @@ use crate::algorithms::oaep::*;
 use crate::algorithms::pad::{i2osp, i2osp_zeroizing, os2ip, os2ip_zeroizing};
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
-use crate::key::{self, RsaPrivateKey, RsaPublicKey};
+use crate::private_key::{self, RsaPrivateKey, RsaPublicKey};
 use crate::traits::{PaddingScheme, PublicKeyParts};
 
 /// Encryption and Decryption using [OAEP padding](https://datatracker.ietf.org/doc/html/rfc8017#section-7.1).
@@ -211,7 +211,7 @@ where
     D: Digest + FixedOutputReset,
     MGD: Digest + FixedOutputReset,
 {
-    key::check_public(pub_key)?;
+    private_key::check_public(pub_key)?;
 
     let em = oaep_encrypt(rng, msg, digest, mgf_digest, label, pub_key.size())?;
 
@@ -237,7 +237,7 @@ where
     D: Digest,
     MGD: Digest + FixedOutputReset,
 {
-    key::check_public(pub_key)?;
+    private_key::check_public(pub_key)?;
 
     let em = oaep_encrypt_digest::<_, D, MGD>(rng, msg, label, pub_key.size())?;
 
@@ -307,7 +307,7 @@ where
     D: Digest,
     MGD: Digest + FixedOutputReset,
 {
-    key::check_public(priv_key)?;
+    private_key::check_public(priv_key)?;
 
     if ciphertext.len() != priv_key.size() {
         return Err(Error::Decryption);
@@ -322,8 +322,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::key::{RsaPrivateKey, RsaPublicKey};
     use crate::oaep::{DecryptingKey, EncryptingKey, Oaep};
+    use crate::private_key::{RsaPrivateKey, RsaPublicKey};
     use crate::traits::PublicKeyParts;
     use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
 

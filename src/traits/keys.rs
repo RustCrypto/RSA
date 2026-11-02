@@ -1,6 +1,6 @@
 //! Traits related to the key components
 
-use crate::key::SecretPrime;
+use crate::private_key::SecretPrime;
 use alloc::boxed::Box;
 use crypto_bigint::{
     BoxedUint, NonZero, Odd,
