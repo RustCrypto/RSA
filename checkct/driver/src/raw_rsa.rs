@@ -21,7 +21,8 @@ pub fn rsa_decrypt_unblinded_non_crt_128() {
 
     // Public modulus (2^64 - 59) * (2^64 - 83), with fixed 128-bit precision.
     let n = BoxedUint::from_be_hex("FFFFFFFFFFFFFF720000000000001321", 128).unwrap();
-    let public = RsaPublicKey::new(n, BoxedUint::from(65537u64)).unwrap();
+    let public =
+        RsaPublicKey::new_with_size_limits(n, BoxedUint::from(65537u64), 128..=128).unwrap();
 
     let mut bytes = [0u8; 16];
     PrivateRng.fill_bytes(&mut bytes);
@@ -107,7 +108,8 @@ pub fn rsa_decrypt_unblinded_crt_128() {
     unsafe { crate::allocator::reset() };
 
     let n = BoxedUint::from_be_hex("FFFFFFFFFFFFFF720000000000001321", 128).unwrap();
-    let public = RsaPublicKey::new(n, BoxedUint::from(65537u64)).unwrap();
+    let public =
+        RsaPublicKey::new_with_size_limits(n, BoxedUint::from(65537u64), 128..=128).unwrap();
     let p = secret_modulus_64();
     let q = secret_modulus_64();
     let primes = vec![p.modulus().clone(), q.modulus().clone()];

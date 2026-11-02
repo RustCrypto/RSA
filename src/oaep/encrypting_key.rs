@@ -74,17 +74,16 @@ where
 mod tests {
 
     #[test]
-    #[cfg(all(feature = "hazmat", feature = "serde"))]
+    #[cfg(feature = "serde")]
     fn test_serde() {
         use super::*;
-        use rand::rngs::ChaCha8Rng;
-        use rand_core::SeedableRng;
+        use pkcs8::DecodePublicKey;
         use serde_test::{Configure, Token, assert_tokens};
 
-        let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let priv_key =
-            crate::RsaPrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key");
-        let encrypting_key = EncryptingKey::<sha2::Sha256>::new(priv_key.to_public_key());
+        let der = include_bytes!("../../tests/examples/pkcs8/rsa2048-pub.der");
+        let pub_key = RsaPublicKey::from_public_key_der(der).unwrap();
+        let encoded = include_str!("../../tests/examples/pkcs8/rsa2048-pub.hex").trim();
+        let encrypting_key = EncryptingKey::<sha2::Sha256>::new(pub_key);
 
         let tokens = [
             Token::Struct {
@@ -92,9 +91,7 @@ mod tests {
                 len: 4,
             },
             Token::Str("inner"),
-            Token::Str(
-                "3024300d06092a864886f70d01010105000313003010020900ab240c3361d02e370203010001",
-            ),
+            Token::Str(encoded),
             Token::Str("label"),
             Token::None,
             Token::Str("phantom"),

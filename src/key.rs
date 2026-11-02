@@ -1,6 +1,7 @@
 use alloc::vec::Vec;
 use core::fmt;
 use core::hash::{Hash, Hasher};
+use core::ops::RangeInclusive;
 
 use crypto_bigint::{
     BoxedUint, ConcatenatingMul, Integer, NonZero, Odd, Resize,
@@ -232,26 +233,51 @@ impl RsaPublicKey {
     /// If for some reason you have a legitimate reason to use keys with public exponents larger
     /// than this value, use the special APIs:
     ///
-    /// - [`RsaPublicKey::new_with_max_size`]
+    /// - [`RsaPublicKey::new_unchecked`]
     /// - [`RsaPrivateKey::from_components_with_large_exponent`]
     pub const MAX_PUB_EXPONENT: u64 = (1 << 33) - 1;
 
-    /// Maximum size of the modulus `n` in bits.
+    /// Default minimum size of the modulus `n` in bits.
+    pub const MIN_SIZE: usize = 1024;
+
+    /// Default maximum size of the modulus `n` in bits.
     pub const MAX_SIZE: usize = 8192;
 
     /// Create a new public key from its components.
     ///
-    /// This function accepts public keys with a modulus size up to 8192-bits,
-    /// i.e. [`RsaPublicKey::MAX_SIZE`].
+    /// Accepts modulus sizes from [`Self::MIN_SIZE`] to [`Self::MAX_SIZE`], inclusive.
+    /// Use [`Self::new_with_size_limits`] to explicitly allow other sizes.
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
     pub fn new(n: BoxedUint, e: BoxedUint) -> Result<Self> {
-        Self::new_with_max_size(n, e, Self::MAX_SIZE)
+        Self::new_with_size_limits(n, e, Self::MIN_SIZE..=Self::MAX_SIZE)
     }
 
-    /// Create a new public key from its components.
-    #[allow(clippy::missing_errors_doc, reason = "TODO")]
-    pub fn new_with_max_size(n: BoxedUint, e: BoxedUint, max_size: usize) -> Result<Self> {
-        check_public_with_max_size(&n, &e, Some(max_size))?;
+    /// Create a new public key with explicit, inclusive modulus size limits in bits.
+    ///
+    /// All other public-key checks still apply. Allowing a smaller minimum can admit insecure
+    /// keys and is intended for testing or compatibility with legacy systems.
+    ///
+    /// For encoded keys outside the default limits, decode the components with the `pkcs1`
+    /// crate and pass them to this constructor explicitly.
+    ///
+    /// # Errors
+    /// Returns [`Error::InvalidArguments`] for an empty range, [`Error::ModulusTooSmall`] or
+    /// [`Error::ModulusTooLarge`] for a modulus outside the range, or an error if the modulus
+    /// or public exponent is invalid.
+    pub fn new_with_size_limits(
+        n: BoxedUint,
+        e: BoxedUint,
+        size_range_bits: RangeInclusive<usize>,
+    ) -> Result<Self> {
+        if size_range_bits.is_empty() {
+            return Err(Error::InvalidArguments);
+        }
+
+        if (n.bits_vartime() as usize) < *size_range_bits.start() {
+            return Err(Error::ModulusTooSmall);
+        }
+
+        check_public_with_max_size(&n, &e, Some(*size_range_bits.end()))?;
 
         let n_odd = Odd::new(n.clone())
             .into_option()
@@ -262,12 +288,19 @@ impl RsaPublicKey {
         Ok(Self { n, e, n_params })
     }
 
+    /// Create a new public key with the default minimum modulus size and a custom maximum.
+    #[deprecated(since = "0.10.0", note = "please use `new_with_size_limits` instead")]
+    #[allow(clippy::missing_errors_doc, reason = "TODO")]
+    pub fn new_with_max_size(n: BoxedUint, e: BoxedUint, max_size: usize) -> Result<Self> {
+        Self::new_with_size_limits(n, e, Self::MIN_SIZE..=max_size)
+    }
+
     /// Create a new public key, bypassing checks around the modulus and public
     /// exponent size.
     ///
     /// This method is not recommended, and only intended for unusual use cases.
     /// Most applications should use [`RsaPublicKey::new`] or
-    /// [`RsaPublicKey::new_with_max_size`] instead.
+    /// [`RsaPublicKey::new_with_size_limits`] instead.
     #[must_use]
     pub fn new_unchecked(n: BoxedUint, e: BoxedUint) -> Self {
         let n_odd = Odd::new(n.clone()).expect("n must be odd");
@@ -295,9 +328,6 @@ impl PublicKeyParts for RsaPrivateKey {
 impl RsaPrivateKey {
     /// Default exponent for RSA keys.
     const EXP: u64 = 65537;
-
-    /// Minimum size of the modulus `n` in bits. Currently only applies to keygen.
-    const MIN_SIZE: u32 = 1024;
 
     /// Generate a new RSA key pair with a modulus of the given bit size using the passed in `rng`.
     ///
@@ -330,7 +360,7 @@ impl RsaPrivateKey {
         bit_size: usize,
         exp: BoxedUint,
     ) -> Result<RsaPrivateKey> {
-        if bit_size < Self::MIN_SIZE as usize {
+        if bit_size < RsaPublicKey::MIN_SIZE {
             return Err(Error::ModulusTooSmall);
         }
 
@@ -1178,7 +1208,7 @@ mod tests {
     fn test_serde() {
         use rand::rngs::ChaCha8Rng;
         use rand_core::SeedableRng;
-        use serde_test::{Configure, Token, assert_tokens};
+        use serde_test::{Configure, Token, assert_ser_tokens, assert_tokens};
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = RsaPrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key");
@@ -1190,12 +1220,13 @@ mod tests {
         ))];
         assert_tokens(&priv_key.clone().readable(), &priv_tokens);
 
-        let priv_tokens = [Token::Str(
+        let pub_tokens = [Token::Str(
             "3024300d06092a864886f70d01010105000313003010020900ab240c3361d02e370203010001",
         )];
-        assert_tokens(
+        // Small public keys can still be serialized, but default decoding rejects them.
+        assert_ser_tokens(
             &RsaPublicKey::from(priv_key.clone()).readable(),
-            &priv_tokens,
+            &pub_tokens,
         );
     }
 
