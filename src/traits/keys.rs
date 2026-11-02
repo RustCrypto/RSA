@@ -47,6 +47,11 @@ pub trait PublicKeyParts {
 }
 
 /// Components of an RSA private key.
+///
+/// Implementations used for private operations must choose all storage precisions from public
+/// parameters, not from the significant bits of secret components. In particular, `d`, `dp`, and
+/// `dq` are processed for their full storage precision. Prime and Montgomery-parameter precisions
+/// must follow the same public policy. `RsaPrivateKey` enforces this during construction.
 pub trait PrivateKeyParts: PublicKeyParts {
     /// Returns the private exponent of the key.
     fn d(&self) -> &BoxedUint;
