@@ -217,6 +217,27 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
     Ok(em[k - length..].to_vec())
 }
 
+/// Sign with the default source of blinding randomness, when enabled.
+fn sign_with_default_rng(
+    priv_key: &RsaPrivateKey,
+    prefix: &[u8],
+    hashed: &[u8],
+) -> Result<Vec<u8>> {
+    #[cfg(feature = "getrandom")]
+    {
+        sign(
+            Some(&mut crypto_common::getrandom::SysRng),
+            priv_key,
+            prefix,
+            hashed,
+        )
+    }
+    #[cfg(not(feature = "getrandom"))]
+    {
+        sign::<crate::dummy_rng::DummyRng>(None, priv_key, prefix, hashed)
+    }
+}
+
 /// Calculates the signature of hashed using `RSASSA-PKCS1-V1_5-SIGN` from RSA PKCS#1 v1.5.
 /// Note that `hashed` must be the result of hashing the input message using the given hash
 /// function. If hash is `None`, hashed is signed directly. This isn't advisable except for
