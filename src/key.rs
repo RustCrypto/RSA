@@ -3,15 +3,15 @@ use core::fmt;
 use core::hash::{Hash, Hasher};
 
 use crypto_bigint::{
-    modular::{BoxedMontyForm, BoxedMontyParams},
     BoxedUint, ConcatenatingMul, Integer, NonZero, Odd, Resize,
+    modular::{BoxedMontyForm, BoxedMontyParams},
 };
 use rand_core::CryptoRng;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 #[cfg(feature = "serde")]
 use {
     pkcs8::{DecodePrivateKey, EncodePrivateKey},
-    serdect::serde::{de, ser, Deserialize, Serialize},
+    serdect::serde::{Deserialize, Serialize, de, ser},
     spki::{DecodePublicKey, EncodePublicKey},
 };
 
@@ -1167,7 +1167,7 @@ mod tests {
     fn test_serde() {
         use rand::rngs::ChaCha8Rng;
         use rand_core::SeedableRng;
-        use serde_test::{assert_tokens, Configure, Token};
+        use serde_test::{Configure, Token, assert_tokens};
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let priv_key = RsaPrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key");

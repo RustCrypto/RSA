@@ -39,8 +39,8 @@ use {
     const_oid::AssociatedOid,
     pkcs1::RsaPssParams,
     spki::{
-        der::{Any, ErrorKind},
         AlgorithmIdentifierOwned,
+        der::{Any, ErrorKind},
     },
 };
 

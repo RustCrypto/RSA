@@ -1,8 +1,8 @@
 //! Reduction modulo an odd, potentially secret modulus using fixed-width Montgomery arithmetic.
 
 use crypto_bigint::{
-    modular::{BoxedMontyForm, BoxedMontyParams},
     BoxedUint, Resize,
+    modular::{BoxedMontyForm, BoxedMontyParams},
 };
 
 /// Convert any input precision to Montgomery form. Loop counts and allocations depend only on

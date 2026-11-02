@@ -6,14 +6,14 @@
 #![cfg(feature = "encoding")]
 
 use crate::{
-    traits::{PrivateKeyParts, PublicKeyParts},
     RsaPrivateKey, RsaPublicKey,
+    traits::{PrivateKeyParts, PublicKeyParts},
 };
 use core::convert::{TryFrom, TryInto};
 use crypto_bigint::{BoxedUint, NonZero, Resize};
 use pkcs8::{
-    der::{asn1::AsUintRef, asn1::OctetStringRef, Decode},
     Document, EncodePrivateKey, EncodePublicKey, ObjectIdentifier, SecretDocument,
+    der::{Decode, asn1::AsUintRef, asn1::OctetStringRef},
 };
 use zeroize::Zeroizing;
 

@@ -7,8 +7,8 @@
 pub(crate) use super::reduction::to_monty;
 
 use crypto_bigint::{
-    modular::BoxedMontyParams, BoxedUint, ConcatenatingMul, ConcatenatingSquare, Gcd, NonZero, Odd,
-    RandomMod, Resize,
+    BoxedUint, ConcatenatingMul, ConcatenatingSquare, Gcd, NonZero, Odd, RandomMod, Resize,
+    modular::BoxedMontyParams,
 };
 use rand_core::TryCryptoRng;
 use zeroize::Zeroize;

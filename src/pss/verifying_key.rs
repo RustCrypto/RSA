@@ -1,19 +1,19 @@
-use super::{verify_digest, Signature};
+use super::{Signature, verify_digest};
 use crate::RsaPublicKey;
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset, Update};
-use signature::{hazmat::PrehashVerifier, DigestVerifier, Verifier};
+use signature::{DigestVerifier, Verifier, hazmat::PrehashVerifier};
 
 #[cfg(feature = "encoding")]
 use {
     crate::encoding::ID_RSASSA_PSS,
     const_oid::AssociatedOid,
     pkcs8::{Document, EncodePublicKey},
-    spki::{der::AnyRef, AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier},
+    spki::{AlgorithmIdentifierRef, AssociatedAlgorithmIdentifier, der::AnyRef},
 };
 #[cfg(feature = "serde")]
 use {
-    serdect::serde::{de, ser, Deserialize, Serialize},
+    serdect::serde::{Deserialize, Serialize, de, ser},
     spki::DecodePublicKey,
 };
 
@@ -252,7 +252,7 @@ mod tests {
         use crate::RsaPrivateKey;
         use rand::rngs::ChaCha8Rng;
         use rand_core::SeedableRng;
-        use serde_test::{assert_tokens, Configure, Token};
+        use serde_test::{Configure, Token, assert_tokens};
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
