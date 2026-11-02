@@ -9,7 +9,10 @@ use serdect::serde::{Deserialize, Serialize, de};
 #[cfg(feature = "encoding")]
 use spki::{
     SignatureBitStringEncoding,
-    der::{Result as DerResult, asn1::BitString},
+    der::{
+        Result as DerResult,
+        asn1::{BitString, BitStringRef},
+    },
 };
 
 /// `RSASSA-PKCS1-v1_5` signatures as described in [RFC8017 § 8.2].
@@ -39,6 +42,15 @@ impl TryFrom<&[u8]> for Signature {
         Ok(Self {
             inner: bytes.into(),
         })
+    }
+}
+
+#[cfg(feature = "encoding")]
+impl TryFrom<BitStringRef<'_>> for Signature {
+    type Error = signature::Error;
+
+    fn try_from(bit_string: BitStringRef<'_>) -> signature::Result<Self> {
+        Self::try_from(bit_string.as_bytes().ok_or_else(signature::Error::new)?)
     }
 }
 
