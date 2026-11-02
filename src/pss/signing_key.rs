@@ -35,6 +35,8 @@ use {
 /// Signing key for producing RSASSA-PSS signatures as described in
 /// [RFC8017 § 8.1].
 ///
+/// Signing uses the supplied RNG for both the salt and RSA base blinding.
+///
 /// [RFC8017 § 8.1]: https://datatracker.ietf.org/doc/html/rfc8017#section-8.1
 #[derive(Debug, Clone)]
 pub struct SigningKey<D>
@@ -113,7 +115,7 @@ where
     ) -> signature::Result<Signature> {
         let mut digest = D::new();
         f(&mut digest)?;
-        sign_digest::<_, D>(rng, false, &self.inner, &digest.finalize(), self.salt_len)?
+        sign_digest::<_, D>(rng, true, &self.inner, &digest.finalize(), self.salt_len)?
             .as_slice()
             .try_into()
     }
@@ -160,7 +162,7 @@ where
         rng: &mut R,
         prehash: &[u8],
     ) -> signature::Result<Signature> {
-        sign_digest::<_, D>(rng, false, &self.inner, prehash, self.salt_len)?
+        sign_digest::<_, D>(rng, true, &self.inner, prehash, self.salt_len)?
             .as_slice()
             .try_into()
     }
