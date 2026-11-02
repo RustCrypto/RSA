@@ -106,7 +106,7 @@ dual licensed as above, without any additional terms or conditions.
 [open security issues]: https://github.com/RustCrypto/RSA/issues?q=is%3Aissue+is%3Aopen+label%3Asecurity
 [Marvin Attack]: https://people.redhat.com/~hkario/marvin/
 [RUSTSEC-2023-0071]: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
-[#390]: https://github.com/RustCrypto/RSA/issues/390
+[#711]: https://github.com/RustCrypto/RSA/issues/711
 
 [RFC8017]: https://www.rfc-editor.org/rfc/rfc8017.html
 [RSAES-OAEP]: https://www.rfc-editor.org/rfc/rfc8017.html#section-7.1
