@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use rand_core::TryCryptoRng;
 
 use crate::errors::Result;
-use crate::private_key::{RsaPrivateKey, RsaPublicKey};
+use crate::{RsaPrivateKey, RsaPublicKey};
 
 /// Padding scheme used for encryption.
 pub trait PaddingScheme {
