@@ -49,7 +49,7 @@ use crate::algorithms::pad::{i2osp, i2osp_zeroizing, os2ip, os2ip_zeroizing};
 use crate::algorithms::pkcs1v15::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
-use crate::key::{self, RsaPrivateKey, RsaPublicKey};
+use crate::private_key::{self, RsaPrivateKey, RsaPublicKey};
 use crate::traits::{PaddingScheme, PrivateKeyParts, PublicKeyParts, SignatureScheme};
 
 /// Encryption using PKCS#1 v1.5 padding. Decryption uses implicit rejection from
@@ -160,7 +160,7 @@ fn encrypt<R: TryCryptoRng + ?Sized>(
     pub_key: &RsaPublicKey,
     msg: &[u8],
 ) -> Result<Vec<u8>> {
-    key::check_public(pub_key)?;
+    private_key::check_public(pub_key)?;
 
     let em = pkcs1v15_encrypt_pad(rng, msg, pub_key.size())?;
     let int = os2ip_zeroizing(em, pub_key.n_bits_precision())?;
@@ -179,7 +179,7 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
     priv_key: &RsaPrivateKey,
     ciphertext: &[u8],
 ) -> Result<Vec<u8>> {
-    key::check_public(priv_key)?;
+    private_key::check_public(priv_key)?;
     let k = priv_key.size();
 
     // RFC8017 §7.2.2 and draft-irtf-cfrg-rsa-guidance-10 §7.2, step 1.
