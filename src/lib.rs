@@ -239,6 +239,7 @@ pub mod traits;
 mod dummy_rng;
 mod encoding;
 mod private_key;
+mod public_key;
 
 #[cfg(feature = "encoding")]
 pub use pkcs1;
@@ -250,8 +251,9 @@ pub use crate::{
     errors::{Error, Result},
     oaep::Oaep,
     pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign},
-    private_key::{RsaPrivateKey, RsaPublicKey},
+    private_key::RsaPrivateKey,
     pss::Pss,
+    public_key::RsaPublicKey,
     traits::keys::CrtValue,
 };
 
