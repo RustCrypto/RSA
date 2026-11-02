@@ -4,7 +4,6 @@
 [![Documentation][doc-image]][doc-link]
 [![Build Status][build-image]][build-link]
 [![codecov][coverage-image]][coverage-link]
-[![Dependency Status][deps-image]][deps-link]
 ![Apache2/MIT licensed][license-image]
 ![MSRV][msrv-image]
 [![Project Chat][chat-image]][chat-link]
@@ -51,48 +50,24 @@ assert_eq!(&data[..], &dec_data[..]);
 > opt-level = 3
 > ```
 
-## Status
-
-Currently at Phase 1 (v) 🚧
-
-There will be three phases before `1.0` 🚢 can be released.
-
-1. 🚧  Make it work
-    - [x] Prime generation ✅
-    - [x] Key generation ✅
-    - [x] PKCS1v1.5: Encryption & Decryption ✅
-    - [x] PKCS1v1.5: Sign & Verify ✅
-    - [ ] PKCS1v1.5 (session key): Encryption & Decryption
-    - [x] OAEP: Encryption & Decryption
-    - [x] PSS: Sign & Verify
-    - [x] Key import & export
-2. 🚀 Make it fast
-    - [x] Benchmarks ✅
-    - [ ] compare to other implementations 🚧
-    - [ ] optimize 🚧
-3. 🔐 Make it secure
-    - [ ] Fuzz testing
-    - [ ] Security Audits
-
 ## ⚠️Security Warning
 
 This crate has received one [security audit by Include Security][audit], with
 only one minor finding which has since been addressed.
 
 See the [open security issues] on our issue tracker for other known problems.
-
-~~Notably the implementation of [modular exponentiation is not constant time],
-but timing variability is masked using [random blinding], a commonly used
-technique.~~ This crate is vulnerable to the [Marvin Attack] which could enable
+This crate was previously vulnerable to the [Marvin Attack] which could enable
 private key recovery by a network attacker (see [RUSTSEC-2023-0071]).
 
-You can follow our work on mitigating this issue in [#390].
+You can follow our work on constant-time hardening in [#711].
 
-## Minimum Supported Rust Version (MSRV)
+## Minimum Supported Rust Version (MSRV) Policy
 
-This crate supports Rust 1.85 or higher.
+MSRV increases are not considered breaking changes and can happen in patch
+releases.
 
-In the future MSRV can be changed, but it will be done with a minor version bump.
+The crate MSRV accounts for all supported targets and crate feature
+combinations.
 
 ## License
 
@@ -123,16 +98,12 @@ dual licensed as above, without any additional terms or conditions.
 [msrv-image]: https://img.shields.io/badge/rustc-1.87+-blue.svg
 [chat-image]: https://img.shields.io/badge/zulip-join_chat-blue.svg
 [chat-link]: https://rustcrypto.zulipchat.com/#narrow/stream/260047-RSA
-[deps-image]: https://deps.rs/repo/github/RustCrypto/RSA/status.svg
-[deps-link]: https://deps.rs/repo/github/RustCrypto/RSA
 
 [//]: # (links)
 
 [RustCrypto]: https://github.com/RustCrypto/
 [audit]: https://public.opentech.fund/documents/1907_OTF_DeltaChat_RPGP_RustRSA_GB_Report_v1.pdf
 [open security issues]: https://github.com/RustCrypto/RSA/issues?q=is%3Aissue+is%3Aopen+label%3Asecurity
-[modular exponentiation is not constant time]: https://github.com/RustCrypto/RSA/issues/19
-[random blinding]: https://en.wikipedia.org/wiki/Blinding_(cryptography)
 [Marvin Attack]: https://people.redhat.com/~hkario/marvin/
 [RUSTSEC-2023-0071]: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
 [#390]: https://github.com/RustCrypto/RSA/issues/390
