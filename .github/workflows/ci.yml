@@ -56,14 +56,15 @@ jobs:
       - run: cargo test --release --features serde
 
   minimal-versions:
-    if: false # disabled until we remove pre-releases dependencies 
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
           submodules: recursive
       - uses: RustCrypto/actions/cargo-cache@master
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-11-01
       - run: cargo update -Z minimal-versions
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo test --release --features getrandom,serde,pkcs5
@@ -77,5 +78,5 @@ jobs:
       - uses: RustCrypto/actions/cargo-cache@master
       - uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-02-22
+          toolchain: nightly-2026-11-01
       - run: cargo build --benches
