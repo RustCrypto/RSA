@@ -52,8 +52,9 @@ assert_eq!(&data[..], &dec_data[..]);
 
 ## ⚠️Security Warning
 
-This crate has received one [security audit by Include Security][audit], with
-only one minor finding which has since been addressed.
+Though this crate has been [previously audited][audit] the implementation has
+diverged significantly since then, and several security issues have been
+discovered which we are still working to address.
 
 See the [open security issues] on our issue tracker for other known problems.
 This crate was previously vulnerable to the [Marvin Attack] which could enable
