@@ -1,6 +1,6 @@
 [package]
 name = "rsa"
-version = "0.10.0-rc.19"
+version = "0.10.0-rc.20"
 authors = ["RustCrypto Developers", "dignifiedquire <dignifiedquire@gmail.com>"]
 edition = "2024"
 description = "Pure Rust RSA implementation"
@@ -17,7 +17,7 @@ exclude = ["checkct/", "marvin_toolkit/", "thirdparty/"]
 members = ["checkct", "checkct/checkct_macros"]
 default-members = ["."]
 exclude = ["marvin-toolkit"]
-resolver = "2"
+resolver = "3"
 
 [workspace.dependencies]
 crypto-bigint = { version = "0.7.10", default-features = false, features = ["zeroize", "alloc"] }
