@@ -111,9 +111,10 @@ where
     ) -> signature::Result<Signature> {
         let mut digest = D::default();
         f(&mut digest)?;
-        sign_with_default_rng(&self.inner, &self.prefix, &digest.finalize_fixed())?
-            .as_slice()
-            .try_into()
+        Ok(Signature {
+            inner: sign_with_default_rng(&self.inner, &self.prefix, &digest.finalize_fixed())?
+                .into_boxed_slice(),
+        })
     }
 }
 
@@ -122,9 +123,9 @@ where
     D: Digest,
 {
     fn sign_prehash(&self, prehash: &[u8]) -> signature::Result<Signature> {
-        sign_with_default_rng(&self.inner, &self.prefix, prehash)?
-            .as_slice()
-            .try_into()
+        Ok(Signature {
+            inner: sign_with_default_rng(&self.inner, &self.prefix, prehash)?.into_boxed_slice(),
+        })
     }
 }
 
@@ -142,14 +143,15 @@ where
     ) -> signature::Result<Signature> {
         let mut digest = D::default();
         f(&mut digest)?;
-        sign(
-            Some(rng),
-            &self.inner,
-            &self.prefix,
-            &digest.finalize_fixed(),
-        )?
-        .as_slice()
-        .try_into()
+        Ok(Signature {
+            inner: sign(
+                Some(rng),
+                &self.inner,
+                &self.prefix,
+                &digest.finalize_fixed(),
+            )?
+            .into_boxed_slice(),
+        })
     }
 }
 
@@ -177,9 +179,10 @@ where
     ) -> signature::Result<Signature> {
         let mut digest = D::new();
         msg.iter().for_each(|slice| digest.update(slice));
-        sign(Some(rng), &self.inner, &self.prefix, &digest.finalize())?
-            .as_slice()
-            .try_into()
+        Ok(Signature {
+            inner: sign(Some(rng), &self.inner, &self.prefix, &digest.finalize())?
+                .into_boxed_slice(),
+        })
     }
 }
 
@@ -199,9 +202,10 @@ where
     fn try_multipart_sign(&self, msg: &[&[u8]]) -> signature::Result<Signature> {
         let mut digest = D::new();
         msg.iter().for_each(|slice| digest.update(slice));
-        sign_with_default_rng(&self.inner, &self.prefix, &digest.finalize())?
-            .as_slice()
-            .try_into()
+        Ok(Signature {
+            inner: sign_with_default_rng(&self.inner, &self.prefix, &digest.finalize())?
+                .into_boxed_slice(),
+        })
     }
 }
 
