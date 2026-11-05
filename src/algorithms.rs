@@ -14,6 +14,7 @@
 
 mod mgf;
 
+pub(crate) mod blinding;
 pub(crate) mod generate;
 pub(crate) mod oaep;
 pub(crate) mod pad;

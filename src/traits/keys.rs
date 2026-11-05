@@ -57,6 +57,8 @@ pub trait PrivateKeyParts: PublicKeyParts {
     fn d(&self) -> &BoxedUint;
 
     /// Returns the prime factors as [`Odd`].
+    ///
+    /// Blinded non-CRT private operations require all factors to compute φ(n).
     fn primes(&self) -> &[Odd<BoxedUint>];
 
     /// Returns prime `p` if precomputed.

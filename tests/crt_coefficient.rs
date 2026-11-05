@@ -1,5 +1,7 @@
 //! Test explicit wide storage for unbalanced primes in both orders.
 
+#[cfg(feature = "hazmat")]
+use rand::rngs::ChaCha8Rng;
 use rsa::{
     BoxedUint, RsaPrivateKey,
     traits::{PrivateKeyParts, PublicKeyParts},
@@ -18,15 +20,18 @@ fn key_and_coefficient(reverse: bool) -> (RsaPrivateKey, BoxedUint) {
     let e = BoxedUint::from(65537u64);
     let d = BoxedUint::from(113429186379523348228037317453566814889u128);
     let primes = vec![BoxedUint::from(p), BoxedUint::from(q)];
-    // The default policy rejects unbalanced keys consistently on 32- and 64-bit machines.
+
+    // The default policy rejects unbalanced keys consistently on 32-bit and 64-bit machines.
     assert!(
         RsaPrivateKey::from_components(n.clone(), e.clone(), d.clone(), primes.clone()).is_err()
     );
+
     let key = RsaPrivateKey::from_components_with_wide_primes(n, e, d, primes)
         .expect("explicit wide key");
     for prime in key.primes() {
         assert_eq!(prime.bits_precision(), key.n().bits_precision());
     }
+
     assert_eq!(
         key.dp().expect("dp").bits_precision(),
         key.n().bits_precision()
@@ -35,6 +40,7 @@ fn key_and_coefficient(reverse: bool) -> (RsaPrivateKey, BoxedUint) {
         key.dq().expect("dq").bits_precision(),
         key.n().bits_precision()
     );
+
     (key, BoxedUint::from(expected))
 }
 
@@ -87,6 +93,10 @@ fn pkcs1_coefficient_wider_q() {
 #[test]
 #[cfg(feature = "hazmat")]
 fn wide_crt_matches_non_crt() {
+    use crypto_bigint::Resize;
+    use rand_core::SeedableRng;
+    let mut rng = ChaCha8Rng::from_seed([42; 32]);
+
     for reverse in [false, true] {
         let (key, _) = key_and_coefficient(reverse);
         let mut non_crt = key.clone();
@@ -95,14 +105,22 @@ fn wide_crt_matches_non_crt() {
         for c in [
             BoxedUint::zero_with_precision(bits),
             BoxedUint::one_with_precision(bits),
+            BoxedUint::from(42u64).resize_unchecked(bits),
+            key.primes()[0].as_ref().clone(),
             key.n().as_ref() - &BoxedUint::one(),
         ] {
-            let crt = rsa::hazmat::rsa_decrypt_and_check::<rand::rngs::ChaCha8Rng>(&key, None, &c)
-                .expect("CRT");
-            let reference =
-                rsa::hazmat::rsa_decrypt_and_check::<rand::rngs::ChaCha8Rng>(&non_crt, None, &c)
-                    .expect("non-CRT");
+            let crt =
+                rsa::hazmat::rsa_decrypt_and_check::<ChaCha8Rng>(&key, None, &c).expect("CRT");
+            let reference = rsa::hazmat::rsa_decrypt_and_check::<ChaCha8Rng>(&non_crt, None, &c)
+                .expect("non-CRT");
+
             assert_eq!(crt, reference);
+
+            for key in [&key, &non_crt] {
+                let blinded =
+                    rsa::hazmat::rsa_decrypt_and_check(key, Some(&mut rng), &c).expect("blinded");
+                assert_eq!(blinded, reference);
+            }
         }
     }
 }
