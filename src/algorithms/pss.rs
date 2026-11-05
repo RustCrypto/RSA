@@ -186,11 +186,16 @@ fn emsa_pss_verify_pre<'a>(
     }
 
     let em_len = em.len(); //(em_bits + 7) / 8;
-    if let Some(s_len) = s_len {
-        // 3. If emLen < hLen + sLen + 2, output "inconsistent" and stop.
-        if em_len < h_len + s_len + 2 {
-            return Err(Error::Verification);
-        }
+
+    // 3. If `emLen < hLen + sLen + 2`, output "inconsistent" and stop.
+    // Auto-detection still requires room for the digest, separator, and trailer.
+    let min_em_len = h_len
+        .checked_add(s_len.unwrap_or(0))
+        .and_then(|len| len.checked_add(2))
+        .ok_or(Error::Verification)?;
+
+    if em_len < min_em_len {
+        return Err(Error::Verification);
     }
 
     // 4. If the rightmost octet of EM does not have hexadecimal value
@@ -373,5 +378,56 @@ where
         Ok(())
     } else {
         Err(Error::Verification)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use sha2::Sha512;
+
+    #[test]
+    fn verify_rejects_short_em() {
+        let digest = Sha512::digest(b"test");
+        for em_len in 0usize..66 {
+            let em_bits = (em_len * 8).saturating_sub(1);
+            for salt_len in [None, Some(0)] {
+                let mut em = vec![0; em_len];
+                if let Some(trailer) = em.last_mut() {
+                    *trailer = 0xbc;
+                }
+                assert_eq!(
+                    emsa_pss_verify(&digest, &mut em, salt_len, &mut Sha512::new(), em_bits),
+                    Err(Error::Verification)
+                );
+                assert_eq!(
+                    emsa_pss_verify_digest::<Sha512>(&digest, &mut em, salt_len, em_bits),
+                    Err(Error::Verification)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn verify_minimum_em_with_empty_salt() {
+        let digest = Sha512::digest(b"test");
+        let em_bits = 66 * 8 - 1;
+        let em = emsa_pss_encode_digest::<Sha512>(&digest, em_bits, &[]).unwrap();
+        for salt_len in [None, Some(0)] {
+            assert_eq!(
+                emsa_pss_verify(
+                    &digest,
+                    &mut em.clone(),
+                    salt_len,
+                    &mut Sha512::new(),
+                    em_bits
+                ),
+                Ok(())
+            );
+            assert_eq!(
+                emsa_pss_verify_digest::<Sha512>(&digest, &mut em.clone(), salt_len, em_bits),
+                Ok(())
+            );
+        }
     }
 }
