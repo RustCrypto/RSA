@@ -17,7 +17,7 @@ use crate::traits::{PaddingScheme, SignatureScheme};
 use crate::{RsaPublicKey, public_key};
 
 use crypto_bigint::{
-    BoxedUint, ConcatenatingMul, NonZero, Odd, Resize,
+    BoxedUint, Choice, ConcatenatingMul, CtEq, CtLt, NonZero, Odd, Resize,
     modular::{BoxedMontyForm, BoxedMontyParams},
 };
 use rand_core::CryptoRng;
@@ -350,12 +350,12 @@ impl RsaPrivateKey {
     /// - `n`: RSA modulus
     /// - `e`: public exponent (i.e. encrypting exponent)
     /// - `d`: private exponent (i.e. decrypting exponent)
-    /// - `primes`: prime factors of `n`: typically two primes `p` and `q`. More than two primes can
-    ///   be provided for multiprime RSA, however this is generally not recommended. If no `primes`
-    ///   are provided, a prime factor recovery algorithm will be employed to attempt to recover the
-    ///   factors (as described in [NIST SP 800-56B Revision 2] Appendix C.2). This algorithm only
-    ///   works if there are just two prime factors `p` and `q` (as opposed to multiprime), and `e`
-    ///   is between 2^16 and 2^256.
+    /// - `primes`: distinct prime factors of `n`: typically two primes `p` and `q`. More than two
+    ///   primes can be provided for multiprime RSA, however this is generally not recommended.
+    ///   If no `primes` are provided, a prime factor recovery algorithm will be employed to attempt
+    ///   to recover the factors (as described in [NIST SP 800-56B Revision 2] Appendix C.2).
+    ///   This algorithm only works if there are just two prime factors `p` and `q` (as opposed to
+    ///   multiprime), and `e` is between 2^16 and 2^256.
     ///
     /// For two-prime keys, each prime must fit in `ceil(bit_length(n) / 2)` bits. Both primes
     /// and their CRT exponents use this public-derived storage width, rounded up to whole limbs.
@@ -417,7 +417,9 @@ impl RsaPrivateKey {
         q: BoxedUint,
         public_exponent: BoxedUint,
     ) -> Result<RsaPrivateKey> {
-        if p == q {
+        // Reject values which would make private-exponent derivation underflow or divide by zero.
+        let two = BoxedUint::from(2u64);
+        if (p.ct_lt(&two) | q.ct_lt(&two)).to_bool() {
             return Err(Error::InvalidPrime);
         }
 
@@ -442,13 +444,14 @@ impl RsaPrivateKey {
             return Err(Error::NprimesTooSmall);
         }
 
-        // Makes sure that the primes are pairwise unequal.
-        for (i, prime1) in primes.iter().enumerate() {
-            for prime2 in primes.iter().take(i) {
-                if prime1 == prime2 {
-                    return Err(Error::InvalidPrime);
-                }
-            }
+        // Reject values which would make private-exponent derivation underflow or divide by zero.
+        let two = BoxedUint::from(2u64);
+        let invalid_primes = primes
+            .iter()
+            .fold(Choice::FALSE, |invalid, p| invalid | p.ct_lt(&two));
+
+        if invalid_primes.to_bool() {
+            return Err(Error::InvalidPrime);
         }
 
         let n = compute_modulus(&primes);
@@ -662,15 +665,25 @@ fn validate_private_key_parts(key: &RsaPrivateKey) -> Result<()> {
 
     // Check that Πprimes == n.
     let mut m = BoxedUint::one_with_precision(key.pubkey_components.n.bits_precision());
-    let one = BoxedUint::one();
-    for prime in &key.primes {
-        // Any primes ≤ 1 will cause divide-by-zero panics later.
-        if prime.as_ref() <= &one {
-            return Err(Error::InvalidPrime);
+    let two = BoxedUint::from(2u64);
+    let mut invalid_primes = Choice::FALSE;
+    for (i, prime) in key.primes.iter().enumerate() {
+        // Any primes <= 1 will cause divide-by-zero panics later.
+        invalid_primes |= prime.as_ref().ct_lt(&two);
+
+        // RFC 8017 §3.2 requires distinct prime factors, including for multiprime RSA.
+        for other in &key.primes[..i] {
+            invalid_primes |= prime.ct_eq(other);
         }
         m = m.wrapping_mul(prime.as_ref());
     }
-    if m != *key.pubkey_components.n {
+
+    // Reveal only whether the factors are invalid, not which factor or pair failed.
+    if invalid_primes.to_bool() {
+        return Err(Error::InvalidPrime);
+    }
+
+    if m.ct_ne(key.pubkey_components.n.as_ref()).to_bool() {
         return Err(Error::InvalidModulus);
     }
 
@@ -684,7 +697,7 @@ fn validate_private_key_parts(key: &RsaPrivateKey) -> Result<()> {
     for prime in &key.primes {
         let x = NonZero::new(prime.wrapping_sub(BoxedUint::one())).unwrap();
         let congruence = de.rem(&x);
-        if !bool::from(congruence.is_one()) {
+        if !congruence.is_one().to_bool() {
             return Err(Error::InvalidExponent);
         }
     }
@@ -745,6 +758,130 @@ mod tests {
 
     #[cfg(feature = "encoding")]
     use pkcs8::DecodePrivateKey;
+
+    #[test]
+    fn repeated_prime_factors() {
+        // Each d satisfies e*d = 1 mod (p-1) for every supplied factor, so the exponent
+        // checks alone cannot reject these keys. Include duplicates in every pair of a
+        // three-factor key and a duplicate which does not involve either CRT factor.
+        for (factors, d) in [
+            (&[61u64, 61][..], 53u64),
+            (&[61, 61, 53][..], 413),
+            (&[61, 53, 61][..], 413),
+            (&[61, 53, 53][..], 413),
+            (&[61, 53, 47, 47][..], 10553),
+        ] {
+            // Different input precisions must not disguise equal factors.
+            let primes: Vec<_> = factors
+                .iter()
+                .zip([64, 128, 192, 256])
+                .map(|(&p, bits)| BoxedUint::from(p).resize_unchecked(bits))
+                .collect();
+            let n = compute_modulus(&primes).get();
+            let e = BoxedUint::from(17u64);
+            let d = BoxedUint::from(d);
+            let key = RsaPrivateKey::from_components_inner(
+                n.clone(),
+                e.clone(),
+                d.clone(),
+                primes.clone(),
+                false,
+            )
+            .unwrap();
+            assert_eq!(key.validate(), Err(Error::InvalidPrime));
+            assert_eq!(
+                RsaPrivateKey::from_components(n.clone(), e.clone(), d.clone(), primes.clone()),
+                Err(Error::InvalidPrime)
+            );
+            assert_eq!(
+                RsaPrivateKey::from_components_with_wide_primes(
+                    n.clone(),
+                    e.clone(),
+                    d.clone(),
+                    primes.clone(),
+                ),
+                Err(Error::InvalidPrime)
+            );
+            #[cfg(feature = "hazmat")]
+            assert_eq!(
+                RsaPrivateKey::from_components_with_large_exponent(n, e.clone(), d, primes.clone()),
+                Err(Error::InvalidPrime)
+            );
+            if primes.len() == 2 {
+                assert_eq!(
+                    RsaPrivateKey::from_p_q(primes[0].clone(), primes[1].clone(), e.clone()),
+                    Err(Error::InvalidPrime)
+                );
+            }
+            assert_eq!(
+                RsaPrivateKey::from_primes(primes, e),
+                Err(Error::InvalidPrime)
+            );
+        }
+    }
+
+    #[test]
+    fn invalid_factors_before_exponent_derivation() {
+        for p in [0u64, 1] {
+            for q in [0u64, 1, 61] {
+                for (p, q) in [(p, q), (q, p)] {
+                    let p = BoxedUint::from(p);
+                    let q = BoxedUint::from(q);
+                    let e = BoxedUint::from(17u64);
+                    assert_eq!(
+                        RsaPrivateKey::from_p_q(p.clone(), q.clone(), e.clone()),
+                        Err(Error::InvalidPrime)
+                    );
+                    assert_eq!(
+                        RsaPrivateKey::from_primes(vec![p, q], e),
+                        Err(Error::InvalidPrime)
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn key_generation_rejects_repeated_factors() {
+        use core::{convert::Infallible, result::Result};
+        use rand_core::{TryCryptoRng, TryRng};
+
+        // Repeating entropy produces the same prime twice. Bound the entropy budget so retrying
+        // forever on this broken RNG fails the test instead of hanging it.
+        struct RepeatingRng(usize);
+
+        impl TryRng for RepeatingRng {
+            type Error = Infallible;
+
+            fn try_next_u32(&mut self) -> Result<u32, Self::Error> {
+                let mut bytes = [0; 4];
+                self.try_fill_bytes(&mut bytes)?;
+                Ok(u32::from_le_bytes(bytes))
+            }
+
+            fn try_next_u64(&mut self) -> Result<u64, Self::Error> {
+                let mut bytes = [0; 8];
+                self.try_fill_bytes(&mut bytes)?;
+                Ok(u64::from_le_bytes(bytes))
+            }
+
+            fn try_fill_bytes(&mut self, bytes: &mut [u8]) -> Result<(), Self::Error> {
+                self.0 = self
+                    .0
+                    .checked_sub(bytes.len())
+                    .expect("key generation retried");
+                bytes.fill(0xaa);
+                Ok(())
+            }
+        }
+
+        impl TryCryptoRng for RepeatingRng {}
+
+        assert_eq!(
+            RsaPrivateKey::new(&mut RepeatingRng(128), 1024),
+            Err(Error::InvalidPrime)
+        );
+    }
 
     #[test]
     fn private_exponent_range_and_identity() {
