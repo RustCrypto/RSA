@@ -228,8 +228,6 @@ fn decrypt_inner<MGF: FnMut(&mut [u8], &mut [u8])>(
         return Err(Error::Decryption);
     }
 
-    let first_byte_is_zero = em[0].ct_eq(&0u8);
-
     let (_, payload) = em.split_at_mut(1);
     let (seed, db) = payload.split_at_mut(h_size);
 
@@ -255,8 +253,90 @@ fn decrypt_inner<MGF: FnMut(&mut [u8], &mut [u8])>(
         nonzero_before_one |= looking_for_index & !equals0;
     }
 
-    let valid = first_byte_is_zero & hash_are_equal & !nonzero_before_one & !looking_for_index;
+    let valid = hash_are_equal & !nonzero_before_one & !looking_for_index;
 
     #[allow(clippy::cast_possible_truncation, reason = "TODO")]
     Ok(CtOption::new(index + 2 + (h_size * 2) as u32, valid))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand::rngs::ChaCha8Rng;
+    use rand_core::SeedableRng;
+    use sha1::Sha1;
+    use sha2::Sha256;
+
+    #[test]
+    fn decrypt_ignores_first_octet() {
+        let mut rng = ChaCha8Rng::from_seed([42; 32]);
+        let k = 128;
+        let label = b"label";
+
+        // Empty, short, and maximum-length messages exercise both ends of DB.
+        for msg_len in [0, 1, k - 2 * <Sha256 as Digest>::output_size() - 2] {
+            let msg = vec![0x42; msg_len];
+            let em = oaep_encrypt_digest::<_, Sha256, Sha1>(
+                &mut rng,
+                &msg,
+                Some(label.as_slice().into()),
+                k,
+            )
+            .unwrap();
+            assert_eq!(em[0], 0);
+
+            for first_octet in 0..=u8::MAX {
+                let mut encoded = em.to_vec();
+                encoded[0] = first_octet;
+
+                assert_eq!(
+                    oaep_decrypt(
+                        &mut encoded.clone(),
+                        &mut Sha256::new(),
+                        &mut Sha1::new(),
+                        Some(label.as_slice().into()),
+                        k,
+                    ),
+                    Ok(msg.clone()),
+                );
+                assert_eq!(
+                    oaep_decrypt_digest::<Sha256, Sha1>(
+                        &mut encoded,
+                        Some(label.as_slice().into()),
+                        k,
+                    ),
+                    Ok(msg.clone()),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn decrypt_rejects_invalid_db() {
+        let h_size = <Sha256 as Digest>::output_size();
+        let p_hash = Sha256::digest(b"");
+        let mut em = [0u8; 128];
+        em[1 + h_size..1 + 2 * h_size].copy_from_slice(&p_hash);
+        let separator = em.len() - 1;
+        em[separator] = 1;
+
+        for first_octet in [0, 1, 0xff] {
+            em[0] = first_octet;
+
+            // Wrong label hash, nonzero PS, missing separator, wrong separator.
+            for (index, value) in [
+                (1 + h_size, p_hash[0] ^ 1),
+                (1 + 2 * h_size, 2),
+                (separator, 0),
+                (separator, 2),
+            ] {
+                let mut invalid = em;
+                invalid[index] = value;
+                let result =
+                    decrypt_inner(&mut invalid, h_size, &p_hash, em.len(), |_, _| {}).unwrap();
+
+                assert!(result.is_none().to_bool());
+            }
+        }
+    }
 }
