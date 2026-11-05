@@ -17,7 +17,7 @@ use crate::traits::{PaddingScheme, SignatureScheme};
 use crate::{RsaPublicKey, public_key};
 
 use crypto_bigint::{
-    BoxedUint, Choice, ConcatenatingMul, CtEq, CtLt, NonZero, Odd, Resize,
+    BoxedUint, Choice, ConcatenatingMul, CtEq, CtLt, Integer, NonZero, Odd, Resize,
     modular::{BoxedMontyForm, BoxedMontyParams},
 };
 use rand_core::CryptoRng;
@@ -417,9 +417,9 @@ impl RsaPrivateKey {
         q: BoxedUint,
         public_exponent: BoxedUint,
     ) -> Result<RsaPrivateKey> {
-        // Reject values which would make private-exponent derivation underflow or divide by zero.
+        // RSA factors must be odd and greater than one. Check before deriving n or d.
         let two = BoxedUint::from(2u64);
-        if (p.ct_lt(&two) | q.ct_lt(&two)).to_bool() {
+        if (p.ct_lt(&two) | q.ct_lt(&two) | !p.is_odd() | !q.is_odd()).to_bool() {
             return Err(Error::InvalidPrime);
         }
 
@@ -444,11 +444,11 @@ impl RsaPrivateKey {
             return Err(Error::NprimesTooSmall);
         }
 
-        // Reject values which would make private-exponent derivation underflow or divide by zero.
+        // RSA factors must be odd and greater than one. Check before deriving n or d.
         let two = BoxedUint::from(2u64);
-        let invalid_primes = primes
-            .iter()
-            .fold(Choice::FALSE, |invalid, p| invalid | p.ct_lt(&two));
+        let invalid_primes = primes.iter().fold(Choice::FALSE, |invalid, p| {
+            invalid | p.ct_lt(&two) | !p.is_odd()
+        });
 
         if invalid_primes.to_bool() {
             return Err(Error::InvalidPrime);
@@ -822,8 +822,8 @@ mod tests {
 
     #[test]
     fn invalid_factors_before_exponent_derivation() {
-        for p in [0u64, 1] {
-            for q in [0u64, 1, 61] {
+        for p in [0u64, 1, 2, 4] {
+            for q in [0u64, 1, 2, 4, 61] {
                 for (p, q) in [(p, q), (q, p)] {
                     let p = BoxedUint::from(p);
                     let q = BoxedUint::from(q);
@@ -837,6 +837,16 @@ mod tests {
                         Err(Error::InvalidPrime)
                     );
                 }
+            }
+
+            // Check every position in a multiprime key, including beyond the first two factors.
+            for i in 0..3 {
+                let mut primes = vec![61u64.into(), 53u64.into(), 47u64.into()];
+                primes[i] = BoxedUint::from(p);
+                assert_eq!(
+                    RsaPrivateKey::from_primes(primes, BoxedUint::from(17u64)),
+                    Err(Error::InvalidPrime)
+                );
             }
         }
     }
