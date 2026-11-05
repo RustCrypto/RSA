@@ -5,7 +5,11 @@
 extern crate alloc;
 
 mod allocator;
+#[allow(dead_code)]
+#[path = "../../../src/algorithms/blinding.rs"]
+mod blinding;
 mod driver;
+mod exponent_blinding;
 mod pkcs1v15;
 #[allow(dead_code)]
 #[path = "../../../src/algorithms/pkcs1v15/selection.rs"]
