@@ -10,6 +10,7 @@ mod allocator;
 mod blinding;
 mod driver;
 mod exponent_blinding;
+mod modulus_blinding;
 mod pkcs1v15;
 #[allow(dead_code)]
 #[path = "../../../src/algorithms/pkcs1v15/selection.rs"]
