@@ -64,7 +64,7 @@ You can follow our work on constant-time hardening in [#711].
 
 Users are adviced to migrate to 0.10 to avoid the discovered side channels.
 
-## ⚠️S PCKS#1 1.5 Warning
+## ⚠️ PCKS#1 1.5 Warning
 
 Additionally legacy PKCS#1 1.5 implementations, including the implementation of
 it within this crate, has seen a long running source of Bleichenbacher and
