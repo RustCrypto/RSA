@@ -3,13 +3,10 @@
 #![allow(clippy::integer_division_remainder_used, reason = "TODO")]
 
 use alloc::vec::Vec;
-use crypto_bigint::{BoxedUint, Odd};
-use crypto_primes::{
-    Flavor,
-    hazmat::{SetBits, SmallFactorsSieveFactory},
-    is_prime, sieve_and_find,
-};
-use rand_core::CryptoRng;
+use core::num::NonZeroU32;
+use crypto_bigint::{BitOps, BoxedUint, Odd, RandomBits, RandomBitsError};
+use crypto_primes::{Flavor, hazmat::SmallFactorsSieve, is_prime};
+use rand_core::TryCryptoRng;
 
 use crate::{
     algorithms::rsa::{compute_modulus, compute_private_exponent_euler_totient},
@@ -35,7 +32,7 @@ pub struct RsaPrivateKeyComponents {
 ///
 /// [1]: https://patents.google.com/patent/US4405829A/en
 /// [2]: http://www.cacr.math.uwaterloo.ca/techreports/2006/cacr2006-16.pdf
-pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRng + ?Sized>(
+pub(crate) fn generate_multi_prime_key_with_exp<R: TryCryptoRng + ?Sized>(
     rng: &mut R,
     nprimes: usize,
     bit_size: usize,
@@ -89,7 +86,7 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRng + ?Sized>(
         #[allow(clippy::cast_possible_truncation, reason = "TODO")]
         for (i, prime) in primes.iter_mut().enumerate() {
             let bits = (todo / (nprimes - i)) as u32;
-            *prime = generate_prime_with_rng(rng, bits);
+            *prime = generate_prime_with_rng(rng, bits)?;
             todo -= prime.bits() as usize;
         }
 
@@ -117,15 +114,33 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: CryptoRng + ?Sized>(
     })
 }
 
-fn generate_prime_with_rng<R: CryptoRng + ?Sized>(rng: &mut R, bit_length: u32) -> BoxedUint {
-    let factory = SmallFactorsSieveFactory::new(Flavor::Any, bit_length, SetBits::TwoMsb)
-        .unwrap_or_else(|err| panic!("Error creating the sieve: {err}"));
+fn generate_prime_with_rng<R: TryCryptoRng + ?Sized>(
+    rng: &mut R,
+    bit_length: u32,
+) -> Result<BoxedUint> {
+    let bit_length = NonZeroU32::new(bit_length)
+        .filter(|bits| bits.get() >= 2)
+        .ok_or(Error::InvalidArguments)?;
 
-    sieve_and_find(rng, factory, |_rng, candidate| {
-        is_prime(Flavor::Any, candidate)
-    })
-    .unwrap_or_else(|err| panic!("Error generating random candidates: {}", err))
-    .expect("will produce a result eventually")
+    loop {
+        // Sample directly because `SmallFactorsSieveFactory` requires an infallible RNG.
+        let mut start =
+            BoxedUint::try_random_bits(rng, bit_length.get()).map_err(|err| match err {
+                RandomBitsError::RandCore(_) => Error::Rng,
+                _ => Error::Internal, // The precision is determined by the requested bit length.
+            })?;
+
+        // Match `SetBits::TwoMsb`: make the candidate odd and set its top two bits.
+        start.set_bit_vartime(0, true);
+        start.set_bit_vartime(bit_length.get() - 1, true);
+        start.set_bit_vartime(bit_length.get() - 2, true);
+
+        let mut sieve =
+            SmallFactorsSieve::new(start, bit_length, false).map_err(|_| Error::Internal)?;
+        if let Some(prime) = sieve.find(|candidate| is_prime(Flavor::Any, candidate)) {
+            return Ok(prime);
+        }
+    }
 }
 
 #[cfg(test)]

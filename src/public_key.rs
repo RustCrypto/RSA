@@ -7,7 +7,7 @@ use core::hash::{Hash, Hasher};
 use core::ops::RangeInclusive;
 use crypto_bigint::modular::BoxedMontyParams;
 use crypto_bigint::{BoxedUint, Integer, NonZero, Odd};
-use rand_core::CryptoRng;
+use rand_core::TryCryptoRng;
 
 #[cfg(feature = "serde")]
 use {
@@ -61,7 +61,7 @@ impl RsaPublicKey {
 
     /// Encrypt the given message.
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
-    pub fn encrypt<R: CryptoRng + ?Sized, P: PaddingScheme>(
+    pub fn encrypt<R: TryCryptoRng + ?Sized, P: PaddingScheme>(
         &self,
         rng: &mut R,
         padding: P,

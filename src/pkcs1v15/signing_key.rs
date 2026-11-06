@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use const_oid::AssociatedOid;
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutput, HashMarker, Update};
-use rand_core::{CryptoRng, TryCryptoRng};
+use rand_core::TryCryptoRng;
 use signature::{
     DigestSigner, Keypair, MultipartSigner, RandomizedDigestSigner, RandomizedMultipartSigner,
     RandomizedSigner, Signer, hazmat::PrehashSigner,
@@ -59,7 +59,7 @@ where
 
     /// Generate a new signing key with a prefix for the digest `D`.
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
-    pub fn random<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random<R: TryCryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
             prefix: pkcs1v15_generate_prefix::<D>(),
@@ -88,7 +88,10 @@ where
 
     /// Generate a new signing key with an empty prefix.
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
-    pub fn random_unprefixed<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random_unprefixed<R: TryCryptoRng + ?Sized>(
+        rng: &mut R,
+        bit_size: usize,
+    ) -> Result<Self> {
         Ok(Self {
             inner: RsaPrivateKey::new(rng, bit_size)?,
             prefix: Vec::new(),

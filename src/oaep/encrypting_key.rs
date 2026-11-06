@@ -3,7 +3,7 @@ use crate::{Result, RsaPublicKey, traits::RandomizedEncryptor};
 use alloc::{boxed::Box, vec::Vec};
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset};
-use rand_core::CryptoRng;
+use rand_core::TryCryptoRng;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
@@ -55,7 +55,11 @@ where
     D: Digest,
     MGD: Digest + FixedOutputReset,
 {
-    fn encrypt_with_rng<R: CryptoRng + ?Sized>(&self, rng: &mut R, msg: &[u8]) -> Result<Vec<u8>> {
+    fn encrypt_with_rng<R: TryCryptoRng + ?Sized>(
+        &self,
+        rng: &mut R,
+        msg: &[u8],
+    ) -> Result<Vec<u8>> {
         encrypt_digest::<_, D, MGD>(rng, &self.inner, msg, self.label.clone())
     }
 }

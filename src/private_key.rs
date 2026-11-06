@@ -20,7 +20,7 @@ use crypto_bigint::{
     BoxedUint, Choice, ConcatenatingMul, CtEq, CtLt, Integer, NonZero, Odd, Resize,
     modular::{BoxedMontyForm, BoxedMontyParams},
 };
-use rand_core::CryptoRng;
+use rand_core::TryCryptoRng;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 #[cfg(feature = "serde")]
@@ -148,7 +148,8 @@ impl RsaPrivateKey {
     ///
     /// # Errors
     /// - If `bit_size` is lower than the minimum 1024-bits.
-    pub fn new<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    /// - If the RNG fails, returns [`Error::Rng`].
+    pub fn new<R: TryCryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Self::new_with_exp(rng, bit_size, Self::EXP.into())
     }
 
@@ -161,7 +162,7 @@ impl RsaPrivateKey {
     /// </div>
     #[cfg(feature = "hazmat")]
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
-    pub fn new_unchecked<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn new_unchecked<R: TryCryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Self::new_with_exp_unchecked(rng, bit_size, Self::EXP.into())
     }
 
@@ -170,7 +171,7 @@ impl RsaPrivateKey {
     ///
     /// Unless you have specific needs, you should use [`RsaPrivateKey::new`] instead.
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
-    pub fn new_with_exp<R: CryptoRng + ?Sized>(
+    pub fn new_with_exp<R: TryCryptoRng + ?Sized>(
         rng: &mut R,
         bit_size: usize,
         exp: BoxedUint,
@@ -200,7 +201,7 @@ impl RsaPrivateKey {
     /// </div>
     #[cfg(feature = "hazmat")]
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
-    pub fn new_with_exp_unchecked<R: CryptoRng + ?Sized>(
+    pub fn new_with_exp_unchecked<R: TryCryptoRng + ?Sized>(
         rng: &mut R,
         bit_size: usize,
         exp: BoxedUint,
@@ -572,7 +573,7 @@ impl RsaPrivateKey {
     /// [`Pkcs1v15Encrypt`][crate::Pkcs1v15Encrypt] has the same implicit-rejection
     /// behavior as [`Self::decrypt`], independently of the blinding randomness.
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
-    pub fn decrypt_blinded<R: CryptoRng + ?Sized, P: PaddingScheme>(
+    pub fn decrypt_blinded<R: TryCryptoRng + ?Sized, P: PaddingScheme>(
         &self,
         rng: &mut R,
         padding: P,
@@ -608,7 +609,7 @@ impl RsaPrivateKey {
     ///   [`Pss::new`][`crate::Pss::new`] for a standard RSASSA-PSS signature with
     ///   RSA base blinding enabled by default.
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
-    pub fn sign_with_rng<R: CryptoRng + ?Sized, S: SignatureScheme>(
+    pub fn sign_with_rng<R: TryCryptoRng + ?Sized, S: SignatureScheme>(
         &self,
         rng: &mut R,
         padding: S,
