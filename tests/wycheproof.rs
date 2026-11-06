@@ -9,7 +9,7 @@ use std::{fmt::Debug, fs::File};
 
 use pkcs1::DecodeRsaPublicKey;
 use pkcs8::DecodePrivateKey;
-use rsa::{Oaep, RsaPrivateKey, RsaPublicKey, pkcs1v15, pss, signature::Verifier};
+use rsa::{Oaep, RsaPrivateKey, RsaPublicKey, pss, signature::Verifier};
 use rstest::rstest;
 use serde::Deserialize;
 use sha1::Sha1;
@@ -17,6 +17,9 @@ use sha2::{
     Sha224, Sha256, Sha384, Sha512, Sha512_224, Sha512_256,
     digest::{Digest, FixedOutputReset},
 };
+
+#[cfg(feature = "pkcs1v15")]
+use rsa::pkcs1v15;
 
 #[derive(Deserialize, Debug)]
 struct TestFile {
@@ -154,6 +157,7 @@ impl Drop for Summary {
 // #[case("rsa_signature_8192_sha256_test.json")] TODO: needs disabling of maxsize
 // #[case("rsa_signature_8192_sha384_test.json")] TODO: needs disabling of maxsize
 // #[case("rsa_signature_8192_sha512_test.json")] TODO: needs disabling of maxsize
+#[cfg(feature = "pkcs1v15")]
 fn test_rsa_pkcs1_verify(#[case] file: &str) {
     let path = format!("thirdparty/wycheproof/testvectors_v1/{file}");
     let data_file = File::open(&path)

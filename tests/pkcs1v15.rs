@@ -1,4 +1,5 @@
-//! PKCS#1 v1.5 tests.
+//! PKCS #1 v1.5 tests
+#![cfg(feature = "pkcs1v15")]
 
 #[cfg(feature = "encoding")]
 #[test]

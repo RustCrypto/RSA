@@ -5,20 +5,25 @@
 use crypto_bigint::{BoxedUint, CtEq};
 use hex_literal::hex;
 use rsa::{
-    RsaPrivateKey, RsaPublicKey, pkcs1v15,
+    RsaPrivateKey, RsaPublicKey,
     pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey},
     pss,
     traits::{PrivateKeyParts, PublicKeyParts},
 };
 use sha2::Sha256;
 
+#[cfg(feature = "pkcs1v15")]
+use rsa::pkcs1v15;
+
 #[cfg(feature = "encoding")]
 use rsa::pkcs8::LineEnding;
 
 /// RSA-2048 PKCS#8 private key encoded as ASN.1 DER
+#[cfg(feature = "pkcs1v15")]
 const RSA_2048_PRIV_DER: &[u8] = include_bytes!("examples/pkcs8/rsa2048-priv.der");
 
 /// RSA-2048 `SubjectPublicKeyInfo` encoded as ASN.1 DER
+#[cfg(feature = "pkcs1v15")]
 const RSA_2048_PUB_DER: &[u8] = include_bytes!("examples/pkcs8/rsa2048-pub.der");
 
 /// RSA-2048 PKCS#8 private key encoded as PEM
@@ -36,6 +41,7 @@ const RSA_2048_PSS_PRIV_DER: &[u8] = include_bytes!("examples/pkcs8/rsa2048-rfc9
 const RSA_2048_PSS_PUB_DER: &[u8] = include_bytes!("examples/pkcs8/rsa2048-rfc9421-pub.der");
 
 #[test]
+#[cfg(feature = "pkcs1v15")]
 fn decode_rsa2048_priv_der() {
     let key = RsaPrivateKey::from_pkcs8_der(RSA_2048_PRIV_DER).unwrap();
 
@@ -96,6 +102,7 @@ fn decode_rsa2048_priv_der() {
 }
 
 #[test]
+#[cfg(feature = "pkcs1v15")]
 fn decode_rsa2048_pub_der() {
     let key = RsaPublicKey::from_public_key_der(RSA_2048_PUB_DER).unwrap();
 
@@ -203,6 +210,7 @@ fn decode_rsa2048_pss_pub_der() {
 }
 
 #[test]
+#[cfg(feature = "pkcs1v15")]
 fn encode_rsa2048_priv_der() {
     let key = RsaPrivateKey::from_pkcs8_der(RSA_2048_PRIV_DER).unwrap();
     let der = key.to_pkcs8_der().unwrap();
@@ -214,6 +222,7 @@ fn encode_rsa2048_priv_der() {
 }
 
 #[test]
+#[cfg(feature = "pkcs1v15")]
 fn encode_rsa2048_pub_der() {
     let key = RsaPublicKey::from_public_key_der(RSA_2048_PUB_DER).unwrap();
     let der = key.to_public_key_der().unwrap();
@@ -226,7 +235,7 @@ fn encode_rsa2048_pub_der() {
 }
 
 #[test]
-#[cfg(feature = "encoding")]
+#[cfg(all(feature = "pkcs1v15", feature = "encoding"))]
 fn decode_rsa2048_priv_pem() {
     let key = RsaPrivateKey::from_pkcs8_pem(RSA_2048_PRIV_PEM).unwrap();
 
@@ -287,7 +296,7 @@ fn decode_rsa2048_priv_pem() {
 }
 
 #[test]
-#[cfg(feature = "encoding")]
+#[cfg(all(feature = "pkcs1v15", feature = "encoding"))]
 fn decode_rsa2048_pub_pem() {
     let key = RsaPublicKey::from_public_key_pem(RSA_2048_PUB_PEM).unwrap();
 

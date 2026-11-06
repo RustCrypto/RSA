@@ -1,15 +1,20 @@
 //! Property-based tests.
 
-#![cfg(feature = "hazmat")]
+// TODO(tarcieri) item here for PSS
+//#![cfg(feature = "hazmat")]
+#![cfg(all(feature = "pkcs1v15", feature = "hazmat"))]
 
 use proptest::prelude::*;
 use rand::rngs::ChaCha8Rng;
 use rand_core::SeedableRng;
 use rsa::{
-    RsaPrivateKey, pkcs1v15,
+    RsaPrivateKey,
     signature::{Keypair, SignatureEncoding, Signer, Verifier},
 };
 use sha2::Sha256;
+
+#[cfg(feature = "pkcs1v15")]
+use rsa::pkcs1v15;
 
 prop_compose! {
     // WARNING: do *NOT* copy and paste this code. It's insecure and optimized for test speed.
@@ -21,6 +26,7 @@ prop_compose! {
 
 proptest! {
     #[test]
+    #[cfg(feature = "pkcs1v15")]
     fn pkcs1v15_sign_roundtrip(private_key in private_key(), msg in any::<Vec<u8>>()) {
         let signing_key = pkcs1v15::SigningKey::<Sha256>::new(private_key);
         let signature_bytes = signing_key.sign(&msg).to_bytes();

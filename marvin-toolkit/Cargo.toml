@@ -9,4 +9,4 @@ publish = false
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 rand = { workspace = true }
-rsa = { path = ".." }
+rsa = { path = "..", features = ["pkcs1v15"] }
