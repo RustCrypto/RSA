@@ -113,7 +113,7 @@ unused_lifetimes = "warn"
 unused_qualifications = "warn"
 
 [package.metadata.docs.rs]
-features = ["std", "serde", "hazmat"]
+all-features = true
 
 [profile.dev]
 opt-level = 2
