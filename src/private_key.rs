@@ -4,7 +4,7 @@ use alloc::vec::Vec;
 use core::fmt;
 use core::hash::{Hash, Hasher};
 
-use crate::algorithms::generate::generate_multi_prime_key_with_exp;
+use crate::algorithms::generate::{generate_multi_prime_key_with_exp, generate_prime_with_rng};
 use crate::algorithms::rsa::{
     compute_modulus, compute_private_exponent_carmicheal, compute_private_exponent_euler_totient,
     recover_primes, to_monty,
@@ -14,7 +14,7 @@ use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::traits::keys::{CrtValue, PrivateKeyParts, PublicKeyParts};
 use crate::traits::{PaddingScheme, SignatureScheme};
-use crate::{RsaPublicKey, public_key};
+use crate::{Generate, RsaPublicKey, public_key};
 
 use crypto_bigint::{
     BoxedUint, Choice, ConcatenatingMul, CtEq, CtLt, Integer, NonZero, Odd, Resize,
@@ -141,6 +141,12 @@ impl PublicKeyParts for RsaPrivateKey {
 }
 
 impl RsaPrivateKey {
+    /// Default modulus size in bits used by [`Generate`].
+    ///
+    /// A 3072-bit RSA modulus provides an estimated 128-bit security strength according to
+    /// [NIST SP 800-57 Part 1 Rev. 5, Table 2](https://doi.org/10.6028/NIST.SP.800-57pt1r5).
+    pub const DEFAULT_BITS: usize = 3072;
+
     /// Default exponent for RSA keys.
     const EXP: u64 = 65537;
 
@@ -616,6 +622,30 @@ impl RsaPrivateKey {
         digest_in: &[u8],
     ) -> Result<Vec<u8>> {
         padding.sign(Some(rng), self, digest_in)
+    }
+}
+
+/// Generate a key with a [`Self::DEFAULT_BITS`]-bit modulus and public exponent 65537.
+impl Generate for RsaPrivateKey {
+    fn try_generate_from_rng<R: TryCryptoRng + ?Sized>(
+        rng: &mut R,
+    ) -> core::result::Result<Self, R::Error> {
+        let Ok(prime_bits) = u32::try_from(Self::DEFAULT_BITS.div_euclid(2)) else {
+            unreachable!("default prime size fits in u32");
+        };
+
+        loop {
+            // Setting the top two bits of both primes ensures a full-size modulus.
+            let p = generate_prime_with_rng(rng, prime_bits)?;
+            let q = generate_prime_with_rng(rng, prime_bits)?;
+
+            match Self::from_primes(vec![p, q], Self::EXP.into()) {
+                Ok(key) => return Ok(key),
+                // Retry if the primes coincide or the public exponent is not invertible.
+                Err(Error::InvalidPrime) => continue,
+                Err(err) => unreachable!("invalid generated RSA key: {err}"),
+            }
+        }
     }
 }
 

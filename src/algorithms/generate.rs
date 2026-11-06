@@ -86,7 +86,7 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: TryCryptoRng + ?Sized>(
         #[allow(clippy::cast_possible_truncation, reason = "TODO")]
         for (i, prime) in primes.iter_mut().enumerate() {
             let bits = (todo / (nprimes - i)) as u32;
-            *prime = generate_prime_with_rng(rng, bits)?;
+            *prime = generate_prime_with_rng(rng, bits).map_err(|_| Error::Rng)?;
             todo -= prime.bits() as usize;
         }
 
@@ -114,20 +114,25 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: TryCryptoRng + ?Sized>(
     })
 }
 
-fn generate_prime_with_rng<R: TryCryptoRng + ?Sized>(
+/// Generate an odd prime with its top two bits set.
+///
+/// # Panics
+/// Panics if `bit_length` is less than two.
+pub(crate) fn generate_prime_with_rng<R: TryCryptoRng + ?Sized>(
     rng: &mut R,
     bit_length: u32,
-) -> Result<BoxedUint> {
+) -> core::result::Result<BoxedUint, R::Error> {
     let bit_length = NonZeroU32::new(bit_length)
         .filter(|bits| bits.get() >= 2)
-        .ok_or(Error::InvalidArguments)?;
+        .expect("prime bit length must be at least two");
 
     loop {
         // Sample directly because `SmallFactorsSieveFactory` requires an infallible RNG.
         let mut start =
             BoxedUint::try_random_bits(rng, bit_length.get()).map_err(|err| match err {
-                RandomBitsError::RandCore(_) => Error::Rng,
-                _ => Error::Internal, // The precision is determined by the requested bit length.
+                RandomBitsError::RandCore(err) => err,
+                // The precision is determined by the requested bit length.
+                _ => unreachable!("random integer has the requested precision"),
             })?;
 
         // Match `SetBits::TwoMsb`: make the candidate odd and set its top two bits.
@@ -135,8 +140,9 @@ fn generate_prime_with_rng<R: TryCryptoRng + ?Sized>(
         start.set_bit_vartime(bit_length.get() - 1, true);
         start.set_bit_vartime(bit_length.get() - 2, true);
 
-        let mut sieve =
-            SmallFactorsSieve::new(start, bit_length, false).map_err(|_| Error::Internal)?;
+        let Ok(mut sieve) = SmallFactorsSieve::new(start, bit_length, false) else {
+            unreachable!("candidate fits the bit length");
+        };
         if let Some(prime) = sieve.find(|candidate| is_prime(Flavor::Any, candidate)) {
             return Ok(prime);
         }
