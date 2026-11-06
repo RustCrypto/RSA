@@ -1,5 +1,5 @@
 use super::{Signature, VerifyingKey, pkcs1v15_generate_prefix, sign, sign_with_default_rng};
-use crate::{Result, RsaPrivateKey};
+use crate::{Generate, Result, RsaPrivateKey};
 use alloc::vec::Vec;
 use const_oid::AssociatedOid;
 use core::marker::PhantomData;
@@ -97,6 +97,20 @@ where
             prefix: Vec::new(),
             phantom: Default::default(),
         })
+    }
+}
+
+/// Generate a key with the default RSA parameters and a prefix for the digest `D`.
+///
+/// See [`RsaPrivateKey::DEFAULT_BITS`] for the default modulus size.
+impl<D> Generate for SigningKey<D>
+where
+    D: Digest + AssociatedOid,
+{
+    fn try_generate_from_rng<R: TryCryptoRng + ?Sized>(
+        rng: &mut R,
+    ) -> core::result::Result<Self, R::Error> {
+        RsaPrivateKey::try_generate_from_rng(rng).map(Self::new)
     }
 }
 

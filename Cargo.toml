@@ -27,6 +27,7 @@ zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
 [dependencies]
 const-oid = { version = "0.10", default-features = false }
 crypto-bigint = { workspace = true }
+crypto-common = { version = "0.2", default-features = false, features = ["rand_core"] }
 crypto-primes = { version = "0.7", default-features = false }
 digest = { version = "0.11", default-features = false, features = ["alloc", "oid"] }
 hmac = { version = "0.13", default-features = false, features = ["zeroize"] }
@@ -36,7 +37,6 @@ signature = { version = "3", default-features = false, features = ["alloc", "dig
 zeroize = { workspace = true, default-features = true }
 
 # optional dependencies
-crypto-common = { version = "0.2", optional = true, features = ["getrandom"] }
 pkcs1 = { version = "0.8", optional = true, default-features = false, features = ["alloc", "pem"] }
 pkcs8 = { version = "0.11", optional = true, default-features = false, features = ["alloc", "pem"] }
 serdect = { version = "0.4", optional = true }
@@ -67,9 +67,8 @@ std = ["pkcs1?/std", "pkcs8?/std"]
 
 encoding = ["dep:pkcs1", "dep:pkcs8", "dep:spki"]
 hazmat = []
-# PKCS #1 v1.5 is only supported as opt-in basis for legacy protocols 
-pkcs1v15 = []
-getrandom = ["crypto-bigint/getrandom", "crypto-common"]
+pkcs1v15 = [] # PKCS #1 v1.5 is only supported as opt-in basis for legacy protocols
+getrandom = ["crypto-bigint/getrandom", "crypto-common/getrandom"]
 serde = ["encoding", "dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pkcs5 = ["pkcs8/encryption"]
 

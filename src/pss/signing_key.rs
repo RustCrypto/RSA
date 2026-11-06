@@ -1,5 +1,5 @@
 use super::{Signature, VerifyingKey, sign_digest};
-use crate::{Result, RsaPrivateKey};
+use crate::{Generate, Result, RsaPrivateKey};
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset, Update};
 use rand_core::TryCryptoRng;
@@ -94,6 +94,20 @@ where
     #[must_use]
     pub fn salt_len(&self) -> usize {
         self.salt_len
+    }
+}
+
+/// Generate a key with the default RSA parameters and a salt length equal to the digest output size.
+///
+/// See [`RsaPrivateKey::DEFAULT_BITS`] for the default modulus size.
+impl<D> Generate for SigningKey<D>
+where
+    D: Digest,
+{
+    fn try_generate_from_rng<R: TryCryptoRng + ?Sized>(
+        rng: &mut R,
+    ) -> core::result::Result<Self, R::Error> {
+        RsaPrivateKey::try_generate_from_rng(rng).map(Self::new)
     }
 }
 

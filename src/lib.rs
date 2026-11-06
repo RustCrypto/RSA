@@ -16,6 +16,21 @@
 //!
 //! # Usage
 //!
+//! ## Key generation
+//!
+//! [`Generate`] creates 3072-bit RSA keys with public exponent 65537. This targets an estimated
+//! 128-bit security strength; see [`RsaPrivateKey::DEFAULT_BITS`] for the rationale. Use
+//! [`RsaPrivateKey::new`] to select a different key size.
+//!
+//! ```
+//! use rsa::{Generate, RsaPrivateKey};
+//!
+//! let private_key = RsaPrivateKey::generate_from_rng(&mut rand::rng());
+//! ```
+//!
+//! With the `getrandom` feature (enabled by default), `Generate::generate` and
+//! `Generate::try_generate` use the operating system RNG.
+//!
 //! ## OAEP encryption
 //!
 //! ```
@@ -227,6 +242,7 @@ extern crate alloc;
 extern crate std;
 
 pub use crypto_bigint::BoxedUint;
+pub use crypto_common::Generate;
 pub use rand_core;
 pub use signature;
 
