@@ -47,7 +47,8 @@
 //! <code><a href="./pkcs1v15/index.html">pkcs1v15</a></code> module.
 //! </div>
 //!
-//! ```
+#![cfg_attr(feature = "legacy-pkcs1v15", doc = "```")]
+#![cfg_attr(not(feature = "legacy-pkcs1v15"), doc = "```ignore")]
 //! use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
 //!
 //! let mut rng = rand::rng();
@@ -73,7 +74,8 @@
 //! See security notes in the <code><a href="./pkcs1v15/index.html">pkcs1v15</a></code> module.
 //! </div>
 //!
-//! ```
+#![cfg_attr(feature = "legacy-pkcs1v15", doc = "```")]
+#![cfg_attr(not(feature = "legacy-pkcs1v15"), doc = "```ignore")]
 //! use rsa::RsaPrivateKey;
 //! use rsa::pkcs1v15::{SigningKey, VerifyingKey};
 //! use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier};
