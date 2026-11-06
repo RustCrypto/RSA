@@ -62,7 +62,7 @@ This crate was previously vulnerable to the [Marvin Attack] which could enable
 
 You can follow our work on constant-time hardening in [#711].
 
-Users are adviced to migrate to 0.10 to avoid the discovered side channels.
+Users are advised to migrate to 0.10 in order to avoid the discovered side channels.
 
 ## ⚠️ PCKS#1 1.5 Warning
 
