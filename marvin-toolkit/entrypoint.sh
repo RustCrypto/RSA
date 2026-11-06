@@ -1,133 +1,113 @@
 #!/bin/bash
+set -euo pipefail
 
-# Build the test harness
-cd example/rust-crypto
-cargo update --quiet
-cargo build --profile release --quiet
-cd ~/marvin-toolkit
-
-# Parse CLI inputs to $size and $repeat
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+repo_dir=$(dirname -- "$script_dir")
 size=2048
 repeat=100000
+workers=1
+mode=default
+analysis_args=()
+output="${MARVIN_OUTPUT_ROOT:-$script_dir/outputs}/run-$(date -u +%Y%m%dT%H%M%SZ)"
 
-# Function to display help message
 display_help() {
-  echo "Usage: $0 [-s SIZE] [-n NUMBER] [-h]"
-  echo "  -s SIZE    Set the RSA key size (1024, 2048, or 4096; default: 2048)"
-  echo "  -n NUMBER  Set the repeat number (integer; default: 100000)"
-  echo "  -h         Display this help message"
+  cat <<HELP
+Usage: $0 [-s SIZE] [-n REPEATS] [-o OUTPUT] [-j WORKERS] [-m MODE] [-q] [-h]
+  -s SIZE     RSA key size: 1024, 2048, 3072, or 4096 (default: 2048)
+  -n REPEATS  Repetitions per probe (default: 100000)
+  -o OUTPUT   New output directory (must not already exist)
+  -j WORKERS  Analysis workers (default: 1)
+  -m MODE     default (OS blinding), blinded (rand::rng), or unblinded
+  -q          Minimal analysis without plots (still writes report.txt)
+  -h          Show help
+Set MARVIN_TOOLKIT to the prepared upstream toolkit checkout (see README.md).
+HELP
 }
 
-# Parse command-line arguments using getopts
-while getopts ":s:n:h" opt; do
-  case $opt in
-    s)
-      size=$OPTARG
-      if [[ ! "$size" =~ ^(1024|2048|4096)$ ]]; then
-        echo "Error: Invalid size. Please choose 1024, 2048, or 4096."
-        exit 1
-      fi
-      ;;
-    n)
-      repeat=$OPTARG
-      if ! [[ "$repeat" =~ ^[0-9]+$ ]]; then
-        echo "Error: Invalid number. Please specify a valid integer."
-        exit 1
-      fi
-      ;;
-    h)
-      display_help
-      exit 0
-      ;;
-    \?)
-      echo "Error: Invalid option -$OPTARG"
-      display_help
-      exit 1
-      ;;
-    :)
-      echo "Error: Option -$OPTARG requires an argument."
-      display_help
-      exit 1
-      ;;
+while getopts ':s:n:o:j:m:qh' opt; do
+  case "$opt" in
+    s) size=$OPTARG ;;
+    n) repeat=$OPTARG ;;
+    o) output=$OPTARG ;;
+    j) workers=$OPTARG ;;
+    m) mode=$OPTARG ;;
+    q) analysis_args=(--minimal-analysis) ;;
+    h) display_help; exit 0 ;;
+    *) display_help >&2; exit 2 ;;
   esac
 done
-size_bytes=$(($size / 8))
-
-# Step 1: Generate key pairs
-. ./certgen/certgen/lib.sh
-name="rsa${size}"
-tmp_file="$(mktemp)"
-if ! x509KeyGen -s $size $name &> "$tmp_file"; then
-    echo "ERROR $size bit key generation failed" >&2
-    cat "$tmp_file" >&2
-    exit 1
+shift $((OPTIND - 1))
+if [[ $# != 0 || ! $size =~ ^(1024|2048|3072|4096)$ ||
+      ! $mode =~ ^(default|blinded|unblinded)$ ||
+      ! $repeat =~ ^[1-9][0-9]*$ || ! $workers =~ ^[1-9][0-9]*$ ]]; then
+  display_help >&2
+  exit 2
 fi
-if ! x509SelfSign $name &> "$tmp_file"; then
-    echo "ERROR: $size bit key self-signing failed" >&2
-    cat "$tmp_file" >&2
-    exit 1
-fi
+: "${MARVIN_TOOLKIT:?Set MARVIN_TOOLKIT to the prepared upstream toolkit checkout}"
+toolkit=$(cd -- "$MARVIN_TOOLKIT" && pwd)
+python="$toolkit/marvin-venv/bin/python"
+[[ -x "$python" && -f "$toolkit/tlsfuzzer/tlsfuzzer/analysis.py" ]]
+export PYTHONPATH="$toolkit/tlsfuzzer"
+# Keep numerical libraries from multiplying the requested analysis worker count.
+export OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 MKL_NUM_THREADS=1
 
-echo "RSA $size bit private key in old OpenSSL PEM format is in" $(x509Key $name)
-echo "RSA $size bit private key in old OpenSSL DER format is in" $(x509Key --der $name)
-echo "RSA $size bit private key in PKCS#8 PEM format is in" $(x509Key --pkcs8 $name)
-echo "RSA $size bit private key in PKCS#8 DER format is in" $(x509Key --der --pkcs8 $name)
-echo "RSA $size bit private key in PKCS#12 format is in" $(x509Key --with-cert --pkcs12 $name)
-echo "RSA $size bit self-signed certificate is in" $(x509Cert $name)
-echo
+cargo build --release --locked --manifest-path "$repo_dir/Cargo.toml" \
+  -p rsa-marvin --target-dir "$repo_dir/target"
+# Refuse reuse so a previous report can never be mistaken for this run's result.
+umask 077
+mkdir -p -- "$(dirname -- "$output")"
+mkdir -- "$output"
+output=$(cd -- "$output" && pwd)
+mkdir "$output/keys"
+{
+  printf 'RSA checkout: '
+  git -C "$script_dir" rev-parse HEAD 2>/dev/null || echo 'unavailable (container build context)'
+  git -C "$script_dir" diff --stat 2>/dev/null || true
+  printf 'Marvin toolkit: '; git -C "$toolkit" rev-parse HEAD
+  printf 'tlsfuzzer: '; git -C "$toolkit/tlsfuzzer" rev-parse HEAD
+  printf 'key_bits=%s repeats=%s mode=%s\n' "$size" "$repeat" "$mode"
+  rustc -Vv
+  uname -a
+  openssl version
+  cargo tree --locked --manifest-path "$script_dir/Cargo.toml"
+} > "$output/environment.txt"
+cp "$repo_dir/Cargo.lock" "$output/Cargo.lock"
+"$python" -m pip freeze > "$output/python-requirements.txt"
 
-# Generate ciphertexts
-case $size in
-  1024)
-    PYTHONPATH=tlsfuzzer ./marvin-venv/bin/python ./step2.py \
-    -c rsa1024/cert.pem -o rsa1024_repeat \
-    --repeat ${repeat} --verbose \
-    no_structure no_padding=48 signature_padding=8 \
-    valid_repeated_byte_payload="118 0xff" \
-    valid_repeated_byte_payload="118 0x01" \
-    valid=48 header_only \
-    no_header_with_payload=48 zero_byte_in_padding="48 4" \
-    valid=0 valid=118
-    ;;
-  2048)
-    PYTHONPATH=tlsfuzzer ./marvin-venv/bin/python ./step2.py \
-    -c rsa2048/cert.pem -o rsa2048_repeat \
-    --repeat ${repeat} --verbose \
-    no_structure no_padding=48 signature_padding=8 \
-    valid_repeated_byte_payload="246 0xff" \
-    valid_repeated_byte_payload="246 0x01" \
-    valid=48 header_only \
-    no_header_with_payload=48 zero_byte_in_padding="48 4" \
-    valid=0 valid=192 valid=246
-    ;;
-  4096)
-    PYTHONPATH=tlsfuzzer ./marvin-venv/bin/python ./step2.py \
-    -c rsa4096/cert.pem -o rsa4096_repeat \
-    --repeat ${repeat} --verbose \
-    no_structure no_padding=48 signature_padding=8 \
-    valid_repeated_byte_payload="502 0xff" \
-    valid_repeated_byte_payload="502 0x01" \
-    valid=48 header_only \
-    no_header_with_payload=48 zero_byte_in_padding="48 4" \
-    valid=0 valid=192 valid=502
-    ;;
-esac
+openssl genpkey -algorithm RSA -pkeyopt "rsa_keygen_bits:$size" \
+  -out "$output/keys/pkcs8.pem"
+openssl req -new -x509 -key "$output/keys/pkcs8.pem" \
+  -subj '/CN=marvin-test-only' -days 1 -out "$output/keys/cert.pem"
 
-# Run decryptions and analyze data
-echo "Starting decryption"
-./example/rust-crypto/target/release/rust-crypto \
-    -i rsa${size}_repeat/ciphers.bin \
-    -o rsa${size}_repeat/raw_times.csv -k rsa${size}/pkcs8.pem -n $size_bytes
-echo "Decryptions finished"
-PYTHONPATH=tlsfuzzer marvin-venv/bin/python3 tlsfuzzer/tlsfuzzer/extract.py \
--l rsa${size}_repeat/log.csv --raw-times rsa${size}_repeat/raw_times.csv \
--o rsa${size}_repeat/ \
---clock-frequency 1000
-PYTHONPATH=tlsfuzzer marvin-venv/bin/python3 tlsfuzzer/tlsfuzzer/analysis.py \
--o rsa${size}_repeat/ --verbose
+size_bytes=$((size / 8))
+max_payload=$((size_bytes - 11))
+short_padding_payload=$((size_bytes - 10))
+# Preserve the old seven-byte-PS probes and also test the valid eight-byte boundary.
+probes=(no_structure no_padding=48 signature_padding=8
+  "valid_repeated_byte_payload=$short_padding_payload 0xff"
+  "valid_repeated_byte_payload=$short_padding_payload 0x01"
+  valid=48 header_only no_header_with_payload=48 zero_byte_in_padding='48 4'
+  valid=0 "valid=$max_payload" "valid=$short_padding_payload"
+  "valid_repeated_byte_payload=$max_payload 0xff"
+  "valid_repeated_byte_payload=$max_payload 0x01")
+if ((size > 1024)); then probes+=(valid=192); fi
+"$python" "$toolkit/step2.py" -c "$output/keys/cert.pem" -k "$output/keys/pkcs8.pem" \
+  -o "$output/results" --repeat "$repeat" --verbose "${probes[@]}"
 
-# Copy over the keys and the results, if the results directory exists
-if [[ -d ~/marvin-toolkit/outputs ]]; then
-  cp -r rsa${size} ~/marvin-toolkit/outputs/keys
-  cp -r rsa${size}_repeat ~/marvin-toolkit/outputs/results
-fi
+"$repo_dir/target/release/rsa-marvin" \
+  -i "$output/results/ciphers.bin" -o "$output/results/raw_times.csv" \
+  -k "$output/keys/pkcs8.pem" -n "$size_bytes" --mode "$mode"
+# Instant::elapsed().as_nanos() uses nanoseconds; this option is in MHz.
+"$python" "$toolkit/tlsfuzzer/tlsfuzzer/extract.py" \
+  -l "$output/results/log.csv" --raw-times "$output/results/raw_times.csv" \
+  -o "$output/results" --clock-frequency 1000
+
+# A detected timing difference is a nonzero analysis result, not a reason to lose data.
+status=0
+"$python" "$toolkit/tlsfuzzer/tlsfuzzer/analysis.py" \
+  -o "$output/results" --verbose --workers "$workers" "${analysis_args[@]}" \
+  > "$output/analysis.log" 2>&1 || status=$?
+cat "$output/analysis.log"
+echo "$status" > "$output/analysis-exit-status.txt"
+echo "Results: $output/results/report.txt (analysis exit status: $status)"
+exit "$status"

@@ -24,7 +24,7 @@ jobs:
         with:
           toolchain: 1.87.0
           components: clippy
-      - run: cargo clippy -p rsa -- -D warnings
+      - run: cargo clippy -p rsa -p rsa-marvin -- -D warnings
 
   fmt:
     runs-on: ubuntu-latest
@@ -35,7 +35,7 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt
-      - run: cargo fmt -p rsa -- --check
+      - run: cargo fmt -p rsa -p rsa-marvin -- --check
 
   doc:
     runs-on: ubuntu-latest
