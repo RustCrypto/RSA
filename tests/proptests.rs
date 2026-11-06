@@ -39,11 +39,11 @@ proptest! {
     // TODO(tarcieri): debug why these are failing
     // #[test]
     // fn pss_sign_roundtrip(private_key in private_key(), msg in any::<Vec<u8>>()) {
-    //      let signing_key = pss::SigningKey::<Sha256>::new(private_key);
-    //      let signature_bytes = signing_key.sign(&msg).to_bytes();
+    //     let signing_key = pss::SigningKey::<Sha256>::new(private_key);
+    //     let signature_bytes = signing_key.sign(&msg).to_bytes();
     //
-    //      let verifying_key = signing_key.verifying_key();
-    //      let signature = pss::Signature::try_from(&*signature_bytes).unwrap();
-    //      prop_assert!(verifying_key.verify(&msg, &signature).is_ok());
+    //     let verifying_key = signing_key.verifying_key();
+    //     let signature = pss::Signature::try_from(&*signature_bytes).unwrap();
+    //     prop_assert!(verifying_key.verify(&msg, &signature).is_ok());
     // }
 }
