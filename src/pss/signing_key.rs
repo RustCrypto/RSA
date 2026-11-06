@@ -2,7 +2,7 @@ use super::{Signature, VerifyingKey, sign_digest};
 use crate::{Result, RsaPrivateKey};
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset, Update};
-use rand_core::{CryptoRng, TryCryptoRng};
+use rand_core::TryCryptoRng;
 use signature::{
     Keypair, RandomizedDigestSigner, RandomizedMultipartSigner, RandomizedSigner,
     hazmat::RandomizedPrehashSigner,
@@ -72,13 +72,13 @@ where
     /// Generate a new random RSASSA-PSS signing key.
     /// Digest output size is used as a salt length.
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
-    pub fn random<R: CryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
+    pub fn random<R: TryCryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Self::random_with_salt_len(rng, bit_size, <D as Digest>::output_size())
     }
 
     /// Generate a new random RSASSA-PSS signing key with a salt of the given length.
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
-    pub fn random_with_salt_len<R: CryptoRng + ?Sized>(
+    pub fn random_with_salt_len<R: TryCryptoRng + ?Sized>(
         rng: &mut R,
         bit_size: usize,
         salt_len: usize,

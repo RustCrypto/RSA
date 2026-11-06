@@ -8,7 +8,7 @@ use crate::{
 use alloc::{boxed::Box, vec::Vec};
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset};
-use rand_core::CryptoRng;
+use rand_core::TryCryptoRng;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use zeroize::ZeroizeOnDrop;
@@ -87,7 +87,7 @@ where
     D: Digest,
     MGD: Digest + FixedOutputReset,
 {
-    fn decrypt_with_rng<R: CryptoRng + ?Sized>(
+    fn decrypt_with_rng<R: TryCryptoRng + ?Sized>(
         &self,
         rng: &mut R,
         ciphertext: &[u8],
