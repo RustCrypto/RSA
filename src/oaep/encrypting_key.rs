@@ -1,5 +1,5 @@
 use super::encrypt_digest;
-use crate::{Result, RsaPublicKey, traits::RandomizedEncryptor};
+use crate::{PublicKey, Result, traits::RandomizedEncryptor};
 use alloc::{boxed::Box, vec::Vec};
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset};
@@ -17,7 +17,7 @@ where
     D: Digest,
     MGD: Digest + FixedOutputReset,
 {
-    inner: RsaPublicKey,
+    inner: PublicKey,
     label: Option<Box<[u8]>>,
     phantom: PhantomData<D>,
     mg_phantom: PhantomData<MGD>,
@@ -30,7 +30,7 @@ where
 {
     /// Create a new verifying key from an RSA public key.
     #[must_use]
-    pub fn new(key: RsaPublicKey) -> Self {
+    pub fn new(key: PublicKey) -> Self {
         Self {
             inner: key,
             label: None,
@@ -40,7 +40,7 @@ where
     }
 
     /// Create a new verifying key from an RSA public key using provided label
-    pub fn new_with_label<S: Into<Box<[u8]>>>(key: RsaPublicKey, label: S) -> Self {
+    pub fn new_with_label<S: Into<Box<[u8]>>>(key: PublicKey, label: S) -> Self {
         Self {
             inner: key,
             label: Some(label.into()),
@@ -85,7 +85,7 @@ mod tests {
         use serde_test::{Configure, Token, assert_tokens};
 
         let der = include_bytes!("../../tests/examples/pkcs8/rsa2048-pub.der");
-        let pub_key = RsaPublicKey::from_public_key_der(der).unwrap();
+        let pub_key = PublicKey::from_public_key_der(der).unwrap();
         let encoded = include_str!("../../tests/examples/pkcs8/rsa2048-pub.hex").trim();
         let encrypting_key = EncryptingKey::<sha2::Sha256>::new(pub_key);
 

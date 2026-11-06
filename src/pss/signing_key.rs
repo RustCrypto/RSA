@@ -1,5 +1,5 @@
 use super::{Signature, VerifyingKey, sign_digest};
-use crate::{Generate, Result, RsaPrivateKey};
+use crate::{Generate, PrivateKey, Result};
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset, Update};
 use rand_core::TryCryptoRng;
@@ -43,7 +43,7 @@ pub struct SigningKey<D>
 where
     D: Digest,
 {
-    inner: RsaPrivateKey,
+    inner: PrivateKey,
     salt_len: usize,
     phantom: PhantomData<D>,
 }
@@ -55,13 +55,13 @@ where
     /// Create a new RSASSA-PSS signing key.
     /// Digest output size is used as a salt length.
     #[must_use]
-    pub fn new(key: RsaPrivateKey) -> Self {
+    pub fn new(key: PrivateKey) -> Self {
         Self::new_with_salt_len(key, <D as Digest>::output_size())
     }
 
     /// Create a new RSASSA-PSS signing key with a salt of the given length.
     #[must_use]
-    pub fn new_with_salt_len(key: RsaPrivateKey, salt_len: usize) -> Self {
+    pub fn new_with_salt_len(key: PrivateKey, salt_len: usize) -> Self {
         Self {
             inner: key,
             salt_len,
@@ -84,7 +84,7 @@ where
         salt_len: usize,
     ) -> Result<Self> {
         Ok(Self {
-            inner: RsaPrivateKey::new(rng, bit_size)?,
+            inner: PrivateKey::new(rng, bit_size)?,
             salt_len,
             phantom: Default::default(),
         })
@@ -99,7 +99,7 @@ where
 
 /// Generate a key with the default RSA parameters and a salt length equal to the digest output size.
 ///
-/// See [`RsaPrivateKey::DEFAULT_BITS`] for the default modulus size.
+/// See [`PrivateKey::DEFAULT_BITS`] for the default modulus size.
 impl<D> Generate for SigningKey<D>
 where
     D: Digest,
@@ -107,7 +107,7 @@ where
     fn try_generate_from_rng<R: TryCryptoRng + ?Sized>(
         rng: &mut R,
     ) -> core::result::Result<Self, R::Error> {
-        RsaPrivateKey::try_generate_from_rng(rng).map(Self::new)
+        PrivateKey::try_generate_from_rng(rng).map(Self::new)
     }
 }
 
@@ -218,11 +218,11 @@ where
 // Other trait impls
 //
 
-impl<D> AsRef<RsaPrivateKey> for SigningKey<D>
+impl<D> AsRef<PrivateKey> for SigningKey<D>
 where
     D: Digest,
 {
-    fn as_ref(&self) -> &RsaPrivateKey {
+    fn as_ref(&self) -> &PrivateKey {
         &self.inner
     }
 }
@@ -257,16 +257,16 @@ where
     }
 }
 
-impl<D> From<RsaPrivateKey> for SigningKey<D>
+impl<D> From<PrivateKey> for SigningKey<D>
 where
     D: Digest,
 {
-    fn from(key: RsaPrivateKey) -> Self {
+    fn from(key: PrivateKey) -> Self {
         Self::new(key)
     }
 }
 
-impl<D> From<SigningKey<D>> for RsaPrivateKey
+impl<D> From<SigningKey<D>> for PrivateKey
 where
     D: Digest,
 {
@@ -297,7 +297,7 @@ where
     type Error = pkcs8::Error;
 
     fn try_from(private_key_info: pkcs8::PrivateKeyInfoRef<'_>) -> pkcs8::Result<Self> {
-        RsaPrivateKey::try_from(private_key_info).map(Self::new)
+        PrivateKey::try_from(private_key_info).map(Self::new)
     }
 }
 
@@ -346,14 +346,14 @@ mod tests {
     #[cfg(all(feature = "hazmat", feature = "serde"))]
     fn test_serde() {
         use super::*;
-        use crate::RsaPrivateKey;
+        use crate::PrivateKey;
         use rand::rngs::ChaCha8Rng;
         use rand_core::SeedableRng;
         use serde_test::{Configure, Token, assert_tokens};
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let priv_key = RsaPrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key");
+        let priv_key = PrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key");
         let signing_key = SigningKey::<Sha256>::new(priv_key);
 
         let tokens = [Token::Str(concat!(

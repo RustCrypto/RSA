@@ -1,6 +1,6 @@
 //! `RSASSA-PKCS1-v1_5` signatures.
 
-use crate::RsaPublicKey;
+use crate::PublicKey;
 use alloc::boxed::Box;
 use core::fmt::{Debug, Display, Formatter, LowerHex, UpperHex};
 use signature::SignatureEncoding;
@@ -31,13 +31,13 @@ pub struct Signature {
 impl Signature {
     /// Default maximum encoded signature length in bytes.
     ///
-    /// Corresponds to the default maximum modulus size, [`RsaPublicKey::MAX_SIZE`].
-    pub const MAX_LEN: usize = RsaPublicKey::MAX_SIZE.div_ceil(8);
+    /// Corresponds to the default maximum modulus size, [`PublicKey::MAX_SIZE`].
+    pub const MAX_LEN: usize = PublicKey::MAX_SIZE.div_ceil(8);
 
     /// Decode a signature with an explicit maximum encoded length in bytes.
     ///
     /// The length is checked before allocating. This can be used to accept signatures
-    /// for keys larger than [`RsaPublicKey::MAX_SIZE`], or to impose a smaller limit.
+    /// for keys larger than [`PublicKey::MAX_SIZE`], or to impose a smaller limit.
     /// The exact length and value are checked against the key during verification.
     ///
     /// Signatures larger than [`Self::MAX_LEN`] must also use this method when

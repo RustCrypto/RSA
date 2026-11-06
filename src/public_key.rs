@@ -1,7 +1,7 @@
 //! RSA public key type.
 
 use crate::traits::{PaddingScheme, PublicKeyParts, SignatureScheme};
-use crate::{Error, Result, RsaPrivateKey};
+use crate::{Error, PrivateKey, Result};
 use alloc::vec::Vec;
 use core::hash::{Hash, Hasher};
 use core::ops::RangeInclusive;
@@ -17,7 +17,7 @@ use {
 
 /// Represents the public part of an RSA key.
 #[derive(Debug, Clone)]
-pub struct RsaPublicKey {
+pub struct PublicKey {
     /// Modulus: product of prime numbers `p` and `q`
     pub(crate) n: NonZero<BoxedUint>,
 
@@ -31,7 +31,7 @@ pub struct RsaPublicKey {
     pub(crate) n_params: BoxedMontyParams,
 }
 
-impl RsaPublicKey {
+impl PublicKey {
     /// Default minimum size of the modulus `n` in bits.
     pub const MIN_SIZE: usize = 1024;
 
@@ -55,8 +55,8 @@ impl RsaPublicKey {
     /// If for some reason you have a legitimate reason to use keys with public exponents larger
     /// than this value, use the special APIs:
     ///
-    /// - [`RsaPublicKey::new_unchecked`]
-    /// - [`RsaPrivateKey::from_components_with_large_exponent`]
+    /// - [`PublicKey::new_unchecked`]
+    /// - [`PrivateKey::from_components_with_large_exponent`]
     pub const MAX_PUB_EXPONENT: u64 = (1 << 33) - 1;
 
     /// Encrypt the given message.
@@ -137,8 +137,8 @@ impl RsaPublicKey {
     /// exponent size.
     ///
     /// This method is not recommended, and only intended for unusual use cases.
-    /// Most applications should use [`RsaPublicKey::new`] or
-    /// [`RsaPublicKey::new_with_size_limits`] instead.
+    /// Most applications should use [`PublicKey::new`] or
+    /// [`PublicKey::new_with_size_limits`] instead.
     #[must_use]
     pub fn new_unchecked(n: BoxedUint, e: BoxedUint) -> Self {
         let n_odd = Odd::new(n.clone()).expect("n must be odd");
@@ -149,26 +149,26 @@ impl RsaPublicKey {
     }
 }
 
-impl Eq for RsaPublicKey {}
-impl PartialEq for RsaPublicKey {
+impl Eq for PublicKey {}
+impl PartialEq for PublicKey {
     #[inline]
-    fn eq(&self, other: &RsaPublicKey) -> bool {
+    fn eq(&self, other: &PublicKey) -> bool {
         self.n == other.n && self.e == other.e
     }
 }
 
-impl From<RsaPrivateKey> for RsaPublicKey {
-    fn from(private_key: RsaPrivateKey) -> Self {
+impl From<PrivateKey> for PublicKey {
+    fn from(private_key: PrivateKey) -> Self {
         (&private_key).into()
     }
 }
 
-impl From<&RsaPrivateKey> for RsaPublicKey {
-    fn from(private_key: &RsaPrivateKey) -> Self {
+impl From<&PrivateKey> for PublicKey {
+    fn from(private_key: &PrivateKey) -> Self {
         let n = PublicKeyParts::n(private_key);
         let e = PublicKeyParts::e(private_key);
         let n_params = PublicKeyParts::n_params(private_key);
-        RsaPublicKey {
+        PublicKey {
             n: n.clone(),
             e: e.clone(),
             n_params: n_params.clone(),
@@ -176,7 +176,7 @@ impl From<&RsaPrivateKey> for RsaPublicKey {
     }
 }
 
-impl Hash for RsaPublicKey {
+impl Hash for PublicKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // Domain separator for RSA private keys
         state.write(b"RsaPublicKey");
@@ -186,7 +186,7 @@ impl Hash for RsaPublicKey {
     }
 }
 
-impl PublicKeyParts for RsaPublicKey {
+impl PublicKeyParts for PublicKey {
     fn n(&self) -> &NonZero<BoxedUint> {
         &self.n
     }
@@ -201,7 +201,7 @@ impl PublicKeyParts for RsaPublicKey {
 }
 
 #[cfg(feature = "serde")]
-impl Serialize for RsaPublicKey {
+impl Serialize for PublicKey {
     fn serialize<S>(&self, serializer: S) -> core::prelude::v1::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -212,7 +212,7 @@ impl Serialize for RsaPublicKey {
 }
 
 #[cfg(feature = "serde")]
-impl<'de> Deserialize<'de> for RsaPublicKey {
+impl<'de> Deserialize<'de> for PublicKey {
     fn deserialize<D>(deserializer: D) -> core::prelude::v1::Result<Self, D::Error>
     where
         D: serde::Deserializer<'de>,
@@ -239,11 +239,11 @@ fn check_public_with_max_size(n: &BoxedUint, e: &BoxedUint, max_size: Option<usi
 
     check_public_skip_exponent_size(n, e)?;
 
-    if e < &BoxedUint::from(RsaPublicKey::MIN_PUB_EXPONENT) {
+    if e < &BoxedUint::from(PublicKey::MIN_PUB_EXPONENT) {
         return Err(Error::PublicExponentTooSmall);
     }
 
-    if e > &BoxedUint::from(RsaPublicKey::MAX_PUB_EXPONENT) {
+    if e > &BoxedUint::from(PublicKey::MAX_PUB_EXPONENT) {
         return Err(Error::PublicExponentTooLarge);
     }
 

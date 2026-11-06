@@ -3,7 +3,7 @@
 use anyhow::{Context, Result, ensure};
 use clap::{Parser, ValueEnum};
 use rsa::{
-    Pkcs1v15Encrypt, RsaPrivateKey,
+    Pkcs1v15Encrypt, PrivateKey,
     pkcs8::DecodePrivateKey,
     traits::{PaddingScheme, PublicKeyParts},
 };
@@ -70,7 +70,7 @@ fn measure(args: &Args, mut decrypt: impl FnMut(&[u8]) -> rsa::Result<Vec<u8>>) 
 fn main() -> Result<()> {
     let args = Args::parse();
     let pem = fs::read_to_string(&args.keyfile).context("reading PKCS#8 key")?;
-    let mut key = RsaPrivateKey::from_pkcs8_pem(&pem)?;
+    let mut key = PrivateKey::from_pkcs8_pem(&pem)?;
     key.validate()?;
     key.precompute()?;
     ensure!(

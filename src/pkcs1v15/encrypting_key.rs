@@ -1,5 +1,5 @@
 use super::encrypt;
-use crate::{Result, RsaPublicKey, traits::RandomizedEncryptor};
+use crate::{PublicKey, Result, traits::RandomizedEncryptor};
 use alloc::vec::Vec;
 use rand_core::TryCryptoRng;
 #[cfg(feature = "serde")]
@@ -11,13 +11,13 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct EncryptingKey {
-    pub(super) inner: RsaPublicKey,
+    pub(super) inner: PublicKey,
 }
 
 impl EncryptingKey {
     /// Create a new verifying key from an RSA public key.
     #[must_use]
-    pub fn new(key: RsaPublicKey) -> Self {
+    pub fn new(key: PublicKey) -> Self {
         Self { inner: key }
     }
 }
@@ -42,7 +42,7 @@ mod tests {
         use serde_test::{Configure, Token, assert_tokens};
 
         let der = include_bytes!("../../tests/examples/pkcs8/rsa2048-pub.der");
-        let pub_key = RsaPublicKey::from_public_key_der(der).unwrap();
+        let pub_key = PublicKey::from_public_key_der(der).unwrap();
         let encoded = include_str!("../../tests/examples/pkcs8/rsa2048-pub.hex").trim();
         let encrypting_key = EncryptingKey::new(pub_key);
 

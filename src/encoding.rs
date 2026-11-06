@@ -6,7 +6,7 @@
 #![cfg(feature = "encoding")]
 
 use crate::{
-    RsaPrivateKey, RsaPublicKey,
+    PrivateKey, PublicKey,
     traits::{PrivateKeyParts, PublicKeyParts},
 };
 use core::convert::{TryFrom, TryInto};
@@ -26,22 +26,22 @@ fn uint_from_slice(data: &[u8], bits: u32) -> pkcs1::Result<BoxedUint> {
     BoxedUint::from_be_slice(data, bits).map_err(|_| pkcs1::Error::KeyMalformed)
 }
 
-impl pkcs1::DecodeRsaPrivateKey for RsaPrivateKey {
+impl pkcs1::DecodeRsaPrivateKey for PrivateKey {
     fn from_pkcs1_der(bytes: &[u8]) -> pkcs1::Result<Self> {
         pkcs1::RsaPrivateKeyRef::from_der(bytes)?.try_into()
     }
 }
 
-impl pkcs1::DecodeRsaPublicKey for RsaPublicKey {
+impl pkcs1::DecodeRsaPublicKey for PublicKey {
     fn from_pkcs1_der(bytes: &[u8]) -> pkcs1::Result<Self> {
         pkcs1::RsaPublicKeyRef::from_der(bytes)?.try_into()
     }
 }
 
-impl<U: AsUintRef> TryFrom<pkcs1::RsaPrivateKey<U>> for RsaPrivateKey {
+impl<U: AsUintRef> TryFrom<pkcs1::RsaPrivateKey<U>> for PrivateKey {
     type Error = pkcs1::Error;
 
-    fn try_from(pkcs1_key: pkcs1::RsaPrivateKey<U>) -> pkcs1::Result<RsaPrivateKey> {
+    fn try_from(pkcs1_key: pkcs1::RsaPrivateKey<U>) -> pkcs1::Result<PrivateKey> {
         use pkcs1::Error::KeyMalformed;
 
         // Multi-prime RSA keys not currently supported
@@ -65,11 +65,11 @@ impl<U: AsUintRef> TryFrom<pkcs1::RsaPrivateKey<U>> for RsaPrivateKey {
         let prime2 = uint_from_slice(pkcs1_key.prime2.as_uint_ref().as_bytes(), bits)?;
         let primes = vec![prime1, prime2];
 
-        RsaPrivateKey::from_components(n, e, d, primes).map_err(|_| KeyMalformed)
+        PrivateKey::from_components(n, e, d, primes).map_err(|_| KeyMalformed)
     }
 }
 
-impl<U: AsUintRef> TryFrom<pkcs1::RsaPublicKey<U>> for RsaPublicKey {
+impl<U: AsUintRef> TryFrom<pkcs1::RsaPublicKey<U>> for PublicKey {
     type Error = pkcs1::Error;
 
     fn try_from(pkcs1_key: pkcs1::RsaPublicKey<U>) -> pkcs1::Result<Self> {
@@ -85,11 +85,11 @@ impl<U: AsUintRef> TryFrom<pkcs1::RsaPublicKey<U>> for RsaPublicKey {
             * 8;
         let e = uint_from_slice(pkcs1_key.public_exponent.as_uint_ref().as_bytes(), bits_e)?;
 
-        RsaPublicKey::new(n, e).map_err(|_| KeyMalformed)
+        PublicKey::new(n, e).map_err(|_| KeyMalformed)
     }
 }
 
-impl pkcs1::EncodeRsaPrivateKey for RsaPrivateKey {
+impl pkcs1::EncodeRsaPrivateKey for PrivateKey {
     fn to_pkcs1_der(&self) -> pkcs1::Result<SecretDocument> {
         // Check if the key is multi prime
         if self.primes.len() > 2 {
@@ -139,7 +139,7 @@ impl pkcs1::EncodeRsaPrivateKey for RsaPrivateKey {
     }
 }
 
-impl pkcs1::EncodeRsaPublicKey for RsaPublicKey {
+impl pkcs1::EncodeRsaPublicKey for PublicKey {
     fn to_pkcs1_der(&self) -> pkcs1::Result<Document> {
         let modulus = self.n().to_be_bytes();
         let public_exponent = self.e().to_be_bytes();
@@ -172,7 +172,7 @@ pub(crate) fn verify_algorithm_id(algorithm: &spki::AlgorithmIdentifierRef) -> s
     Ok(())
 }
 
-impl TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for RsaPrivateKey {
+impl TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for PrivateKey {
     type Error = pkcs8::Error;
 
     fn try_from(private_key_info: pkcs8::PrivateKeyInfoRef<'_>) -> pkcs8::Result<Self> {
@@ -184,7 +184,7 @@ impl TryFrom<pkcs8::PrivateKeyInfoRef<'_>> for RsaPrivateKey {
     }
 }
 
-impl TryFrom<pkcs8::SubjectPublicKeyInfoRef<'_>> for RsaPublicKey {
+impl TryFrom<pkcs8::SubjectPublicKeyInfoRef<'_>> for PublicKey {
     type Error = spki::Error;
 
     fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> spki::Result<Self> {
@@ -198,7 +198,7 @@ impl TryFrom<pkcs8::SubjectPublicKeyInfoRef<'_>> for RsaPublicKey {
     }
 }
 
-impl EncodePrivateKey for RsaPrivateKey {
+impl EncodePrivateKey for PrivateKey {
     fn to_pkcs8_der(&self) -> pkcs8::Result<SecretDocument> {
         let private_key =
             pkcs1::EncodeRsaPrivateKey::to_pkcs1_der(self).map_err(pkcs1_error_to_pkcs8)?;
@@ -211,7 +211,7 @@ impl EncodePrivateKey for RsaPrivateKey {
     }
 }
 
-impl EncodePublicKey for RsaPublicKey {
+impl EncodePublicKey for PublicKey {
     fn to_public_key_der(&self) -> spki::Result<Document> {
         let subject_public_key =
             pkcs1::EncodeRsaPublicKey::to_pkcs1_der(self).map_err(pkcs1_error_to_spki)?;

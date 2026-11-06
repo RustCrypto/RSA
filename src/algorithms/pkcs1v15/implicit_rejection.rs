@@ -122,7 +122,7 @@ mod tests {
     mod vectors {
         use super::*;
         use crate::{
-            RsaPrivateKey,
+            PrivateKey,
             algorithms::{pad::os2ip, pkcs1v15::eme_pkcs1v15_decode, rsa::rsa_decrypt_and_check},
             pkcs1v15::{DecryptingKey, Pkcs1v15Encrypt},
             traits::{Decryptor, PaddingScheme, PublicKeyParts, RandomizedDecryptor},
@@ -181,7 +181,7 @@ mod tests {
                 "k4096.pem" => fixture!("k4096.pem"),
                 _ => panic!("unknown key fixture"),
             };
-            let key = RsaPrivateKey::from_pkcs8_pem(pem).unwrap();
+            let key = PrivateKey::from_pkcs8_pem(pem).unwrap();
             let k = key.size();
             let typed_key = DecryptingKey::new(key.clone());
             let mut rng = ChaCha8Rng::from_seed([42; 32]);

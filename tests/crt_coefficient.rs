@@ -3,11 +3,11 @@
 #[cfg(feature = "hazmat")]
 use rand::rngs::ChaCha8Rng;
 use rsa::{
-    BoxedUint, RsaPrivateKey,
+    BoxedUint, PrivateKey,
     traits::{PrivateKeyParts, PublicKeyParts},
 };
 
-fn key_and_coefficient(reverse: bool) -> (RsaPrivateKey, BoxedUint) {
+fn key_and_coefficient(reverse: bool) -> (PrivateKey, BoxedUint) {
     let (p, q, expected) = if reverse {
         // (2^127 - 1) mod 3 = 1.
         (3u128, u128::MAX >> 1, 1u128)
@@ -22,12 +22,10 @@ fn key_and_coefficient(reverse: bool) -> (RsaPrivateKey, BoxedUint) {
     let primes = vec![BoxedUint::from(p), BoxedUint::from(q)];
 
     // The default policy rejects unbalanced keys consistently on 32-bit and 64-bit machines.
-    assert!(
-        RsaPrivateKey::from_components(n.clone(), e.clone(), d.clone(), primes.clone()).is_err()
-    );
+    assert!(PrivateKey::from_components(n.clone(), e.clone(), d.clone(), primes.clone()).is_err());
 
-    let key = RsaPrivateKey::from_components_with_wide_primes(n, e, d, primes)
-        .expect("explicit wide key");
+    let key =
+        PrivateKey::from_components_with_wide_primes(n, e, d, primes).expect("explicit wide key");
     for prime in key.primes() {
         assert_eq!(prime.bits_precision(), key.n().bits_precision());
     }
@@ -137,8 +135,8 @@ fn half_width_bit_bound_is_independent_of_limb_size() {
         BoxedUint::from(4294967279u64),
     ];
     assert_eq!(
-        RsaPrivateKey::from_components(n.clone(), e.clone(), d.clone(), primes.clone()),
+        PrivateKey::from_components(n.clone(), e.clone(), d.clone(), primes.clone()),
         Err(rsa::Error::InvalidPrime)
     );
-    RsaPrivateKey::from_components_with_wide_primes(n, e, d, primes).expect("wide key");
+    PrivateKey::from_components_with_wide_primes(n, e, d, primes).expect("wide key");
 }

@@ -9,7 +9,7 @@ use crypto_bigint::BoxedUint;
 use hex_literal::hex;
 use rand::rngs::ChaCha8Rng;
 use rand_core::SeedableRng;
-use rsa::{Pkcs1v15Encrypt, Pkcs1v15Sign, RsaPrivateKey};
+use rsa::{Pkcs1v15Encrypt, Pkcs1v15Sign, PrivateKey};
 use sha2::{Digest, Sha256};
 use test::Bencher;
 
@@ -21,7 +21,7 @@ const DECRYPT_VAL: &str = "\
     PJAgEMUxYWCR9xPJ7X256DV1Kt0Ht33DWoFcgh/pPLM1q9pK0HVxCdclXfZOeCql\
     rLgZ5Gxv5DM4BtV7Z4m85w==";
 
-fn get_key() -> RsaPrivateKey {
+fn get_key() -> PrivateKey {
     // 2048 bits
 
     let n = hex!(
@@ -66,7 +66,7 @@ fn get_key() -> RsaPrivateKey {
         ),
     ];
 
-    RsaPrivateKey::from_components(
+    PrivateKey::from_components(
         BoxedUint::from_be_slice(&n, 2048).unwrap(),
         BoxedUint::from(3u32),
         BoxedUint::from_be_slice(&d, 2048).unwrap(),
@@ -83,7 +83,7 @@ fn bench_rsa_1024_gen_key(b: &mut Bencher) {
     let mut rng = ChaCha8Rng::from_seed([42; 32]);
 
     b.iter(|| {
-        let key = RsaPrivateKey::new(&mut rng, 1024).unwrap();
+        let key = PrivateKey::new(&mut rng, 1024).unwrap();
         test::black_box(key);
     });
 }
@@ -93,7 +93,7 @@ fn bench_rsa_2048_gen_key(b: &mut Bencher) {
     let mut rng = ChaCha8Rng::from_seed([42; 32]);
 
     b.iter(|| {
-        let key = RsaPrivateKey::new(&mut rng, 2048).unwrap();
+        let key = PrivateKey::new(&mut rng, 2048).unwrap();
         test::black_box(key);
     });
 }

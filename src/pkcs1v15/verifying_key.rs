@@ -1,5 +1,5 @@
 use super::{Signature, pkcs1v15_generate_prefix, verify};
-use crate::RsaPublicKey;
+use crate::PublicKey;
 use alloc::vec::Vec;
 use const_oid::AssociatedOid;
 use core::marker::PhantomData;
@@ -28,7 +28,7 @@ pub struct VerifyingKey<D>
 where
     D: Digest,
 {
-    pub(super) inner: RsaPublicKey,
+    pub(super) inner: PublicKey,
     pub(super) prefix: Vec<u8>,
     pub(super) phantom: PhantomData<D>,
 }
@@ -39,7 +39,7 @@ where
 {
     /// Create a new verifying key with a prefix for the digest `D`.
     #[must_use]
-    pub fn new(key: RsaPublicKey) -> Self {
+    pub fn new(key: PublicKey) -> Self {
         Self {
             inner: key,
             prefix: pkcs1v15_generate_prefix::<D>(),
@@ -58,7 +58,7 @@ where
     ///
     /// In most cases you'll want to use [`VerifyingKey::new`] instead.
     #[must_use]
-    pub fn new_unprefixed(key: RsaPublicKey) -> Self {
+    pub fn new_unprefixed(key: PublicKey) -> Self {
         Self {
             inner: key,
             prefix: Vec::new(),
@@ -120,11 +120,11 @@ where
 // Other trait impls
 //
 
-impl<D> AsRef<RsaPublicKey> for VerifyingKey<D>
+impl<D> AsRef<PublicKey> for VerifyingKey<D>
 where
     D: Digest,
 {
-    fn as_ref(&self) -> &RsaPublicKey {
+    fn as_ref(&self) -> &PublicKey {
         &self.inner
     }
 }
@@ -163,16 +163,16 @@ where
     }
 }
 
-impl<D> From<RsaPublicKey> for VerifyingKey<D>
+impl<D> From<PublicKey> for VerifyingKey<D>
 where
     D: Digest + AssociatedOid,
 {
-    fn from(key: RsaPublicKey) -> Self {
+    fn from(key: PublicKey) -> Self {
         Self::new(key)
     }
 }
 
-impl<D> From<VerifyingKey<D>> for RsaPublicKey
+impl<D> From<VerifyingKey<D>> for PublicKey
 where
     D: Digest,
 {
@@ -205,7 +205,7 @@ where
     fn try_from(spki: pkcs8::SubjectPublicKeyInfoRef<'_>) -> spki::Result<Self> {
         spki.algorithm.assert_algorithm_oid(pkcs1::ALGORITHM_OID)?;
 
-        RsaPublicKey::try_from(spki).map(Self::new)
+        PublicKey::try_from(spki).map(Self::new)
     }
 }
 
@@ -257,7 +257,7 @@ mod tests {
         use sha2::Sha256;
 
         let der = include_bytes!("../../tests/examples/pkcs8/rsa2048-pub.der");
-        let pub_key = RsaPublicKey::from_public_key_der(der).unwrap();
+        let pub_key = PublicKey::from_public_key_der(der).unwrap();
         let encoded = include_str!("../../tests/examples/pkcs8/rsa2048-pub.hex").trim();
         let verifying_key = VerifyingKey::<Sha256>::new(pub_key);
 

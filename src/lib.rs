@@ -19,8 +19,8 @@
 //! ## Key generation
 //!
 //! [`Generate`] creates 3072-bit RSA keys with public exponent 65537. This targets an estimated
-//! 128-bit security strength; see [`RsaPrivateKey::DEFAULT_BITS`] for the rationale. Use
-//! [`RsaPrivateKey::new`] to select a different key size.
+//! 128-bit security strength; see [`PrivateKey::DEFAULT_BITS`] for the rationale. Use
+//! [`PrivateKey::new`] to select a different key size.
 //!
 //! ```
 //! use rsa::{Generate, RsaPrivateKey};
@@ -150,8 +150,8 @@
 //!
 //! Most modern applications use the newer PKCS#8 format instead (see below).
 //!
-//! The following traits can be used to decode/encode [`RsaPrivateKey`] and
-//! [`RsaPublicKey`] as PKCS#1. Note that [`pkcs1`] is re-exported from the
+//! The following traits can be used to decode/encode [`PrivateKey`] and
+//! [`PublicKey`] as PKCS#1. Note that [`pkcs1`] is re-exported from the
 //! toplevel of the `rsa` crate:
 //!
 //! - [`pkcs1::DecodeRsaPrivateKey`]: decode RSA private keys from PKCS#1
@@ -194,8 +194,8 @@
 //! -----BEGIN PRIVATE KEY-----
 //! ```
 //!
-//! The following traits can be used to decode/encode [`RsaPrivateKey`] and
-//! [`RsaPublicKey`] as PKCS#8. Note that [`pkcs8`] is re-exported from the
+//! The following traits can be used to decode/encode [`PrivateKey`] and
+//! [`PublicKey`] as PKCS#8. Note that [`pkcs8`] is re-exported from the
 //! toplevel of the `rsa` crate:
 //!
 //! - [`pkcs8::DecodePrivateKey`]: decode private keys from PKCS#8
@@ -270,9 +270,9 @@ pub use sha2;
 pub use crate::{
     errors::{Error, Result},
     oaep::Oaep,
-    private_key::RsaPrivateKey,
+    private_key::PrivateKey,
     pss::Pss,
-    public_key::RsaPublicKey,
+    public_key::PublicKey,
     traits::keys::CrtValue,
 };
 
@@ -281,3 +281,11 @@ pub use crate::pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign};
 
 #[cfg(feature = "hazmat")]
 pub mod hazmat;
+
+/// Deprecated alias for [`PrivateKey`].
+#[deprecated(since = "0.10.0", note = "use `rsa::PrivateKey` instead")]
+pub type RsaPrivateKey = PrivateKey;
+
+/// Deprecated alias for [`PublicKey`].
+#[deprecated(since = "0.10.0", note = "use `rsa::PublicKey` instead")]
+pub type RsaPublicKey = PublicKey;

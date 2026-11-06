@@ -8,7 +8,7 @@ use proptest::prelude::*;
 use rand::rngs::ChaCha8Rng;
 use rand_core::SeedableRng;
 use rsa::{
-    RsaPrivateKey,
+    PrivateKey,
     signature::{Keypair, SignatureEncoding, Signer, Verifier},
 };
 use sha2::Sha256;
@@ -18,9 +18,9 @@ use rsa::pkcs1v15;
 
 prop_compose! {
     // WARNING: do *NOT* copy and paste this code. It's insecure and optimized for test speed.
-    fn private_key()(seed in any::<[u8; 32]>()) -> RsaPrivateKey {
+    fn private_key()(seed in any::<[u8; 32]>()) -> PrivateKey {
         let mut rng = ChaCha8Rng::from_seed(seed);
-        RsaPrivateKey::new_unchecked(&mut rng, 512).unwrap()
+        PrivateKey::new_unchecked(&mut rng, 512).unwrap()
     }
 }
 

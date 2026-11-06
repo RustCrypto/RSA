@@ -91,7 +91,7 @@ pub(crate) fn totient(primes: &[Odd<BoxedUint>], bits: u32) -> Result<Zeroizing<
 mod tests {
     use super::*;
     use crate::{
-        RsaPrivateKey,
+        PrivateKey,
         algorithms::rsa::rsa_decrypt_and_check,
         traits::{PrivateKeyParts, PublicKeyParts},
     };
@@ -218,13 +218,11 @@ mod tests {
 
     #[test]
     fn blinding_private_operations() {
-        let two_prime = RsaPrivateKey::from_p_q(61u64.into(), 53u64.into(), 17u64.into())
-            .expect("two-prime key");
-        let multi_prime = RsaPrivateKey::from_primes(
-            vec![61u64.into(), 53u64.into(), 47u64.into()],
-            17u64.into(),
-        )
-        .expect("multiprime key");
+        let two_prime =
+            PrivateKey::from_p_q(61u64.into(), 53u64.into(), 17u64.into()).expect("two-prime key");
+        let multi_prime =
+            PrivateKey::from_primes(vec![61u64.into(), 53u64.into(), 47u64.into()], 17u64.into())
+                .expect("multiprime key");
 
         for mut key in [two_prime, multi_prime] {
             for clear_precomputed in [false, true] {

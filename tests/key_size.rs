@@ -3,7 +3,7 @@
 use crypto_bigint::Resize;
 use rand::rngs::ChaCha8Rng;
 use rand_core::SeedableRng;
-use rsa::{BoxedUint, Error, Oaep, RsaPublicKey};
+use rsa::{BoxedUint, Error, Oaep, PublicKey};
 
 #[cfg(feature = "pkcs1v15")]
 use rsa::Pkcs1v15Encrypt;
@@ -25,16 +25,16 @@ fn default_public_key_size_limits() {
     ] {
         let n = modulus(bits);
         let e = BoxedUint::from(65537u64);
-        assert_eq!(RsaPublicKey::new(n.clone(), e.clone()).err(), error);
+        assert_eq!(PublicKey::new(n.clone(), e.clone()).err(), error);
         assert_eq!(
-            RsaPublicKey::new_with_max_size(n, e, RsaPublicKey::MAX_SIZE).err(),
+            PublicKey::new_with_max_size(n, e, PublicKey::MAX_SIZE).err(),
             error
         );
     }
 
     // Storage precision must not allow a short modulus to evade the minimum.
     assert_eq!(
-        RsaPublicKey::new(
+        PublicKey::new(
             BoxedUint::from(3233u64).resize_unchecked(1024),
             17u64.into()
         ),
@@ -45,7 +45,7 @@ fn default_public_key_size_limits() {
 #[test]
 fn explicit_public_key_size_limits() {
     for bits in [512, 1024, 8193] {
-        let key = RsaPublicKey::new_with_size_limits(
+        let key = PublicKey::new_with_size_limits(
             modulus(bits),
             65537u64.into(),
             bits as usize..=bits as usize,
@@ -68,7 +68,7 @@ fn explicit_public_key_size_limits() {
         (1025..=1024, Error::InvalidArguments),
     ] {
         assert_eq!(
-            RsaPublicKey::new_with_size_limits(modulus(1024), 65537u64.into(), limits),
+            PublicKey::new_with_size_limits(modulus(1024), 65537u64.into(), limits),
             Err(error)
         );
     }
@@ -85,7 +85,7 @@ fn size_override_preserves_public_key_validation() {
         (1 << 40 | 1, 1 << 34 | 1, Error::PublicExponentTooLarge),
     ] {
         assert_eq!(
-            RsaPublicKey::new_with_size_limits(n.into(), e.into(), 0..=8192),
+            PublicKey::new_with_size_limits(n.into(), e.into(), 0..=8192),
             Err(error)
         );
     }
@@ -101,22 +101,22 @@ fn public_key_decoding_enforces_default_size_limits() {
 
     for bits in [512, 1023, 1024] {
         let key =
-            RsaPublicKey::new_with_size_limits(modulus(bits), 65537u64.into(), 0..=8192).unwrap();
+            PublicKey::new_with_size_limits(modulus(bits), 65537u64.into(), 0..=8192).unwrap();
         let pkcs1 = key.to_pkcs1_der().unwrap();
         let spki = key.to_public_key_der().unwrap();
         if bits < 1024 {
             assert!(matches!(
-                RsaPublicKey::from_pkcs1_der(pkcs1.as_bytes()),
+                PublicKey::from_pkcs1_der(pkcs1.as_bytes()),
                 Err(pkcs1::Error::KeyMalformed)
             ));
             assert!(matches!(
-                RsaPublicKey::from_public_key_der(spki.as_bytes()),
+                PublicKey::from_public_key_der(spki.as_bytes()),
                 Err(spki::Error::KeyMalformed)
             ));
         } else {
-            assert_eq!(RsaPublicKey::from_pkcs1_der(pkcs1.as_bytes()).unwrap(), key);
+            assert_eq!(PublicKey::from_pkcs1_der(pkcs1.as_bytes()).unwrap(), key);
             assert_eq!(
-                RsaPublicKey::from_public_key_der(spki.as_bytes()).unwrap(),
+                PublicKey::from_public_key_der(spki.as_bytes()).unwrap(),
                 key
             );
         }
@@ -124,7 +124,7 @@ fn public_key_decoding_enforces_default_size_limits() {
         // A legacy key can be decoded into components and explicitly allowed.
         use rsa::pkcs8::der::Decode;
         let components = pkcs1::RsaPublicKeyRef::from_der(pkcs1.as_bytes()).unwrap();
-        let imported = RsaPublicKey::new_with_size_limits(
+        let imported = PublicKey::new_with_size_limits(
             BoxedUint::from_be_slice_vartime(components.modulus.as_bytes()),
             BoxedUint::from_be_slice_vartime(components.public_exponent.as_bytes()),
             0..=8192,
@@ -135,7 +135,7 @@ fn public_key_decoding_enforces_default_size_limits() {
         #[cfg(feature = "serde")]
         {
             let json = serde_json::to_string(&key).unwrap();
-            let decoded = serde_json::from_str::<RsaPublicKey>(&json);
+            let decoded = serde_json::from_str::<PublicKey>(&json);
             if bits < 1024 {
                 assert!(decoded.is_err());
             } else {

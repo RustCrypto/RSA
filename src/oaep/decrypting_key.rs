@@ -2,7 +2,7 @@ use super::decrypt_digest;
 #[cfg(not(feature = "getrandom"))]
 use crate::dummy_rng::DummyRng;
 use crate::{
-    Result, RsaPrivateKey,
+    PrivateKey, Result,
     traits::{Decryptor, RandomizedDecryptor},
 };
 use alloc::{boxed::Box, vec::Vec};
@@ -27,7 +27,7 @@ where
     D: Digest,
     MGD: Digest + FixedOutputReset,
 {
-    inner: RsaPrivateKey,
+    inner: PrivateKey,
     label: Option<Box<[u8]>>,
     phantom: PhantomData<D>,
     mg_phantom: PhantomData<MGD>,
@@ -40,7 +40,7 @@ where
 {
     /// Create a new verifying key from an RSA public key.
     #[must_use]
-    pub fn new(key: RsaPrivateKey) -> Self {
+    pub fn new(key: PrivateKey) -> Self {
         Self {
             inner: key,
             label: None,
@@ -50,7 +50,7 @@ where
     }
 
     /// Create a new verifying key from an RSA public key using provided label
-    pub fn new_with_label<S: Into<Box<[u8]>>>(key: RsaPrivateKey, label: S) -> Self {
+    pub fn new_with_label<S: Into<Box<[u8]>>>(key: PrivateKey, label: S) -> Self {
         Self {
             inner: key,
             label: Some(label.into()),
@@ -126,7 +126,7 @@ mod tests {
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let decrypting_key = DecryptingKey::<Sha256>::new(
-            RsaPrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key"),
+            PrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key"),
         );
 
         let tokens = [

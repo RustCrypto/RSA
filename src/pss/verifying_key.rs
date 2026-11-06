@@ -1,5 +1,5 @@
 use super::{Signature, verify_digest};
-use crate::RsaPublicKey;
+use crate::PublicKey;
 use core::marker::PhantomData;
 use digest::{Digest, FixedOutputReset, Update};
 use signature::{DigestVerifier, Verifier, hazmat::PrehashVerifier};
@@ -26,7 +26,7 @@ pub struct VerifyingKey<D>
 where
     D: Digest,
 {
-    pub(super) inner: RsaPublicKey,
+    pub(super) inner: PublicKey,
     pub(super) salt_len: Option<usize>,
     pub(super) phantom: PhantomData<D>,
 }
@@ -38,13 +38,13 @@ where
     /// Create a new RSASSA-PSS verifying key.
     /// Digest output size is used as a salt length.
     #[must_use]
-    pub fn new(key: RsaPublicKey) -> Self {
+    pub fn new(key: PublicKey) -> Self {
         Self::new_with_salt_len(key, <D as Digest>::output_size())
     }
 
     /// Create a new RSASSA-PSS verifying key.
     #[must_use]
-    pub fn new_with_salt_len(key: RsaPublicKey, salt_len: usize) -> Self {
+    pub fn new_with_salt_len(key: PublicKey, salt_len: usize) -> Self {
         Self {
             inner: key,
             salt_len: Some(salt_len),
@@ -55,7 +55,7 @@ where
     /// Create a new RSASSA-PSS verifying key.
     /// Attempts to automatically detect the salt length.
     #[must_use]
-    pub fn new_with_auto_salt_len(key: RsaPublicKey) -> Self {
+    pub fn new_with_auto_salt_len(key: PublicKey) -> Self {
         Self {
             inner: key,
             salt_len: None,
@@ -124,11 +124,11 @@ where
 // Other trait impls
 //
 
-impl<D> AsRef<RsaPublicKey> for VerifyingKey<D>
+impl<D> AsRef<PublicKey> for VerifyingKey<D>
 where
     D: Digest,
 {
-    fn as_ref(&self) -> &RsaPublicKey {
+    fn as_ref(&self) -> &PublicKey {
         &self.inner
     }
 }
@@ -167,16 +167,16 @@ where
     }
 }
 
-impl<D> From<RsaPublicKey> for VerifyingKey<D>
+impl<D> From<PublicKey> for VerifyingKey<D>
 where
     D: Digest,
 {
-    fn from(key: RsaPublicKey) -> Self {
+    fn from(key: PublicKey) -> Self {
         Self::new(key)
     }
 }
 
-impl<D> From<VerifyingKey<D>> for RsaPublicKey
+impl<D> From<VerifyingKey<D>> for PublicKey
 where
     D: Digest,
 {
@@ -202,7 +202,7 @@ where
             }
         }
 
-        RsaPublicKey::try_from(spki).map(Self::new)
+        PublicKey::try_from(spki).map(Self::new)
     }
 }
 
@@ -254,7 +254,7 @@ mod tests {
         use sha2::Sha256;
 
         let der = include_bytes!("../../tests/examples/pkcs8/rsa2048-pub.der");
-        let pub_key = RsaPublicKey::from_public_key_der(der).unwrap();
+        let pub_key = PublicKey::from_public_key_der(der).unwrap();
         let encoded = include_str!("../../tests/examples/pkcs8/rsa2048-pub.hex").trim();
         let verifying_key = VerifyingKey::<Sha256>::new(pub_key);
 
