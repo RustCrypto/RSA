@@ -1,66 +1,42 @@
-# Marvin tool-kit integration
-This document describes the procedure for replicating the analysis for the Marvin attack. This analysis is best done on a container for reproducibility.
+# Marvin toolkit integration
 
-**TL;DR**:
-```bash
-# Build the image
-docker build -t marvin:latest .
+This directory measures PKCS#1 v1.5 decryption in the **local RSA checkout**
+using [marvin-toolkit](https://github.com/tomato42/marvin-toolkit) probes and
+tlsfuzzer's statistical analysis. It does not download another version of `rsa`.
 
-# Create the output directory and allow container to write to it
-mkdir -p outputs
-chmod a+rw outputs
+## Native Linux run
 
-# Run the analysis
-docker run -d --rm \
-    --name marvin \
-    -v $(pwd)/outputs:/home/rustcrypto/marvin-toolkit/outputs \
-    -v $(pwd)/Cargo.toml:/home/rustcrypto/marvin-toolkit/example/rust-crypto/Cargo.toml \
-    marvin:latest
-
-# Use "docker logs -f marvin" to read live output
-
-# Read the output
-cat outputs/results/report.txt
-```
-
-## Adjusting analysis parameters
-For more help on the options pass in the `-h` flag in the `docker run` command:
-
-```
-docker run ... marvin:latest -h
-```
-
-There are two main parameters of the analysis: RSA key size and the number of repetitions during ciphertext generation.
-
-RSA key size is specified through `-s <1024|2048|4096>`. The number of repetition is specified through `-n <num>`. A larger repetition number will increase the confidence of the analysis, but will make the analysis take longer. The default key size is 2048 and the default repetition count is 100,000.
+Install Rust, Python with `venv`, Git, and OpenSSL. Prepare the upstream tools:
 
 ```bash
-# Run analysis for RSA 4096 with 1 million repetition
-docker run -d --rm \
-    --name marvin \
-    marvin:latest -s 4096 -n 1000000
+git clone https://github.com/tomato42/marvin-toolkit.git /tmp/marvin-toolkit
+cd /tmp/marvin-toolkit
+git checkout 7d264ab2b6611b25b95d5dd6bd1590a761c47048
+git clone https://github.com/tomato42/tlsfuzzer.git
+git -C tlsfuzzer checkout 5eebc4464e5197a7f7392fb9acda99cfc32441f7
+python3 -m venv marvin-venv
+marvin-venv/bin/pip install -r tlsfuzzer/requirements.txt -r tlsfuzzer/requirements-timing.txt
+export MARVIN_TOOLKIT=/tmp/marvin-toolkit
 ```
 
-## Extracting keys, ciphertexts, and analysis results (WIP)
-After the analysis is done, the generate keys, ciphertexts, and the analysis outputs are all copied into the directory `/home/rustcrypto/marvin-toolkit/outputs`. To extract and preserve these artifacts, mount a volume into this directory, such as using a bind mount:
+From the RSA repository root, exercise the full pipeline with a small run:
 
 ```bash
-mkdir -p outputs
-chmod a+rw outputs
-
-# Mount
-docker run -d --rm --name "marvin" \
-    -v $(pwd)/outputs:/home/rustcrypto/marvin-toolkit/outputs \
-    marvin:latest
+./marvin-toolkit/entrypoint.sh -s 2048 -n 1000 -q -o marvin-toolkit/outputs/smoke
+cat marvin-toolkit/outputs/smoke/results/report.txt
 ```
 
-## Compile test harness with custom `Cargo.toml`
-The test harness is compiled at container run-time, so a custom `Cargo.toml` can be passed into the container at runtime to compile the test harness using custom versions of `RustCrypto/RSA` and/or `RustCrypto/crypto-bigint`:
+## Docker
+
+Build with the **RSA repository root** as the context; this includes local
+source changes in the image:
 
 ```bash
-docker run -d --rm --name "marvin" \
-    -v $(pwd)/Cargo.toml:/home/rustcrypto/marvin-toolkit/example/rust-crypto/Cargo.toml \
-    marvin:latest
+docker build -f marvin-toolkit/Dockerfile -t rsa-marvin .
+mkdir -p marvin-toolkit/outputs
+# Allow the image's non-root user to create run directories in this mount.
+chmod a+rwx marvin-toolkit/outputs
+docker run --rm \
+  -v "$(pwd)/marvin-toolkit/outputs:/outputs" \
+  rsa-marvin -s 2048 -n 1000 -q -o /outputs/smoke
 ```
-
-If no `Cargo.toml` is specified, the default one will use `rsa = 0.9`

@@ -11,16 +11,16 @@ keywords = ["rsa", "encryption", "security", "crypto"]
 categories = ["cryptography"]
 readme = "README.md"
 rust-version = "1.87"
-exclude = ["checkct/", "marvin_toolkit/", "thirdparty/"]
+exclude = ["checkct/", "marvin-toolkit/", "thirdparty/"]
 
 [workspace]
-members = ["checkct", "checkct/checkct_macros"]
+members = ["checkct", "checkct/checkct_macros", "marvin-toolkit"]
 default-members = ["."]
-exclude = ["marvin-toolkit"]
 resolver = "3"
 
 [workspace.dependencies]
 crypto-bigint = { version = "0.7.10", default-features = false, features = ["zeroize", "alloc"] }
+rand = "0.10"
 rand_core = { version = "0.10", default-features = false }
 zeroize = { version = "1.8", default-features = false, features = ["alloc"] }
 
@@ -49,7 +49,7 @@ base64ct = { version = "1", features = ["alloc"] }
 hex-literal = "1"
 proptest = "1"
 serde_test = "1.0.89"
-rand = { version = "0.10", features = ["chacha"] }
+rand = { workspace = true, features = ["chacha"] }
 rand_core = { workspace = true }
 sha1 = { version = "0.11", default-features = false, features = ["oid"] }
 sha3 = { version = "0.12", default-features = false, features = ["oid"] }
