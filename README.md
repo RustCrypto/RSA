@@ -18,8 +18,9 @@ specified in [PKCS#1 v2.2 (RFC8017)][RFC8017].
 | RSASSA-PSS | Signatures | [RFC8017 §8.1][RSASSA-PSS] |
 | RSASSA-PKCS1-v1_5 | Signatures | [RFC8017 §8.2][RSASSA-PKCS1-v1_5] |
 
-PKCS#1 v1.5 encryption is provided for compatibility with legacy applications only.
-Prefer OAEP and PSS for new encryption applications.
+PKCS#1 v1.5 encryption is provided as opt-in through feature `legacy-pkcs1v15`
+for compatibility with legacy applications only. Prefer OAEP and PSS for new
+encryption applications.
 
 See the security warning below for known implementation vulnerabilities.
 

@@ -2,7 +2,7 @@
 
 use rand::{SeedableRng, rngs::ChaCha8Rng};
 use rsa::{
-    BoxedUint, Pkcs1v15Sign, Pss, RsaPrivateKey, RsaPublicKey, pkcs1v15, pss,
+    BoxedUint, Pss, RsaPrivateKey, RsaPublicKey, pss,
     signature::{
         DigestVerifier, RandomizedSigner, SignatureEncoding, Verifier, hazmat::PrehashVerifier,
     },
@@ -10,12 +10,16 @@ use rsa::{
 };
 use sha2::{Digest, Sha256};
 
+#[cfg(feature = "legacy-pkcs1v15")]
+use rsa::{Pkcs1v15Sign, pkcs1v15};
+
 fn private_key() -> RsaPrivateKey {
     // 1025 bits makes both k != storage width and PSS emLen != k.
     let mut rng = ChaCha8Rng::from_seed([42; 32]);
     RsaPrivateKey::new(&mut rng, 1025).unwrap()
 }
 
+#[cfg(feature = "legacy-pkcs1v15")]
 fn check_pkcs1v15(key: &RsaPublicKey, message: &[u8], bytes: &[u8], valid: bool) {
     let digest = Sha256::digest(message);
     let signature = pkcs1v15::Signature::try_from(bytes).unwrap();
@@ -72,21 +76,29 @@ fn check_pss(key: &RsaPublicKey, message: &[u8], bytes: &[u8], valid: bool) {
 }
 
 #[test]
-fn signature_octet_strings_round_trip() {
+#[cfg(feature = "legacy-pkcs1v15")]
+fn signature_octet_strings_round_trip_pkcs1v15() {
     for bytes in [&[][..], &[0][..], &[0, 0, 42][..], &[0u8; 129][..]] {
         let pkcs = pkcs1v15::Signature::try_from(bytes).unwrap();
-        let pss = pss::Signature::try_from(bytes).unwrap();
         assert_eq!(pkcs.to_bytes().as_ref(), bytes);
-        assert_eq!(pss.to_bytes().as_ref(), bytes);
         assert_eq!(format!("{pkcs:x}"), hex::encode(bytes));
-        assert_eq!(format!("{pss:x}"), hex::encode(bytes));
         assert_eq!(format!("{pkcs:X}"), hex::encode_upper(bytes));
+    }
+}
+
+#[test]
+fn signature_octet_strings_round_trip_pss() {
+    for bytes in [&[][..], &[0][..], &[0, 0, 42][..], &[0u8; 129][..]] {
+        let pss = pss::Signature::try_from(bytes).unwrap();
+        assert_eq!(pss.to_bytes().as_ref(), bytes);
+        assert_eq!(format!("{pss:x}"), hex::encode(bytes));
         assert_eq!(format!("{pss:X}"), hex::encode_upper(bytes));
     }
 }
 
 #[test]
-fn signatures_require_exact_modulus_length() {
+#[cfg(feature = "legacy-pkcs1v15")]
+fn signatures_require_exact_modulus_length_pkcs1v15() {
     let key = private_key();
     let public = key.to_public_key();
     let message = b"RFC8017 octet-string lengths";
@@ -94,27 +106,40 @@ fn signatures_require_exact_modulus_length() {
     let pkcs = pkcs1v15::SigningKey::<Sha256>::new(key.clone())
         .sign_with_rng(&mut rng, message)
         .to_bytes();
-    let pss = pss::SigningKey::<Sha256>::new(key)
-        .sign_with_rng(&mut rng, message)
-        .to_bytes();
 
     assert_eq!(pkcs.len(), public.size());
-    assert_eq!(pss.len(), public.size());
     check_pkcs1v15(&public, message, &pkcs, true);
-    check_pss(&public, message, &pss, true);
 
     // Adding zero octets changes S's length without changing OS2IP(S).
     for extra in [1, 7, 8] {
         let mut padded = vec![0; extra];
         padded.extend_from_slice(&pkcs);
         check_pkcs1v15(&public, message, &padded, false);
+    }
+    check_pkcs1v15(&public, message, &pkcs[1..], false);
+    check_pkcs1v15(&public, message, &[], false);
+}
+
+#[test]
+fn signatures_require_exact_modulus_length_pss() {
+    let key = private_key();
+    let public = key.to_public_key();
+    let message = b"RFC8017 octet-string lengths";
+    let mut rng = ChaCha8Rng::from_seed([7; 32]);
+    let pss = pss::SigningKey::<Sha256>::new(key)
+        .sign_with_rng(&mut rng, message)
+        .to_bytes();
+
+    assert_eq!(pss.len(), public.size());
+    check_pss(&public, message, &pss, true);
+
+    // Adding zero octets changes S's length without changing OS2IP(S).
+    for extra in [1, 7, 8] {
         let mut padded = vec![0; extra];
         padded.extend_from_slice(&pss);
         check_pss(&public, message, &padded, false);
     }
-    check_pkcs1v15(&public, message, &pkcs[1..], false);
     check_pss(&public, message, &pss[1..], false);
-    check_pkcs1v15(&public, message, &[], false);
     check_pss(&public, message, &[], false);
 }
 

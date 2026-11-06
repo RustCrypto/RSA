@@ -231,9 +231,11 @@ pub use signature;
 mod algorithms;
 pub mod errors;
 pub mod oaep;
-pub mod pkcs1v15;
 pub mod pss;
 pub mod traits;
+
+#[cfg(feature = "legacy-pkcs1v15")]
+pub mod pkcs1v15;
 
 #[cfg(not(feature = "getrandom"))]
 mod dummy_rng;
@@ -250,12 +252,14 @@ pub use sha2;
 pub use crate::{
     errors::{Error, Result},
     oaep::Oaep,
-    pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign},
     private_key::RsaPrivateKey,
     pss::Pss,
     public_key::RsaPublicKey,
     traits::keys::CrtValue,
 };
+
+#[cfg(feature = "legacy-pkcs1v15")]
+pub use crate::pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign};
 
 #[cfg(feature = "hazmat")]
 pub mod hazmat;
