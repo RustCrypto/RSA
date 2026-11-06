@@ -10,11 +10,11 @@ use signature::{
     hazmat::RandomizedPrehashSigner,
 };
 
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 use rsa::{Pkcs1v15Sign, pkcs1v15};
 
 // These are only tested with pkcs1v15
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 use signature::{DigestSigner, MultipartSigner, SignatureEncoding, Signer, hazmat::PrehashSigner};
 
 fn key() -> RsaPrivateKey {
@@ -125,7 +125,7 @@ fn default_rng_reaches_signature_scheme() {
 }
 
 #[test]
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 fn pkcs1v15_default_signatures_are_unchanged() {
     let key = key();
     let digest = Sha256::digest(b"message");

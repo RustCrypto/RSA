@@ -22,5 +22,5 @@ pub(crate) mod pss;
 pub(crate) mod reduction;
 pub(crate) mod rsa;
 
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 pub(crate) mod pkcs1v15;

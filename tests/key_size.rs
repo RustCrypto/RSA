@@ -5,7 +5,7 @@ use rand::rngs::ChaCha8Rng;
 use rand_core::SeedableRng;
 use rsa::{BoxedUint, Error, Oaep, RsaPublicKey};
 
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 use rsa::Pkcs1v15Encrypt;
 
 // Public-key construction checks the modulus size and parity, not its factorization.
@@ -55,7 +55,7 @@ fn explicit_public_key_size_limits() {
         // Operation-time checks must respect the constructor's explicit size override.
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
 
-        #[cfg(feature = "legacy-pkcs1v15")]
+        #[cfg(feature = "pkcs1v15")]
         key.encrypt(&mut rng, Pkcs1v15Encrypt, b"test").unwrap();
 
         key.encrypt(&mut rng, Oaep::<sha1::Sha1>::new(), b"test")

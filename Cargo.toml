@@ -68,7 +68,7 @@ std = ["pkcs1?/std", "pkcs8?/std"]
 encoding = ["dep:pkcs1", "dep:pkcs8", "dep:spki"]
 hazmat = []
 # PKCS #1 v1.5 is only supported as opt-in basis for legacy protocols 
-legacy-pkcs1v15 = []
+pkcs1v15 = []
 getrandom = ["crypto-bigint/getrandom", "crypto-common"]
 serde = ["encoding", "dep:serde", "dep:serdect", "crypto-bigint/serde"]
 pkcs5 = ["pkcs8/encryption"]

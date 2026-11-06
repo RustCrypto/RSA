@@ -10,7 +10,7 @@ use rsa::{
 };
 use sha2::{Digest, Sha256};
 
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 use rsa::{Pkcs1v15Sign, pkcs1v15};
 
 fn private_key() -> RsaPrivateKey {
@@ -19,7 +19,7 @@ fn private_key() -> RsaPrivateKey {
     RsaPrivateKey::new(&mut rng, 1025).unwrap()
 }
 
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 fn check_pkcs1v15(key: &RsaPublicKey, message: &[u8], bytes: &[u8], valid: bool) {
     let digest = Sha256::digest(message);
     let signature = pkcs1v15::Signature::try_from(bytes).unwrap();
@@ -76,7 +76,7 @@ fn check_pss(key: &RsaPublicKey, message: &[u8], bytes: &[u8], valid: bool) {
 }
 
 #[test]
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 fn signature_octet_strings_round_trip_pkcs1v15() {
     for bytes in [&[][..], &[0][..], &[0, 0, 42][..], &[0u8; 129][..]] {
         let pkcs = pkcs1v15::Signature::try_from(bytes).unwrap();
@@ -97,7 +97,7 @@ fn signature_octet_strings_round_trip_pss() {
 }
 
 #[test]
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 fn signatures_require_exact_modulus_length_pkcs1v15() {
     let key = private_key();
     let public = key.to_public_key();

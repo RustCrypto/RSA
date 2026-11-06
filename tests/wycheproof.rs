@@ -18,7 +18,7 @@ use sha2::{
     digest::{Digest, FixedOutputReset},
 };
 
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 use rsa::pkcs1v15;
 
 #[derive(Deserialize, Debug)]
@@ -157,7 +157,7 @@ impl Drop for Summary {
 // #[case("rsa_signature_8192_sha256_test.json")] TODO: needs disabling of maxsize
 // #[case("rsa_signature_8192_sha384_test.json")] TODO: needs disabling of maxsize
 // #[case("rsa_signature_8192_sha512_test.json")] TODO: needs disabling of maxsize
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 fn test_rsa_pkcs1_verify(#[case] file: &str) {
     let path = format!("thirdparty/wycheproof/testvectors_v1/{file}");
     let data_file = File::open(&path)

@@ -70,11 +70,11 @@ macro_rules! signature_tests {
 
 signature_tests!(pss);
 
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 signature_tests!(pkcs1v15);
 
 #[test]
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 fn sign_with_large_key() {
     use crypto_bigint::{BoxedUint, ConcatenatingMul, NonZero, Resize};
     use rand::{SeedableRng, rngs::ChaCha8Rng};
@@ -123,6 +123,6 @@ fn sign_with_large_key() {
 
     check_signing!(pss);
 
-    #[cfg(feature = "legacy-pkcs1v15")]
+    #[cfg(feature = "pkcs1v15")]
     check_signing!(pkcs1v15);
 }

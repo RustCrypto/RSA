@@ -47,8 +47,8 @@
 //! <code><a href="./pkcs1v15/index.html">pkcs1v15</a></code> module.
 //! </div>
 //!
-#![cfg_attr(feature = "legacy-pkcs1v15", doc = "```")]
-#![cfg_attr(not(feature = "legacy-pkcs1v15"), doc = "```ignore")]
+#![cfg_attr(feature = "pkcs1v15", doc = "```")]
+#![cfg_attr(not(feature = "pkcs1v15"), doc = "```ignore")]
 //! use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Encrypt};
 //!
 //! let mut rng = rand::rng();
@@ -74,8 +74,8 @@
 //! See security notes in the <code><a href="./pkcs1v15/index.html">pkcs1v15</a></code> module.
 //! </div>
 //!
-#![cfg_attr(feature = "legacy-pkcs1v15", doc = "```")]
-#![cfg_attr(not(feature = "legacy-pkcs1v15"), doc = "```ignore")]
+#![cfg_attr(feature = "pkcs1v15", doc = "```")]
+#![cfg_attr(not(feature = "pkcs1v15"), doc = "```ignore")]
 //! use rsa::RsaPrivateKey;
 //! use rsa::pkcs1v15::{SigningKey, VerifyingKey};
 //! use rsa::signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier};
@@ -236,7 +236,7 @@ pub mod oaep;
 pub mod pss;
 pub mod traits;
 
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 pub mod pkcs1v15;
 
 #[cfg(not(feature = "getrandom"))]
@@ -260,7 +260,7 @@ pub use crate::{
     traits::keys::CrtValue,
 };
 
-#[cfg(feature = "legacy-pkcs1v15")]
+#[cfg(feature = "pkcs1v15")]
 pub use crate::pkcs1v15::{Pkcs1v15Encrypt, Pkcs1v15Sign};
 
 #[cfg(feature = "hazmat")]
