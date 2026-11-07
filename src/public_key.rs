@@ -179,7 +179,7 @@ impl From<&PrivateKey> for PublicKey {
 impl Hash for PublicKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // Domain separator for RSA private keys
-        state.write(b"RsaPublicKey");
+        state.write(b"PublicKey");
         // TODO(tarcieri): to match the `PartialEq` impl we should strip leading zeros
         Hash::hash(&self.n.as_limbs(), state);
         Hash::hash(&self.e.as_limbs(), state);

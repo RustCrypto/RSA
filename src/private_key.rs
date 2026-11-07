@@ -52,7 +52,7 @@ impl fmt::Debug for PrivateKey {
         } else {
             "None"
         };
-        f.debug_struct("RsaPrivateKey")
+        f.debug_struct("PrivateKey")
             .field("pubkey_components", &self.pubkey_components)
             .field("d", &"...")
             .field("primes", &"&[...]")
@@ -80,7 +80,7 @@ impl AsRef<PublicKey> for PrivateKey {
 impl Hash for PrivateKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
         // Domain separator for RSA private keys
-        state.write(b"RsaPrivateKey");
+        state.write(b"PrivateKey");
         Hash::hash(&self.pubkey_components, state);
     }
 }
@@ -228,8 +228,8 @@ impl PrivateKey {
     /// `from_components_with_large_exponent`.
     ///
     /// Callers are responsible for:
-    /// 1. Validating the key (to ensure precomputation won't fail)
-    /// 2. Calling precompute() after validation
+    /// 1. Validating the key
+    /// 2. Calling `precompute()` after validation, propagating any error
     fn from_components_inner(
         n: BoxedUint,
         e: BoxedUint,
@@ -343,11 +343,9 @@ impl PrivateKey {
     ) -> Result<PrivateKey> {
         let mut k = Self::from_components_inner(n, e, d, primes, false)?;
 
-        // Validate everything except exponent size bounds (to ensure precompute can't fail)
+        // Validate everything except exponent size bounds.
         validate_skip_exponent_size(&k)?;
-
-        // Precompute when possible, ignore error otherwise.
-        k.precompute().ok();
+        k.precompute()?;
 
         Ok(k)
     }
@@ -378,13 +376,8 @@ impl PrivateKey {
         primes: Vec<BoxedUint>,
     ) -> Result<PrivateKey> {
         let mut k = Self::from_components_inner(n, e, d, primes, false)?;
-
-        // Always validate the key, to ensure precompute can't fail
         k.validate()?;
-
-        // Precompute when possible, ignore error otherwise.
-        k.precompute().ok();
-
+        k.precompute()?;
         Ok(k)
     }
 
@@ -470,7 +463,7 @@ impl PrivateKey {
 
     /// Get the public key from the private key, cloning `n` and `e`.
     ///
-    /// Generally this is not needed since `RsaPrivateKey` implements the `PublicKey` trait,
+    /// Generally this is not needed since `PrivateKey` implements the `PublicKey` trait,
     /// but it can occasionally be useful to discard the private information entirely.
     #[must_use]
     pub fn to_public_key(&self) -> PublicKey {
@@ -478,7 +471,10 @@ impl PrivateKey {
     }
 
     /// Performs some calculations to speed up private key operations.
-    #[allow(clippy::missing_errors_doc, reason = "TODO")]
+    ///
+    /// # Errors
+    /// Returns [`Error::InvalidPrime`] if either of the first two factors is one, or if they
+    /// are not coprime and the CRT coefficient cannot be computed.
     pub fn precompute(&mut self) -> Result<()> {
         if self.precomputed.is_some() {
             return Ok(());
@@ -732,7 +728,7 @@ fn validate_private_key_parts(key: &PrivateKey) -> Result<()> {
 /// Validate the private key structure and cryptographic correctness,
 /// skipping only the exponent size bounds checks.
 ///
-/// This performs all the same checks as `RsaPrivateKey::validate()` except
+/// This performs all the same checks as `PrivateKey::validate()` except
 /// it doesn't verify that the exponent is within the standard bounds.
 #[cfg(feature = "hazmat")]
 fn validate_skip_exponent_size(key: &PrivateKey) -> Result<()> {
@@ -782,6 +778,53 @@ mod tests {
 
     #[cfg(feature = "encoding")]
     use pkcs8::DecodePrivateKey;
+
+    #[test]
+    fn non_coprime_factors_precompute_error() {
+        // Distinct odd composite factors can pass validation: 3 * 19 = 1 mod 8 and mod 14.
+        // However, neither factor is invertible modulo the other, so precomputation fails.
+        for (p, q) in [(9u64, 15u64), (15, 9)] {
+            let n = BoxedUint::from(p * q);
+            let e = BoxedUint::from(3u64);
+            let d = BoxedUint::from(19u64);
+            let primes = vec![BoxedUint::from(p), BoxedUint::from(q)];
+            let mut key = PrivateKey::from_components_inner(
+                n.clone(),
+                e.clone(),
+                d.clone(),
+                primes.clone(),
+                false,
+            )
+            .unwrap();
+            key.validate().unwrap();
+            assert_eq!(key.precompute(), Err(Error::InvalidPrime));
+            assert!(key.precomputed.is_none());
+
+            assert_eq!(
+                PrivateKey::from_components(n.clone(), e.clone(), d.clone(), primes.clone()),
+                Err(Error::InvalidPrime)
+            );
+            assert_eq!(
+                PrivateKey::from_components_with_wide_primes(
+                    n.clone(),
+                    e.clone(),
+                    d.clone(),
+                    primes.clone(),
+                ),
+                Err(Error::InvalidPrime)
+            );
+            #[cfg(feature = "hazmat")]
+            assert_eq!(
+                PrivateKey::from_components_with_large_exponent(n, e.clone(), d, primes.clone()),
+                Err(Error::InvalidPrime)
+            );
+            assert_eq!(
+                PrivateKey::from_p_q(primes[0].clone(), primes[1].clone(), e.clone()),
+                Err(Error::InvalidPrime)
+            );
+            assert_eq!(PrivateKey::from_primes(primes, e), Err(Error::InvalidPrime));
+        }
+    }
 
     #[test]
     fn repeated_prime_factors() {
