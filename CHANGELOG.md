@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add signature max size restrictions ([#767])
 - Impl `TryFrom<BitStringRef<_>>` for Signature types ([#764])
 - Minimum modulus size checks ([#760])
-- Add `RsaPrivateKey::from_components_with_large_exponent ([#648])
+- Add `RsaPrivateKey::from_components_with_large_exponent` ([#648])
 - Support for cryptographic operations with larger keys ([#595])
 - Add `RsaPrivateKey::as_public_key()` convenience method ([#592])
 - error: impl `core::error::Error` ([#530])
