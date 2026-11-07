@@ -7,11 +7,11 @@ fn signature_stringify() {
     use pkcs8::DecodePrivateKey;
     use signature::Signer;
 
-    use rsa::RsaPrivateKey;
+    use rsa::PrivateKey;
     use rsa::pkcs1v15::SigningKey;
 
     let pem = include_str!("examples/pkcs8/rsa2048-priv.pem");
-    let private_key = RsaPrivateKey::from_pkcs8_pem(pem).unwrap();
+    let private_key = PrivateKey::from_pkcs8_pem(pem).unwrap();
     let signing_key = SigningKey::<sha2::Sha256>::new(private_key);
 
     let bytes: &[u8] = b"rsa4096"; // HACK - the criterion is that the signature has leading zeros.
@@ -28,7 +28,7 @@ fn signature_stringify() {
 #[test]
 fn signing_key_new_same_as_from() {
     use pkcs1::DecodeRsaPrivateKey;
-    use rsa::RsaPrivateKey;
+    use rsa::PrivateKey;
     use signature::{Keypair, Signer, Verifier};
 
     // randomly generated key, hardcoded for test repeatability
@@ -60,7 +60,7 @@ eMjIuecwLapPwjY2G0/sUW61bqrxgW10wDJHPNllGsZFanzpb7x5o/7eNhzc4qNf
 Rmb665iB5fwpqmbE/hYKIn7asYQE+V0dkgt8M3qvlJJ5JJbCrJx3
 -----END RSA PRIVATE KEY-----";
 
-    let priv_key = RsaPrivateKey::from_pkcs1_pem(PRIV_KEY_PKCS1_PEM).unwrap();
+    let priv_key = PrivateKey::from_pkcs1_pem(PRIV_KEY_PKCS1_PEM).unwrap();
 
     let msg = b"1234";
 

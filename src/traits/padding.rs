@@ -5,7 +5,7 @@ use alloc::vec::Vec;
 use rand_core::TryCryptoRng;
 
 use crate::errors::Result;
-use crate::{RsaPrivateKey, RsaPublicKey};
+use crate::{PrivateKey, PublicKey};
 
 /// Padding scheme used for encryption.
 pub trait PaddingScheme {
@@ -16,7 +16,7 @@ pub trait PaddingScheme {
     fn decrypt<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: Option<&mut Rng>,
-        priv_key: &RsaPrivateKey,
+        priv_key: &PrivateKey,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>>;
 
@@ -25,7 +25,7 @@ pub trait PaddingScheme {
     fn encrypt<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: &mut Rng,
-        pub_key: &RsaPublicKey,
+        pub_key: &PublicKey,
         msg: &[u8],
     ) -> Result<Vec<u8>>;
 }
@@ -37,7 +37,7 @@ pub trait SignatureScheme {
     fn sign<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: Option<&mut Rng>,
-        priv_key: &RsaPrivateKey,
+        priv_key: &PrivateKey,
         hashed: &[u8],
     ) -> Result<Vec<u8>>;
 
@@ -48,5 +48,5 @@ pub trait SignatureScheme {
     ///
     /// If the message is valid `Ok(())` is returned, otherwise an `Err` indicating failure.
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
-    fn verify(self, pub_key: &RsaPublicKey, hashed: &[u8], sig: &[u8]) -> Result<()>;
+    fn verify(self, pub_key: &PublicKey, hashed: &[u8], sig: &[u8]) -> Result<()>;
 }

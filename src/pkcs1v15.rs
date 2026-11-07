@@ -50,7 +50,7 @@ use crate::algorithms::pkcs1v15::*;
 use crate::algorithms::rsa::{rsa_decrypt_and_check, rsa_encrypt};
 use crate::errors::{Error, Result};
 use crate::traits::{PaddingScheme, PrivateKeyParts, PublicKeyParts, SignatureScheme};
-use crate::{RsaPrivateKey, RsaPublicKey, public_key};
+use crate::{PrivateKey, PublicKey, public_key};
 
 /// Encryption using PKCS#1 v1.5 padding. Decryption uses implicit rejection from
 /// [draft-irtf-cfrg-rsa-guidance-10 §7.2].
@@ -70,7 +70,7 @@ impl PaddingScheme for Pkcs1v15Encrypt {
     fn decrypt<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: Option<&mut Rng>,
-        priv_key: &RsaPrivateKey,
+        priv_key: &PrivateKey,
         ciphertext: &[u8],
     ) -> Result<Vec<u8>> {
         decrypt(rng, priv_key, ciphertext)
@@ -79,7 +79,7 @@ impl PaddingScheme for Pkcs1v15Encrypt {
     fn encrypt<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: &mut Rng,
-        pub_key: &RsaPublicKey,
+        pub_key: &PublicKey,
         msg: &[u8],
     ) -> Result<Vec<u8>> {
         encrypt(rng, pub_key, msg)
@@ -128,7 +128,7 @@ impl SignatureScheme for Pkcs1v15Sign {
     fn sign<Rng: TryCryptoRng + ?Sized>(
         self,
         rng: Option<&mut Rng>,
-        priv_key: &RsaPrivateKey,
+        priv_key: &PrivateKey,
         hashed: &[u8],
     ) -> Result<Vec<u8>> {
         if let Some(hash_len) = self.hash_len {
@@ -140,7 +140,7 @@ impl SignatureScheme for Pkcs1v15Sign {
         sign(rng, priv_key, &self.prefix, hashed)
     }
 
-    fn verify(self, pub_key: &RsaPublicKey, hashed: &[u8], sig: &[u8]) -> Result<()> {
+    fn verify(self, pub_key: &PublicKey, hashed: &[u8], sig: &[u8]) -> Result<()> {
         if let Some(hash_len) = self.hash_len {
             if hashed.len() != hash_len {
                 return Err(Error::InputNotHashed);
@@ -157,7 +157,7 @@ impl SignatureScheme for Pkcs1v15Sign {
 #[inline]
 fn encrypt<R: TryCryptoRng + ?Sized>(
     rng: &mut R,
-    pub_key: &RsaPublicKey,
+    pub_key: &PublicKey,
     msg: &[u8],
 ) -> Result<Vec<u8>> {
     public_key::check_public(pub_key)?;
@@ -176,7 +176,7 @@ fn encrypt<R: TryCryptoRng + ?Sized>(
 #[inline]
 fn decrypt<R: TryCryptoRng + ?Sized>(
     rng: Option<&mut R>,
-    priv_key: &RsaPrivateKey,
+    priv_key: &PrivateKey,
     ciphertext: &[u8],
 ) -> Result<Vec<u8>> {
     public_key::check_public(priv_key)?;
@@ -218,11 +218,7 @@ fn decrypt<R: TryCryptoRng + ?Sized>(
 }
 
 /// Sign with the default source of blinding randomness, when enabled.
-fn sign_with_default_rng(
-    priv_key: &RsaPrivateKey,
-    prefix: &[u8],
-    hashed: &[u8],
-) -> Result<Vec<u8>> {
+fn sign_with_default_rng(priv_key: &PrivateKey, prefix: &[u8], hashed: &[u8]) -> Result<Vec<u8>> {
     #[cfg(feature = "getrandom")]
     {
         sign(
@@ -253,7 +249,7 @@ fn sign_with_default_rng(
 #[inline]
 fn sign<R: TryCryptoRng + ?Sized>(
     rng: Option<&mut R>,
-    priv_key: &RsaPrivateKey,
+    priv_key: &PrivateKey,
     prefix: &[u8],
     hashed: &[u8],
 ) -> Result<Vec<u8>> {
@@ -269,7 +265,7 @@ fn sign<R: TryCryptoRng + ?Sized>(
 
 /// Verifies an RSA PKCS#1 v1.5 signature.
 #[inline]
-fn verify(pub_key: &RsaPublicKey, prefix: &[u8], hashed: &[u8], sig: &[u8]) -> Result<()> {
+fn verify(pub_key: &PublicKey, prefix: &[u8], hashed: &[u8], sig: &[u8]) -> Result<()> {
     // RFC8017 §8.2.2 steps 1 and 2: validate S before converting it to s.
     if sig.len() != pub_key.size() {
         return Err(Error::Verification);
@@ -338,9 +334,9 @@ mod tests {
     use crate::traits::{
         Decryptor, EncryptingKeypair, PublicKeyParts, RandomizedDecryptor, RandomizedEncryptor,
     };
-    use crate::{RsaPrivateKey, RsaPublicKey};
+    use crate::{PrivateKey, PublicKey};
 
-    fn get_private_key() -> RsaPrivateKey {
+    fn get_private_key() -> PrivateKey {
         // In order to generate new test vectors you'll need the PEM form of this key:
         // -----BEGIN RSA PRIVATE KEY-----
         // MIIBOgIBAAJBALKZD0nEffqM1ACuak0bijtqE2QrI/KLADv7l3kK3ppMyCuLKoF0
@@ -352,7 +348,7 @@ mod tests {
         // tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
         // -----END RSA PRIVATE KEY-----
 
-        RsaPrivateKey::from_components(
+        PrivateKey::from_components(
             BoxedUint::from_be_hex("B2990F49C47DFA8CD400AE6A4D1B8A3B6A13642B23F28B003BFB97790ADE9A4CC82B8B2A81747DDEC08B6296E53A08C331687EF25C4BF4936BA1C0E6041E9D15", 512).unwrap(),
             BoxedUint::from(65_537u64),
             BoxedUint::from_be_hex("8ABD6A69F4D1A4B487F0AB8D7AAEFD38609405C999984E30F567E1E8AEEFF44E8B18BDB1EC78DFA31A55E32A48D7FB131F5AF1F44D7D6B2CED2A9DF5E5AE4535", 512).unwrap(),
@@ -402,7 +398,7 @@ mod tests {
                 input = input[0..k - 11].to_vec();
             }
 
-            let pub_key: RsaPublicKey = priv_key.clone().into();
+            let pub_key: PublicKey = priv_key.clone().into();
             let ciphertext = encrypt(&mut rng, &pub_key, &input).unwrap();
             assert_ne!(input, ciphertext);
 
@@ -466,7 +462,7 @@ mod tests {
 
     #[test]
     fn implicit_rejection_preserves_public_errors() {
-        let tiny_key = RsaPrivateKey::from_components(
+        let tiny_key = PrivateKey::from_components(
             BoxedUint::from(3233u64),
             BoxedUint::from(17u64),
             BoxedUint::from(413u64),
@@ -699,7 +695,7 @@ mod tests {
     )]
     fn test_verify_pkcs1v15(#[case] text: &str, #[case] sig: [u8; 64], #[case] expected: bool) {
         let priv_key = get_private_key();
-        let pub_key: RsaPublicKey = priv_key.into();
+        let pub_key: PublicKey = priv_key.into();
 
         let digest = Sha1::digest(text.as_bytes()).to_vec();
 
@@ -736,7 +732,7 @@ mod tests {
     ) {
         let priv_key = get_private_key();
 
-        let pub_key: RsaPublicKey = priv_key.into();
+        let pub_key: PublicKey = priv_key.into();
         let verifying_key = VerifyingKey::<Sha1>::new(pub_key);
 
         let result = verifying_key.verify(
@@ -775,7 +771,7 @@ mod tests {
     ) {
         let priv_key = get_private_key();
 
-        let pub_key: RsaPublicKey = priv_key.into();
+        let pub_key: PublicKey = priv_key.into();
         let verifying_key = VerifyingKey::new(pub_key);
 
         let result = verifying_key.verify_digest(
@@ -802,7 +798,7 @@ mod tests {
         let sig = priv_key.sign(Pkcs1v15Sign::new_unprefixed(), msg).unwrap();
         assert_eq!(expected_sig, sig);
 
-        let pub_key: RsaPublicKey = priv_key.into();
+        let pub_key: PublicKey = priv_key.into();
         pub_key
             .verify(Pkcs1v15Sign::new_unprefixed(), msg, &sig)
             .expect("failed to verify");

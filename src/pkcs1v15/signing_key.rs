@@ -1,5 +1,5 @@
 use super::{Signature, VerifyingKey, pkcs1v15_generate_prefix, sign, sign_with_default_rng};
-use crate::{Generate, Result, RsaPrivateKey};
+use crate::{Generate, PrivateKey, Result};
 use alloc::vec::Vec;
 use const_oid::AssociatedOid;
 use core::marker::PhantomData;
@@ -38,7 +38,7 @@ pub struct SigningKey<D>
 where
     D: Digest,
 {
-    inner: RsaPrivateKey,
+    inner: PrivateKey,
     prefix: Vec<u8>,
     phantom: PhantomData<D>,
 }
@@ -49,7 +49,7 @@ where
 {
     /// Create a new signing key with a prefix for the digest `D`.
     #[must_use]
-    pub fn new(key: RsaPrivateKey) -> Self {
+    pub fn new(key: PrivateKey) -> Self {
         Self {
             inner: key,
             prefix: pkcs1v15_generate_prefix::<D>(),
@@ -61,7 +61,7 @@ where
     #[allow(clippy::missing_errors_doc, reason = "TODO")]
     pub fn random<R: TryCryptoRng + ?Sized>(rng: &mut R, bit_size: usize) -> Result<Self> {
         Ok(Self {
-            inner: RsaPrivateKey::new(rng, bit_size)?,
+            inner: PrivateKey::new(rng, bit_size)?,
             prefix: pkcs1v15_generate_prefix::<D>(),
             phantom: Default::default(),
         })
@@ -78,7 +78,7 @@ where
     ///
     /// In most cases you'll want to use [`SigningKey::new`].
     #[must_use]
-    pub fn new_unprefixed(key: RsaPrivateKey) -> Self {
+    pub fn new_unprefixed(key: PrivateKey) -> Self {
         Self {
             inner: key,
             prefix: Vec::new(),
@@ -93,7 +93,7 @@ where
         bit_size: usize,
     ) -> Result<Self> {
         Ok(Self {
-            inner: RsaPrivateKey::new(rng, bit_size)?,
+            inner: PrivateKey::new(rng, bit_size)?,
             prefix: Vec::new(),
             phantom: Default::default(),
         })
@@ -102,7 +102,7 @@ where
 
 /// Generate a key with the default RSA parameters and a prefix for the digest `D`.
 ///
-/// See [`RsaPrivateKey::DEFAULT_BITS`] for the default modulus size.
+/// See [`PrivateKey::DEFAULT_BITS`] for the default modulus size.
 impl<D> Generate for SigningKey<D>
 where
     D: Digest + AssociatedOid,
@@ -110,7 +110,7 @@ where
     fn try_generate_from_rng<R: TryCryptoRng + ?Sized>(
         rng: &mut R,
     ) -> core::result::Result<Self, R::Error> {
-        RsaPrivateKey::try_generate_from_rng(rng).map(Self::new)
+        PrivateKey::try_generate_from_rng(rng).map(Self::new)
     }
 }
 
@@ -230,11 +230,11 @@ where
 // Other trait impls
 //
 
-impl<D> AsRef<RsaPrivateKey> for SigningKey<D>
+impl<D> AsRef<PrivateKey> for SigningKey<D>
 where
     D: Digest,
 {
-    fn as_ref(&self) -> &RsaPrivateKey {
+    fn as_ref(&self) -> &PrivateKey {
         &self.inner
     }
 }
@@ -259,16 +259,16 @@ where
     }
 }
 
-impl<D> From<RsaPrivateKey> for SigningKey<D>
+impl<D> From<PrivateKey> for SigningKey<D>
 where
     D: Digest + AssociatedOid,
 {
-    fn from(key: RsaPrivateKey) -> Self {
+    fn from(key: PrivateKey) -> Self {
         Self::new(key)
     }
 }
 
-impl<D> From<SigningKey<D>> for RsaPrivateKey
+impl<D> From<SigningKey<D>> for PrivateKey
 where
     D: Digest,
 {
@@ -317,7 +317,7 @@ where
         private_key_info
             .algorithm
             .assert_algorithm_oid(pkcs1::ALGORITHM_OID)?;
-        RsaPrivateKey::try_from(private_key_info).map(Self::new)
+        PrivateKey::try_from(private_key_info).map(Self::new)
     }
 }
 
@@ -366,14 +366,14 @@ mod tests {
     #[cfg(all(feature = "hazmat", feature = "serde"))]
     fn test_serde() {
         use super::*;
-        use crate::RsaPrivateKey;
+        use crate::PrivateKey;
         use rand::rngs::ChaCha8Rng;
         use rand_core::SeedableRng;
         use serde_test::{Configure, Token, assert_tokens};
         use sha2::Sha256;
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        let priv_key = RsaPrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key");
+        let priv_key = PrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key");
         let signing_key = SigningKey::<Sha256>::new(priv_key);
 
         let tokens = [Token::Str(concat!(

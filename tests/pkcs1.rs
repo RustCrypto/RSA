@@ -5,7 +5,7 @@
 use crypto_bigint::{BoxedUint, CtEq};
 use hex_literal::hex;
 use rsa::{
-    RsaPrivateKey, RsaPublicKey,
+    PrivateKey, PublicKey,
     pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},
     traits::{PrivateKeyParts, PublicKeyParts},
 };
@@ -49,7 +49,7 @@ const RSA_4096_PUB_PEM: &str = include_str!("examples/pkcs1/rsa4096-pub.pem");
 
 #[test]
 fn decode_rsa2048_priv_der() {
-    let key = RsaPrivateKey::from_pkcs1_der(RSA_2048_PRIV_DER).unwrap();
+    let key = PrivateKey::from_pkcs1_der(RSA_2048_PRIV_DER).unwrap();
 
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa2048-priv.pem
@@ -108,7 +108,7 @@ fn decode_rsa2048_priv_der() {
 
 #[test]
 fn decode_rsa4096_priv_der() {
-    let key = RsaPrivateKey::from_pkcs1_der(RSA_4096_PRIV_DER).unwrap();
+    let key = PrivateKey::from_pkcs1_der(RSA_4096_PRIV_DER).unwrap();
 
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa4096-priv.pem
@@ -191,7 +191,7 @@ fn decode_rsa4096_priv_der() {
 
 #[test]
 fn decode_rsa2048_pub_der() {
-    let key = RsaPublicKey::from_pkcs1_der(RSA_2048_PUB_DER).unwrap();
+    let key = PublicKey::from_pkcs1_der(RSA_2048_PUB_DER).unwrap();
 
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa2048-pub.pem
@@ -215,7 +215,7 @@ fn decode_rsa2048_pub_der() {
 
 #[test]
 fn decode_rsa4096_pub_der() {
-    let key = RsaPublicKey::from_pkcs1_der(RSA_4096_PUB_DER).unwrap();
+    let key = PublicKey::from_pkcs1_der(RSA_4096_PUB_DER).unwrap();
 
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa4096-pub.pem
@@ -246,28 +246,28 @@ fn decode_rsa4096_pub_der() {
 
 #[test]
 fn encode_rsa2048_priv_der() {
-    let key = RsaPrivateKey::from_pkcs1_der(RSA_2048_PRIV_DER).unwrap();
+    let key = PrivateKey::from_pkcs1_der(RSA_2048_PRIV_DER).unwrap();
     let der = key.to_pkcs1_der().unwrap();
     assert_eq!(der.as_bytes(), RSA_2048_PRIV_DER)
 }
 
 #[test]
 fn encode_rsa4096_priv_der() {
-    let key = RsaPrivateKey::from_pkcs1_der(RSA_4096_PRIV_DER).unwrap();
+    let key = PrivateKey::from_pkcs1_der(RSA_4096_PRIV_DER).unwrap();
     let der = key.to_pkcs1_der().unwrap();
     assert_eq!(der.as_bytes(), RSA_4096_PRIV_DER)
 }
 
 #[test]
 fn encode_rsa2048_pub_der() {
-    let key = RsaPublicKey::from_pkcs1_der(RSA_2048_PUB_DER).unwrap();
+    let key = PublicKey::from_pkcs1_der(RSA_2048_PUB_DER).unwrap();
     let der = key.to_pkcs1_der().unwrap();
     assert_eq!(der.as_ref(), RSA_2048_PUB_DER)
 }
 
 #[test]
 fn encode_rsa4096_pub_der() {
-    let key = RsaPublicKey::from_pkcs1_der(RSA_4096_PUB_DER).unwrap();
+    let key = PublicKey::from_pkcs1_der(RSA_4096_PUB_DER).unwrap();
     let der = key.to_pkcs1_der().unwrap();
     assert_eq!(der.as_ref(), RSA_4096_PUB_DER)
 }
@@ -275,7 +275,7 @@ fn encode_rsa4096_pub_der() {
 #[test]
 #[cfg(feature = "encoding")]
 fn decode_rsa2048_priv_pem() {
-    let key = RsaPrivateKey::from_pkcs1_pem(RSA_2048_PRIV_PEM).unwrap();
+    let key = PrivateKey::from_pkcs1_pem(RSA_2048_PRIV_PEM).unwrap();
 
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa2048-priv.pem
@@ -335,7 +335,7 @@ fn decode_rsa2048_priv_pem() {
 #[test]
 #[cfg(feature = "encoding")]
 fn decode_rsa4096_priv_pem() {
-    let key = RsaPrivateKey::from_pkcs1_pem(RSA_4096_PRIV_PEM).unwrap();
+    let key = PrivateKey::from_pkcs1_pem(RSA_4096_PRIV_PEM).unwrap();
 
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa4096-priv.pem
@@ -420,7 +420,7 @@ fn decode_rsa4096_priv_pem() {
 #[test]
 #[cfg(feature = "encoding")]
 fn decode_rsa2048_pub_pem() {
-    let key = RsaPublicKey::from_pkcs1_pem(RSA_2048_PUB_PEM).unwrap();
+    let key = PublicKey::from_pkcs1_pem(RSA_2048_PUB_PEM).unwrap();
 
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa2048-pub.pem
@@ -444,7 +444,7 @@ fn decode_rsa2048_pub_pem() {
 #[test]
 #[cfg(feature = "encoding")]
 fn decode_rsa4096_pub_pem() {
-    let key = RsaPublicKey::from_pkcs1_pem(RSA_4096_PUB_PEM).unwrap();
+    let key = PublicKey::from_pkcs1_pem(RSA_4096_PUB_PEM).unwrap();
 
     // Extracted using:
     // $ openssl asn1parse -in tests/examples/pkcs1/rsa4096-pub.pem
@@ -476,7 +476,7 @@ fn decode_rsa4096_pub_pem() {
 #[test]
 #[cfg(feature = "encoding")]
 fn encode_rsa2048_priv_pem() {
-    let key = RsaPrivateKey::from_pkcs1_pem(RSA_2048_PRIV_PEM).unwrap();
+    let key = PrivateKey::from_pkcs1_pem(RSA_2048_PRIV_PEM).unwrap();
     let pem = key.to_pkcs1_pem(LineEnding::LF).unwrap();
     assert_eq!(&*pem, RSA_2048_PRIV_PEM)
 }
@@ -484,7 +484,7 @@ fn encode_rsa2048_priv_pem() {
 #[test]
 #[cfg(feature = "encoding")]
 fn encode_rsa4096_priv_pem() {
-    let key = RsaPrivateKey::from_pkcs1_pem(RSA_4096_PRIV_PEM).unwrap();
+    let key = PrivateKey::from_pkcs1_pem(RSA_4096_PRIV_PEM).unwrap();
     let pem = key.to_pkcs1_pem(LineEnding::LF).unwrap();
     assert_eq!(&*pem, RSA_4096_PRIV_PEM)
 }
@@ -492,7 +492,7 @@ fn encode_rsa4096_priv_pem() {
 #[test]
 #[cfg(feature = "encoding")]
 fn encode_rsa2048_pub_pem() {
-    let key = RsaPublicKey::from_pkcs1_pem(RSA_2048_PUB_PEM).unwrap();
+    let key = PublicKey::from_pkcs1_pem(RSA_2048_PUB_PEM).unwrap();
     let pem = key.to_pkcs1_pem(LineEnding::LF).unwrap();
     assert_eq!(&*pem, RSA_2048_PUB_PEM)
 }
@@ -500,7 +500,7 @@ fn encode_rsa2048_pub_pem() {
 #[test]
 #[cfg(feature = "encoding")]
 fn encode_rsa4096_pub_pem() {
-    let key = RsaPublicKey::from_pkcs1_pem(RSA_4096_PUB_PEM).unwrap();
+    let key = PublicKey::from_pkcs1_pem(RSA_4096_PUB_PEM).unwrap();
     let pem = key.to_pkcs1_pem(LineEnding::LF).unwrap();
     assert_eq!(&*pem, RSA_4096_PUB_PEM)
 }

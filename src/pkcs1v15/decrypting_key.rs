@@ -2,7 +2,7 @@ use super::{EncryptingKey, decrypt};
 #[cfg(not(feature = "getrandom"))]
 use crate::dummy_rng::DummyRng;
 use crate::{
-    Result, RsaPrivateKey,
+    PrivateKey, Result,
     traits::{Decryptor, EncryptingKeypair, RandomizedDecryptor},
 };
 use alloc::vec::Vec;
@@ -25,13 +25,13 @@ use zeroize::ZeroizeOnDrop;
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DecryptingKey {
-    inner: RsaPrivateKey,
+    inner: PrivateKey,
 }
 
 impl DecryptingKey {
     /// Create a new decryption key from an RSA private key.
     #[must_use]
-    pub fn new(key: RsaPrivateKey) -> Self {
+    pub fn new(key: PrivateKey) -> Self {
         Self { inner: key }
     }
 }
@@ -86,7 +86,7 @@ mod tests {
 
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
         let decrypting_key = DecryptingKey::new(
-            RsaPrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key"),
+            PrivateKey::new_unchecked(&mut rng, 64).expect("failed to generate key"),
         );
 
         let tokens = [

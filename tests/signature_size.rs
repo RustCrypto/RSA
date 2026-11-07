@@ -79,7 +79,7 @@ fn sign_with_large_key() {
     use crypto_bigint::{BoxedUint, ConcatenatingMul, NonZero, Resize};
     use rand::{SeedableRng, rngs::ChaCha8Rng};
     use rsa::{
-        RsaPrivateKey, RsaPublicKey, pkcs1v15, pss,
+        PrivateKey, PublicKey, pkcs1v15, pss,
         signature::{Keypair, RandomizedSigner, SignatureEncoding, Verifier},
         traits::PublicKeyParts,
     };
@@ -98,9 +98,9 @@ fn sign_with_large_key() {
         .resize_unchecked(phi.bits_precision())
         .invert_mod(&phi)
         .unwrap();
-    let key = RsaPrivateKey::from_components_with_wide_primes(n, e, d, vec![p, q])
-        .expect("valid test key");
-    assert!(key.size() > RsaPublicKey::MAX_SIZE.div_ceil(8));
+    let key =
+        PrivateKey::from_components_with_wide_primes(n, e, d, vec![p, q]).expect("valid test key");
+    assert!(key.size() > PublicKey::MAX_SIZE.div_ceil(8));
 
     let mut rng = ChaCha8Rng::from_seed([42; 32]);
     let message = b"signatures larger than the default decoding limit";

@@ -8,7 +8,7 @@ use crypto_bigint::{
     modular::{BoxedMontyForm, BoxedMontyParams, FixedMontyParams, MontyParams},
 };
 use rsa::{
-    CrtValue, RsaPublicKey,
+    CrtValue, PublicKey,
     hazmat::rsa_decrypt,
     traits::{PrivateKeyParts, PublicKeyParts},
 };
@@ -21,8 +21,7 @@ pub fn rsa_decrypt_unblinded_non_crt_128() {
 
     // Public modulus (2^64 - 59) * (2^64 - 83), with fixed 128-bit precision.
     let n = BoxedUint::from_be_hex("FFFFFFFFFFFFFF720000000000001321", 128).unwrap();
-    let public =
-        RsaPublicKey::new_with_size_limits(n, BoxedUint::from(65537u64), 128..=128).unwrap();
+    let public = PublicKey::new_with_size_limits(n, BoxedUint::from(65537u64), 128..=128).unwrap();
 
     let mut bytes = [0u8; 16];
     PrivateRng.fill_bytes(&mut bytes);
@@ -47,7 +46,7 @@ pub fn rsa_decrypt_unblinded_non_crt_128() {
 // This fixture checks the private operation's arithmetic, not whether the supplied exponent forms a
 // valid RSA key.
 struct NonCrtKey {
-    public: RsaPublicKey,
+    public: PublicKey,
     d: Zeroizing<BoxedUint>,
 }
 
@@ -108,8 +107,7 @@ pub fn rsa_decrypt_unblinded_crt_128() {
     unsafe { crate::allocator::reset() };
 
     let n = BoxedUint::from_be_hex("FFFFFFFFFFFFFF720000000000001321", 128).unwrap();
-    let public =
-        RsaPublicKey::new_with_size_limits(n, BoxedUint::from(65537u64), 128..=128).unwrap();
+    let public = PublicKey::new_with_size_limits(n, BoxedUint::from(65537u64), 128..=128).unwrap();
     let p = secret_modulus_64();
     let q = secret_modulus_64();
     let primes = vec![p.modulus().clone(), q.modulus().clone()];
@@ -171,7 +169,7 @@ fn secret_modulus_64() -> BoxedMontyParams {
 }
 
 struct CrtKey {
-    public: RsaPublicKey,
+    public: PublicKey,
     d: BoxedUint,
     primes: alloc::vec::Vec<Odd<BoxedUint>>,
     p: BoxedMontyParams,

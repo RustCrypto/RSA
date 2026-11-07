@@ -5,7 +5,7 @@ use rand_core::{SeedableRng, TryCryptoRng, TryRng};
 #[cfg(feature = "pkcs1v15")]
 use rsa::pkcs1v15;
 use rsa::{
-    BoxedUint, Error, Generate, RsaPrivateKey, pss,
+    BoxedUint, Error, Generate, PrivateKey, pss,
     traits::{PrivateKeyParts, PublicKeyParts},
 };
 use sha2::Sha256;
@@ -15,8 +15,8 @@ fn rng() -> ChaCha8Rng {
     ChaCha8Rng::from_seed([42; 32])
 }
 
-fn check_key(key: &RsaPrivateKey) {
-    assert_eq!(RsaPrivateKey::DEFAULT_BITS, 3072);
+fn check_key(key: &PrivateKey) {
+    assert_eq!(PrivateKey::DEFAULT_BITS, 3072);
     assert_eq!(key.n().bits(), 3072);
     assert_eq!(key.e(), &BoxedUint::from(65537u64));
     assert_eq!(key.primes().len(), 2);
@@ -29,11 +29,11 @@ fn check_key(key: &RsaPrivateKey) {
 
 #[test]
 fn generate_private_key() {
-    let key = RsaPrivateKey::generate_from_rng(&mut rng());
+    let key = PrivateKey::generate_from_rng(&mut rng());
     check_key(&key);
     assert_eq!(
         key,
-        RsaPrivateKey::new(&mut rng(), RsaPrivateKey::DEFAULT_BITS).unwrap()
+        PrivateKey::new(&mut rng(), PrivateKey::DEFAULT_BITS).unwrap()
     );
 }
 
@@ -117,7 +117,7 @@ fn generate_preserves_rng_errors() {
     // Fail before sampling, between primes, and after rejecting equal primes. The last case
     // ensures `Generate` retries an invalid candidate instead of returning it or panicking.
     for budget in [0, 192, 384] {
-        check_rng_error::<RsaPrivateKey>(budget);
+        check_rng_error::<PrivateKey>(budget);
     }
     #[cfg(feature = "pkcs1v15")]
     check_rng_error::<pkcs1v15::SigningKey<Sha256>>(0);
@@ -125,7 +125,7 @@ fn generate_preserves_rng_errors() {
 
     // Existing constructors continue mapping RNG failures to `rsa::Error::Rng`.
     assert_eq!(
-        RsaPrivateKey::new(&mut RepeatingRng { budget: 0, used: 0 }, 3072),
+        PrivateKey::new(&mut RepeatingRng { budget: 0, used: 0 }, 3072),
         Err(Error::Rng)
     );
 }
@@ -133,5 +133,5 @@ fn generate_preserves_rng_errors() {
 #[test]
 #[cfg(feature = "getrandom")]
 fn generate_with_system_rng() {
-    check_key(&RsaPrivateKey::try_generate().unwrap());
+    check_key(&PrivateKey::try_generate().unwrap());
 }
