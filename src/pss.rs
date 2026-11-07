@@ -29,6 +29,111 @@ use crate::traits::PublicKeyParts;
 use crate::traits::SignatureScheme;
 use crate::{PrivateKey, PublicKey};
 
+#[cfg(feature = "getrandom")]
+use crypto_common::getrandom::SysRng;
+
+impl PublicKey {
+    /// Verify a PSS signature after hashing `msg` with `D`.
+    ///
+    /// Requires a salt of `D`'s output size. For other salt lengths or automatic
+    /// salt-length detection, use [`VerifyingKey`].
+    ///
+    /// # Errors
+    /// Returns an error if the signature is invalid, including an incorrect salt length.
+    pub fn pss_verify<D>(&self, msg: &[u8], sig: &[u8]) -> Result<()>
+    where
+        D: Digest + FixedOutputReset,
+    {
+        self.pss_verify_prehash::<D>(&D::digest(msg), sig)
+    }
+
+    /// Verify a PSS signature over a message hash computed using `D`.
+    ///
+    /// The hash is verified directly, without hashing it again. Requires a salt of
+    /// `D`'s output size. For other salt lengths or automatic salt-length detection,
+    /// use [`VerifyingKey`].
+    ///
+    /// # Errors
+    /// Returns an error if the hash has the wrong length or the signature is invalid,
+    /// including an incorrect salt length.
+    pub fn pss_verify_prehash<D>(&self, hash: &[u8], sig: &[u8]) -> Result<()>
+    where
+        D: Digest + FixedOutputReset,
+    {
+        verify_digest::<D>(self, hash, sig, Some(<D as Digest>::output_size()))
+    }
+}
+
+impl PrivateKey {
+    /// Sign `msg` using PSS after hashing it with `D`.
+    ///
+    /// Uses the operating system RNG for the salt and blinding. The salt length is
+    /// `D`'s output size. For other salt lengths, use [`SigningKey`].
+    ///
+    /// # Errors
+    /// Returns an error if the key is too small for `D` or the private operation fails,
+    /// including RNG failures.
+    #[cfg(feature = "getrandom")]
+    pub fn pss_sign<D>(&self, msg: &[u8]) -> Result<Vec<u8>>
+    where
+        D: Digest + FixedOutputReset,
+    {
+        self.pss_sign_with_rng::<D, _>(&mut SysRng, msg)
+    }
+
+    /// Sign a message hash computed using `D` with PSS, without hashing it again.
+    ///
+    /// Uses the operating system RNG for the salt and blinding. The salt length is
+    /// `D`'s output size. For other salt lengths, use [`SigningKey`].
+    ///
+    /// # Errors
+    /// Returns [`Error::InputNotHashed`] if `hash` has the wrong length, or an error
+    /// if the key is too small for `D` or the private operation fails, including RNG failures.
+    #[cfg(feature = "getrandom")]
+    pub fn pss_sign_prehash<D>(&self, hash: &[u8]) -> Result<Vec<u8>>
+    where
+        D: Digest + FixedOutputReset,
+    {
+        self.pss_sign_prehash_with_rng::<D, _>(&mut SysRng, hash)
+    }
+
+    /// Sign `msg` using PSS after hashing it with `D`.
+    ///
+    /// Uses the provided RNG for the salt and blinding. The salt length is `D`'s
+    /// output size. For other salt lengths, use [`SigningKey`].
+    ///
+    /// # Errors
+    /// Returns an error if the key is too small for `D` or the private operation fails,
+    /// including RNG failures.
+    pub fn pss_sign_with_rng<D, R>(&self, rng: &mut R, msg: &[u8]) -> Result<Vec<u8>>
+    where
+        D: Digest + FixedOutputReset,
+        R: TryCryptoRng + ?Sized,
+    {
+        self.pss_sign_prehash_with_rng::<D, _>(rng, &D::digest(msg))
+    }
+
+    /// Sign a message hash computed using `D` with PSS, without hashing it again.
+    ///
+    /// Uses the provided RNG for the salt and blinding. The salt length is `D`'s
+    /// output size. For other salt lengths, use [`SigningKey`].
+    ///
+    /// # Errors
+    /// Returns [`Error::InputNotHashed`] if `hash` has the wrong length, or an error
+    /// if the key is too small for `D` or the private operation fails, including RNG failures.
+    pub fn pss_sign_prehash_with_rng<D, R>(&self, rng: &mut R, hash: &[u8]) -> Result<Vec<u8>>
+    where
+        D: Digest + FixedOutputReset,
+        R: TryCryptoRng + ?Sized,
+    {
+        if hash.len() != <D as Digest>::output_size() {
+            return Err(Error::InputNotHashed);
+        }
+
+        sign_digest::<_, D>(rng, true, self, hash, <D as Digest>::output_size())
+    }
+}
+
 /// DEPRECATED: type alias for legacy blinded signing key. Blinding is now applied automatically
 /// when available.
 #[deprecated(
