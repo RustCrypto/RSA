@@ -406,6 +406,7 @@ mod tests {
     use crate::traits::{Decryptor, RandomizedDecryptor, RandomizedEncryptor};
     use crate::{PrivateKey, PublicKey};
 
+    use alloc::boxed::Box;
     use crypto_bigint::BoxedUint;
     use digest::{Digest, FixedOutputReset};
     use rand::rngs::ChaCha8Rng;
