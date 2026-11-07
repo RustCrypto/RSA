@@ -4,6 +4,85 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.10.0 (2026-11-7)
+### Added
+- Implement crypto_common::Generate for RsaPrivateKey ([#780])
+- Add signature max size restrictions ([#767])
+- Impl `TryFrom<BitStringRef<_>>` for Signature types ([#764])
+- Minimum modulus size checks ([#760])
+- Add `RsaPrivateKey::from_components_with_large_exponent ([#648])
+- Support for cryptographic operations with larger keys ([#595])
+- Add `RsaPrivateKey::as_public_key()` convenience method ([#592])
+- error: impl core::error::Error ([#530])
+- Implement MultipartSign/Verify ([#525])
+
+### Fixed
+- Fix constant time implementation problems ([#711])
+- Fix PKCS1v1.5 constant-time issues ([#626])
+- Propagate precompute errors from private key constructors ([#782])
+- pss: prevent verification panics on invalid lengths ([#769])
+- Reduce CRT inputs with fixed-width Montgomery arithmetic ([#756])
+- Choose private prime and CRT exponent widths from public parameters ([#755])
+- PSS: Improve interoperability with optional auto salt length detection during verification ([#546])
+
+### Changed
+- Deprecate `Rsa` prefix from `PublicKey` and `PrivateKey` ([#781])
+- Gate PKCS1 v1.5 as opt-in via `feature=pkcs1v15` ([#778])
+- Replace `CryptoRng` with `TryCryptoRng` ([#779])
+- Reject repeated prime factors in private keys ([#772], [#774])
+- Blind signing paths by default; deprecate pss::BlindedSigningKey ([#758])
+- Reject private exponents greater or equal to n ([#738])
+- Implement RFC8017 rules for PSS message width ([#725])
+- Raise max modulus size to 8192-bits ([#681])
+- pss+oaep: remove `DynDigest` ([#593])
+- Gate PKCS#1/PKCS#8 support on encoding feature ([#537])
+- Remove PKCS#8 blanket impls for PKCS#1 traits ([#538])
+- Remove deprecated pkcs1v15 methods ([#524])
+- Bump `rand_core` dependency to v0.10
+- Bump `pkcs1` dependency to v0.8 ([#766])
+- Bump `signature` dependency to v3 ([#693])
+- Bump `pkcs8` depenency to v0.11 ([#688])
+- Bump `spki` crate dependency to v0.8 ([#684])
+
+[#524]: https://github.com/RustCrypto/RSA/pull/524
+[#525]: https://github.com/RustCrypto/RSA/pull/525
+[#530]: https://github.com/RustCrypto/RSA/pull/530
+[#538]: https://github.com/RustCrypto/RSA/pull/538
+[#537]: https://github.com/RustCrypto/RSA/pull/537
+[#546]: https://github.com/RustCrypto/RSA/pull/546
+[#593]: https://github.com/RustCrypto/RSA/pull/593
+[#592]: https://github.com/RustCrypto/RSA/pull/592
+[#648]: https://github.com/RustCrypto/RSA/pull/648
+[#595]: https://github.com/RustCrypto/RSA/pull/595
+[#681]: https://github.com/RustCrypto/RSA/pull/681
+[#684]: https://github.com/RustCrypto/RSA/pull/684
+[#688]: https://github.com/RustCrypto/RSA/pull/688
+[#693]: https://github.com/RustCrypto/RSA/pull/693 
+[#716]: https://github.com/RustCrypto/RSA/pull/716
+[#725]: https://github.com/RustCrypto/RSA/pull/725
+[#738]: https://github.com/RustCrypto/RSA/pull/738
+[#626]: https://github.com/RustCrypto/RSA/issues/626
+[#711]: https://github.com/RustCrypto/RSA/issues/711
+[#752]: https://github.com/RustCrypto/RSA/pull/752
+[#755]: https://github.com/RustCrypto/RSA/pull/755
+[#756]: https://github.com/RustCrypto/RSA/pull/756
+[#758]: https://github.com/RustCrypto/RSA/pull/758
+[#760]: https://github.com/RustCrypto/RSA/pull/760
+[#766]: https://github.com/RustCrypto/RSA/pull/766
+[#764]: https://github.com/RustCrypto/RSA/pull/764
+[#767]: https://github.com/RustCrypto/RSA/pull/767
+[#769]: https://github.com/RustCrypto/RSA/pull/769
+[#770]: https://github.com/RustCrypto/RSA/pull/770
+[#771]: https://github.com/RustCrypto/RSA/pull/771
+[#772]: https://github.com/RustCrypto/RSA/pull/772
+[#773]: https://github.com/RustCrypto/RSA/pull/773
+[#774]: https://github.com/RustCrypto/RSA/pull/774
+[#778]: https://github.com/RustCrypto/RSA/pull/778
+[#779]: https://github.com/RustCrypto/RSA/pull/779
+[#780]: https://github.com/RustCrypto/RSA/pull/780
+[#781]: https://github.com/RustCrypto/RSA/pull/781
+[#782]: https://github.com/RustCrypto/RSA/pull/782
+
 ## 0.9.8 (2025-03-12)
 ### Added
 - Doc comments to specify the `rand` version ([#473])
