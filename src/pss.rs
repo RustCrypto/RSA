@@ -699,8 +699,7 @@ tAboUGBxTDq3ZroNism3DaMIbKPyYrAqhKov1h5V
     fn test_sign_and_verify_2049bit_key() {
         let plaintext = "Hello\n";
         let mut rng = ChaCha8Rng::from_seed([42; 32]);
-        for i in 0..10 {
-            println!("round {i}");
+        for _ in 0..10 {
             let priv_key = PrivateKey::new(&mut rng, 2049).unwrap();
 
             let digest = Sha1::digest(plaintext.as_bytes()).to_vec();

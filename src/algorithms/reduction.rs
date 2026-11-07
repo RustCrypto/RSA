@@ -38,6 +38,7 @@ pub(crate) fn to_monty(x: &BoxedUint, p: &BoxedMontyParams) -> BoxedMontyForm {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::vec::Vec;
     use crypto_bigint::Odd;
 
     #[test]
