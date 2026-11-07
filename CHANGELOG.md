@@ -42,7 +42,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump `rand_core` dependency to v0.10
 - Bump `pkcs1` dependency to v0.8 ([#766])
 - Bump `signature` dependency to v3 ([#693])
-- Bump `pkcs8` depenency to v0.11 ([#688])
+- Bump `pkcs8` dependency to v0.11 ([#688])
 - Bump `spki` crate dependency to v0.8 ([#684])
 
 [#638]: https://github.com/RustCrypto/RSA/pull/638
