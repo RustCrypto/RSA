@@ -6,14 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.10.0 (2026-11-7)
 ### Added
-- Implement crypto_common::Generate for RsaPrivateKey ([#780])
+- Add `PrivateKey/PublicKey` inherent methods for algorithms ([#638])
+- Implement `crypto_common::Generate` for `RsaPrivateKey` ([#780])
 - Add signature max size restrictions ([#767])
 - Impl `TryFrom<BitStringRef<_>>` for Signature types ([#764])
 - Minimum modulus size checks ([#760])
 - Add `RsaPrivateKey::from_components_with_large_exponent ([#648])
 - Support for cryptographic operations with larger keys ([#595])
 - Add `RsaPrivateKey::as_public_key()` convenience method ([#592])
-- error: impl core::error::Error ([#530])
+- error: impl `core::error::Error` ([#530])
 - Implement MultipartSign/Verify ([#525])
 
 ### Fixed
@@ -44,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bump `pkcs8` depenency to v0.11 ([#688])
 - Bump `spki` crate dependency to v0.8 ([#684])
 
+[#638]: https://github.com/RustCrypto/RSA/pull/638
 [#524]: https://github.com/RustCrypto/RSA/pull/524
 [#525]: https://github.com/RustCrypto/RSA/pull/525
 [#530]: https://github.com/RustCrypto/RSA/pull/530
