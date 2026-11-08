@@ -33,7 +33,7 @@ use crate::traits::keys::{PrivateKeyParts, PublicKeyParts};
 #[allow(clippy::missing_errors_doc, reason = "TODO")]
 pub fn rsa_encrypt<K: PublicKeyParts>(key: &K, m: &BoxedUint) -> Result<BoxedUint> {
     let e = key.e();
-    let res = pow_mod_params_vartime_exp_bits(m, e, e.bits(), key.n_params());
+    let res = pow_mod_params_vartime_exp_bits(m, e, e.bit_width(), key.n_params());
     Ok(res)
 }
 
@@ -229,7 +229,7 @@ fn blind<R: TryCryptoRng + ?Sized, K: PublicKeyParts>(
     let blinded = {
         // r^e (mod n)
         let e = key.e();
-        let mut rpowe = pow_mod_params_vartime_exp_bits(&r, e, e.bits(), n_params);
+        let mut rpowe = pow_mod_params_vartime_exp_bits(&r, e, e.bit_width(), n_params);
         // c * r^e (mod n)
         let c = c.mul_mod(&rpowe, n_params.modulus().as_nz_ref());
         rpowe.zeroize();

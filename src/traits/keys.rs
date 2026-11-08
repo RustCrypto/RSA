@@ -21,7 +21,7 @@ pub trait PublicKeyParts {
     /// Ciphertexts and signatures have this length, including any leading zero octets.
     /// This may be smaller than the modulus's allocated storage width.
     fn size(&self) -> usize {
-        (self.n().bits() as usize).div_ceil(8)
+        (self.n().bit_width() as usize).div_ceil(8)
     }
 
     /// Returns the parameters for montgomery operations.

@@ -111,7 +111,7 @@ impl PublicKey {
             return Err(Error::InvalidArguments);
         }
 
-        if (n.bits_vartime() as usize) < *size_range_bits.start() {
+        if (n.bit_width_vartime() as usize) < *size_range_bits.start() {
             return Err(Error::ModulusTooSmall);
         }
 
@@ -232,7 +232,7 @@ pub(crate) fn check_public(public_key: &impl PublicKeyParts) -> Result<()> {
 #[inline]
 fn check_public_with_max_size(n: &BoxedUint, e: &BoxedUint, max_size: Option<usize>) -> Result<()> {
     if let Some(max_size) = max_size {
-        if n.bits_vartime() as usize > max_size {
+        if n.bit_width_vartime() as usize > max_size {
             return Err(Error::ModulusTooLarge);
         }
     }

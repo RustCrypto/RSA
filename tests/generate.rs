@@ -17,7 +17,7 @@ fn rng() -> ChaCha8Rng {
 
 fn check_key(key: &PrivateKey) {
     assert_eq!(PrivateKey::DEFAULT_BITS, 3072);
-    assert_eq!(key.n().bits(), 3072);
+    assert_eq!(key.n().bit_width(), 3072);
     assert_eq!(key.e(), &BoxedUint::from(65537u64));
     assert_eq!(key.primes().len(), 2);
     assert_ne!(key.primes()[0], key.primes()[1]);

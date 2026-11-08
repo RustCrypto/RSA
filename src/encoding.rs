@@ -104,8 +104,8 @@ impl pkcs1::EncodeRsaPrivateKey for PrivateKey {
 
         let bits = self.d().bits_precision();
 
-        debug_assert!(bits >= self.primes[0].bits_vartime());
-        debug_assert!(bits >= self.primes[1].bits_vartime());
+        debug_assert!(bits >= self.primes[0].bit_width_vartime());
+        debug_assert!(bits >= self.primes[1].bit_width_vartime());
 
         let exponent1 = Zeroizing::new(
             (self.d()

@@ -241,7 +241,7 @@ impl PrivateKey {
 
         // The modulus may come in padded with zeros, shorten it
         // to ensure optimal performance of arithmetic operations.
-        let n_bits = n.bits_vartime();
+        let n_bits = n.bit_width_vartime();
         let n = n.resize_unchecked(n_bits);
 
         // Use a public storage width even when the caller supplies a short or zero-padded `d`.
@@ -290,7 +290,7 @@ impl PrivateKey {
         let primes = primes
             .into_iter()
             .map(|p| {
-                if p.bits() > prime_bits {
+                if p.bit_width() > prime_bits {
                     return Err(Error::InvalidPrime);
                 }
 
@@ -1059,7 +1059,8 @@ mod tests {
                 .unwrap();
                 assert_eq!(key.d(), &d);
                 let prime_precision =
-                    BoxedUint::zero_with_precision(key.n().bits().div_ceil(2)).bits_precision();
+                    BoxedUint::zero_with_precision(key.n().bit_width().div_ceil(2))
+                        .bits_precision();
                 for prime in key.primes() {
                     assert_eq!(prime.bits_precision(), prime_precision);
                 }
@@ -1115,7 +1116,7 @@ mod tests {
                         components.primes,
                     )
                     .unwrap();
-                    assert_eq!(PublicKeyParts::n(&private_key).bits(), $size);
+                    assert_eq!(PublicKeyParts::n(&private_key).bit_width(), $size);
 
                     test_key_basics(&private_key);
                 }

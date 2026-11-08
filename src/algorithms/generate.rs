@@ -87,12 +87,12 @@ pub(crate) fn generate_multi_prime_key_with_exp<R: TryCryptoRng + ?Sized>(
         for (i, prime) in primes.iter_mut().enumerate() {
             let bits = (todo / (nprimes - i)) as u32;
             *prime = generate_prime_with_rng(rng, bits).map_err(|_| Error::Rng)?;
-            todo -= prime.bits() as usize;
+            todo -= prime.bit_width() as usize;
         }
 
         let n = compute_modulus(&primes);
 
-        if n.bits() as usize != bit_size {
+        if n.bit_width() as usize != bit_size {
             // This should never happen for nprimes == 2 because
             // generate_prime_with_rng should set the top two bits in each prime.
             // For nprimes > 2 we hope it does not happen often.
@@ -180,7 +180,7 @@ mod tests {
                     let components =
                         generate_multi_prime_key_with_exp(&mut rng, $multi, $size, exp.clone())
                             .unwrap();
-                    assert_eq!(components.n.bits(), $size);
+                    assert_eq!(components.n.bit_width(), $size);
                     assert_eq!(components.primes.len(), $multi);
                 }
             }
