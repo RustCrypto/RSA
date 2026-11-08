@@ -263,7 +263,7 @@ where
     D: Digest + FixedOutputReset,
 {
     let mut em = decode_signature(pub_key, sig)?;
-    let em_bits = pub_key.n().bits() as usize - 1;
+    let em_bits = pub_key.n().bit_width() as usize - 1;
     emsa_pss_verify(hashed, &mut em, salt_len, digest, em_bits)
 }
 
@@ -277,7 +277,7 @@ where
     D: Digest + FixedOutputReset,
 {
     let mut em = decode_signature(pub_key, sig)?;
-    let em_bits = pub_key.n().bits() as usize - 1;
+    let em_bits = pub_key.n().bit_width() as usize - 1;
     emsa_pss_verify_digest::<D>(hashed, &mut em, salt_len, em_bits)
 }
 
@@ -299,9 +299,9 @@ fn decode_signature(pub_key: &PublicKey, signature: &[u8]) -> Result<Vec<u8>> {
     //
     // Check the public representative's width before calling infallible I2OSP; discarding a nonzero
     // leading octet is invalid.
-    let em_bits = pub_key.n().bits() as usize - 1;
+    let em_bits = pub_key.n().bit_width() as usize - 1;
     let em_len = em_bits.div_ceil(8);
-    if m.bits() as usize > 8 * em_len {
+    if m.bit_width() as usize > 8 * em_len {
         return Err(Error::Verification);
     }
     Ok(i2osp(m, em_len))
@@ -363,7 +363,7 @@ where
     T: TryCryptoRng + ?Sized,
     D: Digest + FixedOutputReset,
 {
-    let em_bits = priv_key.n().bits() - 1;
+    let em_bits = priv_key.n().bit_width() - 1;
 
     let em = emsa_pss_encode(hashed, em_bits as _, salt, digest)?;
 
@@ -382,7 +382,7 @@ where
     T: TryCryptoRng + ?Sized,
     D: Digest + FixedOutputReset,
 {
-    let em_bits = priv_key.n().bits() - 1;
+    let em_bits = priv_key.n().bit_width() - 1;
     let em = emsa_pss_encode_digest::<D>(hashed, em_bits as _, salt)?;
 
     let em = os2ip(&em, priv_key.n_bits_precision())?;
