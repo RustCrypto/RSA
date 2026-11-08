@@ -4,6 +4,176 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.10.0 (2026-11-08)
+### Security
+- Replace `num-bigint-dig` with `crypto-bigint` for constant-time modular exponentiation ([#394])
+- Redact private-key components from `Debug` output ([#480])
+- Harden private-key operations following `draft-irtf-cfrg-rsa-guidance` ([#710], [#715], [#739],
+  [#751], [#752], [#755], [#756], [#758], [#770], [#771], [#773])
+- Zeroize stored secret-prime Montgomery parameters in `PrecomputedValues` ([#716])
+- Implement PKCS#1 v1.5 implicit rejection: return deterministic synthetic plaintext on invalid
+  padding instead of exposing a padding error and with it a sidechannel ([#726], [#729], [#749])
+
+### Added
+- PKCS#8/SPKI decoding for PSS keys, including `id-RSASSA-PSS` algorithm identifiers ([#424])
+- `pss::VerifyingKey::salt_len` and opt-in automatic salt-length detection via
+  `new_with_auto_salt_len` ([#448], [#546])
+- Wycheproof test coverage for PKCS#1 v1.5, PSS, and OAEP ([#477], [#740])
+- `PublicKeyParts::n_bytes` and `e_bytes` serialization helpers ([#519])
+- Multipart signing trait implementations for PKCS#1 v1.5 and PSS ([#525])
+- `Clone` and `core::error::Error` implementations for `Error` ([#530], [#694])
+- `PrivateKey::as_public_key` accessor ([#592])
+- Algorithm-specific inherent methods on `PrivateKey` and `PublicKey` for OAEP encryption/decryption
+  and PKCS#1 v1.5/PSS signing/verification, including prehash and explicit-RNG variants ([#638])
+- `PrivateKey::from_components_with_large_exponent`, gated on `hazmat` ([#648])
+- Constant-time validation harness using `cargo checkct`/BINSEC ([#732], [#733], [#749], [#756],
+  [#771], [#773])
+- `PrivateKey::from_components_with_wide_primes` for unbalanced two-prime keys, which ordinary
+  constructors now reject ([#755])
+- `TryFrom<BitStringRef<'_>>` for PKCS#1 v1.5 and PSS signatures ([#764])
+- `crypto_common::Generate` implementation and `Generate` re-export for generating 3072-bit keys
+  with public exponent 65537 ([#780])
+
+### Changed
+- Replace `BigUint` in the public API with `BoxedUint`; return `NonZero<BoxedUint>` for the modulus
+  and `Odd<BoxedUint>` for prime factors ([#394], [#735])
+- Use `crypto-primes` for prime generation ([#394])
+- Use DER-based key encodings and hex-or-binary serde representations via `serdect`; extend serde
+  support to OAEP, PKCS#1 v1.5, and PSS wrapper types ([#420])
+- Accept arbitrary byte strings as OAEP labels ([#467])
+- Gate PKCS#1/PKCS#8/SPKI support on the default-enabled `encoding` feature; `std` no longer
+  implicitly enables encoding dependencies ([#537], [#543])
+- Enforce a 1024-bit minimum for key generation and default public-key construction/decoding; add
+  `PublicKey::new_with_size_limits` and `hazmat`-gated unchecked key generation ([#576], [#760])
+- Bump `pkcs1` to v0.8; `pkcs8` to v0.11; `spki` to v0.8; `serdect` to v0.4 ([#584], [#684], [#688],
+  [#766])
+- Make `Oaep` and `Pss` generic over their digest types instead of using `DynDigest` ([#593])
+- Bump `rand_core` to v0.10, `crypto-common` to v0.2, `digest` to v0.11, and `signature` to v3
+  ([#650], [#671], [#693])
+- Remove a redundant allocation during OAEP decryption ([#659])
+- Improve encryption and verification performance by bounding exponentiation to the public
+  exponent's bit length ([#662])
+- Bump `crypto-bigint` to v0.7.10 and `crypto-primes` to v0.7 ([#673], [#766])
+- Raise the default maximum public-key modulus size to 8192 bits ([#681])
+- Bump `sha1` and `sha2` to v0.11 ([#683])
+- Store PKCS#1 v1.5 and PSS signatures as byte strings, preserving their encoded width ([#722],
+  [#723])
+- MSRV 1.87; Rust 2024 edition ([#731], [#757])
+- Enable `getrandom` by default and use the system RNG for blinding in default decryption and
+  signing paths ([#739], [#758])
+- Limit signature decoding to 1024 bytes by default; add `Signature::from_bytes_with_max_len` for
+  explicit limits ([#767])
+- Require the opt-in `pkcs1v15` feature for PKCS#1 v1.5 encryption and signatures ([#778])
+- Accept fallible RNGs through `TryCryptoRng` and propagate RNG failures as errors ([#779])
+- Rename `RsaPrivateKey` and `RsaPublicKey` to `PrivateKey` and `PublicKey`, retaining the old names
+  as deprecated aliases ([#781])
+
+### Deprecated
+- `pss::BlindedSigningKey` in favor of `pss::SigningKey`, which now applies blinding by
+  default ([#758])
+- `PublicKey::new_with_max_size` in favor of `PublicKey::new_with_size_limits` ([#760])
+
+### Removed
+- `nightly` and `u64_digit` features associated with `num-bigint-dig` ([#394])
+- Deprecated `Pkcs1v15Sign::new_raw` and `pkcs1v15` `*_with_prefix` constructors ([#524])
+- Separate `pem` feature; PEM support is included with `encoding` ([#537])
+- Optional `sha2` feature; SHA-2 support is now always enabled ([#749])
+
+### Fixed
+- Honor explicit larger-key construction limits during cryptographic operations, including OAEP
+  decryption ([#441], [#595])
+- PKCS#1 v1.5 `SigningKey::from` and `VerifyingKey::from` now use the digest prefix consistently
+  with `new` ([#472], [#498])
+- Check the modulus's actual bit length instead of its storage precision when enforcing size limits
+  ([#529])
+- Retry zero blinding factors instead of replacing them with one ([#653])
+- Reject private-key factors less than or equal to one, even or repeated factors, and private 
+  exponents greater than or equal to the modulus ([#655], [#738], [#772], [#774])
+- Reject PSS salt lengths that cannot be represented by the `AlgorithmIdentifier` encoder instead of
+  truncating them ([#704])
+- Apply RFC 8017 encoded-message width rules for PSS, including moduli whose bit length is congruent
+  to 1 modulo 8 ([#725])
+- Return verification errors instead of panicking for undersized PSS encoded messages and
+  overflowing salt lengths ([#769])
+- Propagate CRT precomputation errors from private-key constructors ([#782])
+
+[#394]: https://github.com/RustCrypto/RSA/pull/394
+[#420]: https://github.com/RustCrypto/RSA/pull/420
+[#424]: https://github.com/RustCrypto/RSA/pull/424
+[#441]: https://github.com/RustCrypto/RSA/pull/441
+[#448]: https://github.com/RustCrypto/RSA/pull/448
+[#467]: https://github.com/RustCrypto/RSA/pull/467
+[#472]: https://github.com/RustCrypto/RSA/pull/472
+[#477]: https://github.com/RustCrypto/RSA/pull/477
+[#480]: https://github.com/RustCrypto/RSA/pull/480
+[#498]: https://github.com/RustCrypto/RSA/pull/498
+[#519]: https://github.com/RustCrypto/RSA/pull/519
+[#524]: https://github.com/RustCrypto/RSA/pull/524
+[#525]: https://github.com/RustCrypto/RSA/pull/525
+[#529]: https://github.com/RustCrypto/RSA/pull/529
+[#530]: https://github.com/RustCrypto/RSA/pull/530
+[#537]: https://github.com/RustCrypto/RSA/pull/537
+[#543]: https://github.com/RustCrypto/RSA/pull/543
+[#546]: https://github.com/RustCrypto/RSA/pull/546
+[#576]: https://github.com/RustCrypto/RSA/pull/576
+[#584]: https://github.com/RustCrypto/RSA/pull/584
+[#592]: https://github.com/RustCrypto/RSA/pull/592
+[#593]: https://github.com/RustCrypto/RSA/pull/593
+[#595]: https://github.com/RustCrypto/RSA/pull/595
+[#638]: https://github.com/RustCrypto/RSA/pull/638
+[#648]: https://github.com/RustCrypto/RSA/pull/648
+[#650]: https://github.com/RustCrypto/RSA/pull/650
+[#653]: https://github.com/RustCrypto/RSA/pull/653
+[#655]: https://github.com/RustCrypto/RSA/pull/655
+[#659]: https://github.com/RustCrypto/RSA/pull/659
+[#662]: https://github.com/RustCrypto/RSA/pull/662
+[#671]: https://github.com/RustCrypto/RSA/pull/671
+[#673]: https://github.com/RustCrypto/RSA/pull/673
+[#681]: https://github.com/RustCrypto/RSA/pull/681
+[#683]: https://github.com/RustCrypto/RSA/pull/683
+[#684]: https://github.com/RustCrypto/RSA/pull/684
+[#688]: https://github.com/RustCrypto/RSA/pull/688
+[#693]: https://github.com/RustCrypto/RSA/pull/693
+[#694]: https://github.com/RustCrypto/RSA/pull/694
+[#704]: https://github.com/RustCrypto/RSA/pull/704
+[#710]: https://github.com/RustCrypto/RSA/pull/710
+[#715]: https://github.com/RustCrypto/RSA/pull/715
+[#716]: https://github.com/RustCrypto/RSA/pull/716
+[#722]: https://github.com/RustCrypto/RSA/pull/722
+[#723]: https://github.com/RustCrypto/RSA/pull/723
+[#725]: https://github.com/RustCrypto/RSA/pull/725
+[#726]: https://github.com/RustCrypto/RSA/pull/726
+[#729]: https://github.com/RustCrypto/RSA/pull/729
+[#731]: https://github.com/RustCrypto/RSA/pull/731
+[#732]: https://github.com/RustCrypto/RSA/pull/732
+[#733]: https://github.com/RustCrypto/RSA/pull/733
+[#735]: https://github.com/RustCrypto/RSA/pull/735
+[#738]: https://github.com/RustCrypto/RSA/pull/738
+[#739]: https://github.com/RustCrypto/RSA/pull/739
+[#740]: https://github.com/RustCrypto/RSA/pull/740
+[#749]: https://github.com/RustCrypto/RSA/pull/749
+[#751]: https://github.com/RustCrypto/RSA/pull/751
+[#752]: https://github.com/RustCrypto/RSA/pull/752
+[#755]: https://github.com/RustCrypto/RSA/pull/755
+[#756]: https://github.com/RustCrypto/RSA/pull/756
+[#757]: https://github.com/RustCrypto/RSA/pull/757
+[#758]: https://github.com/RustCrypto/RSA/pull/758
+[#760]: https://github.com/RustCrypto/RSA/pull/760
+[#764]: https://github.com/RustCrypto/RSA/pull/764
+[#766]: https://github.com/RustCrypto/RSA/pull/766
+[#767]: https://github.com/RustCrypto/RSA/pull/767
+[#769]: https://github.com/RustCrypto/RSA/pull/769
+[#770]: https://github.com/RustCrypto/RSA/pull/770
+[#771]: https://github.com/RustCrypto/RSA/pull/771
+[#772]: https://github.com/RustCrypto/RSA/pull/772
+[#773]: https://github.com/RustCrypto/RSA/pull/773
+[#774]: https://github.com/RustCrypto/RSA/pull/774
+[#778]: https://github.com/RustCrypto/RSA/pull/778
+[#779]: https://github.com/RustCrypto/RSA/pull/779
+[#780]: https://github.com/RustCrypto/RSA/pull/780
+[#781]: https://github.com/RustCrypto/RSA/pull/781
+[#782]: https://github.com/RustCrypto/RSA/pull/782
+
 ## 0.9.8 (2025-03-12)
 ### Added
 - Doc comments to specify the `rand` version ([#473])
