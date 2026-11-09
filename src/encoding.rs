@@ -1,7 +1,4 @@
 //! PKCS#1 and PKCS#8 encoding support.
-//!
-//! Note: PKCS#1 support is achieved through a blanket impl of the
-//! `pkcs1` crate's traits for types which impl the `pkcs8` crate's traits.
 
 #![cfg(feature = "encoding")]
 
@@ -13,15 +10,41 @@ use core::convert::{TryFrom, TryInto};
 use crypto_bigint::{BoxedUint, NonZero, Resize};
 use pkcs8::{
     Document, EncodePrivateKey, EncodePublicKey, ObjectIdentifier, SecretDocument,
-    der::{Decode, asn1::AsUintRef, asn1::OctetStringRef},
+    der::{
+        Decode,
+        asn1::{self, AsUintRef},
+    },
 };
 use zeroize::Zeroizing;
 
 /// ObjectID for the RSA PSS keys
 pub const ID_RSASSA_PSS: ObjectIdentifier = ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.10");
 
+/// Maximum allowed modulus size in bits.
+#[allow(clippy::integer_division_remainder_used, reason = "constant")]
+const MAX_MODULUS_BITS: usize = PublicKey::MAX_SIZE / 8;
+
 // PKCS#1
 
+/// Get the number of bits required to store a given `UintRef`.
+fn bits_for_uint_ref(encoded_modulus: asn1::UintRef<'_>) -> pkcs1::Result<u32> {
+    u32::try_from(encoded_modulus.as_bytes().len())
+        .ok()
+        .and_then(|bytes| bytes.checked_mul(8))
+        .ok_or(pkcs1::Error::KeyMalformed)
+}
+
+/// Parse the modulus from an `asn1::UintRef`.
+fn encoded_modulus_to_uint(encoded_modulus: asn1::UintRef<'_>) -> pkcs1::Result<BoxedUint> {
+    if encoded_modulus.as_bytes().len() > MAX_MODULUS_BITS {
+        return Err(pkcs1::Error::KeyMalformed);
+    }
+
+    let bits = bits_for_uint_ref(encoded_modulus)?;
+    uint_from_slice(encoded_modulus.as_bytes(), bits)
+}
+
+/// Convert the given byte slice into a [`BoxedUint`].
 fn uint_from_slice(data: &[u8], bits: u32) -> pkcs1::Result<BoxedUint> {
     BoxedUint::from_be_slice(data, bits).map_err(|_| pkcs1::Error::KeyMalformed)
 }
@@ -49,14 +72,9 @@ impl<U: AsUintRef> TryFrom<pkcs1::RsaPrivateKey<U>> for PrivateKey {
             return Err(pkcs1::Error::Version);
         }
 
-        let bits = u32::try_from(pkcs1_key.modulus.as_uint_ref().as_bytes().len())
-            .map_err(|_| KeyMalformed)?
-            * 8;
-
-        let n = uint_from_slice(pkcs1_key.modulus.as_uint_ref().as_bytes(), bits)?;
-        let bits_e = u32::try_from(pkcs1_key.public_exponent.as_uint_ref().as_bytes().len())
-            .map_err(|_| KeyMalformed)?
-            * 8;
+        let n = encoded_modulus_to_uint(pkcs1_key.modulus.as_uint_ref())?;
+        let bits = n.bit_width();
+        let bits_e = bits_for_uint_ref(pkcs1_key.public_exponent.as_uint_ref())?;
         let e = uint_from_slice(pkcs1_key.public_exponent.as_uint_ref().as_bytes(), bits_e)?;
         let e = Option::from(e).ok_or(KeyMalformed)?;
 
@@ -75,14 +93,8 @@ impl<U: AsUintRef> TryFrom<pkcs1::RsaPublicKey<U>> for PublicKey {
     fn try_from(pkcs1_key: pkcs1::RsaPublicKey<U>) -> pkcs1::Result<Self> {
         use pkcs1::Error::KeyMalformed;
 
-        let bits = u32::try_from(pkcs1_key.modulus.as_uint_ref().as_bytes().len())
-            .map_err(|_| KeyMalformed)?
-            * 8;
-        let n = uint_from_slice(pkcs1_key.modulus.as_uint_ref().as_bytes(), bits)?;
-
-        let bits_e = u32::try_from(pkcs1_key.public_exponent.as_uint_ref().as_bytes().len())
-            .map_err(|_| KeyMalformed)?
-            * 8;
+        let n = encoded_modulus_to_uint(pkcs1_key.modulus.as_uint_ref())?;
+        let bits_e = bits_for_uint_ref(pkcs1_key.public_exponent.as_uint_ref())?;
         let e = uint_from_slice(pkcs1_key.public_exponent.as_uint_ref().as_bytes(), bits_e)?;
 
         PublicKey::new(n, e).map_err(|_| KeyMalformed)
@@ -126,14 +138,14 @@ impl pkcs1::EncodeRsaPrivateKey for PrivateKey {
         );
 
         Ok(SecretDocument::encode_msg(&pkcs1::RsaPrivateKey {
-            modulus: pkcs1::UintRef::new(&modulus)?,
-            public_exponent: pkcs1::UintRef::new(&public_exponent)?,
-            private_exponent: pkcs1::UintRef::new(&private_exponent)?,
-            prime1: pkcs1::UintRef::new(&prime1)?,
-            prime2: pkcs1::UintRef::new(&prime2)?,
-            exponent1: pkcs1::UintRef::new(&exponent1)?,
-            exponent2: pkcs1::UintRef::new(&exponent2)?,
-            coefficient: pkcs1::UintRef::new(&coefficient)?,
+            modulus: asn1::UintRef::new(&modulus)?,
+            public_exponent: asn1::UintRef::new(&public_exponent)?,
+            private_exponent: asn1::UintRef::new(&private_exponent)?,
+            prime1: asn1::UintRef::new(&prime1)?,
+            prime2: asn1::UintRef::new(&prime2)?,
+            exponent1: asn1::UintRef::new(&exponent1)?,
+            exponent2: asn1::UintRef::new(&exponent2)?,
+            coefficient: asn1::UintRef::new(&coefficient)?,
             other_prime_infos: None,
         })?)
     }
@@ -145,8 +157,8 @@ impl pkcs1::EncodeRsaPublicKey for PublicKey {
         let public_exponent = self.e().to_be_bytes();
 
         Ok(Document::encode_msg(&pkcs1::RsaPublicKeyRef {
-            modulus: pkcs1::UintRef::new(&modulus)?,
-            public_exponent: pkcs1::UintRef::new(&public_exponent)?,
+            modulus: asn1::UintRef::new(&modulus)?,
+            public_exponent: asn1::UintRef::new(&public_exponent)?,
         })?)
     }
 }
@@ -157,7 +169,7 @@ impl pkcs1::EncodeRsaPublicKey for PublicKey {
 pub(crate) fn verify_algorithm_id(algorithm: &spki::AlgorithmIdentifierRef) -> spki::Result<()> {
     match algorithm.oid {
         pkcs1::ALGORITHM_OID => {
-            if algorithm.parameters_any()? != pkcs8::der::asn1::Null.into() {
+            if algorithm.parameters_any()? != asn1::Null.into() {
                 return Err(spki::Error::KeyMalformed);
             }
         }
@@ -205,7 +217,7 @@ impl EncodePrivateKey for PrivateKey {
 
         pkcs8::PrivateKeyInfoRef::new(
             pkcs1::ALGORITHM_ID,
-            OctetStringRef::new(private_key.as_bytes())?,
+            asn1::OctetStringRef::new(private_key.as_bytes())?,
         )
         .try_into()
     }
@@ -218,10 +230,7 @@ impl EncodePublicKey for PublicKey {
 
         pkcs8::SubjectPublicKeyInfoRef {
             algorithm: pkcs1::ALGORITHM_ID,
-            subject_public_key: pkcs8::der::asn1::BitStringRef::new(
-                0,
-                subject_public_key.as_ref(),
-            )?,
+            subject_public_key: asn1::BitStringRef::new(0, subject_public_key.as_ref())?,
         }
         .try_into()
     }
