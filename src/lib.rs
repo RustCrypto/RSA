@@ -236,6 +236,17 @@
 //! # }
 //! ```
 //!
+//! With the `pkcs5` feature, you can also read password-encrypted PKCS#8 keys:
+//!
+#![cfg_attr(feature = "pkcs5", doc = "```")]
+#![cfg_attr(not(feature = "pkcs5"), doc = "```ignore")]
+//! use rsa::{PrivateKey, pkcs8::{self, DecodePrivateKey}};
+//!
+//! fn load_key(der: &[u8], password: &[u8]) -> pkcs8::Result<PrivateKey> {
+//!     PrivateKey::from_pkcs8_encrypted_der(der, password)
+//! }
+//! ```
+//!
 //! [RFC8017]: https://www.rfc-editor.org/rfc/rfc8017.html
 //!
 // TODO(tarcieri): figure out why rustdoc isn't rendering these links correctly

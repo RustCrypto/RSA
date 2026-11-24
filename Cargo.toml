@@ -70,7 +70,7 @@ hazmat = []
 pkcs1v15 = [] # PKCS #1 v1.5 is only supported as opt-in basis for legacy protocols
 getrandom = ["crypto-bigint/getrandom", "crypto-common/getrandom"]
 serde = ["encoding", "dep:serde", "dep:serdect", "crypto-bigint/serde"]
-pkcs5 = ["pkcs8/encryption"]
+pkcs5 = ["encoding", "pkcs8/encryption"]
 
 [lints.clippy]
 borrow_as_ptr = "warn"
